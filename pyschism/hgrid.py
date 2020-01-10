@@ -41,9 +41,6 @@ class Hgrid:
         kwargs.update({"crs": crs})
         return cls(**kwargs)
 
-    def generate_boundaries(self):
-        pass
-
     def transform_to(self, dst_crs):
         dst_crs = CRS.from_user_input(dst_crs)
         if self.srs != dst_crs.srs:
@@ -53,11 +50,14 @@ class Hgrid:
             self._crs = dst_crs
 
     def _figure(f):
-        def decorator(self, axes=None, show=False, figsize=None, **kwargs):
-            axes = fig.get_axes(axes, figsize)
+        def decorator(*argv, **kwargs):
+            axes = fig.get_axes(
+                kwargs.get('axes', None),
+                kwargs.get('figsize', None)
+                )
             kwargs.update({'axes': axes})
-            f(self, **kwargs)
-            if show:
+            axes = f(*argv, **kwargs)
+            if kwargs.get('show', False):
                 axes.axis('scaled')
                 plt.show()
             return axes
@@ -109,12 +109,8 @@ class Hgrid:
         axes=None,
         show=False,
         figsize=None,
-        # edgecolor='none',
-        # linewidth=0.07,
         **kwargs
     ):
-        # kwargs.update({'edgecolor': edgecolor})
-        # kwargs.update({'linewidth': linewidth})
         pc = PolyCollection(
             self.vertices[self.quads],
             **kwargs
@@ -152,9 +148,13 @@ class Hgrid:
             vmax = np.max(self.values)
         kwargs.update(**fig.get_topobathy_kwargs(self.values, vmin, vmax))
         col_val = kwargs.pop('col_val')
-        self.tricontourf(axes=axes, vmin=vmin, vmax=vmax, **kwargs)
+        if len(self.triangles) > 0:
+            self.tricontourf(axes=axes, vmin=vmin, vmax=vmax, **kwargs)
+            self.triplot(axes=axes)
         kwargs.pop('levels')
-        self.quadface(axes=axes, **kwargs)
+        if len(self.quads) > 0:
+            self.quadface(axes=axes, **kwargs)
+            self.quadplot(axes=axes)
         axes.axis('scaled')
         if extent is not None:
             axes.axis(extent)
@@ -179,13 +179,10 @@ class Hgrid:
             cbar.set_ticklabels([np.around(vmin, 2), np.around(vmax, 2)])
         if cbar_label is not None:
             cbar.set_label(cbar_label)
-        axes = self.plot_boundaries(axes=axes)
-        self.triplot(axes=axes)
-        self.quadplot(axes=axes)
-        if show is True:
-            plt.show()
+        self.plot_boundaries(axes=axes)
         return axes
 
+    @_figure
     def plot_ocean_boundary(
         self,
         id,
@@ -194,14 +191,10 @@ class Hgrid:
         figsize=None,
         **kwargs
     ):
-        axes = fig.get_axes(axes, figsize)
         kwargs.update({'axes': axes})
-        self._make_boundary_plot(self.ocean_boundaries[id], **kwargs)
-        if show:
-            axes.axis('scaled')
-            plt.show()
-        return axes
+        return self._make_boundary_plot(self.ocean_boundaries[id], **kwargs)
 
+    @_figure
     def plot_land_boundary(
         self,
         id,
@@ -210,14 +203,10 @@ class Hgrid:
         figsize=None,
         **kwargs
     ):
-        axes = fig.get_axes(axes, figsize)
         kwargs.update({'axes': axes})
-        self._make_boundary_plot(self.land_boundaries[id], **kwargs)
-        if show:
-            axes.axis('scaled')
-            plt.show()
-        return axes
+        return self._make_boundary_plot(self.land_boundaries[id], **kwargs)
 
+    @_figure
     def plot_interior_boundary(
         self,
         id,
@@ -226,14 +215,10 @@ class Hgrid:
         figsize=None,
         **kwargs
     ):
-        axes = fig.get_axes(axes, figsize)
         kwargs.update({'axes': axes})
-        self._make_boundary_plot(self.interior_boundaries[id], **kwargs)
-        if show:
-            axes.axis('scaled')
-            plt.show()
-        return axes
+        return self._make_boundary_plot(self.interior_boundaries[id], **kwargs)
 
+    @_figure
     def plot_boundaries(
         self,
         axes=None,
@@ -241,16 +226,13 @@ class Hgrid:
         figsize=None,
         **kwargs
     ):
-        kwargs.update({'axes': fig.get_axes(axes, figsize)})
-        axes = self.plot_ocean_boundaries(**kwargs)
         kwargs.update({'axes': axes})
-        self.plot_land_boundaries(**kwargs)
-        kwargs.update({'axes': axes})
-        self.plot_interior_boundaries(**kwargs)
-        if show:
-            plt.show()
-        return axes
+        kwargs.update({'axes': self.plot_ocean_boundaries(**kwargs)})
+        kwargs.update({'axes': self.plot_land_boundaries(**kwargs)})
+        kwargs.update({'axes': self.plot_interior_boundaries(**kwargs)})
+        return kwargs['axes']
 
+    @_figure
     def plot_ocean_boundaries(
         self,
         axes=None,
@@ -258,14 +240,13 @@ class Hgrid:
         figsize=None,
         **kwargs
     ):
-        kwargs.update({'axes': fig.get_axes(axes, figsize)})
+        kwargs.update({'axes': axes})
         for id in self.ocean_boundaries:
             axes = self.plot_ocean_boundary(id, **kwargs)
             kwargs.update({'axes': axes})
-        if show:
-            plt.show()
         return axes
 
+    @_figure
     def plot_land_boundaries(
         self,
         axes=None,
@@ -273,16 +254,13 @@ class Hgrid:
         figsize=None,
         **kwargs
     ):
-        axes = fig.get_axes(axes, figsize)
         kwargs.update({'axes': axes})
         for id in self.ocean_boundaries:
             axes = self.plot_land_boundary(id, **kwargs)
             kwargs.update({'axes': axes})
-        if show:
-            axes.axis('scaled')
-            plt.show()
         return axes
 
+    @_figure
     def plot_interior_boundaries(
         self,
         axes=None,
