@@ -15,7 +15,6 @@ setuptools.setup(
     url=meta['url'],
     packages=setuptools.find_packages(),
     python_requires='>=3.6',
-    setup_requires=['wheel', 'numpy'],
     install_requires=[
         'matplotlib',
         'netCDF4',
