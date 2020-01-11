@@ -25,6 +25,7 @@ setuptools.setup(
         'f90nml',
         'ordered_set',
         'psutil',
+        'paramiko'
     ],
     entry_points={
         'console_scripts': [

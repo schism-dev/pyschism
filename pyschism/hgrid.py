@@ -8,7 +8,7 @@ from matplotlib.cm import ScalarMappable
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from pyproj import CRS, Transformer
 import pyschism.figures as fig
-from pyschism.gr3 import parse_gr3
+from pyschism.gr3 import parse_gr3, write_gr3
 
 
 class Hgrid:
@@ -48,6 +48,19 @@ class Hgrid:
                 self.crs, dst_crs, always_xy=True)
             self._vertices = list(zip(*transformer.transform(self.x, self.y)))
             self._crs = dst_crs
+
+    def dump(self, path, overwrite=False):
+        grd = {
+            'description': self.description,
+            'vertices': self.vertices,
+            'values': self.values,
+            'triangles': self.triangles,
+            'quads': self.quads,
+            'ocean_boundaries': self.ocean_boundaries,
+            'land_boundaries': self.land_boundaries,
+            'interior_boundaries': self.interior_boundaries,
+        }
+        write_gr3(grd, path, overwrite)
 
     def _figure(f):
         def decorator(*argv, **kwargs):

@@ -1,13 +1,9 @@
 from pyschism.hgrid import Hgrid
 from pyschism.vgrid import Vgrid
-
-__all__ = [
-    "Hgrid",
-    "Vgrid"
-]
+from pyschism.fgrid import Fgrid
 
 
-class SchismMesh(Hgrid):
+class Mesh:
     """
     Class representing a SCHISM computational domain.
     This class combines the horizontal grid (hgrid), vertical grid (vgrid) and
@@ -37,12 +33,20 @@ class SchismMesh(Hgrid):
         return self._vgrid
 
     @property
+    def fgrid(self):
+        return self._fgrid
+
+    @property
     def _hgrid(self):
         return self.__hgrid
 
     @property
     def _vgrid(self):
         return self.__vgrid
+
+    @property
+    def _fgrid(self):
+        return self.__fgrid
 
     @_hgrid.setter
     def _hgrid(self, hgrid):
@@ -51,5 +55,14 @@ class SchismMesh(Hgrid):
 
     @_vgrid.setter
     def _vgrid(self, vgrid):
-        assert isinstance(vgrid, vgrid)
+        if vgrid is None:
+            vgrid = Vgrid()
+        assert isinstance(vgrid, Vgrid)
         self.__vgrid = vgrid
+
+    @_fgrid.setter
+    def _fgrid(self, fgrid):
+        if fgrid is None:
+            fgrid = Fgrid()
+        assert isinstance(fgrid, Fgrid)
+        self.__fgrid = fgrid
