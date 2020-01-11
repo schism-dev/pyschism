@@ -1,4 +1,4 @@
-# PySchism
+# PySCHISM
 
 ## A Python interface for SCHISM model runs.
 
