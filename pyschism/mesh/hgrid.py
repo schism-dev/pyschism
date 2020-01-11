@@ -117,9 +117,10 @@ class Hgrid:
         color='black',
         **kwargs
     ):
-        kwargs.update({'linewidth': linewidth})
-        kwargs.update({'color': color})
-        axes.triplot(self.triangulation, **kwargs)
+        if len(self.triangles) > 0:
+            kwargs.update({'linewidth': linewidth})
+            kwargs.update({'color': color})
+            axes.triplot(self.triangulation, **kwargs)
         return axes
 
     @_figure
@@ -133,13 +134,14 @@ class Hgrid:
         linewidth=0.07,
         **kwargs
     ):
-        pc = PolyCollection(
-            self.vertices[self.quads],
-            facecolor=facecolor,
-            edgecolor=edgecolor,
-            linewidth=0.07,
-            )
-        axes.add_collection(pc)
+        if len(self.quads) > 0:
+            pc = PolyCollection(
+                self.vertices[self.quads],
+                facecolor=facecolor,
+                edgecolor=edgecolor,
+                linewidth=0.07,
+                )
+            axes.add_collection(pc)
         return axes
 
     @_figure
@@ -160,13 +162,10 @@ class Hgrid:
         return axes
 
     @_figure
-    def wireframeplot(
-        axes=None,
-        show=False,
-        figsize=None,
-        **kwargs
-    ):
-        pass
+    def plot_wireframe(self, axes=None, **kwargs):
+        self.triplot(axes=axes, **kwargs)
+        self.quadplot(axes=axes, **kwargs)
+        return axes
 
     @_figure
     def make_plot(
@@ -189,11 +188,9 @@ class Hgrid:
         col_val = kwargs.pop('col_val')
         if len(self.triangles) > 0:
             self.tricontourf(axes=axes, vmin=vmin, vmax=vmax, **kwargs)
-            self.triplot(axes=axes)
         kwargs.pop('levels')
         if len(self.quads) > 0:
             self.quadface(axes=axes, **kwargs)
-            self.quadplot(axes=axes)
         axes.axis('scaled')
         if extent is not None:
             axes.axis(extent)
@@ -218,7 +215,6 @@ class Hgrid:
             cbar.set_ticklabels([np.around(vmin, 2), np.around(vmax, 2)])
         if cbar_label is not None:
             cbar.set_label(cbar_label)
-        self.plot_boundaries(axes=axes)
         return axes
 
     @_figure

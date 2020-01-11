@@ -28,6 +28,7 @@ setuptools.setup(
     ],
     entry_points={
         'console_scripts': [
+            'plot_mesh = pyschism.cmd.plot_mesh:main',
             'tidal_run = pyschism.cmd.tidal_run:main',
         ]
     }

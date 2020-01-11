@@ -34,6 +34,13 @@ class Mesh:
 
         return m
 
+    def make_plot(self, **kwargs):
+        if not self.vgrid:
+            self.hgrid.make_plot(**kwargs)
+        else:
+            msg = "Plotting not yet supported for 3D meshes."
+            raise NotImplementedError(msg)
+
     @property
     def hgrid(self):
         return self._hgrid
@@ -65,9 +72,8 @@ class Mesh:
 
     @_vgrid.setter
     def _vgrid(self, vgrid):
-        if vgrid is None:
-            vgrid = Vgrid()
-        assert isinstance(vgrid, Vgrid)
+        if vgrid is not None:
+            assert isinstance(vgrid, Vgrid)
         self.__vgrid = vgrid
 
     @_fgrid.setter
