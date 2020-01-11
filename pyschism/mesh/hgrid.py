@@ -1,5 +1,6 @@
 import numpy as np
 from functools import lru_cache
+from collections.abc import Iterable
 from matplotlib import rcParams
 import matplotlib.pyplot as plt
 from matplotlib.collections import PolyCollection
@@ -7,8 +8,9 @@ from matplotlib.tri import Triangulation
 from matplotlib.cm import ScalarMappable
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from pyproj import CRS, Transformer
-import pyschism.figures as fig
-from pyschism.gr3 import parse_gr3, write_gr3
+from pyschism.mesh.friction import ManningsN, DragCoefficient, RoughnessLength
+from pyschism.mesh.gr3 import parse_gr3, write_gr3
+import pyschism.mesh.figures as fig
 
 
 class Hgrid:
@@ -40,6 +42,30 @@ class Hgrid:
         kwargs = cls.parse(hgrid)
         kwargs.update({"crs": crs})
         return cls(**kwargs)
+
+    def set_friction(self, value, ftype='manning'):
+
+        # certify ftype
+        _ftypes = {
+            'manning': ManningsN,
+            'drag': DragCoefficient,
+            'rough': RoughnessLength
+        }
+        msg = f"ftype argument must be one of {_ftypes.keys()}"
+        assert ftype in _ftypes, msg
+
+        # certify value
+        msg = "value argument must be an instance of type "
+        msg += f"{int}, {float} or an iterable ."
+        assert isinstance(value, (Iterable, int, float)), msg
+
+        _ftypes = {}
+
+        if isinstance(value, (int, float)):
+            if ftype == 'manning':
+                self._fgrid = ManningsN.constant(self, value)
+
+        return self.fgrid
 
     def transform_to(self, dst_crs):
         dst_crs = CRS.from_user_input(dst_crs)
@@ -350,6 +376,10 @@ class Hgrid:
     def triangulation(self):
         return Triangulation(self.x, self.y, self.triangles)
 
+    @property
+    def fgrid(self):
+        return self._fgrid
+
     def _make_boundary_plot(
         self,
         boundary,
@@ -400,6 +430,10 @@ class Hgrid:
     def _description(self):
         return self.__description
 
+    @property
+    def _fgrid(self):
+        return self.__fgrid
+
     @description.setter
     def description(self, description):
         self._description = description
@@ -439,3 +473,7 @@ class Hgrid:
     @_description.setter
     def _description(self, description):
         self.__description = description
+
+    @_fgrid.setter
+    def _fgrid(self, fgrid):
+        self.__fgrid = fgrid

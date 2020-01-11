@@ -1,4 +1,4 @@
-from pyschism.server import ServerConfig
+from pyschism.cmd.server import ServerConfig
 
 
 class SlurmConfig(ServerConfig):

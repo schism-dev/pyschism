@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from pyschism.mesh import Mesh
 from pyschism.driver import SchismRun
 from pyschism.forcing import TidalForcing
-from pyschism.server import ServerConfig, SlurmConfig
+from pyschism.cmd.server import ServerConfig, SlurmConfig
 
 
 class SchismBaseCommand:

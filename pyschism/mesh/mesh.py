@@ -1,6 +1,6 @@
-from pyschism.hgrid import Hgrid
-from pyschism.vgrid import Vgrid
-from pyschism.fgrid import Fgrid
+from pyschism.mesh.hgrid import Hgrid
+from pyschism.mesh.vgrid import Vgrid
+from pyschism.mesh.friction.fgrid import Fgrid
 
 
 class Mesh:
@@ -14,15 +14,25 @@ class Mesh:
         self,
         hgrid,
         vgrid=None,
-        fgrid=None,
     ):
         self._hgrid = hgrid
         self._vgrid = vgrid
-        self._fgrid = fgrid
 
     @classmethod
     def open(cls, hgrid, vgrid=None, fgrid=None, crs=None):
-        return cls(Hgrid.open(hgrid))
+        if vgrid:
+            vgrid = Vgrid.open(vgrid)
+
+        m = cls(
+            Hgrid.open(hgrid, crs),
+            vgrid,
+            )
+
+        if fgrid:
+            fgrid = Fgrid.open(fgrid, crs)
+            m.set_friction(fgrid)
+
+        return m
 
     @property
     def hgrid(self):
@@ -63,6 +73,6 @@ class Mesh:
     @_fgrid.setter
     def _fgrid(self, fgrid):
         if fgrid is None:
-            fgrid = Fgrid()
+            fgrid = Fgrid.constant_manning(0.025)
         assert isinstance(fgrid, Fgrid)
         self.__fgrid = fgrid
