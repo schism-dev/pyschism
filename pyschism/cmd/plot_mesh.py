@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 import argparse
 import matplotlib.pyplot as plt
-from pyschism.argument_parser import add_boundary_options
-from pyschism import AdcircMesh
+from pyschism.mesh import Mesh
 
 
 class PlotMeshCommand:
@@ -14,7 +13,8 @@ class PlotMeshCommand:
         self._make_plot()
         self._make_triplot()
         self._make_boundary_plot()
-        plt.show()
+        self._save_fig()
+        self._show_fig()
         return 0
 
     def _make_plot(self):
@@ -27,12 +27,27 @@ class PlotMeshCommand:
                 )
 
     def _make_triplot(self):
-        if self.args.show_elements:
-            self.ax.triplot(self.mesh.triangulation, color='k', linewidth=0.07)
+        if self.args.plot_elements:
+            self.mesh.hgrid.plot_wireframe(axes=self.ax)
 
     def _make_boundary_plot(self):
         if self.args.plot_boundaries:
-            self.mesh.plot_ocean_boundaries(axes=self.ax)
+            self.mesh.hgrid.plot_boundaries(axes=self.ax)
+        else:
+            if self.args.plot_ocean_boundaries:
+                self.mesh.hgrid.plot_ocean_boundaries(axes=self.ax)
+            if self.args.plot_land_boundaries:
+                self.mesh.hgrid.plot_land_boundaries(axes=self.ax)
+            if self.args.plot_interior_boundaries:
+                self.mesh.hgrid.plot_interior_boundaries(axes=self.ax)
+
+    def _save_fig(self):
+        if self.args.save_path:
+            self.fig.savefig(self.args.save_path, bbox_inches='tight')
+
+    def _show_fig(self):
+        if not self.args.no_show:
+            plt.show()
 
     @property
     def args(self):
@@ -43,10 +58,7 @@ class PlotMeshCommand:
         try:
             return self.__mesh
         except AttributeError:
-            self.__mesh = AdcircMesh.open(self.args.mesh)
-            if self.args.generate_ocean_boundaries:
-                self.__mesh.generate_ocean_boundaries(
-                    self.args.generate_ocean_boundaries)
+            self.__mesh = Mesh.open(self.args.mesh)
             return self.__mesh
 
     @property
@@ -76,17 +88,20 @@ class PlotMeshCommand:
 
 def parse_args():
     parser = argparse.ArgumentParser(
-            description="Program to see a quick plot of an ADCIRC mesh.")
-    parser.add_argument("mesh", help="ADCIRC mesh file path.")
-    parser.add_argument("--show-elements", action="store_true",
-                        default=False)
-    parser.add_argument("--no-topobathy", action="store_true",
-                        default=False)
+            description="Program to see a quick plot of an SCHISM mesh.")
+    parser.add_argument('hgrid')
+    # parser.add_argument('--vgrid')
     parser.add_argument("--vmin", type=float)
     parser.add_argument("--vmax", type=float)
+    parser.add_argument("--no-topobathy", action="store_true",)
+    parser.add_argument("--plot-elements", action="store_true")
     parser.add_argument("--plot-boundaries", action="store_true")
-    # parser.add_argument("--levels", default=256, type=int)
-    add_boundary_options(parser)
+    parser.add_argument("--plot-ocean-boundaries", action="store_true")
+    parser.add_argument("--plot-land-boundaries", action="store_true")
+    parser.add_argument("--plot-interior-boundaries", action="store_true")
+    parser.add_argument("--save-path", "--save")
+    parser.add_argument("--overwrite", action="store_true")
+    parser.add_argument("--no-show", action='store_true')
     return parser.parse_args()
 
 
