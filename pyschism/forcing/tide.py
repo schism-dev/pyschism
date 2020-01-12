@@ -17,47 +17,44 @@ class TidalForcing:
         return self.get_tidal_constituent(constituent)
 
     def __iter__(self):
-        for constituent in self.__active_constituents:
+        for constituent in self.active_constituents:
             yield (constituent, self.get_tidal_constituent(constituent))
 
     def __len__(self):
-        return len(self.__active_constituents)
+        return len(self.active_constituents)
 
     def use_all(self):
-        for constituent in self.__constituents:
-            self.__active_constituents.append(constituent)
+        for constituent in self.constituents:
+            self._active_constituents.add(constituent)
 
     def use_major(self):
-        for constituent in self.__major_constituents:
+        for constituent in self.major_constituents:
             self.use_constituent(constituent)
 
     def use_constituent(self, constituent):
         msg = "Constituent must be one of "
         msg += f"{self.constituents}"
         assert constituent in self.constituents, msg
-        self.active_constituents.add(constituent)
+        self._active_constituents.add(constituent)
 
     def drop_constituent(self, constituent):
         msg = "constituent must be one of: "
-        msg += "{}".format(self.active_constituents)
+        msg += f"{self.active_constituents}"
         assert constituent in self.active_constituents, msg
-        self.active_constituents.pop(
-            self.active_constituents.index(constituent))
+        self.__active_constituents = OrderedSet(
+            [c for c in self.active_constituents if c != constituent]
+            )
 
     def get_active_constituents(self):
         return self.active_constituents
 
     def get_tidal_potential_amplitude(self, constituent):
-        try:
+        if constituent in self.tidal_potential_amplitudes:
             return self.tidal_potential_amplitudes[constituent]
-        except KeyError:
-            pass
 
     def get_earth_tidal_potential(self, constituent):
-        try:
+        if constituent in self.earth_tidal_potentials:
             return self.earth_tidal_potentials[constituent]
-        except KeyError:
-            pass
 
     def get_orbital_frequency(self, constituent):
         return self.orbital_frequencies[constituent]
@@ -67,7 +64,7 @@ class TidalForcing:
                 self.get_orbital_frequency(constituent),
                 self.get_earth_tidal_potential(constituent),
                 self.get_nodal_factor(constituent),
-                self.get_greenwich_term(constituent))
+                self.get_greenwich_factor(constituent))
 
     def get_nodal_factor(self, constituent):
         if constituent == "M2":
@@ -145,8 +142,8 @@ class TidalForcing:
         elif constituent == "MS4":
             return self.EQ78
         else:
-            raise RuntimeError('Unrecognized constituent '
-                               + '{}.'.format(constituent))
+            msg = f'Unrecognized constituent {constituent}'
+            raise RuntimeError(msg)
 
     def _normalize_to_360(f):
         def decorator(self, constituent):
@@ -154,7 +151,7 @@ class TidalForcing:
         return decorator
 
     @_normalize_to_360
-    def get_greenwich_term(self, constituent):
+    def get_greenwich_factor(self, constituent):
         if constituent == "M2":
             return 2.*(self.DT-self.DS+self.DH)+2.*(self.DXI-self.DNU)
         elif constituent == "S2":
@@ -239,8 +236,8 @@ class TidalForcing:
         elif constituent == "MS4":
             return 2.*(2.*self.DT-self.DS+self.DH)+2.*(self.DXI-self.DNU)
         else:
-            raise RuntimeError('Unrecognized constituent '
-                               + '{}.'.format(constituent))
+            msg = f'Unrecognized constituent {constituent}'
+            raise RuntimeError(msg)
 
     def get_lunar_node(self):
         return (259.1560564 - 19.328185764 * self.DYR - .0529539336 * self.DDAY
@@ -331,10 +328,6 @@ class TidalForcing:
                             * np.cos(2.*self.NU)+.0981)
 
     @property
-    def units(self):
-        return 'rad/sec'
-
-    @property
     def start_date(self):
         try:
             return self.__start_date
@@ -363,11 +356,7 @@ class TidalForcing:
 
     @property
     def active_constituents(self):
-        try:
-            return self.__active_constituents
-        except AttributeError:
-            self.__active_constituents = OrderedSet()
-            return self.__active_constituents
+        return tuple(self._active_constituents)
 
     @property
     def major_constituents(self):
@@ -502,24 +491,8 @@ class TidalForcing:
         return self.get_solar_mean_longitude()
 
     @property
-    def H(self):
-        return np.deg2rad(self.DH)
-
-    @property
-    def S(self):
-        return np.deg2rad(self.DS)
-
-    @property
     def DP1(self):
         return self.get_solar_perigee()  # HR
-
-    @property
-    def P1(self):
-        return np.deg2rad(self.DP1)
-
-    @property
-    def DI(self):
-        return np.rad2deg(self.I)
 
     @property
     def DNU(self):
@@ -532,10 +505,6 @@ class TidalForcing:
     @property
     def DXI(self):
         return np.rad2deg(self.XI)
-
-    @property
-    def T(self):
-        return np.deg2rad(self.DT)
 
     @property
     def NUP(self):
@@ -635,4 +604,15 @@ class TidalForcing:
 
     @spinup_time.deleter
     def spinup_time(self):
-        self.__spinup_time = timedelta(0.)
+        try:
+            del(self.__spinup_time)
+        except AttributeError:
+            pass
+
+    @property
+    def _active_constituents(self):
+        try:
+            return self.__active_constituents
+        except AttributeError:
+            self.__active_constituents = OrderedSet()
+            return self.__active_constituents
