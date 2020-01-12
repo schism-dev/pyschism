@@ -1,5 +1,5 @@
 """
-Namesapce definitions for pyschism.mesh module
+Namespace definitions for pyschism.mesh module
 """
 
 from pyschism.mesh.hgrid import Hgrid
