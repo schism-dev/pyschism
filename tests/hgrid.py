@@ -1,21 +1,38 @@
 #! /usr/bin/env python
+import numpy as np
 from pyschism.mesh import Hgrid
 import unittest
 
 
 class HgridTestCase(unittest.TestCase):
 
-    def test_triangles_only(self):
-        x = [0, 1, 0.5]
-        y = [0, 0, 0.5]
+    def test_triangule_only_mesh(self):
+        verts = [(0., 0.),
+                 (1., 0.),
+                 (0., 1.)]
+        values = np.random.rand(len(verts),)
         triangles = [[0, 1, 2]]
-        Hgrid(x, y, triangles)
+        Hgrid(verts, values, triangles=triangles)
 
-    def test_quads_only(self):
-        x = [0, 1, 1, 0]
-        y = [0, 0, 1, 1]
+    def test_quads_only_mesh(self):
+        verts = [(0., 0.),
+                 (1., 0.),
+                 (1., 1.),
+                 (0., 1.)]
+        values = np.random.rand(len(verts),)
         quads = [[0, 1, 2, 3]]
-        Hgrid(x, y, quads)
+        Hgrid(verts, values, quads=quads)
+
+    def test_hybrid_mesh(self):
+        verts = [(0., 0.),
+                 (1., 0.),
+                 (1., 1.),
+                 (0., 1.),
+                 (0.5, 1.5)]
+        values = np.random.rand(len(verts),)
+        triangles = [[2, 4, 3]]
+        quads = [[0, 1, 2, 3]]
+        Hgrid(verts, values, triangles, quads)
 
 
 if __name__ == '__main__':
