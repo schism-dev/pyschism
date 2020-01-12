@@ -12,11 +12,11 @@ git clone https://github.com/schism-dev/pyschism && cd pyschism
 ```
 Then, install the package using pip:
 
-```sh
+```bash
 pip install .
 ```
 if you are a developer, you  may install in developer mode instead:
-```sh
+```bash
 pip install -e .
 ```
 
