@@ -4,17 +4,17 @@
 
 ### Installation:
 
-It is highly recommended that you run this software using a Python virtual environment, and that you use Python >= 3.6. To install, clone this repository, navigate into it and install using pip:
+It is highly recommended that you run this software using a [Python virtual environment](https://gist.github.com/jreniel/c2dd4f2f68f9d8172355461b5337f236), and that you use Python==3.8.
+
+To install clone this repository, and navigate into it:
 ``` bash
-pip install .
+git clone https://github.com/schism-dev/pyschism && cd pyschism
 ```
-
-
 
 ### Usage examples:
 
 #### Using the CLI
-##### Example 1: Full domain Hgrid plot from the terminal.
+##### Example 1: Full domain hgrid plot from the terminal.
 ``` bash
 plot_mesh /path/to/hgrid.gr3 --plot-boundaries --plot-elements
 ```
