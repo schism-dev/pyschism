@@ -32,7 +32,7 @@ class HgridTestCase(unittest.TestCase):
         values = np.random.rand(len(verts),)
         triangles = [[2, 4, 3]]
         quads = [[0, 1, 2, 3]]
-        Hgrid(verts, values, triangles, quads)
+        Hgrid(verts, values, triangles=triangles, quads=quads)
 
 
 if __name__ == '__main__':
