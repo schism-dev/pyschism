@@ -18,7 +18,7 @@ It is highly recommended that you run this software using a Python virtual envir
 ``` bash
 plot_mesh /path/to/hgrid.gr3 --plot-boundaries --plot-elements
 ```
-![example_1_hgrid](https://raw.githubusercontent.com/schism-dev/pyschism/dev/examples/example_1/hgrid.png)
+![example_1_hgrid](https://raw.githubusercontent.com/schism-dev/pyschism/master/examples/example_1/hgrid.png)
 
 #### Library
 ##### Example 1: Full domain Hgrid plot:
