@@ -4,7 +4,7 @@
 
 ### Installation:
 
-It is highly recommended that you run this software using a [Python virtual environment](https://gist.github.com/jreniel/c2dd4f2f68f9d8172355461b5337f236), and that you use Python==3.8.
+It is highly recommended that you run this software using a [Python virtual environment](https://gist.github.com/jreniel/c2dd4f2f68f9d8172355461b5337f236), and that you use Python>=3.6 (preferrably, using the latest available Python is encouraged).
 
 To install clone this repository, and navigate into it:
 ``` bash
