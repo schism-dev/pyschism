@@ -4,13 +4,13 @@
 
 ### Installation:
 
-It is highly recommended that you run this software using a [Python virtual environment](https://gist.github.com/jreniel/c2dd4f2f68f9d8172355461b5337f236), and that you use Python>=3.6 (preferrably, using the latest available Python is encouraged).
+It is highly recommended that you run this software using a [Python virtual environment](https://gist.github.com/jreniel/c2dd4f2f68f9d8172355461b5337f236), and that you use Python>=3.6 (preferrably, using the latest available Python version is encouraged). You may use conda or venv to satisfy this dependency.
 
 To install clone this repository, and navigate into it:
 ``` bash
 git clone https://github.com/schism-dev/pyschism && cd pyschism
 ```
-Then, install the package using pip:
+Make sure to activate the target Python environment, then, install the package using pip:
 
 ```bash
 pip install .
