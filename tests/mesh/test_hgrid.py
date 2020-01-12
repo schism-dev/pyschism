@@ -1,5 +1,7 @@
 #! /usr/bin/env python
 import tempfile
+import pathlib
+import os
 import random
 from pyschism.mesh import Hgrid
 import unittest
@@ -76,6 +78,62 @@ class HgridTestCase(unittest.TestCase):
                 f.write(f"\n")
                 _cnt += 1
         h = Hgrid.open(tmpfile.name)
+        self.assertIsInstance(h, Hgrid)
+
+    def test_make_plot(self):
+        verts = [(0., 0.),
+                 (1., 0.),
+                 (1., 1.),
+                 (0., 1.),
+                 (0.5, 1.5)]
+        triangles = [[2, 4, 3]]
+        quads = [[0, 1, 2, 3]]
+        values = self.values(verts)
+        h = Hgrid(
+            verts,
+            values,
+            triangles=triangles,
+            quads=quads
+            )
+        h.make_plot()
+        self.assertIsInstance(h, Hgrid)
+
+    def test_make_plot_wet_only(self):
+        verts = [(0., 0.),
+                 (1., 0.),
+                 (1., 1.),
+                 (0., 1.),
+                 (0.5, 1.5)]
+        triangles = [[2, 4, 3]]
+        quads = [[0, 1, 2, 3]]
+        values = self.values(verts)
+        values = [-abs(value) for value in values]
+        h = Hgrid(
+            verts,
+            values,
+            triangles=triangles,
+            quads=quads
+            )
+        h.make_plot()
+        self.assertIsInstance(h, Hgrid)
+
+    def test_dump(self):
+        verts = [(0., 0.),
+                 (1., 0.),
+                 (1., 1.),
+                 (0., 1.),
+                 (0.5, 1.5)]
+        triangles = [[2, 4, 3]]
+        quads = [[0, 1, 2, 3]]
+        h = Hgrid(
+            verts,
+            self.values(verts),
+            triangles=triangles,
+            quads=quads
+            )
+        tmpdir = pathlib.Path(tempfile.gettempdir()).absolute()
+        h.dump(tmpdir / 'test_hgrid.gr3')
+        os.remove(tmpdir / 'test_hgrid.gr3')
         self.assertIsInstance(h, Hgrid)
 
 

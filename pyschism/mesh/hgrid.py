@@ -134,7 +134,7 @@ class Hgrid:
         linewidth=0.07,
         **kwargs
     ):
-        if len(self.quads) > 0:
+        if self.quads is not None:
             pc = PolyCollection(
                 self.vertices[self.quads],
                 facecolor=facecolor,
@@ -152,13 +152,14 @@ class Hgrid:
         figsize=None,
         **kwargs
     ):
-        pc = PolyCollection(
-            self.vertices[self.quads],
-            **kwargs
-            )
-        quad_values = np.mean(self.values[self.quads], axis=1)
-        pc.set_array(quad_values)
-        axes.add_collection(pc)
+        if self.quads is not None:
+            pc = PolyCollection(
+                self.vertices[self.quads],
+                **kwargs
+                )
+            quad_values = np.mean(self.values[self.quads], axis=1)
+            pc.set_array(quad_values)
+            axes.add_collection(pc)
         return axes
 
     @_figure
@@ -186,10 +187,10 @@ class Hgrid:
             vmax = np.max(self.values)
         kwargs.update(**fig.get_topobathy_kwargs(self.values, vmin, vmax))
         col_val = kwargs.pop('col_val')
-        if len(self.triangles) > 0:
+        if self.triangles is not None:
             self.tricontourf(axes=axes, vmin=vmin, vmax=vmax, **kwargs)
         kwargs.pop('levels')
-        if len(self.quads) > 0:
+        if self.quads is not None:
             self.quadface(axes=axes, **kwargs)
         axes.axis('scaled')
         if extent is not None:
@@ -452,22 +453,40 @@ class Hgrid:
 
     @_triangles.setter
     def _triangles(self, triangles):
+        if triangles is not None:
+            msg = "triangles argument must be a iterable."
+            assert isinstance(triangles, Iterable), msg
+            msg = "triangles argument must be an array of shape "
+            msg += f"({self.vertices.shape[0]}, 3)"
+            assert np.asarray(triangles).shape[1] == 3, msg
         self.__triangles = triangles
 
     @_quads.setter
     def _quads(self, quads):
+        if quads is not None:
+            msg = "quads argument must be a iterable."
+            assert isinstance(quads, Iterable), msg
+            msg = "quads argument must be an array of size "
+            msg += f"({self.vertices.shape[0]}, 4)"
+            assert np.asarray(quads).shape[1] == 4, msg
         self.__quads = quads
 
     @_ocean_boundaries.setter
     def _ocean_boundaries(self, ocean_boundaries):
+        if ocean_boundaries is None:
+            ocean_boundaries = {}
         self.__ocean_boundaries = ocean_boundaries
 
     @_land_boundaries.setter
     def _land_boundaries(self, land_boundaries):
+        if land_boundaries is None:
+            land_boundaries = {}
         self.__land_boundaries = land_boundaries
 
     @_interior_boundaries.setter
     def _interior_boundaries(self, interior_boundaries):
+        if interior_boundaries is None:
+            interior_boundaries = {}
         self.__interior_boundaries = interior_boundaries
 
     @_crs.setter
