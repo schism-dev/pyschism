@@ -10,6 +10,15 @@ To install clone this repository, and navigate into it:
 ``` bash
 git clone https://github.com/schism-dev/pyschism && cd pyschism
 ```
+Then, install the package using pip:
+
+```sh
+pip install .
+```
+if you are a developer, you  may install in developer mode instead:
+```sh
+pip install -e .
+```
 
 ### Usage examples:
 
