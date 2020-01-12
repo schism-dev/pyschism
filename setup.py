@@ -24,12 +24,14 @@ setuptools.setup(
         'f90nml',
         'ordered_set',
         'psutil',
-        'paramiko'
+        'paramiko',
     ],
     entry_points={
         'console_scripts': [
             'plot_mesh = pyschism.cmd.plot_mesh:main',
             'tidal_run = pyschism.cmd.tidal_run:main',
         ]
-    }
+    },
+    tests_require=['nose'],
+    test_suite='nose.collector',
 )
