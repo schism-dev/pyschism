@@ -436,10 +436,18 @@ class Hgrid:
 
     @_vertices.setter
     def _vertices(self, vertices):
+        msg = "vertices argument must be a iterable."
+        assert isinstance(vertices, Iterable), msg
+        msg = "vertices argument must be an array of size (?, 2)"
+        assert np.asarray(vertices).shape[1] == 2, msg
         self.__vertices = vertices
 
     @_values.setter
     def _values(self, values):
+        msg = "values argument must be a iterable."
+        assert isinstance(values, Iterable), msg
+        msg = "values argument must have same length as vertices."
+        assert len(values) == len(self.vertices), msg
         self.__values = values
 
     @_triangles.setter
