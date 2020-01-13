@@ -4,32 +4,19 @@ from collections import defaultdict
 
 
 def parse_gr3(path):
-    grd = defaultdict()
-    grd['vertices'] = list()
-    grd['values'] = list()
-    grd['triangles'] = list()
-    grd['quads'] = list()
-    grd['ocean_boundaries'] = defaultdict(list)
-    grd['land_boundaries'] = defaultdict(list)
-    grd['interior_boundaries'] = defaultdict(list)
+    grd = dict()
+    grd['nodes'] = defaultdict(list)
+    grd['elements'] = defaultdict(list)
+    grd['boundaries'] = defaultdict(dict)
     with open(pathlib.Path(path), 'r') as f:
         grd['description'] = f.readline().strip('\n')
         NE, NP = map(int, f.readline().split())
         for i in range(NP):
-            _, x, y, z = f.readline().split()
-            grd['vertices'].append((float(x), float(y)))
-            grd['values'].append(-float(z))
+            id, x, y, z = f.readline().split()
+            grd['nodes'][id] = (float(x), float(y), -float(z))
         for i in range(NE):
-            line = f.readline().split()
-            geom_t = int(line[1])
-            geom = [int(x)-1 for x in line[2:]]
-            if geom_t == 3:
-                grd['triangles'].append(geom)
-            elif geom_t == 4:
-                grd['quads'].append(geom)
-            else:
-                msg = 'ERROR: only supports triangular and quad meshes.'
-                raise NotImplementedError(msg)
+            geom = f.readline().split()
+            grd['elements'][geom[0]] = [x for x in geom[2:]]
         # Assume EOF if NOPE is empty.
         try:
             NOPE = int(f.readline().split()[0])
@@ -42,96 +29,88 @@ def parse_gr3(path):
         while _bnd_id < NOPE:
             NETA = int(f.readline().split()[0])
             _cnt = 0
+            grd['boundaries'][None][_bnd_id] = list()
             while _cnt < NETA:
-                grd['ocean_boundaries'][_bnd_id].append(
-                    int(f.readline().split()[0])-1)
+                grd['boundaries'][None][_bnd_id].append(
+                    f.readline().split()[0].strip())
                 _cnt += 1
             _bnd_id += 1
         NBOU = int(f.readline().split()[0])
         _nbnd_cnt = 0
-        _land_bnd_id = 0
-        _inte_bnd_id = 0
         f.readline()  # not used
         while _nbnd_cnt < NBOU:
             npts, ibtype = map(int, f.readline().split()[:2])
-            msg = f"ERROR: Found ibtype {ibtype} which is an unknown "
-            msg += "boundary type for SCHISM."
-            assert ibtype in [0, 1]
             _pnt_cnt = 0
+            if ibtype not in grd['boundaries']:
+                _bnd_id = 0
+            else:
+                _bnd_id = len(grd['boundaries'][ibtype]) + 1
+            grd['boundaries'][ibtype][_bnd_id] = list()
             while _pnt_cnt < npts:
                 line = f.readline().split()
-                if ibtype == 0:
-                    grd['land_boundaries'][_land_bnd_id].append(
-                        int(line[0])-1)
-                elif ibtype == 1:
-                    grd['interior_boundaries'][_inte_bnd_id].append(
-                        int(line[0])-1)
+                grd['boundaries'][ibtype][_bnd_id].append(line[0])
                 _pnt_cnt += 1
-            if ibtype == 0:
-                _land_bnd_id += 1
-            elif ibtype == 1:
-                _inte_bnd_id += 1
             _nbnd_cnt += 1
+    # typecast defaultdict to regular dict
+    for key, value in grd.items():
+        if key != 'description':
+            grd[key] = dict(value)
     return grd
 
 
 def get_gr3(grd):
     f = f"{grd['description']}\n"
-    f += f"{len(grd['triangles']) + len(grd['quads'])} "
-    f += f"{grd['values'].shape[0]}\n"
+    f += f"{len(grd['elements'])} "
+    f += f"{len(grd['nodes'])}\n"
     # TODO: Make faster using np.array2string
-    for i in range(grd['values'].shape[0]):
-        f += f"{i + 1} "
-        f += f"{grd['vertices'][i][0]:<.16E} "
-        f += f" {grd['vertices'][i][1]:<.16E} "
-        f += f"{-grd['values'][i]:<.16E}\n"
-    _cnt = 0
-    for geom_t in ['triangles', 'quads']:
-        for i in range(len(grd[geom_t])):
-            f += f"{_cnt + 1} "
-            f += f"{len(grd[geom_t][i]):d} "
-            for idx in grd[geom_t][i]:
-                f += f"{idx+1:d} "
-            f += "\n"
-            _cnt += 1
+    for id, (x, y, z) in grd['nodes'].items():
+        f += f"{id} "
+        f += f"{x:<.16E} "
+        f += f"{y:<.16E} "
+        f += f"{z:<.16E}\n"
+    for id, geom in grd['elements'].items():
+        f += f"{id} "
+        f += f"{len(geom):d} "
+        for idx in geom:
+            f += f"{idx} "
+        f += "\n"
     # ocean boundaries
-    f += f"{len(grd['ocean_boundaries'].keys()):d} "
+    f += f"{len(grd['boundaries'][None]):d} "
     f += "! total number of ocean boundaries\n"
     # count total number of ocean boundaries
     _sum = np.sum(
-        [len(boundary) for boundary in grd['ocean_boundaries'].values()]
+        [len(boundary) for boundary in grd['boundaries'][None].values()]
         )
     f += f"{int(_sum):d} ! total number of ocean boundary nodes\n"
     # write ocean boundary indexes
-    for i, boundary in grd['ocean_boundaries'].items():
+    for i, boundary in grd['boundaries'][None].items():
         f += f"{len(boundary):d}"
         f += f" ! number of nodes for ocean_boundary_{i}\n"
         for idx in boundary:
-            f += f"{idx+1:d}\n"
+            f += f"{idx}\n"
     # count remaining boundaries
-    _cnt = len(grd['land_boundaries'].keys())
-    _cnt += len(grd['interior_boundaries'].keys())
+    _cnt = 0
+    for key in grd['boundaries']:
+        if key is not None:
+            _cnt += len(grd['boundaries'][key])
     f += f"{_cnt:d}  ! total number of non-ocean boundaries\n"
-    _cnt = int(np.sum([len(x) for x in grd['land_boundaries'].values()]))
-    _cnt += int(
-        np.sum([len(x) for x in grd['interior_boundaries'].values()]))
+    # count remaining boundary nodes
+    _cnt = 0
+    for ibtype in grd['boundaries']:
+        if ibtype is not None:
+            for bnd in grd['boundaries'][ibtype].values():
+                _cnt += np.asarray(bnd).size
     f += f"{_cnt:d} ! Total number of non-ocean boundary nodes\n"
-    # write land boundaries
-    for i, boundary in grd['land_boundaries'].items():
-        f += f"{len(boundary):d} "
-        f += f"0 "
-        f += "! number of nodes for land_boundary_"
-        f += f"{i}\n"
-        for idx in boundary:
-            f += f"{idx+1:d}\n"
-    # write inner boundaries
-    for i, boundary in grd['interior_boundaries'].items():
-        f += f"{len(boundary):d} "
-        f += f"1 "
-        f += "! number of nodes for inner_boundary_"
-        f += f"{i + len(grd['land_boundaries'].keys())}\n"
-        for idx in boundary:
-            f += f"{idx+1:d}\n"
+    # all additional boundaries
+    for ibtype, boundaries in grd['boundaries'].items():
+        if ibtype is None:
+            continue
+        for id, boundary in boundaries.items():
+            f += f"{len(boundary):d} "
+            f += f"{ibtype} "
+            f += f"! boundary {ibtype}:{id}\n"
+            for idx in boundary:
+                f += f"{idx}\n"
     return f
 
 

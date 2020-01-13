@@ -43,11 +43,11 @@ class TidalForcingTestCase(unittest.TestCase):
         for f in self.tf.orbital_frequencies:
             self.tf.get_greenwich_factor(f)
 
-    def _test_get_nodal_factor_raise(self):
-        self.tf.get_nodal_factor('FALSE')
+    def test_get_nodal_factor_raise(self):
+        self.assertRaises(TypeError, self.tf.get_nodal_factor, '')
 
-    def _test_get_greenwich_factor_raise(self):
-        self.tf.get_greenwich_factor('FALSE')
+    def test_get_greenwich_factor_raise(self):
+        self.assertRaises(TypeError, self.tf.get_greenwich_factor, '')
 
     def test_reset_dates(self):
         new_date = self.tf.start_date

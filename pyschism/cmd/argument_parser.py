@@ -1,10 +1,10 @@
+import argparse
 import logging
 import sys
 import re
 
 
-def add_general_options(parser):
-
+def add_mesh_options(parser):
     # mesh
     parser.add_argument('hgrid')
 
@@ -15,6 +15,10 @@ def add_general_options(parser):
     msg += "corresponds to WGS84. For Cartesian meshes use 3395 which "
     msg += "corresponds to Mercator projection."
     parser.add_argument('--crs', default=4326)
+
+
+def add_general_options(parser):
+    add_mesh_options(parser)
 
     # output directory
     msg = "Directory to which SCHISM input files will be written to. "
@@ -105,8 +109,8 @@ def add_server_options(parser):
     parser.add_argument("--additional-mpi-options")
 
     # make nproc required when using ssh
-    r = re.compile('--hostname*')
-    if any(r.match(line) for line in sys.argv):
+    args = parser.parse_known_args()[0]
+    if args.hostname is not None:
         parser.add_argument("--nproc", "--ncpu", type=int, required=True)
     else:
         parser.add_argument("--nproc", "--ncpu", type=int, default=-1)
@@ -197,6 +201,7 @@ def add_stations_output_request(physical_var, parser):
 
 
 def add_best_track_options(parser):
+    add_mesh_options(parser)
     # storm_id
     msg = "National Hurricane Center (NHC) storm id. "
     msg += " Examples: AL132012 for Sandy2012 or AL152017 for Maria2017."
@@ -206,6 +211,7 @@ def add_best_track_options(parser):
 
 
 def add_tidal_run_options(parser):
+    add_mesh_options(parser)
     # start_date
     msg = "Start date is relative to hotstart, that is, this is the "
     msg += "true start date of the model (in UTC time). Use format "

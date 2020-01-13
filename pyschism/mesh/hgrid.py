@@ -1,10 +1,11 @@
 import numpy as np
 from functools import lru_cache
-from collections.abc import Iterable
+from collections import defaultdict
+from collections.abc import Iterable, Mapping
 from matplotlib import rcParams
 import matplotlib.pyplot as plt
-from matplotlib.collections import PolyCollection
 from matplotlib.tri import Triangulation
+from matplotlib.collections import PolyCollection
 from matplotlib.cm import ScalarMappable
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from pyproj import CRS, Transformer
@@ -17,23 +18,15 @@ class Hgrid:
 
     def __init__(
         self,
-        vertices,
-        values,
-        triangles=None,
-        quads=None,
-        ocean_boundaries=None,
-        land_boundaries=None,
-        interior_boundaries=None,
+        nodes,
+        elements,
+        boundaries=None,
         crs=None,
         description=None,
     ):
-        self._vertices = vertices
-        self._values = values
-        self._triangles = triangles
-        self._quads = quads
-        self._ocean_boundaries = ocean_boundaries
-        self._land_boundaries = land_boundaries
-        self._interior_boundaries = interior_boundaries
+        self._nodes = nodes
+        self._elements = elements
+        self._boundaries = boundaries
         self._crs = crs
         self._description = description
 
@@ -67,6 +60,17 @@ class Hgrid:
 
         return self.fgrid
 
+    def add_boundary_type(self, ibtype):
+        if ibtype not in self.boundaries:
+            self._boundaries[ibtype] = defaultdict()
+
+    def add_boundary_data(self, ibtype, id, indexes, **properties):
+        assert set(indexes).issubset(set(self.vertices.keys()))
+        self._boundary[ibtype] = {
+            'indexes': indexes,
+            **properties
+        }
+
     def transform_to(self, dst_crs):
         dst_crs = CRS.from_user_input(dst_crs)
         if self.srs != dst_crs.srs:
@@ -78,13 +82,9 @@ class Hgrid:
     def dump(self, path, overwrite=False):
         grd = {
             'description': self.description,
-            'vertices': self.vertices,
-            'values': self.values,
-            'triangles': self.triangles,
-            'quads': self.quads,
-            'ocean_boundaries': self.ocean_boundaries,
-            'land_boundaries': self.land_boundaries,
-            'interior_boundaries': self.interior_boundaries,
+            'nodes': self.nodes,
+            'elements': self.elements,
+            'boundaries': self.boundaries,
         }
         write_gr3(grd, path, overwrite)
 
@@ -317,9 +317,26 @@ class Hgrid:
         return parse_gr3(path)
 
     @property
+    def nodes(self):
+        return self._nodes
+
+    @property
+    def elements(self):
+        return self._elements
+
+    @property
     @lru_cache
     def vertices(self):
-        return np.array(self._vertices)
+        return np.array(
+            [(x, y) for x, y, _ in self.nodes.values()]
+            )
+
+    @property
+    @lru_cache
+    def values(self):
+        return np.array(
+            [z for _, _, z in self.nodes.values()]
+            )
 
     @property
     def xy(self):
@@ -335,30 +352,29 @@ class Hgrid:
 
     @property
     @lru_cache
-    def values(self):
-        return np.array(self._values)
-
-    @property
-    @lru_cache
     def triangles(self):
-        return np.array(self._triangles)
+        try:
+            return self.__triangles
+        except AttributeError:
+            self.__triangles = self._get_geom_by_length(3)
+            return self.__triangles
 
     @property
     @lru_cache
     def quads(self):
-        return np.array(self._quads)
+        try:
+            return self.__triangles
+        except AttributeError:
+            self.__triangles = self._get_geom_by_length(4)
+            return self.__triangles
 
     @property
-    def ocean_boundaries(self):
-        return dict(self._ocean_boundaries)
+    def boundaries(self):
+        return self._boundaries.copy()
 
     @property
-    def land_boundaries(self):
-        return dict(self._land_boundaries)
-
-    @property
-    def interior_boundaries(self):
-        return dict(self._interior_boundaries)
+    def triangulation(self):
+        return Triangulation(self.x, self.y, self.triangles)
 
     @property
     def crs(self):
@@ -369,9 +385,16 @@ class Hgrid:
         return self._description
 
     @property
-    @lru_cache
-    def triangulation(self):
-        return Triangulation(self.x, self.y, self.triangles)
+    def ocean_boundaries(self):
+        return self.boundaries[None]
+
+    @property
+    def land_boundaries(self):
+        return self.boundaries[0]
+
+    @property
+    def interior_boundaries(self):
+        return self.boundaries[1]
 
     @property
     def fgrid(self):
@@ -391,33 +414,25 @@ class Hgrid:
             plt.show()
         return axes
 
-    @property
-    def _vertices(self):
-        return self.__vertices
+    def _get_geom_by_length(self, lenght):
+        geom = list()
+        for _geom in self.elements.values():
+            _geom = list(map(int, _geom))
+            if len(_geom) == lenght:
+                geom.append([idx for idx in _geom])
+        return np.array(geom)
 
     @property
-    def _values(self):
-        return self.__values
+    def _nodes(self):
+        return self.__nodes
 
     @property
-    def _triangles(self):
-        return self.__triangles
+    def _elements(self):
+        return self.__elements
 
     @property
-    def _quads(self):
-        return self.__quads
-
-    @property
-    def _ocean_boundaries(self):
-        return self.__ocean_boundaries
-
-    @property
-    def _land_boundaries(self):
-        return self.__land_boundaries
-
-    @property
-    def _interior_boundaries(self):
-        return self.__interior_boundaries
+    def _boundaries(self):
+        return self.__boundaries
 
     @property
     def _crs(self):
@@ -435,59 +450,55 @@ class Hgrid:
     def description(self, description):
         self._description = description
 
-    @_vertices.setter
-    def _vertices(self, vertices):
-        msg = "vertices argument must be a iterable."
-        assert isinstance(vertices, Iterable), msg
-        msg = "vertices argument must be an array of size (?, 2)"
-        assert np.asarray(vertices).shape[1] == 2, msg
-        self.__vertices = vertices
+    @_nodes.setter
+    def _nodes(self, nodes):
+        msg = "nodes argument must be a dictionary of the form "
+        msg += "\\{node_id:  (x, y, z)\\}"
+        assert isinstance(nodes, Mapping), msg
+        for node in nodes.values():
+            assert len(node) == 3, msg
+            for coord in node:
+                assert isinstance(coord, (float, int)), msg
+        self.__nodes = nodes
 
-    @_values.setter
-    def _values(self, values):
-        msg = "values argument must be a iterable."
-        assert isinstance(values, Iterable), msg
-        msg = "values argument must have same length as vertices."
-        assert len(values) == len(self.vertices), msg
-        self.__values = values
+    @_elements.setter
+    def _elements(self, elements):
+        msg = "elemens argument must be a dictionary of the form "
+        msg += "\\{element_id:  (e0, ..., en)\\} where n==2 or n==3."
+        assert isinstance(elements, Mapping), msg
+        for geom in elements.values():
+            msg = f"Found an element with {len(geom)} sides. "
+            msg += "Only triangles and quadrilaterals are supported."
+            assert len(geom) in [3, 4], msg
+            # msg = "Boundary indexes must be a subset of the node id's."
+            # assert set(geom).issubset(self.nodes.keys()), msg
+        self.__elements = elements
 
-    @_triangles.setter
-    def _triangles(self, triangles):
-        if triangles is not None:
-            msg = "triangles argument must be a iterable."
-            assert isinstance(triangles, Iterable), msg
-            msg = "triangles argument must be an array of shape "
-            msg += f"({self.vertices.shape[0]}, 3)"
-            assert np.asarray(triangles).shape[1] == 3, msg
-        self.__triangles = triangles
+    @_boundaries.setter
+    def _boundaries(self, boundaries):
+        if boundaries is not None:
+            msg = "elemens argument must be a dictionary of the form "
+            msg += "\\{element_id:  (e0, ..., en)\\} where n==2 or n==3."
+            assert isinstance(boundaries, Mapping), msg
+            for geom in boundaries.values():
+                msg = f"Found an element with {len(geom)} sides. "
+                msg += "Only triangles and quadrilaterals are supported."
+                assert len(geom) in [3, 4], msg
+                # msg = "Boundary indexes must be a subset of the node id's."
+                # assert set(geom).issubset(self.nodes), msg
+        else:
+            boundaries = {}
+        # ocean boundaries
+        if None not in boundaries:
+            boundaries[None] = {}
+        # land boundaries
+        if 0 not in boundaries:
+            boundaries[0] = {}
+        # interior boundaries
+        if 1 not in boundaries:
+            boundaries[1] = {}
 
-    @_quads.setter
-    def _quads(self, quads):
-        if quads is not None:
-            msg = "quads argument must be a iterable."
-            assert isinstance(quads, Iterable), msg
-            msg = "quads argument must be an array of size "
-            msg += f"({self.vertices.shape[0]}, 4)"
-            assert np.asarray(quads).shape[1] == 4, msg
-        self.__quads = quads
-
-    @_ocean_boundaries.setter
-    def _ocean_boundaries(self, ocean_boundaries):
-        if ocean_boundaries is None:
-            ocean_boundaries = {}
-        self.__ocean_boundaries = ocean_boundaries
-
-    @_land_boundaries.setter
-    def _land_boundaries(self, land_boundaries):
-        if land_boundaries is None:
-            land_boundaries = {}
-        self.__land_boundaries = land_boundaries
-
-    @_interior_boundaries.setter
-    def _interior_boundaries(self, interior_boundaries):
-        if interior_boundaries is None:
-            interior_boundaries = {}
-        self.__interior_boundaries = interior_boundaries
+        self.__boundaries = boundaries
 
     @_crs.setter
     def _crs(self, crs):

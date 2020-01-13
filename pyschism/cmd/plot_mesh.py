@@ -33,13 +33,6 @@ class PlotMeshCommand:
     def _make_boundary_plot(self):
         if self.args.plot_boundaries:
             self.mesh.hgrid.plot_boundaries(axes=self.ax)
-        else:
-            if self.args.plot_ocean_boundaries:
-                self.mesh.hgrid.plot_ocean_boundaries(axes=self.ax)
-            if self.args.plot_land_boundaries:
-                self.mesh.hgrid.plot_land_boundaries(axes=self.ax)
-            if self.args.plot_interior_boundaries:
-                self.mesh.hgrid.plot_interior_boundaries(axes=self.ax)
 
     def _save_fig(self):
         if self.args.save_path:
@@ -58,7 +51,11 @@ class PlotMeshCommand:
         try:
             return self.__mesh
         except AttributeError:
-            self.__mesh = Mesh.open(self.args.mesh)
+            self.__mesh = Mesh.open(
+                self.args.hgrid,
+                # vgrid=self.args.vgrid,
+                # crs=self.args.crs,
+                )
             return self.__mesh
 
     @property
@@ -96,9 +93,6 @@ def parse_args():
     parser.add_argument("--no-topobathy", action="store_true",)
     parser.add_argument("--plot-elements", action="store_true")
     parser.add_argument("--plot-boundaries", action="store_true")
-    parser.add_argument("--plot-ocean-boundaries", action="store_true")
-    parser.add_argument("--plot-land-boundaries", action="store_true")
-    parser.add_argument("--plot-interior-boundaries", action="store_true")
     parser.add_argument("--save-path", "--save")
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--no-show", action='store_true')
@@ -106,8 +100,8 @@ def parse_args():
 
 
 def main():
-    exit(PlotMeshCommand(parse_args()).run())
+    return PlotMeshCommand(parse_args()).run()
 
 
 if __name__ == "__main__":
-    main()
+    exit(main())

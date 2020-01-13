@@ -1,139 +1,126 @@
 #! /usr/bin/env python
+import numpy as np
 import tempfile
 import pathlib
-import os
-import random
 from pyschism.mesh import Hgrid
 import unittest
 
 
 class HgridTestCase(unittest.TestCase):
 
-    def setUp(self):
-        rand = random.SystemRandom()
-        self.values = lambda verts: [
-            rand.random() for _ in range(len(verts))]
-
     def test_triangule_only_mesh(self):
-        verts = [(0., 0.),
-                 (1., 0.),
-                 (0., 1.)]
-        triangles = [[0, 1, 2]]
-        h = Hgrid(verts, self.values(verts), triangles=triangles)
+        nodes = {
+            0: (0., 0., np.nan),
+            1: (1., 0., np.nan),
+            2: (0., 1., np.nan),
+        }
+        elements = {0: [0, 1, 2]}
+        h = Hgrid(nodes, elements)
         self.assertIsInstance(h, Hgrid)
 
     def test_quads_only_mesh(self):
-        verts = [(0., 0.),
-                 (1., 0.),
-                 (1., 1.),
-                 (0., 1.)]
-        quads = [[0, 1, 2, 3]]
-        h = Hgrid(verts, self.values(verts), quads=quads)
+        nodes = {
+            0: (0., 0., np.nan),
+            1: (1., 0., np.nan),
+            2: (1., 1., np.nan),
+            3: (0., 1., np.nan),
+        }
+        elements = {0: [0, 1, 2, 3]}
+        h = Hgrid(nodes, elements)
         self.assertIsInstance(h, Hgrid)
 
     def test_hybrid_mesh(self):
-        verts = [(0., 0.),
-                 (1., 0.),
-                 (1., 1.),
-                 (0., 1.),
-                 (0.5, 1.5)]
-        triangles = [[2, 4, 3]]
-        quads = [[0, 1, 2, 3]]
-        h = Hgrid(verts, self.values(verts), triangles=triangles, quads=quads)
+        nodes = {
+            0: (0., 0., np.nan),
+            1: (1., 0., np.nan),
+            2: (1., 1., np.nan),
+            3: (0., 1., np.nan),
+            4: (0.5, 1.5, np.nan),
+        }
+        elements = {
+            0: [2, 4, 3],
+            1: [3, 0, 1, 2],
+        }
+        h = Hgrid(nodes, elements)
         self.assertIsInstance(h, Hgrid)
 
     def test_open_mesh(self):
-        verts = [(0., 0.),
-                 (1., 0.),
-                 (1., 1.),
-                 (0., 1.),
-                 (0.5, 1.5)]
-        triangles = [[2, 4, 3]]
-        quads = [[0, 1, 2, 3]]
-        values = self.values(verts)
+        nodes = {
+            0: (0., 0., np.nan),
+            1: (1., 0., np.nan),
+            2: (1., 1., np.nan),
+            3: (0., 1., np.nan),
+            4: (0.5, 1.5, np.nan),
+        }
+        elements = {
+            0: [2, 4, 3],
+            1: [0, 1, 2, 3],
+        }
         tmpfile = tempfile.NamedTemporaryFile()
         with open(tmpfile.name, 'w') as f:
             f.write('\n')
-            elen = len(triangles) + len(quads)
-            f.write(f'{elen:d} ')
-            f.write(f'{len(verts):d}\n')
-            for i, (x, y) in enumerate(verts):
-                f.write(f"{i+1} ")
-                f.write(f"{verts[i][0]} ")
-                f.write(f"{verts[i][1]} ")
-                f.write(f"{values[i]}\n")
-            _cnt = 0
-            for geom in triangles:
-                f.write(f"{_cnt+1} ")
-                f.write(f"3 ")
-                for tri in geom:
-                    f.write(f"{tri} ")
+            f.write(f'{len(elements):d} ')
+            f.write(f'{len(nodes):d}\n')
+            for id, (x, y, z) in nodes.items():
+                f.write(f"{id} ")
+                f.write(f"{x} ")
+                f.write(f"{y} ")
+                f.write(f"{z}\n")
+            for id, geom in elements.items():
+                f.write(f"{id} ")
+                f.write(f"{len(geom)} ")
+                for idx in geom:
+                    f.write(f"{idx:d} ")
                 f.write(f"\n")
-                _cnt += 1
-            for geom in quads:
-                f.write(f"{_cnt+1} ")
-                f.write(f"4 ")
-                for quad in geom:
-                    f.write(f"{quad:d} ")
-                f.write(f"\n")
-                _cnt += 1
-        h = Hgrid.open(tmpfile.name)
-        self.assertIsInstance(h, Hgrid)
+        self.assertIsInstance(Hgrid.open(tmpfile.name), Hgrid)
 
     def test_make_plot(self):
-        verts = [(0., 0.),
-                 (1., 0.),
-                 (1., 1.),
-                 (0., 1.),
-                 (0.5, 1.5)]
-        triangles = [[2, 4, 3]]
-        quads = [[0, 1, 2, 3]]
-        values = self.values(verts)
-        h = Hgrid(
-            verts,
-            values,
-            triangles=triangles,
-            quads=quads
-            )
+        nodes = {
+            0: (0., 0., 0),
+            1: (1., 0., 1),
+            2: (1., 1., 2),
+            3: (0., 1., 3),
+            4: (0.5, 1.5, 4),
+        }
+        elements = {
+            0: [2, 4, 3],
+            1: [0, 1, 2, 3],
+        }
+        h = Hgrid(nodes, elements)
         h.make_plot()
         self.assertIsInstance(h, Hgrid)
 
     def test_make_plot_wet_only(self):
-        verts = [(0., 0.),
-                 (1., 0.),
-                 (1., 1.),
-                 (0., 1.),
-                 (0.5, 1.5)]
-        triangles = [[2, 4, 3]]
-        quads = [[0, 1, 2, 3]]
-        values = self.values(verts)
-        values = [-abs(value) for value in values]
-        h = Hgrid(
-            verts,
-            values,
-            triangles=triangles,
-            quads=quads
-            )
+        nodes = {
+            0: (0., 0., 0),
+            1: (1., 0., -1),
+            2: (1., 1., -2),
+            3: (0., 1., -3),
+            4: (0.5, 1.5, -4),
+        }
+        elements = {
+            0: [2, 4, 3],
+            1: [0, 1, 2, 3],
+        }
+        h = Hgrid(nodes, elements)
         h.make_plot()
         self.assertIsInstance(h, Hgrid)
 
     def test_dump(self):
-        verts = [(0., 0.),
-                 (1., 0.),
-                 (1., 1.),
-                 (0., 1.),
-                 (0.5, 1.5)]
-        triangles = [[2, 4, 3]]
-        quads = [[0, 1, 2, 3]]
-        h = Hgrid(
-            verts,
-            self.values(verts),
-            triangles=triangles,
-            quads=quads
-            )
-        tmpdir = pathlib.Path(tempfile.gettempdir()).absolute()
-        h.dump(tmpdir / 'test_hgrid.gr3')
-        os.remove(tmpdir / 'test_hgrid.gr3')
+        nodes = {
+            0: (0., 0., 0),
+            1: (1., 0., -1),
+            2: (1., 1., -2),
+            3: (0., 1., -3),
+            4: (0.5, 1.5, -4),
+        }
+        elements = {
+            0: [2, 4, 3],
+            1: [0, 1, 2, 3],
+        }
+        h = Hgrid(nodes, elements)
+        tmpdir = tempfile.TemporaryDirectory()
+        h.dump(pathlib.Path(tmpdir.name) / 'test_hgrid.gr3')
         self.assertIsInstance(h, Hgrid)
 
 

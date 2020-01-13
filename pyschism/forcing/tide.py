@@ -143,7 +143,7 @@ class TidalForcing:
             return self.EQ78
         else:
             msg = f'Unrecognized constituent {constituent}'
-            raise RuntimeError(msg)
+            raise TypeError(msg)
 
     def _normalize_to_360(f):
         def decorator(self, constituent):
@@ -237,7 +237,7 @@ class TidalForcing:
             return 2.*(2.*self.DT-self.DS+self.DH)+2.*(self.DXI-self.DNU)
         else:
             msg = f'Unrecognized constituent {constituent}'
-            raise RuntimeError(msg)
+            raise TypeError(msg)
 
     def get_lunar_node(self):
         return (259.1560564 - 19.328185764 * self.DYR - .0529539336 * self.DDAY
