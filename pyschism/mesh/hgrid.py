@@ -104,7 +104,8 @@ class Hgrid:
 
     @_figure
     def tricontourf(self, axes=None, show=True, figsize=None, **kwargs):
-        axes.tricontourf(self.triangulation, self.values, **kwargs)
+        if len(self.triangles) > 0:
+            axes.tricontourf(self.triangulation, self.values, **kwargs)
         return axes
 
     @_figure
@@ -134,7 +135,7 @@ class Hgrid:
         linewidth=0.07,
         **kwargs
     ):
-        if self.quads is not None:
+        if len(self.quads) > 0:
             pc = PolyCollection(
                 self.vertices[self.quads],
                 facecolor=facecolor,
@@ -152,7 +153,7 @@ class Hgrid:
         figsize=None,
         **kwargs
     ):
-        if self.quads is not None:
+        if len(self.quads) > 0:
             pc = PolyCollection(
                 self.vertices[self.quads],
                 **kwargs
@@ -187,11 +188,9 @@ class Hgrid:
             vmax = np.max(self.values)
         kwargs.update(**fig.get_topobathy_kwargs(self.values, vmin, vmax))
         col_val = kwargs.pop('col_val')
-        if self.triangles is not None:
-            self.tricontourf(axes=axes, vmin=vmin, vmax=vmax, **kwargs)
+        self.tricontourf(axes=axes, vmin=vmin, vmax=vmax, **kwargs)
         kwargs.pop('levels')
-        if self.quads is not None:
-            self.quadface(axes=axes, **kwargs)
+        self.quadface(axes=axes, **kwargs)
         axes.axis('scaled')
         if extent is not None:
             axes.axis(extent)
@@ -219,40 +218,18 @@ class Hgrid:
         return axes
 
     @_figure
-    def plot_ocean_boundary(
+    def plot_boundary(
         self,
+        ibtype,
         id,
         axes=None,
         show=False,
         figsize=None,
         **kwargs
     ):
-        kwargs.update({'axes': axes})
-        return self._make_boundary_plot(self.ocean_boundaries[id], **kwargs)
-
-    @_figure
-    def plot_land_boundary(
-        self,
-        id,
-        axes=None,
-        show=False,
-        figsize=None,
-        **kwargs
-    ):
-        kwargs.update({'axes': axes})
-        return self._make_boundary_plot(self.land_boundaries[id], **kwargs)
-
-    @_figure
-    def plot_interior_boundary(
-        self,
-        id,
-        axes=None,
-        show=False,
-        figsize=None,
-        **kwargs
-    ):
-        kwargs.update({'axes': axes})
-        return self._make_boundary_plot(self.interior_boundaries[id], **kwargs)
+        boundary = [int(idx)-1 for idx in self.boundaries[ibtype][id]]
+        axes.plot(self.x[boundary], self.y[boundary], **kwargs)
+        return axes
 
     @_figure
     def plot_boundaries(
@@ -263,54 +240,11 @@ class Hgrid:
         **kwargs
     ):
         kwargs.update({'axes': axes})
-        kwargs.update({'axes': self.plot_ocean_boundaries(**kwargs)})
-        kwargs.update({'axes': self.plot_land_boundaries(**kwargs)})
-        kwargs.update({'axes': self.plot_interior_boundaries(**kwargs)})
+        for ibtype, bnds in self.boundaries.items():
+            for bnd in bnds:
+                axes = self.plot_boundary(ibtype, bnd, **kwargs)
+                kwargs.update({'axes': axes})
         return kwargs['axes']
-
-    @_figure
-    def plot_ocean_boundaries(
-        self,
-        axes=None,
-        show=False,
-        figsize=None,
-        **kwargs
-    ):
-        kwargs.update({'axes': axes})
-        for id in self.ocean_boundaries:
-            axes = self.plot_ocean_boundary(id, **kwargs)
-            kwargs.update({'axes': axes})
-        return axes
-
-    @_figure
-    def plot_land_boundaries(
-        self,
-        axes=None,
-        show=False,
-        figsize=None,
-        **kwargs
-    ):
-        kwargs.update({'axes': axes})
-        for id in self.ocean_boundaries:
-            axes = self.plot_land_boundary(id, **kwargs)
-            kwargs.update({'axes': axes})
-        return axes
-
-    @_figure
-    def plot_interior_boundaries(
-        self,
-        axes=None,
-        show=False,
-        figsize=None,
-        **kwargs
-    ):
-        kwargs.update({'axes': fig.get_axes(axes, figsize)})
-        for id in self.interior_boundaries:
-            axes = self.plot_interior_boundary(id, **kwargs)
-            kwargs.update({'axes': axes})
-        if show:
-            plt.show()
-        return axes
 
     @staticmethod
     def parse(path):
@@ -363,10 +297,10 @@ class Hgrid:
     @lru_cache
     def quads(self):
         try:
-            return self.__triangles
+            return self.__quads
         except AttributeError:
-            self.__triangles = self._get_geom_by_length(4)
-            return self.__triangles
+            self.__quads = self._get_geom_by_length(4)
+            return self.__quads
 
     @property
     def boundaries(self):
@@ -385,41 +319,15 @@ class Hgrid:
         return self._description
 
     @property
-    def ocean_boundaries(self):
-        return self.boundaries[None]
-
-    @property
-    def land_boundaries(self):
-        return self.boundaries[0]
-
-    @property
-    def interior_boundaries(self):
-        return self.boundaries[1]
-
-    @property
     def fgrid(self):
         return self._fgrid
-
-    def _make_boundary_plot(
-        self,
-        boundary,
-        axes=None,
-        show=False,
-        title=None,
-        **kwargs
-    ):
-        axes = fig.get_axes(axes)
-        axes.plot(self.x[boundary], self.y[boundary], **kwargs)
-        if show:
-            plt.show()
-        return axes
 
     def _get_geom_by_length(self, lenght):
         geom = list()
         for _geom in self.elements.values():
             _geom = list(map(int, _geom))
             if len(_geom) == lenght:
-                geom.append([idx for idx in _geom])
+                geom.append([idx-1 for idx in _geom])
         return np.array(geom)
 
     @property
@@ -480,12 +388,10 @@ class Hgrid:
             msg = "elemens argument must be a dictionary of the form "
             msg += "\\{element_id:  (e0, ..., en)\\} where n==2 or n==3."
             assert isinstance(boundaries, Mapping), msg
-            for geom in boundaries.values():
-                msg = f"Found an element with {len(geom)} sides. "
-                msg += "Only triangles and quadrilaterals are supported."
-                assert len(geom) in [3, 4], msg
-                # msg = "Boundary indexes must be a subset of the node id's."
-                # assert set(geom).issubset(self.nodes), msg
+            # for bnds in boundaries.values():
+            #     for geom in bnds.values():
+            #         msg = "Boundary indexes must be a subset of the node id's."
+            #         assert set(geom).issubset(self.nodes), msg
         else:
             boundaries = {}
         # ocean boundaries
