@@ -75,3 +75,18 @@ class FixPointNormalize(Normalize):
         if np.ma.is_masked(value)is False:
             value = np.ma.masked_invalid(value)
         return np.ma.masked_where(value.mask, np.interp(value, x, y))
+
+
+def _figure(f):
+    def decorator(*argv, **kwargs):
+        axes = get_axes(
+            kwargs.get('axes', None),
+            kwargs.get('figsize', None)
+            )
+        kwargs.update({'axes': axes})
+        axes = f(*argv, **kwargs)
+        if kwargs.get('show', False):
+            axes.axis('scaled')
+            plt.show()
+        return axes
+    return decorator

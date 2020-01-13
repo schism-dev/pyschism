@@ -3,7 +3,7 @@ import numpy as np
 from collections import defaultdict
 
 
-def parse_gr3(path):
+def reader(path):
     grd = dict()
     grd['nodes'] = defaultdict(list)
     grd['elements'] = defaultdict(list)
@@ -58,7 +58,7 @@ def parse_gr3(path):
     return grd
 
 
-def get_gr3(grd):
+def get_gr3_graph(grd):
     f = f"{grd['description']}\n"
     f += f"{len(grd['elements'])} "
     f += f"{len(grd['nodes'])}\n"
@@ -74,7 +74,12 @@ def get_gr3(grd):
         for idx in geom:
             f += f"{idx} "
         f += "\n"
+    return f
+
+
+def get_gr3_boundaries(grd):
     # ocean boundaries
+    f = ""
     f += f"{len(grd['boundaries'][None]):d} "
     f += "! total number of ocean boundaries\n"
     # count total number of ocean boundaries
@@ -114,10 +119,17 @@ def get_gr3(grd):
     return f
 
 
-def write_gr3(grd, path, overwrite=False):
+def gr3(grd):
+    f = get_gr3_graph(grd)
+    if 'boundaries' in grd.keys():
+        f += get_gr3_boundaries(grd)
+    return f
+
+
+def writer(grd, path, overwrite=False):
     path = pathlib.Path(path)
     if path.is_file() and not overwrite:
         msg = 'File exists, pass overwrite=True to allow overwrite.'
         raise Exception(msg)
     with open(path, 'w') as f:
-        f.write(get_gr3(grd))
+        f.write(gr3(grd))

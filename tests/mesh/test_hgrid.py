@@ -3,6 +3,7 @@ import numpy as np
 import tempfile
 import pathlib
 from pyschism.mesh import Hgrid
+from pyschism.mesh.friction import Fgrid
 import unittest
 
 
@@ -120,8 +121,24 @@ class HgridTestCase(unittest.TestCase):
         }
         h = Hgrid(nodes, elements)
         tmpdir = tempfile.TemporaryDirectory()
-        h.dump(pathlib.Path(tmpdir.name) / 'test_hgrid.gr3')
+        h.write(pathlib.Path(tmpdir.name) / 'test_hgrid.gr3')
         self.assertIsInstance(h, Hgrid)
+
+    def test_set_friction(self):
+        nodes = {
+            0: (0., 0., 0),
+            1: (1., 0., -1),
+            2: (1., 1., -2),
+            3: (0., 1., -3),
+            4: (0.5, 1.5, -4),
+        }
+        elements = {
+            0: [2, 4, 3],
+            1: [0, 1, 2, 3],
+        }
+        h = Hgrid(nodes, elements)
+        fric = h.set_friction(0.025, 'manning')
+        self.assertIsInstance(fric, Fgrid)
 
 
 if __name__ == '__main__':
