@@ -6,8 +6,11 @@ class ManningsN(Fgrid):
 
     @classmethod
     def constant(cls, mesh, value):
-        nodes = dict()
-        for id, (x, y, _) in mesh.nodes.items():
-            nodes[id] = (x, y, value)
-        description = mesh.description + "_mannings"
-        return cls(nodes, mesh.elements, crs=mesh.crs, description=description)
+        return cls(
+            mesh._coords,
+            mesh._triangles,
+            mesh._quads,
+            values=len(mesh.coords)*[value],
+            crs=mesh.crs,
+            description=mesh.description + "_mannings"
+            )

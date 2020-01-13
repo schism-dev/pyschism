@@ -13,7 +13,7 @@ def reader(path):
         NE, NP = map(int, f.readline().split())
         for i in range(NP):
             id, x, y, z = f.readline().split()
-            grd['nodes'][id] = (float(x), float(y), -float(z))
+            grd['nodes'][id] = ((float(x), float(y)), float(z))
         for i in range(NE):
             geom = f.readline().split()
             grd['elements'][geom[0]] = [x for x in geom[2:]]
@@ -63,7 +63,7 @@ def get_gr3_graph(grd):
     f += f"{len(grd['elements'])} "
     f += f"{len(grd['nodes'])}\n"
     # TODO: Make faster using np.array2string
-    for id, (x, y, z) in grd['nodes'].items():
+    for id, ((x, y), z) in grd['nodes'].items():
         f += f"{id} "
         f += f"{x:<.16E} "
         f += f"{y:<.16E} "

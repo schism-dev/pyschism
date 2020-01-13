@@ -4,6 +4,7 @@ from collections.abc import Iterable, Mapping
 from matplotlib import rcParams
 import matplotlib.pyplot as plt
 from matplotlib.cm import ScalarMappable
+from functools import lru_cache
 from pyschism.mesh import gr3
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from pyschism.mesh.gmesh import Gmesh
@@ -24,7 +25,13 @@ class Hgrid(Gmesh):
         crs=None,
         description=None,
     ):
-        super().__init__(nodes, elements, crs, description)
+        coords = {id: (x, y) for id, ((x, y), value) in nodes.items()}
+        values = [-value for coord, value in nodes.values()]
+        triangles = {id: geom for id, geom in elements.items()
+                     if len(geom) == 3}
+        quads = {id: geom for id, geom in elements.items()
+                 if len(geom) == 4}
+        super().__init__(coords, triangles, quads, values, crs, description)
         self._boundaries = boundaries
 
     @staticmethod
@@ -153,6 +160,25 @@ class Hgrid(Gmesh):
         return kwargs['axes']
 
     @property
+    @lru_cache
+    def nodes(self):
+        return {id: ((x, y), self.values[i]) for i, (id, (x, y))
+                in enumerate(self._coords.items())}
+
+    @property
+    @lru_cache
+    def elements(self):
+        keys = [id for id in self._triangles]
+        keys.extend([id for id in self._quads])
+        keys.sort(key=int)
+        geom = dict(self._triangles.items())
+        geom.update(dict(self._quads.items()))
+        elements = dict()
+        for i, id in enumerate(keys):
+            elements[id] = geom[id]
+        return elements
+
+    @property
     def boundaries(self):
         return self._boundaries.copy()
 
@@ -195,3 +221,4 @@ class Hgrid(Gmesh):
     @_fgrid.setter
     def _fgrid(self, fgrid):
         self.__fgrid = fgrid
+

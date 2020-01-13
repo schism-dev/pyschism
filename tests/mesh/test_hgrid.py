@@ -2,6 +2,7 @@
 import numpy as np
 import tempfile
 import pathlib
+import matplotlib.pyplot as plt
 from pyschism.mesh import Hgrid
 from pyschism.mesh.friction import Fgrid
 import unittest
@@ -11,9 +12,9 @@ class HgridTestCase(unittest.TestCase):
 
     def test_triangule_only_mesh(self):
         nodes = {
-            0: (0., 0., np.nan),
-            1: (1., 0., np.nan),
-            2: (0., 1., np.nan),
+            0: ((0., 0.), np.nan),
+            1: ((1., 0.), np.nan),
+            2: ((0., 1.), np.nan),
         }
         elements = {0: [0, 1, 2]}
         h = Hgrid(nodes, elements)
@@ -21,10 +22,10 @@ class HgridTestCase(unittest.TestCase):
 
     def test_quads_only_mesh(self):
         nodes = {
-            0: (0., 0., np.nan),
-            1: (1., 0., np.nan),
-            2: (1., 1., np.nan),
-            3: (0., 1., np.nan),
+            0: ((0., 0.), np.nan),
+            1: ((1., 0.), np.nan),
+            2: ((1., 1.), np.nan),
+            3: ((0., 1.), np.nan),
         }
         elements = {0: [0, 1, 2, 3]}
         h = Hgrid(nodes, elements)
@@ -32,11 +33,11 @@ class HgridTestCase(unittest.TestCase):
 
     def test_hybrid_mesh(self):
         nodes = {
-            0: (0., 0., np.nan),
-            1: (1., 0., np.nan),
-            2: (1., 1., np.nan),
-            3: (0., 1., np.nan),
-            4: (0.5, 1.5, np.nan),
+            0: ((0., 0.), np.nan),
+            1: ((1., 0.), np.nan),
+            2: ((1., 1.), np.nan),
+            3: ((0., 1.), np.nan),
+            4: ((0.5, 1.5), np.nan),
         }
         elements = {
             0: [2, 4, 3],
@@ -47,11 +48,11 @@ class HgridTestCase(unittest.TestCase):
 
     def test_open_mesh(self):
         nodes = {
-            0: (0., 0., np.nan),
-            1: (1., 0., np.nan),
-            2: (1., 1., np.nan),
-            3: (0., 1., np.nan),
-            4: (0.5, 1.5, np.nan),
+            0: ((0., 0.), np.nan),
+            1: ((1., 0.), np.nan),
+            2: ((1., 1.), np.nan),
+            3: ((0., 1.), np.nan),
+            4: ((0.5, 1.5), np.nan),
         }
         elements = {
             0: [2, 4, 3],
@@ -62,7 +63,7 @@ class HgridTestCase(unittest.TestCase):
             f.write('\n')
             f.write(f'{len(elements):d} ')
             f.write(f'{len(nodes):d}\n')
-            for id, (x, y, z) in nodes.items():
+            for id, ((x, y), z) in nodes.items():
                 f.write(f"{id} ")
                 f.write(f"{x} ")
                 f.write(f"{y} ")
@@ -77,27 +78,28 @@ class HgridTestCase(unittest.TestCase):
 
     def test_make_plot(self):
         nodes = {
-            0: (0., 0., 0),
-            1: (1., 0., 1),
-            2: (1., 1., 2),
-            3: (0., 1., 3),
-            4: (0.5, 1.5, 4),
+            0: ((0., 0.), 0),
+            1: ((1., 0.), 1),
+            2: ((1., 1.), 2),
+            3: ((0., 1.), 3),
+            4: ((0.5, 1.5), 4),
         }
         elements = {
             0: [2, 4, 3],
             1: [0, 1, 2, 3],
         }
         h = Hgrid(nodes, elements)
-        h.make_plot()
+        plt.switch_backend('Agg')
+        h.make_plot(show=True)
         self.assertIsInstance(h, Hgrid)
 
     def test_make_plot_wet_only(self):
         nodes = {
-            0: (0., 0., 0),
-            1: (1., 0., -1),
-            2: (1., 1., -2),
-            3: (0., 1., -3),
-            4: (0.5, 1.5, -4),
+            0: ((0., 0.), 0),
+            1: ((1., 0.), -1),
+            2: ((1., 1.), -2),
+            3: ((0., 1.), -3),
+            4: ((0.5, 1.5), -4),
         }
         elements = {
             0: [2, 4, 3],
@@ -109,11 +111,11 @@ class HgridTestCase(unittest.TestCase):
 
     def test_dump(self):
         nodes = {
-            0: (0., 0., 0),
-            1: (1., 0., -1),
-            2: (1., 1., -2),
-            3: (0., 1., -3),
-            4: (0.5, 1.5, -4),
+            0: ((0., 0.), 0),
+            1: ((1., 0.), -1),
+            2: ((1., 1.), -2),
+            3: ((0., 1.), -3),
+            4: ((0.5, 1.5), -4),
         }
         elements = {
             0: [2, 4, 3],
@@ -126,11 +128,11 @@ class HgridTestCase(unittest.TestCase):
 
     def test_set_friction(self):
         nodes = {
-            0: (0., 0., 0),
-            1: (1., 0., -1),
-            2: (1., 1., -2),
-            3: (0., 1., -3),
-            4: (0.5, 1.5, -4),
+            0: ((0., 0), 0),
+            1: ((1., 0.), -1),
+            2: ((1., 1.), -2),
+            3: ((0., 1.), -3),
+            4: ((0.5, 1.5), -4),
         }
         elements = {
             0: [2, 4, 3],
