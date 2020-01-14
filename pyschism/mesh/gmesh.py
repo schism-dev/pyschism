@@ -196,7 +196,7 @@ class Geomesh:
     @_values.setter
     def _values(self, values):
         if values is None:
-            values = np.full(self.coords.shape)
+            values = np.full(self.coords.shape[0], np.nan)
         values = np.asarray(values)
         assert values.shape[0] == self.coords.shape[0]
         self.__values = values
