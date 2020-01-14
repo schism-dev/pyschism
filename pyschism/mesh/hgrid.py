@@ -34,11 +34,11 @@ class Hgrid(Gmesh):
         super().__init__(coords, triangles, quads, values, crs, description)
         self._boundaries = boundaries
 
-    @staticmethod
-    def open(hgrid, crs=None):
+    @classmethod
+    def open(cls, hgrid, crs=None):
         kwargs = gr3.reader(hgrid)
         kwargs.update({"crs": crs})
-        return Hgrid(**kwargs)
+        return cls(**kwargs)
 
     def set_friction(self, value, ftype='manning'):
 
@@ -162,7 +162,7 @@ class Hgrid(Gmesh):
     @property
     @lru_cache
     def nodes(self):
-        return {id: ((x, y), self.values[i]) for i, (id, (x, y))
+        return {id: ((x, y), -self.values[i]) for i, (id, (x, y))
                 in enumerate(self._coords.items())}
 
     @property
@@ -180,7 +180,7 @@ class Hgrid(Gmesh):
 
     @property
     def boundaries(self):
-        return self._boundaries.copy()
+        return self._boundaries
 
     @property
     def fgrid(self):
@@ -221,4 +221,3 @@ class Hgrid(Gmesh):
     @_fgrid.setter
     def _fgrid(self, fgrid):
         self.__fgrid = fgrid
-
