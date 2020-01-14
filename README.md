@@ -1,4 +1,5 @@
 # PySCHISM
+![coverage](tests/coverage.svg)
 
 ## A Python interface for SCHISM model runs.
 
