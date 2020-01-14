@@ -11,7 +11,7 @@ import unittest
 
 class HgridTestCase(unittest.TestCase):
 
-    def test_triangule_only_mesh(self):
+    def test_triangles_only(self):
         nodes = {
             0: ((0., 0.), np.nan),
             1: ((1., 0.), np.nan),
@@ -21,7 +21,7 @@ class HgridTestCase(unittest.TestCase):
         h = Hgrid(nodes, elements)
         self.assertIsInstance(h, Hgrid)
 
-    def test_quads_only_mesh(self):
+    def test_quads_only(self):
         nodes = {
             0: ((0., 0.), np.nan),
             1: ((1., 0.), np.nan),
@@ -32,7 +32,7 @@ class HgridTestCase(unittest.TestCase):
         h = Hgrid(nodes, elements)
         self.assertIsInstance(h, Hgrid)
 
-    def test_hybrid_mesh(self):
+    def test_hybrid(self):
         nodes = {
             0: ((0., 0.), np.nan),
             1: ((1., 0.), np.nan),
@@ -47,7 +47,7 @@ class HgridTestCase(unittest.TestCase):
         h = Hgrid(nodes, elements)
         self.assertIsInstance(h, Hgrid)
 
-    def test_open_mesh(self):
+    def test_open(self):
         nodes = {
             0: ((0., 0.), np.nan),
             1: ((1., 0.), np.nan),
@@ -112,7 +112,7 @@ class HgridTestCase(unittest.TestCase):
         h.make_plot()
         self.assertIsInstance(h, Hgrid)
 
-    def test_dump(self):
+    def test_write(self):
         nodes = {
             0: ((0., 0.), 0),
             1: ((1., 0.), -1),

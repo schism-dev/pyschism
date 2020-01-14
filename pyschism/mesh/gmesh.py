@@ -101,9 +101,9 @@ class Geomesh:
         return axes
 
     @_figure
-    def plot_wireframe(self, axes=None, **kwargs):
-        self.triplot(axes=axes, **kwargs)
-        self.quadplot(axes=axes, **kwargs)
+    def plot_wireframe(self, axes=None, show=False, **kwargs):
+        axes = self.triplot(axes=axes, **kwargs)
+        axes = self.quadplot(axes=axes, **kwargs)
         return axes
 
     @property
