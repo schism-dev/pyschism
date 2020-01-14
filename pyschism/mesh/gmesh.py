@@ -15,14 +15,14 @@ class Geomesh:
     def __init__(
         self,
         coords,
-        triangles=None,
+        triang=None,
         quads=None,
         values=None,
         crs=None,
         description=None,
     ):
         self._coords = coords
-        self._triangles = triangles
+        self._triangles = triang
         self._quads = quads
         self._values = values
         self._crs = crs
