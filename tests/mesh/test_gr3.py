@@ -7,96 +7,106 @@ from pyschism.mesh.gr3 import reader, writer
 
 class Gr3TestCase(unittest.TestCase):
 
-    def test_gr3_write(self):
-        nodes = {
-            0: ((0., 0.), -99999.),
-            1: ((.5, 0.), -99999.),
-            2: ((0., 1.), -99999.),
-            3: ((1., 1.), -99999.),
-            4: ((0., 1.), -99999.),
-            5: ((.5, 1.5), -99999.),
-            6: ((.33, .33), -99999.),
-            7: ((.66, .33), -99999.),
-            8: ((.5, .66), -99999.),
-            9: ((-1., 1), -99999.),
-            10: ((-1, 0.), -99999.),
-        }
-        elements = {
-            0: [4, 6, 8],
-            1: [0, 1, 6],
+    def setUp(self):
+        self.nodes = {
+            1: ((0., 0.), -99999.),
+            2: ((.5, 0.), -99999.),
+            3: ((0., 1.), -99999.),
+            4: ((1., 1.), -99999.),
+            5: ((0., 1.), -99999.),
+            6: ((.5, 1.5), -99999.),
+            7: ((.33, .33), -99999.),
+            8: ((.66, .33), -99999.),
+            9: ((.5, .66), -99999.),
+            10: ((-1., 1), -99999.),
+            11: ((-1, 0.), -99999.),
+            }
+        self.elements = {
+            1: [5, 7, 9],
             2: [1, 2, 7],
-            3: [7, 6, 1],
-            4: [2, 3, 7],
-            5: [3, 8, 7],
-            6: [3, 5, 4],
-            7: [4, 9, 10, 0],
-            8: [8, 3, 4],
-            9: [4, 0, 6]
+            3: [2, 3, 8],
+            4: [8, 7, 2],
+            5: [3, 4, 8],
+            6: [4, 9, 8],
+            7: [4, 6, 5],
+            8: [5, 10, 11, 1],
+            9: [9, 4, 5],
+            10: [5, 1, 7]
+            }
+
+        self.boundaries = dict()
+
+        self.boundaries[None] = {  # "open" boundaries
+                1: [10, 11, 1, 2],
+                2: [2, 3, 4]
         }
 
-        boundaries = dict()
-        boundaries[None] = {  # "open" boundaries
-            0: [9, 10, 0, 1],
-            1: [1, 2, 3]
+        self.boundaries[0] = {  # "land" boundaries
+            1: [4, 6],
+            2: [6,  5, 10]
         }
-        boundaries[0] = {  # "land" boundaries
-            0: [3, 5],
-            1: [5,  4, 9]
+
+        self.boundaries[1] = {1: [7, 8, 9]}  # "interior" boundary
+
+        self.grd = {
+            'nodes': self.nodes,
+            'elements': self.elements,
+            'boundaries': self.boundaries,
+            'description': 'test_writer_unittest'
         }
-        boundaries[1] = {0: [6, 7, 8]}  # "interior" boundary
-        grd = {
-            'nodes': nodes,
-            'elements': elements,
-            'boundaries': boundaries,
-            'description': 'gr3.py unittest'
-        }
+
+    def test_writer(self):
         tmpdir = tempfile.TemporaryDirectory()
-        writer(grd, pathlib.Path(tmpdir.name) / 'hgrid.gr3')
+        writer(self.grd, pathlib.Path(tmpdir.name) / 'hgrid.gr3')
 
-    def _test_gr3_read(self):
-        gr3 = "test\n"
-        gr3 += "10 11\n"
-        gr3 += "0 0. 0. -99999.\n"
-        gr3 += "1 .5 0. -99999.\n"
-        gr3 += "2 0. 1. -99999.\n"
-        gr3 += "3 1. 1. -99999.\n"
-        gr3 += "4 0. 1. -99999.\n"
-        gr3 += "5 .5 1.5 -99999.\n"
-        gr3 += "6 .33 .33 -99999.\n"
-        gr3 += "7 .66 .33 -99999.\n"
-        gr3 += "8 .5 .66 -99999.\n"
-        gr3 += "9 -1. 1 -99999.\n"
-        gr3 += "10 -1 0. -99999.\n"
-        gr3 += "0 3 4 6 8 \n"
-        gr3 += "1 3 0 1 6 \n"
-        gr3 += "2 3 1 2 7 \n"
-        gr3 += "3 3 7 6 1 \n"
-        gr3 += "4 3 2 3 7 \n"
-        gr3 += "5 3 3 8 7 \n"
-        gr3 += "6 3 3 5 4 \n"
-        gr3 += "7 4 4 9 10 0 \n"
-        gr3 += "8 3 8 3 4 \n"
-        gr3 += "9 3 4 0 6 \n"
-        gr3 += "9 3 4 0 6 \n"
-        gr3 += "2\n"
-        gr3 += "7\n"
-        gr3 += "4\n"
-        gr3 += "9\n10\n0\n1"
-        gr3 += "3\n"
-        gr3 += "1\n2\n3\n"
-        gr3 += "3\n"
-        gr3 += "8\n"
-        gr3 += "2 0\n"
-        gr3 += "3\n5\n"
-        gr3 += "3 0\n"
-        gr3 += "5\n4\n9\n"
-        gr3 += "3 1\n"
-        gr3 += "6\n7\n8\n"
+    def test_reader(self):
 
+        g = self.grd['description'] + "\n"
+        g += f"{len(self.grd['elements'])} {len(self.grd['nodes'])}\n"
+        for id, ((x, y), values) in self.nodes.items():
+            g += f"{id} {x:f} {y:f} {values}\n"
+        for id, geom in self.elements.items():
+            g += f"{id} {len(geom)} "
+            for i in geom:
+                g += f"{i} "
+            g += "\n"
+        # total no of ocean bnds
+        g += f"{len(self.grd['boundaries'][None])}\n"
+        # total no of ocean bnd nodes
+        _cnt = 0
+        for bnd in self.grd['boundaries'][None].values():
+            _cnt += len(bnd)
+        g += f"{_cnt}\n"
+        # write ocean bnds
+        for bnd in self.grd['boundaries'][None].values():
+            g += f"{len(bnd)}\n"
+            for i in bnd:
+                g += f"{i}\n"
+        # total no of non-ocean bnds
+        _cnt = 0
+        for ibtype in self.grd['boundaries']:
+            if ibtype is not None:
+                _cnt += len(self.grd['boundaries'][ibtype])
+        g += f"{_cnt}\n"
+        # total no of non-ocean bnd nodes
+        _cnt = 0
+        for ibtype in self.grd['boundaries']:
+            if ibtype is not None:
+                for bnd in self.grd['boundaries'][ibtype].values():
+                    _cnt += len(bnd)
+        g += f"{_cnt}\n"
+        # write remaining boundaries
+        for ibtype in self.grd['boundaries']:
+            if ibtype is not None:
+                for bnd in self.grd['boundaries'][ibtype].values():
+                    g += f"{len(bnd)} {ibtype}\n"
+                    for i in bnd:
+                        g += f"{i}\n"
+        print(g)
         tmpfile = tempfile.NamedTemporaryFile()
         with open(tmpfile.name, 'w') as f:
-            f.write(gr3)
-        reader(pathlib.Path(tmpfile.name) / 'hgrid.gr3')
+            f.write(g)
+        reader(pathlib.Path(tmpfile.name))
 
     def test_gr3_overwrite(self):
         nodes = {
