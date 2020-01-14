@@ -2,6 +2,7 @@
 import numpy as np
 import tempfile
 import pathlib
+import warnings
 import matplotlib.pyplot as plt
 from pyschism.mesh import Hgrid
 from pyschism.mesh.friction import Fgrid
@@ -89,8 +90,10 @@ class HgridTestCase(unittest.TestCase):
             1: [0, 1, 2, 3],
         }
         h = Hgrid(nodes, elements)
-        plt.switch_backend('Agg')
-        h.make_plot(show=True)
+        with warnings.catch_warnings():
+            plt.switch_backend('Agg')
+            warnings.simplefilter("ignore")
+            h.make_plot(show=True)
         self.assertIsInstance(h, Hgrid)
 
     def test_make_plot_wet_only(self):

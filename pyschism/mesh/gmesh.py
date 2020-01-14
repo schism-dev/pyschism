@@ -36,6 +36,9 @@ class Geomesh:
             self._vertices = list(zip(*transformer.transform(self.x, self.y)))
             self._crs = dst_crs
 
+    def get_index(self, id):
+        return self.node_indexes[id]
+
     @_figure
     def tricontourf(self, axes=None, show=True, figsize=None, **kwargs):
         if len(self.triangles) > 0:
@@ -112,21 +115,22 @@ class Geomesh:
 
     @property
     @lru_cache
+    def node_indexes(self):
+        return {id: index for index, id in enumerate(self._coords)}
+
+    @property
+    @lru_cache
     def triangles(self):
-        triangles = np.array(
-            [list(map(int, index)) for index in self._triangles.values()]
-            )
-        triangles -= 1
-        return triangles
+        return np.array(
+            [list(map(self.get_index, index))
+             for index in self._triangles.values()])
 
     @property
     @lru_cache
     def quads(self):
-        quads = np.array(
-            [list(map(int, index)) for index in self._quads.values()]
-            )
-        quads -= 1
-        return quads
+        return np.array(
+            [list(map(self.get_index, index))
+             for index in self._quads.values()])
 
     @property
     def xy(self):
@@ -188,19 +192,6 @@ class Geomesh:
             for coord in coord:
                 assert isinstance(coord, (float, int)), msg
         self.__coords = coords
-
-    # @_elements.setter
-    # def _elements(self, elements):
-    #     msg = "elemens argument must be a dictionary of the form "
-    #     msg += "\\{element_id:  (e0, ..., en)\\} where n==2 or n==3."
-    #     assert isinstance(elements, Mapping), msg
-    #     for geom in elements.values():
-    #         msg = f"Found an element with {len(geom)} sides. "
-    #         msg += "Only triangles and quadrilaterals are supported."
-    #         assert len(geom) in [3, 4], msg
-    #         # msg = "Boundary indexes must be a subset of the node id's."
-    #         # assert set(geom).issubset(self.nodes.keys()), msg
-    #     self.__elements = elements
 
     @_values.setter
     def _values(self, values):
