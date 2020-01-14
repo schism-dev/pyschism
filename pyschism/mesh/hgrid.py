@@ -25,6 +25,7 @@ class Hgrid(Gmesh):
         crs=None,
         description=None,
     ):
+        # cast gr3 inputs into a geomesh structure format
         coords = {id: (x, y) for id, ((x, y), value) in nodes.items()}
         values = [-value for coord, value in nodes.values()]
         triangles = {id: geom for id, geom in elements.items()
@@ -196,14 +197,15 @@ class Hgrid(Gmesh):
 
     @_boundaries.setter
     def _boundaries(self, boundaries):
+        """
+        elements in boundaries should be a subset of the node keys.
+        """
         if boundaries is not None:
-            msg = "elemens argument must be a dictionary of the form "
+            msg = "elements argument must be a dictionary of the form "
             msg += "\\{element_id:  (e0, ..., en)\\} where n==2 or n==3."
             assert isinstance(boundaries, Mapping), msg
-            # for bnds in boundaries.values():
-            #     for geom in bnds.values():
-            #         msg = "Boundary indexes must be a subset of the node id's."
-            #         assert set(geom).issubset(self.nodes), msg
+            for geom in boundaries.values():
+                assert len(geom) in [3, 4], msg
         else:
             boundaries = {}
         # ocean boundaries

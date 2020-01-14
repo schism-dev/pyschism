@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import sys
 import argparse
 import matplotlib.pyplot as plt
 from pyschism.mesh import Mesh
@@ -103,5 +104,9 @@ def main():
     return PlotMeshCommand(parse_args()).run()
 
 
-if __name__ == "__main__":
-    exit(main())
+def init():
+    if __name__ == "__main__":
+        sys.exit(main())
+
+
+init()

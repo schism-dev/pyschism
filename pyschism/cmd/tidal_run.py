@@ -25,3 +25,11 @@ def main():
     drv = TidalRunCommand(args)
     retv = drv.run()
     exit(retv)
+
+
+def init():
+    if __name__ == "__main__":
+        exit(main())
+
+
+init()

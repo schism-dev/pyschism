@@ -51,6 +51,13 @@ class PlotMeshCmdTestCase(unittest.TestCase):
                 warnings.simplefilter("ignore")
                 self.assertEqual(plot_mesh.main(), 0)
 
+    def test_init(self):
+        with patch.object(plot_mesh, "main", return_value=0):
+            with patch.object(plot_mesh, "__name__", "__main__"):
+                with patch.object(plot_mesh.sys, 'exit') as mock_exit:
+                    plot_mesh.init()
+                    assert mock_exit.call_args[0][0] == 0
+
 
 if __name__ == '__main__':
     unittest.main()
