@@ -102,7 +102,6 @@ class Gr3TestCase(unittest.TestCase):
                     g += f"{len(bnd)} {ibtype}\n"
                     for i in bnd:
                         g += f"{i}\n"
-        print(g)
         tmpfile = tempfile.NamedTemporaryFile()
         with open(tmpfile.name, 'w') as f:
             f.write(g)
