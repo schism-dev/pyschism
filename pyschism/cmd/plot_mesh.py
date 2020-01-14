@@ -104,6 +104,7 @@ def main():
     return PlotMeshCommand(parse_args()).run()
 
 
+# https://medium.com/opsops/how-to-test-if-name-main-1928367290cb
 def init():
     if __name__ == "__main__":
         sys.exit(main())

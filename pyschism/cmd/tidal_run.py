@@ -1,3 +1,4 @@
+import sys
 import logging
 import argparse
 from pyschism.cmd import argument_parser
@@ -5,7 +6,7 @@ from pyschism.cmd.basecmd import SchismBaseCommand
 
 
 class TidalRunCommand(SchismBaseCommand):
-    """ """
+    """  Wrapper for SCHISM tidal only run CLI tool.  """
 
 
 def parse_args():
@@ -27,9 +28,10 @@ def main():
     exit(retv)
 
 
+# https://medium.com/opsops/how-to-test-if-name-main-1928367290cb
 def init():
     if __name__ == "__main__":
-        exit(main())
+        sys.exit(main())
 
 
 init()
