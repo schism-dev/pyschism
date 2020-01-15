@@ -55,58 +55,11 @@ class Gr3TestCase(unittest.TestCase):
             'description': 'test_writer_unittest'
         }
 
-    def test_writer(self):
+    def test_write_read(self):
         tmpdir = tempfile.TemporaryDirectory()
-        self.assertIsNone(
-            writer(self.grd, pathlib.Path(tmpdir.name) / 'hgrid.gr3'))
-
-    def test_reader(self):
-        # write a sample test file
-        g = self.grd['description'] + "\n"
-        g += f"{len(self.grd['elements'])} {len(self.grd['nodes'])}\n"
-        for id, ((x, y), values) in self.nodes.items():
-            g += f"{id} {x:f} {y:f} {values}\n"
-        for id, geom in self.elements.items():
-            g += f"{id} {len(geom)} "
-            for i in geom:
-                g += f"{i} "
-            g += "\n"
-        # total no of ocean bnds
-        g += f"{len(self.grd['boundaries'][None])}\n"
-        # total no of ocean bnd nodes
-        _cnt = 0
-        for bnd in self.grd['boundaries'][None].values():
-            _cnt += len(bnd)
-        g += f"{_cnt}\n"
-        # write ocean bnds
-        for bnd in self.grd['boundaries'][None].values():
-            g += f"{len(bnd)}\n"
-            for i in bnd:
-                g += f"{i}\n"
-        # total no of non-ocean bnds
-        _cnt = 0
-        for ibtype in self.grd['boundaries']:
-            if ibtype is not None:
-                _cnt += len(self.grd['boundaries'][ibtype])
-        g += f"{_cnt}\n"
-        # total no of non-ocean bnd nodes
-        _cnt = 0
-        for ibtype in self.grd['boundaries']:
-            if ibtype is not None:
-                for bnd in self.grd['boundaries'][ibtype].values():
-                    _cnt += len(bnd)
-        g += f"{_cnt}\n"
-        # write remaining boundaries
-        for ibtype in self.grd['boundaries']:
-            if ibtype is not None:
-                for bnd in self.grd['boundaries'][ibtype].values():
-                    g += f"{len(bnd)} {ibtype}\n"
-                    for i in bnd:
-                        g += f"{i}\n"
-        tmpfile = tempfile.NamedTemporaryFile()
-        with open(tmpfile.name, 'w') as f:
-            f.write(g)
-        self.assertDictEqual(reader(pathlib.Path(tmpfile.name)), self.grd)
+        tmpfile = pathlib.Path(tmpdir.name) / 'hgrid.gr3'
+        writer(self.grd, pathlib.Path(tmpfile))
+        self.assertDictEqual(reader(pathlib.Path(tmpfile)), self.grd)
 
     def test_overwrite(self):
         tmpdir = tempfile.TemporaryDirectory()

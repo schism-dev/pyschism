@@ -133,3 +133,4 @@ def writer(grd, path, overwrite=False):
         raise Exception(msg)
     with open(path, 'w') as f:
         f.write(gr3(grd))
+    return 0
