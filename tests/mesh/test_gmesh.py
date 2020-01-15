@@ -116,6 +116,13 @@ class GmeshTestCase(unittest.TestCase):
         gmsh.description = 'test'
         self.assertEqual(gmsh.description, 'test')
 
+    def test_from_gr3(self):
+        nodes = {id: (coord, -99999.) for id, coord in self.coords.items()}
+        elements = {id: index for id, index in self.triangles.items()}
+        elements.update({id: index for id, index in self.quads.items()})
+        gmsh = Gmesh.from_gr3(nodes, elements)
+        self.assertIsInstance(gmsh, Gmesh)
+
 
 if __name__ == '__main__':
     unittest.main()

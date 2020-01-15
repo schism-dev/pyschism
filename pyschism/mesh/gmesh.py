@@ -15,14 +15,14 @@ class Geomesh:
     def __init__(
         self,
         coords,
-        triang=None,
+        triangles=None,
         quads=None,
         values=None,
         crs=None,
         description=None,
     ):
         self._coords = coords
-        self._triangles = triang
+        self._triangles = triangles
         self._quads = quads
         self._values = values
         self._crs = crs
@@ -38,6 +38,10 @@ class Geomesh:
 
     def get_index(self, id):
         return self.node_indexes[id]
+
+    @classmethod
+    def from_gr3(cls, nodes, elements):
+        return cls(*cls._gr3_to_mesh(nodes, elements))
 
     @_figure
     def tricontourf(self, axes=None, show=True, figsize=None, **kwargs):
@@ -189,6 +193,17 @@ class Geomesh:
     @property
     def _description(self):
         return self.__description
+
+    @staticmethod
+    def _gr3_to_mesh(nodes, elements):
+        # cast gr3 inputs into a geomesh structure format
+        coords = {id: (x, y) for id, ((x, y), value) in nodes.items()}
+        triangles = {id: geom for id, geom in elements.items()
+                     if len(geom) == 3}
+        quads = {id: geom for id, geom in elements.items()
+                 if len(geom) == 4}
+        values = [value for coord, value in nodes.values()]
+        return coords, triangles, quads, values
 
     @_coords.setter
     def _coords(self, coords):

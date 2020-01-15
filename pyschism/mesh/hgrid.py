@@ -26,13 +26,9 @@ class Hgrid(Gmesh):
         description=None,
     ):
         # cast gr3 inputs into a geomesh structure format
-        coords = {id: (x, y) for id, ((x, y), value) in nodes.items()}
-        values = [-value for coord, value in nodes.values()]
-        triangles = {id: geom for id, geom in elements.items()
-                     if len(geom) == 3}
-        quads = {id: geom for id, geom in elements.items()
-                 if len(geom) == 4}
-        super().__init__(coords, triangles, quads, values, crs, description)
+        msh = list(self._gr3_to_mesh(nodes, elements))
+        msh[3] = [-value for coord, value in nodes.values()]
+        super().__init__(*msh, crs, description)
         self._boundaries = boundaries
 
     @classmethod

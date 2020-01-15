@@ -4,7 +4,11 @@ from functools import lru_cache
 
 class Vgrid:
 
-    def dump(self, path, overwrite=False):
+    @classmethod
+    def open(cls, path):
+        pass
+
+    def write(self, path, overwrite=False):
         path = pathlib.Path(path)
         if path.is_file() and not overwrite:
             msg = 'File exists, pass overwrite=True to allow overwrite.'
