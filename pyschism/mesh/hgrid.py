@@ -7,12 +7,17 @@ from matplotlib.cm import ScalarMappable
 from functools import lru_cache
 from pyschism.mesh import gr3
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from pyschism.mesh.gmesh import Gmesh
-from pyschism.mesh.friction import ManningsN, DragCoefficient, RoughnessLength
+from pyschism.mesh.gr3 import Gr3
 import pyschism.mesh.figures as fig
+from pyschism.mesh.friction import (
+    Fgrid,
+    ManningsN,
+    DragCoefficient,
+    RoughnessLength
+)
 
 
-class Hgrid(Gmesh):
+class Hgrid(Gr3):
     """
     Class that represents the unstructured planar mesh used by SCHISM.
     """
@@ -25,17 +30,9 @@ class Hgrid(Gmesh):
         crs=None,
         description=None,
     ):
-        # cast gr3 inputs into a geomesh structure format
-        msh = list(self._gr3_to_mesh(nodes, elements))
-        msh[3] = [-value for coord, value in nodes.values()]
-        super().__init__(*msh, crs, description)
+        nodes = {id: (coord, -value) for id, (coord, value) in nodes.items()}
+        super().__init__(nodes, elements, crs, description)
         self._boundaries = boundaries
-
-    @classmethod
-    def open(cls, hgrid, crs=None):
-        kwargs = gr3.reader(hgrid)
-        kwargs.update({"crs": crs})
-        return cls(**kwargs)
 
     def set_friction(self, value, ftype='manning'):
 
@@ -51,9 +48,12 @@ class Hgrid(Gmesh):
         # certify value
         msg = "value argument must be an instance of type "
         msg += f"{int}, {float} or an iterable ."
-        assert isinstance(value, (Iterable, int, float)), msg
+        assert isinstance(value, (Iterable, int, float, Fgrid)), msg
 
-        if isinstance(value, (int, float)):
+        if isinstance(value, Fgrid):
+            self._fgrid = value
+
+        elif isinstance(value, (int, float)):
             if ftype == 'manning':
                 self._fgrid = ftypes[ftype].constant(self, value)
 

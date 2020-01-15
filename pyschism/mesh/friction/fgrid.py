@@ -1,17 +1,7 @@
-from pyschism.mesh.gmesh import Gmesh
+from pyschism.mesh.gr3 import Gr3
 
 
-class Fgrid(Gmesh):
+class Fgrid(Gr3):
     """
     Base class for all friction types (e.g. manning.gr3, drag.gr3, etc...)
     """
-
-    def __init__(
-        self,
-        nodes,
-        elements,
-        values=None,
-        crs=None,
-        description=None,
-    ):
-        super().__init__(*self._gr3_to_mesh(nodes, elements), crs, description)

@@ -30,7 +30,7 @@ class Mesh:
 
         if fgrid:
             fgrid = Fgrid.open(fgrid, crs)
-            m.set_friction(fgrid)
+            m.hgrid.set_friction(fgrid)
 
         return m
 

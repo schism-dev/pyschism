@@ -84,11 +84,27 @@ class MeshTestCase(unittest.TestCase):
             f.write("40. 1. 1.e-4  !h_c, theta_b, theta_f\n")
             f.write("   1    -1.\n")
             f.write("   2     0.\n")
-
+        fgrid = pathlib.Path(tmpdir.name) / 'fgrid.gr3'
+        with open(fgrid, 'w') as f:
+            f.write('generic_friction\n')
+            f.write(f'{len(self.elements):d} ')
+            f.write(f'{len(self.nodes):d}\n')
+            for id, ((x, y), z) in self.nodes.items():
+                f.write(f"{id} ")
+                f.write(f"{x} ")
+                f.write(f"{y} ")
+                f.write(f"{z}\n")
+            for id, geom in self.elements.items():
+                f.write(f"{id} ")
+                f.write(f"{len(geom)} ")
+                for idx in geom:
+                    f.write(f"{idx} ")
+                f.write(f"\n")
         self.assertIsInstance(
             Mesh.open(
                 hgrid,
-                vgrid
+                vgrid,
+                fgrid
                 ),
             Mesh
         )

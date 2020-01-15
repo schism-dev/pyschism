@@ -1,5 +1,6 @@
 import pathlib
 import numpy as np
+from pyschism.mesh.gmesh import Gmesh
 from collections import defaultdict
 
 
@@ -17,7 +18,6 @@ def reader(path):
     grd = dict()
     grd['nodes'] = defaultdict(list)
     grd['elements'] = defaultdict(list)
-    grd['boundaries'] = defaultdict(dict)
     with open(pathlib.Path(path), 'r') as f:
         grd['description'] = f.readline().strip('\n')
         NE, NP = map(int, f.readline().split())
@@ -34,6 +34,7 @@ def reader(path):
             return grd
         # let NOPE=-1 mean an ellipsoidal-mesh
         # reassigning NOPE to 0 until further implementation is applied.
+        grd['boundaries'] = defaultdict(dict)
         _bnd_id = 0
         f.readline()  # Not used.
         while _bnd_id < NOPE:
@@ -130,3 +131,32 @@ def write_boundaries(f, grd):
             f.write(f"! boundary {ibtype}:{id}\n")
             for idx in boundary:
                 f.write(f"{idx}\n")
+
+
+def to_mesh(nodes, elements):
+    # cast gr3 inputs into a geomesh structure format
+    coords = {id: (x, y) for id, ((x, y), value) in nodes.items()}
+    triangles = {id: geom for id, geom in elements.items()
+                 if len(geom) == 3}
+    quads = {id: geom for id, geom in elements.items()
+             if len(geom) == 4}
+    values = [value for coord, value in nodes.values()]
+    return coords, triangles, quads, values
+
+
+class Gr3(Gmesh):
+
+    def __init__(
+        self,
+        nodes,
+        elements,
+        crs=None,
+        description=None,
+    ):
+        super().__init__(*to_mesh(nodes, elements), crs, description)
+
+    @classmethod
+    def open(cls, gr3, crs=None):
+        kwargs = reader(gr3)
+        kwargs.update({"crs": crs})
+        return cls(**kwargs)
