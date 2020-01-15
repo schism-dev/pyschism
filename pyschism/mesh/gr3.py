@@ -58,7 +58,7 @@ def reader(path):
     return grd
 
 
-def get_gr3_graph(grd):
+def graph_string(grd):
     f = f"{grd['description']}\n"
     f += f"{len(grd['elements'])} "
     f += f"{len(grd['nodes'])}\n"
@@ -77,7 +77,7 @@ def get_gr3_graph(grd):
     return f
 
 
-def get_gr3_boundaries(grd):
+def boundaries_string(grd):
     # ocean boundaries
     f = ""
     f += f"{len(grd['boundaries'][None]):d} "
@@ -120,9 +120,9 @@ def get_gr3_boundaries(grd):
 
 
 def gr3(grd):
-    f = get_gr3_graph(grd)
+    f = graph_string(grd)
     if 'boundaries' in grd.keys():
-        f += get_gr3_boundaries(grd)
+        f += boundaries_string(grd)
     return f
 
 
