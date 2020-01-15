@@ -44,7 +44,7 @@ def reader(path):
             if ibtype not in grd['boundaries']:
                 _bnd_id = 0
             else:
-                _bnd_id = len(grd['boundaries'][ibtype]) + 1
+                _bnd_id = len(grd['boundaries'][ibtype])
             grd['boundaries'][ibtype][_bnd_id] = list()
             while _pnt_cnt < npts:
                 line = f.readline().split()
