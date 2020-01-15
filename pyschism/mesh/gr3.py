@@ -10,7 +10,7 @@ def writer(grd, path, overwrite=False):
         raise Exception(msg)
     with open(path, 'w') as f:
         write_gr3(f, grd)
-    return 0
+    return 0  # for unittests
 
 
 def reader(path):
@@ -72,67 +72,61 @@ def write_gr3(f, grd):
     write_graph(f, grd)
     if 'boundaries' in grd.keys():
         write_boundaries(f, grd)
-    return f
 
 
-def write_graph(h, grd):
-    f = f"{grd['description']}\n"
-    f += f"{len(grd['elements'])} "
-    f += f"{len(grd['nodes'])}\n"
+def write_graph(f, grd):
+    f.write(f"{grd['description']}\n")
+    f.write(f"{len(grd['elements'])} ")
+    f.write(f"{len(grd['nodes'])}\n")
     # TODO: Make faster using np.array2string
     for id, ((x, y), z) in grd['nodes'].items():
-        f += f"{id} "
-        f += f"{x:<.16E} "
-        f += f"{y:<.16E} "
-        f += f"{z:<.16E}\n"
+        f.write(f"{id} ")
+        f.write(f"{x:<.16E} ")
+        f.write(f"{y:<.16E} ")
+        f.write(f"{z:<.16E}\n")
     for id, geom in grd['elements'].items():
-        f += f"{id} "
-        f += f"{len(geom):d} "
+        f.write(f"{id} ")
+        f.write(f"{len(geom):d} ")
         for idx in geom:
-            f += f"{idx} "
-        f += "\n"
-    h.write(f)
-    return 0
+            f.write(f"{idx} ")
+        f.write("\n")
 
 
-def write_boundaries(h, grd):
+def write_boundaries(f, grd):
     # ocean boundaries
-    f = ""
-    f += f"{len(grd['boundaries'][None]):d} "
-    f += "! total number of ocean boundaries\n"
+    f.write(f"{len(grd['boundaries'][None]):d} ")
+    f.write("! total number of ocean boundaries\n")
     # count total number of ocean boundaries
     _sum = np.sum(
         [len(boundary) for boundary in grd['boundaries'][None].values()]
         )
-    f += f"{int(_sum):d} ! total number of ocean boundary nodes\n"
+    f.write(f"{int(_sum):d} ! total number of ocean boundary nodes\n")
     # write ocean boundary indexes
     for i, boundary in grd['boundaries'][None].items():
-        f += f"{len(boundary):d}"
-        f += f" ! number of nodes for ocean_boundary_{i}\n"
+        f.write(f"{len(boundary):d}")
+        f.write(f" ! number of nodes for ocean_boundary_{i}\n")
         for idx in boundary:
-            f += f"{idx}\n"
+            f.write(f"{idx}\n")
     # count remaining boundaries
     _cnt = 0
     for key in grd['boundaries']:
         if key is not None:
             _cnt += len(grd['boundaries'][key])
-    f += f"{_cnt:d}  ! total number of non-ocean boundaries\n"
+    f.write(f"{_cnt:d}  ! total number of non-ocean boundaries\n")
     # count remaining boundary nodes
     _cnt = 0
     for ibtype in grd['boundaries']:
         if ibtype is not None:
             for bnd in grd['boundaries'][ibtype].values():
                 _cnt += np.asarray(bnd).size
-    f += f"{_cnt:d} ! Total number of non-ocean boundary nodes\n"
+    f.write(f"{_cnt:d} ! Total number of non-ocean boundary nodes\n")
     # all additional boundaries
     for ibtype, boundaries in grd['boundaries'].items():
         if ibtype is None:
             continue
         for id, boundary in boundaries.items():
-            f += f"{len(boundary):d} "
-            f += f"{ibtype} "
-            f += f"! boundary {ibtype}:{id}\n"
+            f.write(f"{len(boundary):d} ")
+            f.write(f"{ibtype} ")
+            f.write(f"! boundary {ibtype}:{id}\n")
             for idx in boundary:
-                f += f"{idx}\n"
-    h.write(f)
-    return 0
+                f.write(f"{idx}\n")
