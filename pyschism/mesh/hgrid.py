@@ -67,9 +67,16 @@ class Hgrid(Gmesh):
         if ibtype not in self.boundaries:
             self._boundaries[ibtype] = defaultdict()
 
-    def add_boundary_data(self, ibtype, id, indexes, **properties):
-        assert set(indexes).issubset(set(self.vertices.keys()))
-        self._boundary[ibtype] = {
+    def set_boundary_data(self, ibtype, id, indexes, **properties):
+        keys = set(self.nodes.keys())
+        for idx in indexes:
+            msg = "Indexes must be subset of node id's."
+            if isinstance(idx, (str, int)):
+                assert set(idx).issubset(keys), msg
+            elif isinstance(idx, Iterable):
+                for _idx in idx:
+                    assert set(_idx).issubset(keys), msg
+        self._boundaries[ibtype] = {
             'indexes': indexes,
             **properties
         }
@@ -101,7 +108,7 @@ class Hgrid(Gmesh):
         if vmax is None:
             vmax = np.max(self.values)
         kwargs.update(**fig.get_topobathy_kwargs(self.values, vmin, vmax))
-        col_val = kwargs.pop('col_val')
+        kwargs.pop('col_val')
         self.tricontourf(axes=axes, vmin=vmin, vmax=vmax, **kwargs)
         kwargs.pop('levels')
         self.quadface(axes=axes, **kwargs)
@@ -118,15 +125,10 @@ class Hgrid(Gmesh):
         cbar = plt.colorbar(
             mappable,
             cax=cax,
-            # extend=cmap_extend,
             orientation='horizontal'
         )
-        if col_val != 0:
-            cbar.set_ticks([vmin, vmin + col_val * (vmax-vmin), vmax])
-            cbar.set_ticklabels([np.around(vmin, 2), 0.0, np.around(vmax, 2)])
-        else:
-            cbar.set_ticks([vmin, vmax])
-            cbar.set_ticklabels([np.around(vmin, 2), np.around(vmax, 2)])
+        cbar.set_ticks([vmin, vmax])
+        cbar.set_ticklabels([np.around(vmin, 2), np.around(vmax, 2)])
         if cbar_label is not None:
             cbar.set_label(cbar_label)
         return axes
@@ -200,12 +202,15 @@ class Hgrid(Gmesh):
         """
         elements in boundaries should be a subset of the node keys.
         """
+        keys = set(self.nodes)
         if boundaries is not None:
             msg = "elements argument must be a dictionary of the form "
             msg += "\\{element_id:  (e0, ..., en)\\} where n==2 or n==3."
             assert isinstance(boundaries, Mapping), msg
+            msg = "(e0, ..., en) must be a subset of the node keys."
             for geom in boundaries.values():
-                assert len(geom) in [3, 4], msg
+                for bnd in geom.values():
+                    assert set(bnd).issubset(keys), msg
         else:
             boundaries = {}
         # ocean boundaries

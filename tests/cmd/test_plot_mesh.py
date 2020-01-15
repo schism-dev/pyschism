@@ -5,14 +5,13 @@ import sys
 import tempfile
 import warnings
 import pathlib
-import matplotlib.pyplot as plt
 from pyschism.cmd import plot_mesh
 
 
 class PlotMeshCmdTestCase(unittest.TestCase):
 
-    def test_plot_mesh_command(self):
-        plt.switch_backend('Agg')
+    @patch('matplotlib.pyplot.show')
+    def test_plot_mesh_command(self, mock):
         tmpdir = tempfile.TemporaryDirectory()
         outdir = pathlib.Path(tmpdir.name)
         nodes = {

@@ -4,7 +4,7 @@ from pyschism.mesh.figures import _figure
 from collections.abc import Mapping
 from matplotlib.tri import Triangulation
 from matplotlib.collections import PolyCollection
-from pyproj import CRS, Transformer
+from pyproj import CRS, Transformer, Proj
 from functools import lru_cache
 
 
@@ -157,6 +157,14 @@ class Geomesh:
     @property
     def description(self):
         return self._description
+
+    @property
+    def proj(self):
+        return Proj(self.crs)
+
+    @property
+    def srs(self):
+        return self.proj.srs
 
     @property
     def crs(self):
