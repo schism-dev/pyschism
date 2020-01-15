@@ -6,7 +6,7 @@ class Vgrid:
 
     @classmethod
     def open(cls, path):
-        pass
+        return cls()
 
     def write(self, path, overwrite=False):
         path = pathlib.Path(path)

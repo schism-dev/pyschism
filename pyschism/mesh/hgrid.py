@@ -183,7 +183,11 @@ class Hgrid(Gr3):
 
     @property
     def fgrid(self):
-        return self._fgrid
+        try:
+            return self.__fgrid
+        except AttributeError:
+            self._fgrid = ManningsN.constant(self, 0.025)
+            return self.__fgrid
 
     @property
     def _boundaries(self):
@@ -223,4 +227,5 @@ class Hgrid(Gr3):
 
     @_fgrid.setter
     def _fgrid(self, fgrid):
+        assert isinstance(fgrid, Fgrid)
         self.__fgrid = fgrid

@@ -13,7 +13,7 @@ class HgridTestCase(unittest.TestCase):
         self.nodes = {
             '1': ((0., 0.), -5.),
             '2': ((.5, 0.), -4.),
-            '3': ((0., 1.), -3.),
+            '3': ((1., 0.), -3.),
             '4': ((1., 1.), -2.),
             '5': ((0., 1.), -1.),
             '6': ((.5, 1.5), 0.),
@@ -48,7 +48,7 @@ class HgridTestCase(unittest.TestCase):
             1: ['6',  '5', '10']
         }
 
-        self.boundaries[1] = {0: ['7', '8', '9']}  # "interior" boundary
+        self.boundaries[1] = {0: ['7', '8', '9', '7']}  # "interior" boundary
 
         self.grd = {
             'nodes': self.nodes,
@@ -183,6 +183,15 @@ class HgridTestCase(unittest.TestCase):
     def test_plot_boundaries(self):
         h = Hgrid(self.nodes, self.elements, self.boundaries)
         h.plot_boundaries()
+
+    def test_triplot(self):
+        h = Hgrid(self.nodes, self.elements, self.boundaries)
+        h.triplot()
+
+    def test__fgrid_getter(self):
+        h = Hgrid(self.nodes, self.elements)
+        h.fgrid
+        assert isinstance(h._fgrid, Fgrid)
 
 
 if __name__ == '__main__':

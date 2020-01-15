@@ -11,7 +11,7 @@ class Gr3TestCase(unittest.TestCase):
         self.nodes = {
             '1': ((0., 0.), -99999.),
             '2': ((.5, 0.), -99999.),
-            '3': ((0., 1.), -99999.),
+            '3': ((1., 0.), -99999.),
             '4': ((1., 1.), -99999.),
             '5': ((0., 1.), -99999.),
             '6': ((.5, 1.5), -99999.),
@@ -46,7 +46,7 @@ class Gr3TestCase(unittest.TestCase):
             1: ['6',  '5', '10']
         }
 
-        self.boundaries[1] = {0: ['7', '8', '9']}  # "interior" boundary
+        self.boundaries[1] = {0: ['7', '8', '9', '7']}  # "interior" boundary
 
         self.grd = {
             'nodes': self.nodes,

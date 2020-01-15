@@ -20,7 +20,7 @@ class Mesh:
 
     @classmethod
     def open(cls, hgrid, vgrid=None, fgrid=None, crs=None):
-        if vgrid:
+        if vgrid is not None:
             vgrid = Vgrid.open(vgrid)
 
         m = cls(
@@ -28,14 +28,14 @@ class Mesh:
             vgrid,
             )
 
-        if fgrid:
+        if fgrid is not None:
             fgrid = Fgrid.open(fgrid, crs)
             m.hgrid.set_friction(fgrid)
 
         return m
 
     def make_plot(self, **kwargs):
-        if not self.vgrid:
+        if self.vgrid is None:
             self.hgrid.make_plot(**kwargs)
         else:
             msg = "Plotting not yet supported for 3D meshes."
@@ -51,7 +51,7 @@ class Mesh:
 
     @property
     def fgrid(self):
-        return self._fgrid
+        return self.hgrid.fgrid
 
     @property
     def _hgrid(self):
@@ -60,10 +60,6 @@ class Mesh:
     @property
     def _vgrid(self):
         return self.__vgrid
-
-    @property
-    def _fgrid(self):
-        return self.__fgrid
 
     @_hgrid.setter
     def _hgrid(self, hgrid):
@@ -75,10 +71,3 @@ class Mesh:
         if vgrid is not None:
             assert isinstance(vgrid, Vgrid)
         self.__vgrid = vgrid
-
-    @_fgrid.setter
-    def _fgrid(self, fgrid):
-        if fgrid is None:
-            fgrid = Fgrid.constant_manning(0.025)
-        assert isinstance(fgrid, Fgrid)
-        self.__fgrid = fgrid
