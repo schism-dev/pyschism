@@ -3,6 +3,16 @@ import numpy as np
 from collections import defaultdict
 
 
+def writer(grd, path, overwrite=False):
+    path = pathlib.Path(path)
+    if path.is_file() and not overwrite:
+        msg = 'File exists, pass overwrite=True to allow overwrite.'
+        raise Exception(msg)
+    with open(path, 'w') as f:
+        write_gr3(f, grd)
+    return 0
+
+
 def reader(path):
     grd = dict()
     grd['nodes'] = defaultdict(list)
@@ -58,7 +68,14 @@ def reader(path):
     return grd
 
 
-def graph_string(grd):
+def write_gr3(f, grd):
+    write_graph(f, grd)
+    if 'boundaries' in grd.keys():
+        write_boundaries(f, grd)
+    return f
+
+
+def write_graph(h, grd):
     f = f"{grd['description']}\n"
     f += f"{len(grd['elements'])} "
     f += f"{len(grd['nodes'])}\n"
@@ -74,10 +91,11 @@ def graph_string(grd):
         for idx in geom:
             f += f"{idx} "
         f += "\n"
-    return f
+    h.write(f)
+    return 0
 
 
-def boundaries_string(grd):
+def write_boundaries(h, grd):
     # ocean boundaries
     f = ""
     f += f"{len(grd['boundaries'][None]):d} "
@@ -116,21 +134,5 @@ def boundaries_string(grd):
             f += f"! boundary {ibtype}:{id}\n"
             for idx in boundary:
                 f += f"{idx}\n"
-    return f
-
-
-def gr3(grd):
-    f = graph_string(grd)
-    if 'boundaries' in grd.keys():
-        f += boundaries_string(grd)
-    return f
-
-
-def writer(grd, path, overwrite=False):
-    path = pathlib.Path(path)
-    if path.is_file() and not overwrite:
-        msg = 'File exists, pass overwrite=True to allow overwrite.'
-        raise Exception(msg)
-    with open(path, 'w') as f:
-        f.write(gr3(grd))
+    h.write(f)
     return 0
