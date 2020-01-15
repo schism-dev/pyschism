@@ -52,7 +52,7 @@ class Gr3TestCase(unittest.TestCase):
             'nodes': self.nodes,
             'elements': self.elements,
             'boundaries': self.boundaries,
-            'description': 'test_writer_unittest'
+            'description': 'gr3_unittest'
         }
 
     def test_write_read(self):
