@@ -2,7 +2,8 @@
 import tempfile
 import pathlib
 from pyschism.mesh.friction import Fgrid
-from pyschism.mesh import Mesh
+from pyschism.mesh import Mesh, Vgrid
+from unittest.mock import patch
 import unittest
 
 
@@ -115,3 +116,8 @@ class MeshTestCase(unittest.TestCase):
     def test_default_fgrid(self):
         m = Mesh.open(self.hgrid)
         assert isinstance(m.fgrid, Fgrid)
+
+    @patch.object(Vgrid, 'is3D', return_value=True)
+    def test_make_plot_3D(self, mock):
+        m = Mesh.open(self.hgrid)
+        self.assertRaises(NotImplementedError, m.make_plot)

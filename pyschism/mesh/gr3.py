@@ -2,7 +2,7 @@ import pathlib
 import numpy as np
 from pyschism.mesh.gmesh import Gmesh
 from functools import lru_cache
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 
 
 def writer(grd, path, overwrite=False):
@@ -142,7 +142,12 @@ def to_mesh(nodes, elements):
     quads = {id: geom for id, geom in elements.items()
              if len(geom) == 4}
     values = [value for coord, value in nodes.values()]
-    return coords, triangles, quads, values
+    msh = namedtuple("msh", ["coords", "triangles", "quads", "values"])
+    return msh(
+        coords=coords,
+        triangles=triangles,
+        quads=quads,
+        values=values)
 
 
 class Gr3(Gmesh):
@@ -154,7 +159,15 @@ class Gr3(Gmesh):
         crs=None,
         description=None,
     ):
-        super().__init__(*to_mesh(nodes, elements), crs, description)
+        msh = to_mesh(nodes, elements)
+        super().__init__(
+            msh.coords,
+            msh.triangles,
+            msh.quads,
+            msh.values,
+            crs,
+            description
+        )
 
     @classmethod
     def open(cls, gr3, crs=None):

@@ -2,7 +2,7 @@
 import unittest
 import pathlib
 import tempfile
-from pyschism.mesh.gr3 import reader, writer
+from pyschism.mesh.gr3 import reader, writer, Gr3
 
 
 class Gr3TestCase(unittest.TestCase):
@@ -70,6 +70,14 @@ class Gr3TestCase(unittest.TestCase):
             self.grd,
             pathlib.Path(tmpdir.name) / 'hgrid.gr3'
             )
+
+    def test_Gr3_description_override(self):
+        self.grd.pop('boundaries')
+        self.grd.update({"crs": 3395})
+        self.assertEqual(
+            Gr3(**self.grd).grd['description'],
+            "gr3_unittest CRS: epsg:3395"
+        )
 
 
 if __name__ == '__main__':
