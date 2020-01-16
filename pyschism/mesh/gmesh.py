@@ -32,8 +32,14 @@ class Geomesh:
         dst_crs = CRS.from_user_input(dst_crs)
         if self.srs != dst_crs.srs:
             transformer = Transformer.from_crs(
-                self.crs, dst_crs, always_xy=True)
-            self._vertices = list(zip(*transformer.transform(self.x, self.y)))
+                self.crs, dst_crs,
+                always_xy=True
+                )
+            xy = list(zip(*transformer.transform(self.x, self.y)))
+            ids = list(self._coords.keys())
+            self._coords = {
+                ids[i]: coord for i, coord in enumerate(xy)
+            }
             self._crs = dst_crs
 
     def get_index(self, id):
@@ -43,6 +49,12 @@ class Geomesh:
     def tricontourf(self, axes=None, show=True, figsize=None, **kwargs):
         if len(self.triangles) > 0:
             axes.tricontourf(self.triangulation, self.values, **kwargs)
+        return axes
+
+    @_figure
+    def tripcolor(self, axes=None, show=True, figsize=None, **kwargs):
+        if len(self.triangles) > 0:
+            axes.tripcolor(self.triangulation, self.values, **kwargs)
         return axes
 
     @_figure
@@ -107,7 +119,6 @@ class Geomesh:
         return axes
 
     @property
-    @lru_cache
     def coords(self):
         return np.array(
             [coord for coord in self._coords.values()]

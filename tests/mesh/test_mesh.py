@@ -112,13 +112,6 @@ class MeshTestCase(unittest.TestCase):
         m = Mesh.open(self.hgrid)
         m.make_plot()
 
-    def test_make_plot_3D_raise(self):
-        m = Mesh.open(self.hgrid, self.vgrid)
-        self.assertRaises(
-            NotImplementedError,
-            m.make_plot
-        )
-
     def test_default_fgrid(self):
         m = Mesh.open(self.hgrid)
         assert isinstance(m.fgrid, Fgrid)

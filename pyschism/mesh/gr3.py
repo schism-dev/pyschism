@@ -1,6 +1,7 @@
 import pathlib
 import numpy as np
 from pyschism.mesh.gmesh import Gmesh
+from functools import lru_cache
 from collections import defaultdict
 
 
@@ -160,3 +161,37 @@ class Gr3(Gmesh):
         kwargs = reader(gr3)
         kwargs.update({"crs": crs})
         return cls(**kwargs)
+
+    def write(self, path, overwrite=False):
+        writer(self.grd, path, overwrite)
+
+    @property
+    @lru_cache
+    def grd(self):
+        description = self.description
+        if self.crs is not None:
+            description += f" CRS: {self.crs.srs}"
+        return {
+            "nodes": self.nodes,
+            "elements": self.elements,
+            "description": description,
+        }
+
+    @property
+    @lru_cache
+    def nodes(self):
+        return {id: ((x, y), -self.values[i]) for i, (id, (x, y))
+                in enumerate(self._coords.items())}
+
+    @property
+    @lru_cache
+    def elements(self):
+        keys = [id for id in self._triangles]
+        keys.extend([id for id in self._quads])
+        keys.sort(key=int)
+        geom = dict(self._triangles.items())
+        geom.update(dict(self._quads.items()))
+        elements = dict()
+        for i, id in enumerate(keys):
+            elements[id] = geom[id]
+        return elements

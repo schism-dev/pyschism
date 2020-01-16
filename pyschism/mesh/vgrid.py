@@ -17,6 +17,12 @@ class Vgrid:
         with open(path, 'w') as f:
             f.write(self.boilerplate_2D)
 
+    def is2D(self):
+        return True
+
+    def is3D(self):
+        return False
+
     @property
     @lru_cache
     def boilerplate_2D(self):  # TODO: *QUICK HACK*, please fix ASAP.

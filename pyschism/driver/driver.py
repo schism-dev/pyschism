@@ -73,7 +73,7 @@ class SchismRun:
 
         return self._output_collection
 
-    def dump(
+    def write(
         self,
         output_directory,
         overwrite=False,
@@ -87,15 +87,15 @@ class SchismRun:
         if not outdir.exists():
             outdir.mkdir(parents=True)
         if hgrid:
-            self.mesh.hgrid.dump(outdir / hgrid, overwrite)
+            self.mesh.hgrid.write(outdir / hgrid, overwrite)
         if vgrid:
-            self.mesh.vgrid.dump(outdir / vgrid, overwrite)
+            self.mesh.vgrid.write(outdir / vgrid, overwrite)
         if fgrid:
-            self.mesh.fgrid.dump(outdir / fgrid, overwrite)
+            self.mesh.fgrid.write(outdir / fgrid, overwrite)
         if param:
-            self.param.dump(outdir / param, overwrite)
+            self.param.write(outdir / param, overwrite)
         if bctides:
-            self.bctides.dump(outdir / bctides, overwrite)
+            self.bctides.write(outdir / bctides, overwrite)
 
     @property
     def mesh(self):
@@ -118,7 +118,7 @@ class SchismRun:
         return self._use_transport
 
     def _run_local(self, nproc, outdir, overwrite):
-        self.dump(outdir, overwrite)
+        self.write(outdir, overwrite)
 
     def _run_coldstart(self, nproc, wdir):
         self._stage_files('coldstart', nproc, wdir)

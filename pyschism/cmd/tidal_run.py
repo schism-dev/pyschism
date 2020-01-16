@@ -11,8 +11,7 @@ class TidalRunCommand(SchismBaseCommand):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    argument_parser.add_general_options(parser)
-    argument_parser.add_tidal_run_options(parser)
+    argument_parser.add_general_options(parser, 'tidal')
     return parser.parse_args()
 
 

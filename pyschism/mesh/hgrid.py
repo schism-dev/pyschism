@@ -77,15 +77,6 @@ class Hgrid(Gr3):
             **properties
         }
 
-    def write(self, path, overwrite=False):
-        grd = {
-            'description': self.description,
-            'nodes': self.nodes,
-            'elements': self.elements,
-            'boundaries': self.boundaries,
-        }
-        gr3.writer(grd, path, overwrite)
-
     @fig._figure
     def make_plot(
         self,
@@ -105,8 +96,17 @@ class Hgrid(Gr3):
             vmax = np.max(self.values)
         kwargs.update(**fig.get_topobathy_kwargs(self.values, vmin, vmax))
         kwargs.pop('col_val')
-        self.tricontourf(axes=axes, vmin=vmin, vmax=vmax, **kwargs)
-        kwargs.pop('levels')
+        levels = kwargs.pop('levels')
+        if vmin != vmax:
+            self.tricontourf(
+                axes=axes,
+                levels=levels,
+                vmin=vmin,
+                vmax=vmax,
+                **kwargs
+            )
+        else:
+            self.tripcolor(axes=axes, **kwargs)
         self.quadface(axes=axes, **kwargs)
         axes.axis('scaled')
         if extent is not None:
@@ -160,22 +160,10 @@ class Hgrid(Gr3):
 
     @property
     @lru_cache
-    def nodes(self):
-        return {id: ((x, y), -self.values[i]) for i, (id, (x, y))
-                in enumerate(self._coords.items())}
-
-    @property
-    @lru_cache
-    def elements(self):
-        keys = [id for id in self._triangles]
-        keys.extend([id for id in self._quads])
-        keys.sort(key=int)
-        geom = dict(self._triangles.items())
-        geom.update(dict(self._quads.items()))
-        elements = dict()
-        for i, id in enumerate(keys):
-            elements[id] = geom[id]
-        return elements
+    def grd(self):
+        grd = super().grd
+        grd.update({"boundaries": self.boundaries})
+        return grd
 
     @property
     def boundaries(self):

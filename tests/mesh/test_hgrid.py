@@ -188,6 +188,11 @@ class HgridTestCase(unittest.TestCase):
         h = Hgrid(self.nodes, self.elements, self.boundaries)
         h.triplot()
 
+    def test_make_plot_flat_domain(self):
+        nodes = {id: (coord, 0.) for id, (coord, _) in self.nodes.items()}
+        h = Hgrid(nodes, self.elements, self.boundaries)
+        h.make_plot()
+
     def test__fgrid_getter(self):
         h = Hgrid(self.nodes, self.elements)
         h.fgrid

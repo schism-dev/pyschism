@@ -1,7 +1,5 @@
-import argparse
 import logging
 import sys
-import re
 
 
 def add_mesh_options(parser):
@@ -17,8 +15,15 @@ def add_mesh_options(parser):
     parser.add_argument('--crs', default=4326)
 
 
-def add_general_options(parser):
+def add_general_options(parser, runtype=None):
     add_mesh_options(parser)
+
+    if runtype is not None:
+        if runtype == "tidal":
+            add_tidal_run_options(parser)
+
+        elif runtype == 'best_track':
+            add_best_track_options(parser)
 
     # output directory
     msg = "Directory to which SCHISM input files will be written to. "
@@ -39,7 +44,7 @@ def add_general_options(parser):
     add_server_options(parser)
 
     # add tidal constituents
-    add_tidal_constituents(parser)
+    add_tidal_constituents_options(parser)
 
     # add surface output requests
     add_surface_output_request('elevation', parser)
@@ -132,7 +137,7 @@ def add_server_options(parser):
         )
 
 
-def add_tidal_constituents(parser):
+def add_tidal_constituents_options(parser):
     # tidal constituents
     msg = "Tidal constituent to be forced in the model. Pass "
     msg += "--use-constituent='all' to use all available constituents "
@@ -201,7 +206,6 @@ def add_stations_output_request(physical_var, parser):
 
 
 def add_best_track_options(parser):
-    add_mesh_options(parser)
     # storm_id
     msg = "National Hurricane Center (NHC) storm id. "
     msg += " Examples: AL132012 for Sandy2012 or AL152017 for Maria2017."
@@ -211,7 +215,6 @@ def add_best_track_options(parser):
 
 
 def add_tidal_run_options(parser):
-    add_mesh_options(parser)
     # start_date
     msg = "Start date is relative to hotstart, that is, this is the "
     msg += "true start date of the model (in UTC time). Use format "

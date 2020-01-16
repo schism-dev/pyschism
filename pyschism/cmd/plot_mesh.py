@@ -54,8 +54,8 @@ class PlotMeshCommand:
         except AttributeError:
             self.__mesh = Mesh.open(
                 self.args.hgrid,
-                # vgrid=self.args.vgrid,
-                # crs=self.args.crs,
+                vgrid=self.args.vgrid,
+                crs=self.args.crs,
                 )
             return self.__mesh
 
@@ -88,7 +88,8 @@ def parse_args():
     parser = argparse.ArgumentParser(
             description="Program to see a quick plot of an SCHISM mesh.")
     parser.add_argument('hgrid')
-    # parser.add_argument('--vgrid')
+    parser.add_argument('--vgrid')
+    parser.add_argument('--crs')
     parser.add_argument("--vmin", type=float)
     parser.add_argument("--vmax", type=float)
     parser.add_argument("--no-topobathy", action="store_true",)
