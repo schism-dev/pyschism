@@ -22,10 +22,9 @@ If you are a developer, you  may install in developer mode instead:
 ```bash
 pip install -e .
 ```
-
-
-### Usage examples:
 ---
+### Usage examples:
+
 #### Using the CLI
 ##### Example 1: Full domain hgrid plot from the terminal.
 ``` bash
@@ -33,7 +32,6 @@ plot_mesh /path/to/hgrid.gr3 --plot-boundaries --plot-elements
 ```
 ![example_1_hgrid](https://raw.githubusercontent.com/schism-dev/pyschism/master/examples/example_1/hgrid.png)
 
----
 #### Using the Library
 Hint: You can test the library functions from the command line (without having to write a .py file) by using `python -c` and wrapping the commands between a pair of quotes, for example:
 ```bash
