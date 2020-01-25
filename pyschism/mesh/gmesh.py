@@ -3,6 +3,7 @@ import pathlib
 import logging
 from collections import defaultdict
 import fiona
+from functools import lru_cache
 from matplotlib.cm import ScalarMappable
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from shapely.geometry import LineString, mapping
@@ -24,7 +25,7 @@ class Gmesh(EuclideanMesh2D):
         crs=None,
         description=None,
         boundaries=None,
-    ):
+    ): 
         super().__init__(coords, triangles, quads, values, crs, description)
         self._boundaries = boundaries
 
@@ -185,13 +186,9 @@ class Gmesh(EuclideanMesh2D):
         return kwargs['axes']
 
     @property
+    @lru_cache
     def logger(self):
-        try:
-            return self.__logger
-        except AttributeError:
-            self.__logger = logging.getLogger(
-                __name__ + '.' + self.__class__.__name__)
-            return self.__logger
+        return logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
     @property
     def boundaries(self):
