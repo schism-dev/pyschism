@@ -18,7 +18,7 @@ After making sure your target environment is active, you can install the package
 ```bash
 pip install .
 ```
-if you are a developer, you  may install in developer mode instead:
+If you are a developer, you  may install in developer mode instead:
 ```bash
 pip install -e .
 ```
