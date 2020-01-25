@@ -9,10 +9,14 @@ def reader(path):
             if len(line) == 0:
                 break
             if line[0] in ['E3T', 'E4Q']:
+                if line[0] not in sms2dm:
+                    sms2dm[line[0]] = {}
                 sms2dm[line[0]].update({
                     line[1]: line[2:]
                     })
             if line[0] == 'ND':
+                if line[0] not in sms2dm:
+                    sms2dm[line[0]] = {}
                 sms2dm[line[0]].update({
                     line[1]: (
                         list(map(float, line[2:-1])), float(line[-1])
@@ -48,10 +52,10 @@ def nodes(sms2dm):
     assert all(int(id) > 0 for id in sms2dm['ND'])
     f = ''
     for id, (coords, value)in sms2dm['ND'].items():
-        f += f"ND {int(id)} {id:d}"
+        f += f"ND {int(id):d} "
         f += f"{coords[0]:<.16E} "
         f += f"{coords[1]:<.16E} "
-        f += f"{-value:<.16E}\n"
+        f += f"{value:<.16E}\n"
     return f
 
 def boundaries(sms2dm):
