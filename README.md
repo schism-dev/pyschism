@@ -47,3 +47,11 @@ from pyschism.mesh import Hgrid
 hgrid = Hgrid.open('hgrid.gr3')
 hgrid.write_boundaries("/path/to/output/dir", overwrite=True)
 ```
+
+##### Example 3: Write mesh to QGIS friendly format
+```python
+# NOTE: 2dm files can be read by QGIS > 3.0
+from pyschism.mesh import Hgrid
+hgrid = Hgrid.open('hgrid.gr3')
+hgrid.write("/path/to/output/dir", fmt='2dm')
+```
