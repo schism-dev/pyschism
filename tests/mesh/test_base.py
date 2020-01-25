@@ -205,8 +205,10 @@ class EuclideanMesh2DTestCase(unittest.TestCase):
         msh = EuclideanMesh2D.open(gr3.absolute(), fmt='grd')
         self.assertIsInstance(msh, EuclideanMesh2D)
 
-    def test_open_fmt_2dm(self):
-        pass
+    def test_sms2dm(self):
+        m = EuclideanMesh2D(self.coords, self.triangles, self.quads)
+        self.assertIsInstance(m.sms2dm, str)
+
 
 
 if __name__ == '__main__':

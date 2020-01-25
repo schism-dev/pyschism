@@ -35,6 +35,25 @@ def string(sms2dm):
     f += boundaries(sms2dm)
     return f
 
+
+def graph(sms2dm):
+    f = "MESH2D\n"
+    # TODO: Make faster using np.array2string
+    f += triangular_elements(sms2dm)
+    f += quadrilateral_elements(sms2dm)
+    f += nodes(sms2dm)
+    return f
+
+def nodes(sms2dm):
+    assert all(int(id) > 0 for id in sms2dm['ND'])
+    f = ''
+    for id, (coords, value)in sms2dm['ND'].items():
+        f += f"ND {int(id)} {id:d}"
+        f += f"{coords[0]:<.16E} "
+        f += f"{coords[1]:<.16E} "
+        f += f"{-value:<.16E}\n"
+    return f
+
 def boundaries(sms2dm):
     f = ''
     if 'boundaries' in sms2dm.keys():
@@ -43,13 +62,14 @@ def boundaries(sms2dm):
                 f += nodestring(bnd['indexes'])
     return f
 
-def geom_string(geom_type, geom):
+def geom_string(geom_type, sms2dm):
     assert geom_type in ['E3T', 'E4Q', 'E6T', 'E8Q', 'E9Q']
+    assert all(int(id) > 0 for id in sms2dm[geom_type])
     f = ''
-    for i in range(len(geom)):
-        f += f"{geom_type} {i + 1} "
-        for j in range(len(geom[i, :])):
-            f += f"{geom[i, j]+1} "
+    for id, geom in sms2dm[geom_type].items():
+        f += f"{geom_type} {id} "
+        for j in range(len(geom)):
+            f += f"{geom[j]} "
         f += "\n"
     return f
 
@@ -67,23 +87,5 @@ def triangular_elements(geom):
 def quadrilateral_elements(geom):
     f = ''
     if geom is not None:
-        for i in range(len(geom)):
-            f += f"E4Q {i + 1} "
-            for j in range(len(geom[i, :])):
-                f += f"{geom[i, j]+1} "
-            f += "\n"
-    return f
-
-def graph(sms2dm):
-    f = "MESH2D\n"
-    # TODO: Make faster using np.array2string
-    if 'triangles' in sms2dm:
-        f += geom_string("E3T", sms2dm['triangles'])
-    if 'quads' in sms2dm:
-        f += geom_string("E4Q", sms2dm['quads'])
-    for i in range(len(sms2dm['coords'])):
-        f += f"ND {i + 1} "
-        f += f"{sms2dm['coords'][i][0]:<.16E} "
-        f += f"{sms2dm['coords'][i][1]:<.16E} "
-        f += f"{-sms2dm['values'][i]:<.16E}\n"
+        f += geom_string("E4Q", geom)
     return f

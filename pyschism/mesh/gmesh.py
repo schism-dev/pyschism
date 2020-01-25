@@ -15,7 +15,9 @@ from pyschism.mesh.base import EuclideanMesh2D
 
 
 class Gmesh(EuclideanMesh2D):
-
+    """
+    boundaries = {ibtype: {id: {'indexes': [i0, ..., in], 'properties': object }}
+    """
     def __init__(
         self,
         coords,
@@ -25,7 +27,7 @@ class Gmesh(EuclideanMesh2D):
         crs=None,
         description=None,
         boundaries=None,
-    ): 
+    ):
         super().__init__(coords, triangles, quads, values, crs, description)
         self._boundaries = boundaries
 
@@ -62,7 +64,6 @@ class Gmesh(EuclideanMesh2D):
 
     def write_boundaries(self, path, overwrite=False):
         path = pathlib.Path(path)
-        # print(path)
         if path.exists() and not overwrite:
             msg = "Destination path exists and overwrite=False"
             raise IOError(msg)
@@ -203,7 +204,9 @@ class Gmesh(EuclideanMesh2D):
     @property
     def _sms2dm(self):
         sms2dm = super()._sms2dm
-        sms2dm.update({'boundaries': self.boundaries})
+        def nodestrings(boundaries):
+            return
+        sms2dm.update({'nodestrings': nodestrings(self.boundaries)})
         return sms2dm
     
     @property
@@ -212,9 +215,6 @@ class Gmesh(EuclideanMesh2D):
 
     @_boundaries.setter
     def _boundaries(self, boundaries):
-        """
-        boundaries = {ibtype: {id: {'indexes': [i0, ..., in], 'properties': object }}
-        """
         self.clear_boundaries() # clear
         if boundaries is not None:
             for ibtype, bnds in boundaries.items():

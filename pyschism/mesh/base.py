@@ -317,14 +317,14 @@ class EuclideanMesh2D:
     def tria3(self):
         return np.array(
             [list(map(self.get_node_index, index))
-             for id, index in self._triangles.items()])
+             for index in self._triangles.values()])
 
     @property
     @lru_cache
     def quad4(self):
         return np.array(
             [list(map(self.get_node_index, index))
-             for id, index in self._quads.items()])
+             for index in self._quads.values()])
    
     @property
     def logger(self):
@@ -419,9 +419,9 @@ class EuclideanMesh2D:
         if self.crs is not None:
             description += f"; {self.crs.srs}"
         return {
-            "nodes": self.nodes,
-            "elements": self.elements,
-            "description": description,
+            "ND": self._nodes,
+            "E3T": self._triangles,
+            "E4Q": self._quads,
         }
 
     @_coords.setter

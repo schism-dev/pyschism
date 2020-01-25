@@ -287,7 +287,7 @@ class GmeshTestCase(unittest.TestCase):
         msh.logger.debug('coverage')
         self.assertRaises(IOError, msh.write_boundaries, shp)
 
-    def test_gr3(self):
+    def test_grd(self):
         boundaries = {
             None: {
                 0: {
@@ -309,6 +309,30 @@ class GmeshTestCase(unittest.TestCase):
             crs="EPSG:3395",
             boundaries=boundaries)
         self.assertIsInstance(msh.grd, str)
+
+    def test_sms2dm(self):
+        boundaries = {
+            None: {
+                0: {
+                    'indexes':
+                        [139510, 140443, 140461, 140462, 141993, 150761]
+                    }
+                },
+            0: {
+                0: {
+                    'indexes':
+                        [139510, 140443, 140461, 140462, 141993, 150761],
+                    'properties': {'fake_velocites': None},
+                    }
+                }
+            }
+        msh = Gmesh(
+            self.coords,
+            self.triangles,
+            self.quads,
+            crs="EPSG:3395",
+            boundaries=boundaries)
+        self.assertIsInstance(msh.sms2dm, str)
 
 if __name__ == '__main__':
     unittest.main()
