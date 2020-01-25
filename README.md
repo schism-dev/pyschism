@@ -53,5 +53,5 @@ hgrid.write_boundaries("/path/to/output/dir", overwrite=True)
 # NOTE: 2dm files can be read by QGIS > 3.0
 from pyschism.mesh import Hgrid
 hgrid = Hgrid.open('hgrid.gr3')
-hgrid.write("/path/to/output/dir", fmt='2dm')
+hgrid.write("/path/to/output/file.2dm", fmt='2dm')
 ```
