@@ -2,7 +2,7 @@
 import unittest
 import pathlib
 import tempfile
-from pyschism.mesh.gr3 import reader, writer, Gr3
+from pyschism.mesh.gr3 import reader, writer, to_gmesh
 
 
 class Gr3TestCase(unittest.TestCase):
@@ -37,16 +37,18 @@ class Gr3TestCase(unittest.TestCase):
         self.boundaries = dict()
 
         self.boundaries[None] = {  # "open" boundaries
-                0: ['10', '11', '1', '2'],
-                1: ['2', '3', '4']
+                0: {'indexes': ['10', '11', '1', '2']},
+                1: {'indexes': ['2', '3', '4']}
         }
 
         self.boundaries[0] = {  # "land" boundaries
-            0: ['4', '6'],
-            1: ['6',  '5', '10']
+            0: {'indexes': ['4', '6']},
+            1: {'indexes': ['6',  '5', '10']}
         }
 
-        self.boundaries[1] = {0: ['7', '8', '9', '7']}  # "interior" boundary
+        self.boundaries[1] = { # "interior" boundary
+            0: {'indexes': ['7', '8', '9', '7']}
+        }  
 
         self.grd = {
             'nodes': self.nodes,
@@ -71,13 +73,16 @@ class Gr3TestCase(unittest.TestCase):
             pathlib.Path(tmpdir.name) / 'hgrid.gr3'
             )
 
-    def test_Gr3_description_override(self):
+    def test_no_ocean_bnd(self):
+        tmpdir = tempfile.TemporaryDirectory()
+        tmpfile = pathlib.Path(tmpdir.name) / 'hgrid.gr3'
+        self.grd['boundaries'].pop(None)
+        writer(self.grd, pathlib.Path(tmpfile))
+        self.assertDictEqual(reader(pathlib.Path(tmpfile)), self.grd)
+
+    def test_to_gmesh(self):
         self.grd.pop('boundaries')
-        self.grd.update({"crs": 3395})
-        self.assertEqual(
-            Gr3(**self.grd).grd['description'],
-            "gr3_unittest CRS: epsg:3395"
-        )
+        self.assertIsInstance(to_gmesh(self.grd), dict)
 
 
 if __name__ == '__main__':

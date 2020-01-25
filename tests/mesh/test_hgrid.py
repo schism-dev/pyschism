@@ -39,16 +39,18 @@ class HgridTestCase(unittest.TestCase):
         self.boundaries = dict()
 
         self.boundaries[None] = {  # "open" boundaries
-                0: ['10', '11', '1', '2'],
-                1: ['2', '3', '4']
+                0: {'indexes': ['10', '11', '1', '2']},
+                1: {'indexes': ['2', '3', '4']}
         }
 
         self.boundaries[0] = {  # "land" boundaries
-            0: ['4', '6'],
-            1: ['6',  '5', '10']
+            0: {'indexes': ['4', '6']},
+            1: {'indexes': ['6',  '5', '10']}
         }
 
-        self.boundaries[1] = {0: ['7', '8', '9', '7']}  # "interior" boundary
+        self.boundaries[1] = { # "interior" boundary
+            0: {'indexes': ['7', '8', '9', '7']}
+        }  
 
         self.grd = {
             'nodes': self.nodes,

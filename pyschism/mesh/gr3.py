@@ -1,8 +1,6 @@
 import pathlib
 import numpy as np
-from pyschism.mesh.gmesh import Gmesh
-from functools import lru_cache
-from collections import defaultdict, namedtuple
+from collections import defaultdict
 
 
 def writer(grd, path, overwrite=False):
@@ -11,7 +9,10 @@ def writer(grd, path, overwrite=False):
         msg = 'File exists, pass overwrite=True to allow overwrite.'
         raise Exception(msg)
     with open(path, 'w') as f:
-        write_gr3(f, grd)
+        g = graph(grd)
+        if 'boundaries' in grd.keys():
+            g += boundaries(grd)
+        f.write(g)
     return 0  # for unittests
 
 
@@ -41,9 +42,10 @@ def reader(path):
         while _bnd_id < NOPE:
             NETA = int(f.readline().split()[0])
             _cnt = 0
-            grd['boundaries'][None][_bnd_id] = list()
+            grd['boundaries'][None][_bnd_id] = dict()
+            grd['boundaries'][None][_bnd_id]['indexes'] = list()
             while _cnt < NETA:
-                grd['boundaries'][None][_bnd_id].append(
+                grd['boundaries'][None][_bnd_id]['indexes'].append(
                     f.readline().split()[0].strip())
                 _cnt += 1
             _bnd_id += 1
@@ -57,10 +59,11 @@ def reader(path):
                 _bnd_id = 0
             else:
                 _bnd_id = len(grd['boundaries'][ibtype])
-            grd['boundaries'][ibtype][_bnd_id] = list()
+            grd['boundaries'][ibtype][_bnd_id] = dict()
+            grd['boundaries'][ibtype][_bnd_id]['indexes'] = list()
             while _pnt_cnt < npts:
                 line = f.readline().split()
-                grd['boundaries'][ibtype][_bnd_id].append(line[0])
+                grd['boundaries'][ibtype][_bnd_id]['indexes'].append(line[0])
                 _pnt_cnt += 1
             _nbnd_cnt += 1
     # typecast defaultdict to regular dict
@@ -70,141 +73,92 @@ def reader(path):
     return grd
 
 
-def write_gr3(f, grd):
-    write_graph(f, grd)
-    if 'boundaries' in grd.keys():
-        write_boundaries(f, grd)
-
-
-def write_graph(f, grd):
-    f.write(f"{grd['description']}\n")
-    f.write(f"{len(grd['elements'])} ")
-    f.write(f"{len(grd['nodes'])}\n")
+def graph(grd):
+    f = ""
+    f += f"{grd['description']}\n"
+    f += f"{len(grd['elements'])} "
+    f += f"{len(grd['nodes'])}\n"
     # TODO: Make faster using np.array2string
     for id, ((x, y), z) in grd['nodes'].items():
-        f.write(f"{id} ")
-        f.write(f"{x:<.16E} ")
-        f.write(f"{y:<.16E} ")
-        f.write(f"{z:<.16E}\n")
+        f += f"{id} "
+        f += f"{x:<.16E} "
+        f += f"{y:<.16E} "
+        f += f"{z:<.16E}\n"
     for id, geom in grd['elements'].items():
-        f.write(f"{id} ")
-        f.write(f"{len(geom):d} ")
+        f += f"{id} "
+        f += f"{len(geom):d} "
         for idx in geom:
-            f.write(f"{idx} ")
-        f.write("\n")
+            f += f"{idx} "
+        f += "\n"
+    return f
 
-
-def write_boundaries(f, grd):
+def boundaries(grd):
+    f = ""
     # ocean boundaries
-    f.write(f"{len(grd['boundaries'][None]):d} ")
-    f.write("! total number of ocean boundaries\n")
-    # count total number of ocean boundaries
-    _sum = np.sum(
-        [len(boundary) for boundary in grd['boundaries'][None].values()]
-        )
-    f.write(f"{int(_sum):d} ! total number of ocean boundary nodes\n")
-    # write ocean boundary indexes
-    for i, boundary in grd['boundaries'][None].items():
-        f.write(f"{len(boundary):d}")
-        f.write(f" ! number of nodes for ocean_boundary_{i}\n")
-        for idx in boundary:
-            f.write(f"{idx}\n")
-    # count remaining boundaries
+    if None in grd['boundaries']:
+        f += f"{len(grd['boundaries'][None]):d} "
+        f += "! total number of ocean boundaries\n"
+        # count total number of ocean boundaries
+        _sum = 0
+        for bnd in grd['boundaries'][None].values():
+            _sum += len(bnd['indexes'])
+        f += f"{int(_sum):d} ! total number of ocean boundary nodes\n"
+        # write ocean boundary indexes
+        for i, boundary in grd['boundaries'][None].items():
+            f += f"{len(boundary['indexes']):d}"
+            f += f" ! number of nodes for ocean_boundary_{i}\n"
+            for idx in boundary['indexes']:
+                f += f"{idx}\n"
+    else:
+        f += "0 ! total number of ocean boundaries\n"
+        f += "0 ! total number of ocean boundary nodes\n"
+    # remaining boundaries
     _cnt = 0
     for key in grd['boundaries']:
         if key is not None:
-            _cnt += len(grd['boundaries'][key])
-    f.write(f"{_cnt:d}  ! total number of non-ocean boundaries\n")
+            for bnd in grd['boundaries'][key]:
+                _cnt += 1
+    f += f"{_cnt:d}  ! total number of non-ocean boundaries\n"
     # count remaining boundary nodes
     _cnt = 0
     for ibtype in grd['boundaries']:
         if ibtype is not None:
             for bnd in grd['boundaries'][ibtype].values():
-                _cnt += np.asarray(bnd).size
-    f.write(f"{_cnt:d} ! Total number of non-ocean boundary nodes\n")
+                _cnt += np.asarray(bnd['indexes']).size
+    f += f"{_cnt:d} ! Total number of non-ocean boundary nodes\n"
     # all additional boundaries
     for ibtype, boundaries in grd['boundaries'].items():
         if ibtype is None:
             continue
         for id, boundary in boundaries.items():
-            f.write(f"{len(boundary):d} ")
-            f.write(f"{ibtype} ")
-            f.write(f"! boundary {ibtype}:{id}\n")
-            for idx in boundary:
-                f.write(f"{idx}\n")
+            f += f"{len(boundary['indexes']):d} "
+            f += f"{ibtype} "
+            f += f"! boundary {ibtype}:{id}\n"
+            for idx in boundary['indexes']:
+                f += f"{idx}\n"
+    return f
 
 
-def to_mesh(nodes, elements):
+def to_gmesh(grd):
+    # from geomesh.mesh.hgrid import Hgrid
     # cast gr3 inputs into a geomesh structure format
-    coords = {id: (x, y) for id, ((x, y), value) in nodes.items()}
-    triangles = {id: geom for id, geom in elements.items()
+    coords = {id: (x, y) for id, ((x, y), value) in grd['nodes'].items()}
+    triangles = {id: geom for id, geom in grd['elements'].items()
                  if len(geom) == 3}
-    quads = {id: geom for id, geom in elements.items()
+    quads = {id: geom for id, geom in grd['elements'].items()
              if len(geom) == 4}
-    values = [value for coord, value in nodes.values()]
-    msh = namedtuple("msh", ["coords", "triangles", "quads", "values"])
-    return msh(
-        coords=coords,
-        triangles=triangles,
-        quads=quads,
-        values=values)
-
-
-class Gr3(Gmesh):
-
-    def __init__(
-        self,
-        nodes,
-        elements,
-        crs=None,
-        description=None,
-    ):
-        msh = to_mesh(nodes, elements)
-        super().__init__(
-            msh.coords,
-            msh.triangles,
-            msh.quads,
-            msh.values,
-            crs,
-            description
-        )
-
-    @classmethod
-    def open(cls, gr3, crs=None):
-        kwargs = reader(gr3)
-        kwargs.update({"crs": crs})
-        return cls(**kwargs)
-
-    def write(self, path, overwrite=False):
-        writer(self.grd, path, overwrite)
-
-    @property
-    @lru_cache
-    def grd(self):
-        description = self.description
-        if self.crs is not None:
-            description += f" CRS: {self.crs.srs}"
-        return {
-            "nodes": self.nodes,
-            "elements": self.elements,
-            "description": description,
+    values = [-value for coord, value in grd['nodes'].values()]
+    if 'boundaries' in grd.keys():
+        boundaries = grd['boundaries']
+    else:
+        boundaries = {}
+    description = grd['description']
+    # TODO: try to parse CRS out of description
+    return {
+        "coords": coords,
+        "triangles": triangles,
+        "quads": quads,
+        "values": values,
+        "boundaries": boundaries,
+        "description": description
         }
-
-    @property
-    @lru_cache
-    def nodes(self):
-        return {id: ((x, y), -self.values[i]) for i, (id, (x, y))
-                in enumerate(self._coords.items())}
-
-    @property
-    @lru_cache
-    def elements(self):
-        keys = [id for id in self._triangles]
-        keys.extend([id for id in self._quads])
-        keys.sort(key=int)
-        geom = dict(self._triangles.items())
-        geom.update(dict(self._quads.items()))
-        elements = dict()
-        for i, id in enumerate(keys):
-            elements[id] = geom[id]
-        return elements

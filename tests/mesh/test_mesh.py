@@ -36,20 +36,6 @@ class MeshTestCase(unittest.TestCase):
             '10': ['5', '1', '7']
             }
 
-        boundaries = dict()
-
-        boundaries[None] = {  # "open" boundaries
-                0: ['10', '11', '1', '2'],
-                1: ['2', '3', '4']
-        }
-
-        boundaries[0] = {  # "land" boundaries
-            0: ['4', '6'],
-            1: ['6',  '5', '10']
-        }
-
-        boundaries[1] = {0: ['7', '8', '9', '7']}  # "interior" boundary
-
         # write hgrid
         tmpdir = tempfile.TemporaryDirectory()
         hgrid = pathlib.Path(tmpdir.name) / 'hgrid.gr3'

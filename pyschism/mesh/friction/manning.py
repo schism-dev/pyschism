@@ -7,8 +7,8 @@ class ManningsN(Fgrid):
     @classmethod
     def constant(cls, mesh, value):
         return cls(
-            mesh.nodes,
-            mesh.elements,
+            mesh._nodes,
+            mesh._elements,
             crs=mesh.crs,
             description=mesh.description + "_mannings"
             )

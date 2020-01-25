@@ -1,17 +1,20 @@
-import uuid
 import numpy as np
-from pyschism.mesh.figures import _figure
-from collections.abc import Mapping
-from matplotlib.tri import Triangulation
-from matplotlib.collections import PolyCollection
-from pyproj import CRS, Transformer, Proj
-from functools import lru_cache
+import pathlib
+import logging
+from collections import defaultdict
+import fiona
+from matplotlib.cm import ScalarMappable
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from shapely.geometry import LineString, mapping
+import matplotlib.pyplot as plt
+from pyschism.mesh import gr3
+from pyschism import figures as fig
+from pyschism.mesh.base import EuclideanMesh2D
 
 
-class Geomesh:
-    """
-    Base class for all geographic unstructured mesh.
-    """
+
+class Gmesh(EuclideanMesh2D):
+
     def __init__(
         self,
         coords,
@@ -20,217 +23,242 @@ class Geomesh:
         values=None,
         crs=None,
         description=None,
+        boundaries=None,
     ):
-        self._coords = coords
-        self._triangles = triangles
-        self._quads = quads
-        self._values = values
-        self._crs = crs
-        self._description = description
+        super().__init__(coords, triangles, quads, values, crs, description)
+        self._boundaries = boundaries
 
-    def transform_to(self, dst_crs):
-        dst_crs = CRS.from_user_input(dst_crs)
-        if self.srs != dst_crs.srs:
-            transformer = Transformer.from_crs(
-                self.crs, dst_crs,
-                always_xy=True
-                )
-            xy = list(zip(*transformer.transform(self.x, self.y)))
-            ids = list(self._coords.keys())
-            self._coords = {
-                ids[i]: coord for i, coord in enumerate(xy)
-            }
-            self._crs = dst_crs
+    @classmethod
+    def open_gr3(cls, path, crs=None):
+        return cls(**gr3.to_gmesh(gr3.reader(path)), crs=crs)
 
-    def get_index(self, id):
-        return self.node_indexes[id]
+    def add_boundary_type(self, ibtype):
+        if ibtype not in self.boundaries:
+            self.__boundaries[ibtype] = defaultdict()
+        else:
+            msg = f"Cannot add boundary_type={ibtype}: boundary type already "
+            msg += "exists."
+            raise Exception(msg)
 
-    @_figure
-    def tricontourf(self, axes=None, show=True, figsize=None, **kwargs):
-        if len(self.triangles) > 0:
-            axes.tricontourf(self.triangulation, self.values, **kwargs)
-        return axes
+    def set_boundary_data(self, ibtype, id, indexes, **properties):
+        msg = "Indexes must be subset of node id's."
+        for idx in np.asarray(indexes).flatten():
+            assert idx in self.node_index.keys(), msg
+        self.__boundaries[ibtype][id] = {
+            'indexes': indexes,
+            **properties
+        }
 
-    @_figure
-    def tripcolor(self, axes=None, show=True, figsize=None, **kwargs):
-        if len(self.triangles) > 0:
-            axes.tripcolor(self.triangulation, self.values, **kwargs)
-        return axes
+    def clear_boundaries(self):
+        self.__boundaries = {}
+        self.__boundaries[None] = {}
 
-    @_figure
-    def triplot(
+    def delete_boundary_type(self, ibtype):
+        del self.__boundaries[ibtype]
+
+    def delete_boundary_data(self, ibtype, id):
+        del self.__boundaries[ibtype][id]
+
+    def write_boundaries(self, path, overwrite=False):
+        path = pathlib.Path(path)
+        with fiona.open(
+                    path.name,
+                    'w',
+                    driver='ESRI Shapefile',
+                    crs=self.crs.srs,
+                    schema={
+                        'geometry': 'LineString',
+                        'properties': {
+                            'id': 'int',
+                            'ibtype': 'str',
+                            'bnd_id': 'str'
+                            }
+                        }) as dst:
+            _cnt = 0
+            for ibtype, bnds in self.boundaries.items():
+                for id, bnd in bnds.items():
+                    idxs = list(map(self.get_node_index, bnd['indexes']))
+                    linear_ring = LineString(self.xy[idxs].tolist())
+                    dst.write({
+                            "geometry": mapping(linear_ring),
+                            "properties": {
+                                "id": _cnt,
+                                "ibtype": ibtype,
+                                "bnd_id": f"{ibtype}:{id}"
+                                }
+                            })
+                    _cnt += 1
+
+    @fig._figure
+    def make_plot(
         self,
         axes=None,
+        vmin=None,
+        vmax=None,
         show=False,
-        figsize=None,
-        linewidth=0.07,
-        color='black',
+        title=None,
+        # figsize=rcParams["figure.figsize"],
+        extent=None,
+        cbar_label=None,
         **kwargs
     ):
-        if len(self.triangles) > 0:
-            kwargs.update({'linewidth': linewidth})
-            kwargs.update({'color': color})
-            axes.triplot(self.triangulation, **kwargs)
-        return axes
-
-    @_figure
-    def quadplot(
-        self,
-        axes=None,
-        show=False,
-        figsize=None,
-        facecolor='none',
-        edgecolor='k',
-        linewidth=0.07,
-        **kwargs
-    ):
-        if len(self.quads) > 0:
-            pc = PolyCollection(
-                self.coords[self.quads],
-                facecolor=facecolor,
-                edgecolor=edgecolor,
-                linewidth=0.07,
-                )
-            axes.add_collection(pc)
-        return axes
-
-    @_figure
-    def quadface(
-        self,
-        axes=None,
-        show=False,
-        figsize=None,
-        **kwargs
-    ):
-        if len(self.quads) > 0:
-            pc = PolyCollection(
-                self.coords[self.quads],
+        if vmin is None:
+            vmin = np.min(self.values)
+        if vmax is None:
+            vmax = np.max(self.values)
+        kwargs.update(**fig.get_topobathy_kwargs(self.values, vmin, vmax))
+        kwargs.pop('col_val')
+        levels = kwargs.pop('levels')
+        if vmin != vmax:
+            self.tricontourf(
+                axes=axes,
+                levels=levels,
+                vmin=vmin,
+                vmax=vmax,
                 **kwargs
-                )
-            quad_values = np.mean(self.values[self.quads], axis=1)
-            pc.set_array(quad_values)
-            axes.add_collection(pc)
-        return axes
-
-    @_figure
-    def plot_wireframe(self, axes=None, show=False, **kwargs):
-        axes = self.triplot(axes=axes, **kwargs)
-        axes = self.quadplot(axes=axes, **kwargs)
-        return axes
-
-    @property
-    def coords(self):
-        return np.array(
-            [coord for coord in self._coords.values()]
             )
+        else:
+            self.tripcolor(axes=axes, **kwargs)
+        self.quadface(axes=axes, **kwargs)
+        axes.axis('scaled')
+        if extent is not None:
+            axes.axis(extent)
+        if title is not None:
+            axes.set_title(title)
+        mappable = ScalarMappable(cmap=kwargs['cmap'])
+        mappable.set_array([])
+        mappable.set_clim(vmin, vmax)
+        divider = make_axes_locatable(axes)
+        cax = divider.append_axes("bottom", size="2%", pad=0.5)
+        cbar = plt.colorbar(
+            mappable,
+            cax=cax,
+            orientation='horizontal'
+        )
+        cbar.set_ticks([vmin, vmax])
+        cbar.set_ticklabels([np.around(vmin, 2), np.around(vmax, 2)])
+        if cbar_label is not None:
+            cbar.set_label(cbar_label)
+        return axes
+
+    @fig._figure
+    def plot_boundary(
+        self,
+        ibtype,
+        id,
+        tags=True,
+        axes=None,
+        show=False,
+        figsize=None,
+        **kwargs
+    ):
+
+        boundary = list(map(
+            self.get_node_index, self.boundaries[ibtype][id]['indexes']))
+        p = axes.plot(self.x[boundary], self.y[boundary], **kwargs)
+        if tags:
+            axes.text(
+                self.x[boundary[len(boundary)//2]],
+                self.y[boundary[len(boundary)//2]],
+                f"ibtype={ibtype}\nid={id}",
+                color=p[-1].get_color()
+                )
+        return axes
+
+    @fig._figure
+    def plot_boundaries(
+        self,
+        axes=None,
+        show=False,
+        figsize=None,
+        **kwargs
+    ):
+        kwargs.update({'axes': axes})
+        for ibtype, bnds in self.boundaries.items():
+            for id in bnds:
+                axes = self.plot_boundary(ibtype, id, **kwargs)
+                kwargs.update({'axes': axes})
+        return kwargs['axes']
 
     @property
-    @lru_cache
-    def node_indexes(self):
-        return {id: index for index, id in enumerate(self._coords)}
+    def logger(self):
+        try:
+            return self.__logger
+        except AttributeError:
+            self.__logger = logging.getLogger(
+                __name__ + '.' + self.__class__.__name__)
+            return self.__logger
 
     @property
-    @lru_cache
-    def triangles(self):
-        return np.array(
-            [list(map(self.get_index, index))
-             for index in self._triangles.values()])
+    def boundaries(self):
+        return self._boundaries
 
     @property
-    @lru_cache
-    def quads(self):
-        return np.array(
-            [list(map(self.get_index, index))
-             for index in self._quads.values()])
+    def gr3(self):
+        f = super().gr3
+        # ocean boundaries
+        f += f"{len(self.boundaries[None].keys()):d} "
+        f += "! total number of ocean boundaries\n"
+        # count total number of ocean boundaries
+        _sum = np.sum(
+            [len(boundary['indexes'])
+             for boundary in self.boundaries[None].values()]
+            )
+        f += f"{int(_sum):d} ! total number of ocean boundary nodes\n"
+        # write ocean boundary indexes
+        for i, boundary in self.boundaries[None].items():
+            f += f"{len(boundary['indexes']):d}"
+            f += f" ! number of nodes for ocean_boundary_{i}\n"
+            for idx in boundary['indexes']:
+                f += f"{idx}\n"
+        # count non-ocean boundaries
+        _cnt = 0
+        for ibtype, bnd in self.boundaries.items():
+            if ibtype is not None:
+                _cnt += len(self.boundaries[ibtype].keys())
+        f += f"{_cnt:d}  ! total number of non-ocean boundaries\n"
+        # count all remaining nodes of all non-ocean boundaries
+        _cnt = 0
+        for ibtype, bnd in self.boundaries.items():
+            if ibtype is not None:
+                _cnt = int(np.sum([len(x['indexes'])
+                    for x in self.boundaries[ibtype].values()]))
+        f += f"{_cnt:d} ! Total number of non-ocean boundary nodes\n"
+        # write all non-ocean boundaries
+        for ibtype, bnds in self.boundaries.items():
+            if ibtype is not None:
+                # write land boundaries
+                for i, bnd in bnds.items():
+                    f += f"{len(bnd['indexes']):d} "
+                    f += f"{ibtype} "
+                    f += "! number of nodes for boundary_"
+                    f += f"{i}\n"
+                    for idx in bnd['indexes']:
+                        f += f"{idx}\n"
+        return f
 
     @property
-    def xy(self):
-        return self.coords
+    def _boundaries(self):
+        return self.__boundaries
 
-    @property
-    def x(self):
-        return self.coords[:, 0]
-
-    @property
-    def y(self):
-        return self.coords[:, 1]
-
-    @property
-    def values(self):
-        return self._values
-
-    @property
-    @lru_cache
-    def triangulation(self):
-        if len(self.triangles) > 0:
-            return Triangulation(self.x, self.y, self.triangles)
-
-    @property
-    def description(self):
-        return self._description
-
-    @property
-    def proj(self):
-        return Proj(self.crs)
-
-    @property
-    def srs(self):
-        return self.proj.srs
-
-    @property
-    def crs(self):
-        return self._crs
-
-    @description.setter
-    def description(self, description):
-        self._description = description
-
-    @property
-    def _coords(self):
-        return self.__coords
-
-    @property
-    def _values(self):
-        return self.__values
-
-    @property
-    def _crs(self):
-        return self.__crs
-
-    @property
-    def _description(self):
-        return self.__description
-
-    @_coords.setter
-    def _coords(self, coords):
-        msg = "coords argument must be a dictionary of the form "
-        msg += "\\{coord_id:  (x, y)\\}"
-        assert isinstance(coords, Mapping), msg
-        for coord in coords.values():
-            assert len(coord) == 2, msg
-            for coord in coord:
-                assert isinstance(coord, (float, int)), msg
-        self.__coords = coords
-
-    @_values.setter
-    def _values(self, values):
-        if values is None:
-            values = np.full(self.coords.shape[0], np.nan)
-        values = np.asarray(values)
-        assert values.shape[0] == self.coords.shape[0]
-        self.__values = values
-
-    @_crs.setter
-    def _crs(self, crs):
-        if crs is not None:
-            crs = CRS.from_user_input(crs)
-        self.__crs = crs
-
-    @_description.setter
-    def _description(self, description):
-        if description is None:
-            description = str(uuid.uuid4())[:8]
-        self.__description = description
-
-
-Gmesh = Geomesh  # Namespace alias
+    @_boundaries.setter
+    def _boundaries(self, boundaries):
+        """
+        boundaries = {ibtype: {id: {'indexes': [i0, ..., in], 'properties': object }}
+        """
+        self.clear_boundaries() # clear
+        if boundaries is not None:
+            for ibtype, bnds in boundaries.items():
+                if ibtype is not None:
+                    self.add_boundary_type(ibtype)
+                for id, bnd in bnds.items():
+                    if 'properties' in bnd.keys():
+                        properties = bnd['properties']
+                    else:
+                        properties = {}
+                    self.set_boundary_data(
+                        ibtype,
+                        id,
+                        bnd['indexes'],
+                        **properties
+                    )

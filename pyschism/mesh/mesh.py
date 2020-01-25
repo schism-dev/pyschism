@@ -63,6 +63,7 @@ class Mesh:
 
     @_hgrid.setter
     def _hgrid(self, hgrid):
+        print(hgrid)
         assert isinstance(hgrid, Hgrid)
         self.__hgrid = hgrid
 

@@ -1,5 +1,8 @@
 #! /usr/bin/env python
 import unittest
+import tempfile
+import pathlib
+import numpy as np
 from pyschism.mesh import Gmesh
 
 
@@ -116,6 +119,136 @@ class GmeshTestCase(unittest.TestCase):
         gmsh.description = 'test'
         self.assertEqual(gmsh.description, 'test')
 
+    def test_open_gr3(self):
+        nodes = {
+            '1': ((0., 0.), -99999.),
+            '2': ((.5, 0.), -99999.),
+            '3': ((1., 0.), -99999.),
+            '4': ((1., 1.), -99999.),
+            '5': ((0., 1.), -99999.),
+            '6': ((.5, 1.5), -99999.),
+            '7': ((.33, .33), -99999.),
+            '8': ((.66, .33), -99999.),
+            '9': ((.5, .66), -99999.),
+            '10': ((-1., 1.), -99999.),
+            '11': ((-1., 0.), -99999.),
+            }
+        elements = {
+            '1': ['5', '7', '9'],
+            '2': ['1', '2', '7'],
+            '3': ['2', '3', '8'],
+            '4': ['8', '7', '2'],
+            '5': ['3', '4', '8'],
+            '6': ['4', '9', '8'],
+            '7': ['4', '6', '5'],
+            '8': ['5', '10', '11', '1'],
+            '9': ['9', '4', '5'],
+            '10': ['5', '1', '7']
+            }
+
+        boundaries = dict()
+
+        boundaries[None] = {  # "open" boundaries
+                0: {'indexes': ['10', '11', '1', '2']},
+                1: {'indexes': ['2', '3', '4']}
+        }
+
+        boundaries[0] = {  # "land" boundaries
+            0: {'indexes': ['4', '6']},
+            1: {'indexes': ['6',  '5', '10']}
+        }
+
+        boundaries[1] = { # "interior" boundary
+            0: {'indexes': ['7', '8', '9', '7']}
+        }
+        f = "test\n"
+        f += f'{len(elements):d} '
+        f += f'{len(nodes):d}\n'
+        for id, ((x, y), z) in nodes.items():
+            f += f"{id} "
+            f += f"{x} "
+            f += f"{y} "
+            f += f"{z}\n"
+        for id, geom in elements.items():
+            f += f"{id} "
+            f += f"{len(geom)} "
+            for idx in geom:
+                f += f"{idx} "
+            f += f"\n"
+        if None in boundaries:
+            f += f"{len(boundaries[None]):d} "
+            f += "! total number of ocean boundaries\n"
+            # count total number of ocean boundaries
+            _sum = 0
+            for bnd in boundaries[None].values():
+                _sum += len(bnd['indexes'])
+            f += f"{int(_sum):d} ! total number of ocean boundary nodes\n"
+            # write ocean boundary indexes
+            for i, boundary in boundaries[None].items():
+                f += f"{len(boundary['indexes']):d}"
+                f += f" ! number of nodes for ocean_boundary_{i}\n"
+                for idx in boundary['indexes']:
+                    f += f"{idx}\n"
+        else:
+            f += "0 ! total number of ocean boundaries\n"
+            f += "0 ! total number of ocean boundary nodes\n"
+        # remaining boundaries
+        _cnt = 0
+        for key in boundaries:
+            if key is not None:
+                for bnd in boundaries[key]:
+                    _cnt += 1
+        f += f"{_cnt:d}  ! total number of non-ocean boundaries\n"
+        # count remaining boundary nodes
+        _cnt = 0
+        for ibtype in boundaries:
+            if ibtype is not None:
+                for bnd in boundaries[ibtype].values():
+                    _cnt += np.asarray(bnd['indexes']).size
+        f += f"{_cnt:d} ! Total number of non-ocean boundary nodes\n"
+        # all additional boundaries
+        for ibtype, boundaries in boundaries.items():
+            if ibtype is None:
+                continue
+            for id, boundary in boundaries.items():
+                f += f"{len(boundary['indexes']):d} "
+                f += f"{ibtype} "
+                f += f"! boundary {ibtype}:{id}\n"
+                for idx in boundary['indexes']:
+                    f += f"{idx}\n"
+        tmpdir = tempfile.TemporaryDirectory()
+        gr3 = pathlib.Path(tmpdir.name) / 'gr3.gr3'
+        with open(gr3.absolute(), 'w') as h:
+            h.write(f)
+        msh = Gmesh.open_gr3(gr3.absolute())
+        self.assertIsInstance(msh, Gmesh)
+
+    def test_add_existing_boundary_type_raises(self):
+        msh = Gmesh(self.coords, self.triangles)
+        self.assertRaises(Exception, msh.add_boundary_type, None)
+
+    def test_boundary_type(self):
+        msh = Gmesh(self.coords, self.triangles)
+        msh.delete_boundary_type(None)
+
+    def test_set_boundary_data_raises_bad_indexes(self):
+        msh = Gmesh(self.coords, self.triangles)
+        data = ['10', '11', '1', '2']
+        self.assertRaises(
+            AssertionError,
+            msh.set_boundary_data,
+            None, 0, data)
+
+    def test_set_boundary_data(self):
+        msh = Gmesh(self.coords, self.triangles)
+        data = [139510, 140443, 140461, 140462, 141993, 150761]
+        msh.set_boundary_data(None, 0, data)
+
+    def test_delete_boundary_data(self):
+        msh = Gmesh(self.coords, self.triangles)
+        data = [139510, 140443, 140461, 140462, 141993, 150761]
+        msh.set_boundary_data(None, 0, data)
+        msh.delete_boundary_data(None, 0)
 
 if __name__ == '__main__':
     unittest.main()
