@@ -250,5 +250,41 @@ class GmeshTestCase(unittest.TestCase):
         msh.set_boundary_data(None, 0, data)
         msh.delete_boundary_data(None, 0)
 
+    def test_write_boundaries(self):
+        tmpdir = tempfile.TemporaryDirectory()
+        shp = pathlib.Path(tmpdir.name).absolute()
+        boundaries = {
+            None: {
+                0: {
+                    'indexes':
+                        [139510, 140443, 140461, 140462, 141993, 150761]
+                    }
+                }
+            }
+        msh = Gmesh(
+            self.coords,
+            self.triangles,
+            crs="EPSG:3395",
+            boundaries=boundaries)
+        msh.write_boundaries(shp, overwrite=True)
+
+    def test_write_boundaries_raises(self):
+        tmpdir = tempfile.TemporaryDirectory()
+        shp = pathlib.Path(tmpdir.name).absolute()
+        boundaries = {
+            None: {
+                0: {
+                    'indexes':
+                        [139510, 140443, 140461, 140462, 141993, 150761]
+                    }
+                }
+            }
+        msh = Gmesh(
+            self.coords,
+            self.triangles,
+            crs="EPSG:3395",
+            boundaries=boundaries)
+        self.assertRaises(IOError, msh.write_boundaries, shp)
+
 if __name__ == '__main__':
     unittest.main()

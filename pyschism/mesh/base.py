@@ -362,10 +362,6 @@ class EuclideanMesh2D:
         return f
 
     @property
-    def geom(self):
-        return self.pslg.geom
-
-    @property
     @lru_cache
     def grd(self):
         description = self.description

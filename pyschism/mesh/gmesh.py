@@ -61,8 +61,12 @@ class Gmesh(EuclideanMesh2D):
 
     def write_boundaries(self, path, overwrite=False):
         path = pathlib.Path(path)
+        # print(path)
+        if path.exists() and not overwrite:
+            msg = "Destination path exists and overwrite=False"
+            raise IOError(msg)
         with fiona.open(
-                    path.name,
+                    path.absolute(),
                     'w',
                     driver='ESRI Shapefile',
                     crs=self.crs.srs,
