@@ -61,12 +61,32 @@ class Sms2dmTestCase(unittest.TestCase):
             'E4Q': {
                 id: indexes 
                 for id, indexes in self.elements.items() if len(indexes) == 4
+            },
+            'boundaries': self.boundaries,
+        }
+        tmpdir = tempfile.TemporaryDirectory()
+        tmpfile = pathlib.Path(tmpdir.name) / 'hgrid.2dm'
+        writer(grd, pathlib.Path(tmpfile))
+        grd.pop('boundaries')
+        self.assertDictEqual(reader(pathlib.Path(tmpfile)), grd)
+
+    def test_write_raise_exists(self):
+        grd = {
+            'ND': self.nodes,
+            'E3T': {
+                id: indexes 
+                for id, indexes in self.elements.items() if len(indexes) == 3
+            },
+            'E4Q': {
+                id: indexes 
+                for id, indexes in self.elements.items() if len(indexes) == 4
             }
         }
         tmpdir = tempfile.TemporaryDirectory()
         tmpfile = pathlib.Path(tmpdir.name) / 'hgrid.2dm'
         writer(grd, pathlib.Path(tmpfile))
-        self.assertDictEqual(reader(pathlib.Path(tmpfile)), grd)
+        self.assertRaises(Exception, writer, grd, pathlib.Path(tmpfile))
+
 
 if __name__ == '__main__':
     unittest.main()

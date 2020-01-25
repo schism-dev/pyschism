@@ -79,7 +79,11 @@ def geom_string(geom_type, sms2dm):
 
 
 def nodestring(geom):
-    raise NotImplementedError
+    f = "NS "
+    for i in range(len(geom) -1):
+        f += f"{geom[i]} "
+    f += f"-{geom[-1]}\n"
+    return f
 
 
 def triangular_elements(geom):
