@@ -2,10 +2,10 @@
 import unittest
 import pathlib
 import tempfile
-from pyschism.mesh.gr3 import reader, writer, to_gmesh
+from pyschism.mesh.grd import reader, writer, to_gmesh
 
 
-class Gr3TestCase(unittest.TestCase):
+class GrdTestCase(unittest.TestCase):
 
     def setUp(self):
         self.nodes = {
@@ -54,28 +54,28 @@ class Gr3TestCase(unittest.TestCase):
             'nodes': self.nodes,
             'elements': self.elements,
             'boundaries': self.boundaries,
-            'description': 'gr3_unittest'
+            'description': 'grd_unittest'
         }
 
     def test_write_read(self):
         tmpdir = tempfile.TemporaryDirectory()
-        tmpfile = pathlib.Path(tmpdir.name) / 'hgrid.gr3'
+        tmpfile = pathlib.Path(tmpdir.name) / 'hgrid.grd'
         writer(self.grd, pathlib.Path(tmpfile))
         self.assertDictEqual(reader(pathlib.Path(tmpfile)), self.grd)
 
     def test_overwrite(self):
         tmpdir = tempfile.TemporaryDirectory()
-        writer(self.grd, pathlib.Path(tmpdir.name) / 'hgrid.gr3')
+        writer(self.grd, pathlib.Path(tmpdir.name) / 'hgrid.grd')
         self.assertRaises(
             Exception,
             writer,
             self.grd,
-            pathlib.Path(tmpdir.name) / 'hgrid.gr3'
+            pathlib.Path(tmpdir.name) / 'hgrid.grd'
             )
 
     def test_no_ocean_bnd(self):
         tmpdir = tempfile.TemporaryDirectory()
-        tmpfile = pathlib.Path(tmpdir.name) / 'hgrid.gr3'
+        tmpfile = pathlib.Path(tmpdir.name) / 'hgrid.grd'
         self.grd['boundaries'].pop(None)
         writer(self.grd, pathlib.Path(tmpfile))
         self.assertDictEqual(reader(pathlib.Path(tmpfile)), self.grd)

@@ -8,7 +8,7 @@ from matplotlib.cm import ScalarMappable
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from shapely.geometry import LineString, mapping
 import matplotlib.pyplot as plt
-from pyschism.mesh import gr3
+from pyschism.mesh import grd
 from pyschism import figures as fig
 from pyschism.mesh.base import EuclideanMesh2D
 
@@ -29,9 +29,9 @@ class Gmesh(EuclideanMesh2D):
         super().__init__(coords, triangles, quads, values, crs, description)
         self._boundaries = boundaries
 
-    @classmethod
-    def open_gr3(cls, path, crs=None):
-        return cls(**gr3.to_gmesh(gr3.reader(path)), crs=crs)
+    @staticmethod
+    def open_grd(path, crs=None):
+        return Gmesh(**grd.to_gmesh(grd.reader(path)), crs=crs)
 
     def add_boundary_type(self, ibtype):
         if ibtype not in self.boundaries:
@@ -195,49 +195,17 @@ class Gmesh(EuclideanMesh2D):
         return self._boundaries
 
     @property
-    def gr3(self):
-        f = super().gr3
-        # ocean boundaries
-        f += f"{len(self.boundaries[None].keys()):d} "
-        f += "! total number of ocean boundaries\n"
-        # count total number of ocean boundaries
-        _sum = np.sum(
-            [len(boundary['indexes'])
-             for boundary in self.boundaries[None].values()]
-            )
-        f += f"{int(_sum):d} ! total number of ocean boundary nodes\n"
-        # write ocean boundary indexes
-        for i, boundary in self.boundaries[None].items():
-            f += f"{len(boundary['indexes']):d}"
-            f += f" ! number of nodes for ocean_boundary_{i}\n"
-            for idx in boundary['indexes']:
-                f += f"{idx}\n"
-        # count non-ocean boundaries
-        _cnt = 0
-        for ibtype, bnd in self.boundaries.items():
-            if ibtype is not None:
-                _cnt += len(self.boundaries[ibtype].keys())
-        f += f"{_cnt:d}  ! total number of non-ocean boundaries\n"
-        # count all remaining nodes of all non-ocean boundaries
-        _cnt = 0
-        for ibtype, bnd in self.boundaries.items():
-            if ibtype is not None:
-                _cnt = int(np.sum([len(x['indexes'])
-                    for x in self.boundaries[ibtype].values()]))
-        f += f"{_cnt:d} ! Total number of non-ocean boundary nodes\n"
-        # write all non-ocean boundaries
-        for ibtype, bnds in self.boundaries.items():
-            if ibtype is not None:
-                # write land boundaries
-                for i, bnd in bnds.items():
-                    f += f"{len(bnd['indexes']):d} "
-                    f += f"{ibtype} "
-                    f += "! number of nodes for boundary_"
-                    f += f"{i}\n"
-                    for idx in bnd['indexes']:
-                        f += f"{idx}\n"
-        return f
+    def _grd(self):
+        grd = super()._grd
+        grd.update({'boundaries': self.boundaries})
+        return grd
 
+    @property
+    def _sms2dm(self):
+        sms2dm = super()._sms2dm
+        sms2dm.update({'boundaries': self.boundaries})
+        return sms2dm
+    
     @property
     def _boundaries(self):
         return self.__boundaries

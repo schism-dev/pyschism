@@ -3,17 +3,6 @@ import numpy as np
 from collections import defaultdict
 
 
-def writer(grd, path, overwrite=False):
-    path = pathlib.Path(path)
-    if path.is_file() and not overwrite:
-        msg = 'File exists, pass overwrite=True to allow overwrite.'
-        raise Exception(msg)
-    with open(path, 'w') as f:
-        g = graph(grd)
-        if 'boundaries' in grd.keys():
-            g += boundaries(grd)
-        f.write(g)
-    return 0  # for unittests
 
 
 def reader(path):
@@ -72,6 +61,21 @@ def reader(path):
             grd[key] = dict(value)
     return grd
 
+
+def writer(grd, path, overwrite=False):
+    path = pathlib.Path(path)
+    if path.is_file() and not overwrite:
+        msg = 'File exists, pass overwrite=True to allow overwrite.'
+        raise Exception(msg)
+    with open(path, 'w') as f:
+        f.write(string(grd))
+    return 0  # for unittests
+
+def string(grd):
+    f = graph(grd)
+    if 'boundaries' in grd.keys():
+        f += boundaries(grd)
+    return f
 
 def graph(grd):
     f = ""

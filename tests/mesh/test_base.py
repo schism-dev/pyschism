@@ -3,10 +3,10 @@ import unittest
 import tempfile
 import pathlib
 import numpy as np
-from pyschism.mesh import Gmesh
+from pyschism.mesh.base import EuclideanMesh2D
 
 
-class GmeshTestCase(unittest.TestCase):
+class EuclideanMesh2DTestCase(unittest.TestCase):
 
     def setUp(self):
 
@@ -100,26 +100,8 @@ class GmeshTestCase(unittest.TestCase):
             323105: [179740, 179741, 179731, 179730],
             }
 
-    def test_init(self):
-        gmsh = Gmesh(self.coords, self.triangles, self.quads)
-        self.assertIsInstance(gmsh, Gmesh)
 
-    def test_transform_to(self):
-        gmsh = Gmesh(self.coords, self.triangles, self.quads, crs=3395)
-        gmsh.transform_to(4326)
-        self.assertIsInstance(gmsh, Gmesh)
-
-    def test_xy(self):
-        gmsh = Gmesh(self.coords, self.triangles, self.quads, crs=3395)
-        values = [[x, y] for x, y in self.coords.values()]
-        self.assertSequenceEqual(gmsh.xy.tolist(), values)
-
-    def test_default_description(self):
-        gmsh = Gmesh(self.coords, self.triangles, self.quads, crs=3395)
-        gmsh.description = 'test'
-        self.assertEqual(gmsh.description, 'test')
-
-    def test_open_gr3(self):
+    def test_open_fmt_grd(self):
         nodes = {
             '1': ((0., 0.), -99999.),
             '2': ((.5, 0.), -99999.),
@@ -220,95 +202,12 @@ class GmeshTestCase(unittest.TestCase):
         gr3 = pathlib.Path(tmpdir.name) / 'gr3.gr3'
         with open(gr3.absolute(), 'w') as h:
             h.write(f)
-        msh = Gmesh.open_gr3(gr3.absolute())
-        self.assertIsInstance(msh, Gmesh)
+        msh = EuclideanMesh2D.open(gr3.absolute(), fmt='grd')
+        self.assertIsInstance(msh, EuclideanMesh2D)
 
-    def test_add_existing_boundary_type_raises(self):
-        msh = Gmesh(self.coords, self.triangles)
-        self.assertRaises(Exception, msh.add_boundary_type, None)
+    def test_open_fmt_2dm(self):
+        pass
 
-    def test_boundary_type(self):
-        msh = Gmesh(self.coords, self.triangles)
-        msh.delete_boundary_type(None)
-
-    def test_set_boundary_data_raises_bad_indexes(self):
-        msh = Gmesh(self.coords, self.triangles)
-        data = ['10', '11', '1', '2']
-        self.assertRaises(
-            AssertionError,
-            msh.set_boundary_data,
-            None, 0, data)
-
-    def test_set_boundary_data(self):
-        msh = Gmesh(self.coords, self.triangles)
-        data = [139510, 140443, 140461, 140462, 141993, 150761]
-        msh.set_boundary_data(None, 0, data)
-
-    def test_delete_boundary_data(self):
-        msh = Gmesh(self.coords, self.triangles)
-        data = [139510, 140443, 140461, 140462, 141993, 150761]
-        msh.set_boundary_data(None, 0, data)
-        msh.delete_boundary_data(None, 0)
-
-    def test_write_boundaries(self):
-        tmpdir = tempfile.TemporaryDirectory()
-        shp = pathlib.Path(tmpdir.name).absolute()
-        boundaries = {
-            None: {
-                0: {
-                    'indexes':
-                        [139510, 140443, 140461, 140462, 141993, 150761]
-                    }
-                }
-            }
-        msh = Gmesh(
-            self.coords,
-            self.triangles,
-            crs="EPSG:3395",
-            boundaries=boundaries)
-        msh.write_boundaries(shp, overwrite=True)
-
-    def test_write_boundaries_raises(self):
-        tmpdir = tempfile.TemporaryDirectory()
-        shp = pathlib.Path(tmpdir.name).absolute()
-        boundaries = {
-            None: {
-                0: {
-                    'indexes':
-                        [139510, 140443, 140461, 140462, 141993, 150761]
-                    }
-                }
-            }
-        msh = Gmesh(
-            self.coords,
-            self.triangles,
-            crs="EPSG:3395",
-            boundaries=boundaries)
-        msh.logger.debug('coverage')
-        self.assertRaises(IOError, msh.write_boundaries, shp)
-
-    def test_gr3(self):
-        boundaries = {
-            None: {
-                0: {
-                    'indexes':
-                        [139510, 140443, 140461, 140462, 141993, 150761]
-                    }
-                },
-            0: {
-                0: {
-                    'indexes':
-                        [139510, 140443, 140461, 140462, 141993, 150761],
-                    'properties': {'fake_velocites': None},
-                    }
-                }
-            }
-        msh = Gmesh(
-            self.coords,
-            self.triangles,
-            crs="EPSG:3395",
-            boundaries=boundaries)
-        self.assertIsInstance(msh.grd, str)
 
 if __name__ == '__main__':
     unittest.main()

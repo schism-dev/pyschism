@@ -4,7 +4,7 @@ from functools import lru_cache
 import logging
 import uuid
 import pathlib
-from pyschism.mesh import gr3
+from pyschism.mesh import grd, sms2dm
 from pyschism.figures import _figure
 from collections.abc import Mapping
 from matplotlib.tri import Triangulation
@@ -32,13 +32,11 @@ class EuclideanMesh2D:
 
     @classmethod
     def open(cls, path, crs=None, fmt="grd"):
-        assert fmt.lower() in ['grd', 'gr3', 'adcirc', 'schism', '2dm', 'sms', 'msh']
-        
+        assert fmt.lower() in ['grd', 'gr3', 'adcirc', 'schism', '2dm', 'sms',
+                               'msh']
+
         if fmt.lower() in ['grd', 'gr3', 'adcirc', 'schism']:
-            return cls.open_gr3(path, crs)
-        
-        elif fmt.lower() in ['msh']:
-            return cls.open_msh(path, crs)
+            return cls.open_grd(path, crs)
 
         elif fmt.lower() in ['2dm', 'sms']:
             return cls.open_2dm(path, crs)
@@ -48,17 +46,21 @@ class EuclideanMesh2D:
         raise NotImplementedError
 
     @classmethod
-    def open_gr3(cls, path, crs=None):
-        grd = gr3.reader(path)
-        grd.pop('boundaries')
-        return cls.from_grd(grd, crs)
+    def open_grd(cls, path, crs=None):
+        _grd = grd.reader(path)
+        _grd.pop('boundaries')
+        return cls.from_grd(_grd, crs)
 
     @classmethod
-    def from_grd(cls, grd, crs=None):
-        grd = gr3.to_gmesh(grd)
-        if 'boundaries' in grd:
-            grd.pop('boundaries')
-        return cls(**gr3.to_gmesh(grd), crs=crs)
+    def open_gr3(cls, path, crs=None):
+        return cls.open_grd(path, crs)
+
+    @classmethod
+    def from_grd(cls, grid, crs=None):
+        grid = grd.to_gmesh(grid)
+        if 'boundaries' in grid:
+            grid.pop('boundaries')
+        return cls(**grid, crs=crs)
 
     def transform_to(self, dst_crs):
         dst_crs = CRS.from_user_input(dst_crs)
@@ -112,7 +114,7 @@ class EuclideanMesh2D:
 
     def ascii_string(self, fmt):
         if fmt.lower() in ['grd', 'gr3', 'adcirc', 'schism']:
-            return self.gr3
+            return self.grd
         if fmt.lower() in ['sms', '2dm']:
             return self.sms
 
@@ -284,24 +286,7 @@ class EuclideanMesh2D:
 
     @staticmethod
     def parse_2dm(path):
-        grd = dict()
-        with open(pathlib.Path(path), 'r') as f:
-            f.readline()
-            while 1:
-                line = f.readline().split()
-                if len(line) == 0:
-                    break
-                if line[0] in ['E3T', 'E4Q']:
-                    grd[line[0]].update({
-                        line[1]: line[2:]
-                        })
-                if line[0] == 'ND':
-                    grd[line[0]].update({
-                        line[1]: (
-                            list(map(float, line[2:-1])), float(line[-1])
-                            )
-                        })
-        return grd
+        return sms2dm.reader(path)
 
     @property
     def description(self):
@@ -320,58 +305,12 @@ class EuclideanMesh2D:
         return self._crs
 
     @property
-    def gr3(self):
-        f = f"{self.description}\n"
-        f += f"{len(self.elements)} "
-        f += f"{len(self.nodes)}\n"
-        # TODO: Make faster using np.array2string
-        for id, ((x, y), value) in self._nodes.items():
-            f += f"{id} "
-            f += f"{x:<.16E} "
-            f += f" {y:<.16E} "
-            f += f"{value:<.16E}\n"
-        for id, element in self._elements.items():
-            f += f"{id} "
-            f += f"{len(element):d} "
-            for tag in element:
-                f += f"{tag} "
-            f += "\n"
-        return f
-
-    @property
-    def sms(self):
-        def geom_string(geom_type, geom):
-            f = ''
-            if geom is not None:
-                for i in range(geom.shape[0]):
-                    f += f"{geom_type} {i + 1} "
-                    for j in range(len(geom[i, :])):
-                        f += f"{geom[i, j]+1} "
-                    f += "\n"
-            return f
-
-        f = "MESH2D\n"
-        # TODO: Make faster using np.array2string
-        f += geom_string("E3T", self.triangles)
-        f += geom_string("E4Q", self.quads)
-        for i in range(self.coords.shape[0]):
-            f += f"ND {i + 1} "
-            f += f"{self.x[i]:<.16E} "
-            f += f"{self.y[i]:<.16E} "
-            f += f"{-self.values[i]:<.16E}\n"
-        return f
-
-    @property
-    @lru_cache
     def grd(self):
-        description = self.description
-        if self.crs is not None:
-            description += f"; {self.crs.srs}"
-        return {
-            "nodes": self.nodes,
-            "elements": self.elements,
-            "description": description,
-        }
+        return grd.string(self._grd)
+
+    @property
+    def sms2dm(self):
+        return sms2dm.string(self._sms2dm)        
     
     @property
     @lru_cache
@@ -458,6 +397,32 @@ class EuclideanMesh2D:
         elements = {
             elements_id[i]: indexes for i, indexes in enumerate(elements)}
         return elements
+
+
+    @property
+    @lru_cache
+    def _grd(self):
+        description = self.description
+        if self.crs is not None:
+            description += f"; {self.crs.srs}"
+        return {
+            "nodes": self._nodes,
+            "elements": self._elements,
+            "description": description,
+        }
+
+
+    @property
+    @lru_cache
+    def _sms2dm(self):
+        description = self.description
+        if self.crs is not None:
+            description += f"; {self.crs.srs}"
+        return {
+            "nodes": self.nodes,
+            "elements": self.elements,
+            "description": description,
+        }
 
     @_coords.setter
     def _coords(self, coords):

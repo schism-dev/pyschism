@@ -1,5 +1,5 @@
 from collections.abc import Iterable
-from pyschism.mesh import gr3
+from pyschism.mesh import grd
 from pyschism.mesh import Gmesh
 from pyschism.mesh.friction import (
     Fgrid,
@@ -22,17 +22,16 @@ class Hgrid(Gmesh):
         crs=None,
         description=None,
     ):
-        grd = {
+        super().__init__(**grd.to_gmesh({
             'nodes': nodes,
             'elements': elements,
             'description': description,
-            'boundaries': boundaries,
-        }
-        super().__init__(**gr3.to_gmesh(grd), crs=crs)
+            'boundaries': boundaries}),
+        crs=crs)
 
     @staticmethod
     def open(path, crs=None):
-        return Hgrid(**gr3.reader(path), crs=crs)
+        return Hgrid(**grd.reader(path), crs=crs)
 
     def set_friction(self, value, ftype='manning'):
 
