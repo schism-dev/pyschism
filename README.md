@@ -42,7 +42,7 @@ hgrid.make_plot(show=True)
 ```
 ##### Example 2: Write boundaries to shapefile
 ```python
-# open mesh as 
+# open mesh as example above
 from pyschism.mesh import Hgrid
 hgrid = Hgrid.open('hgrid.gr3')
 hgrid.write_boundaries("/path/to/output/dir", overwrite=True)
