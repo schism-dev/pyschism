@@ -107,3 +107,7 @@ class MeshTestCase(unittest.TestCase):
     def test_make_plot_3D(self, mock):
         m = Mesh.open(self.hgrid)
         self.assertRaises(NotImplementedError, m.make_plot)
+
+
+if __name__ == '__main__':
+    unittest.main()

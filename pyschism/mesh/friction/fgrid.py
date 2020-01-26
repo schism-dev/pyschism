@@ -1,8 +1,8 @@
 from pyschism.mesh import grd
-from pyschism.mesh.gmesh import Gmesh
+from pyschism.mesh.base import EuclideanMesh2D
 
 
-class Fgrid(Gmesh):
+class Fgrid(EuclideanMesh2D):
     """
     Base class for all friction types (e.g. manning.grd, drag.grd, etc...)
     """
@@ -10,17 +10,19 @@ class Fgrid(Gmesh):
         self,
         nodes,
         elements,
-        boundaries=None,
         crs=None,
         description=None,
     ):
-        super().__init__(**grd.to_gmesh({
+        msh = grd.euclidean_mesh({
             'nodes': nodes,
             'elements': elements,
             'description': description,
-            'boundaries': boundaries}),
-        crs=crs)
+            'crs': crs})
+        msh.update({"crs": crs})
+        super().__init__(**msh)
 
     @staticmethod
     def open(path, crs=None):
-        return Fgrid(**grd.reader(path), crs=crs)
+        msh = grd.reader(path)
+        msh.update({"crs": crs})
+        return Fgrid(**msh)

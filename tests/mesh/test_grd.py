@@ -2,7 +2,7 @@
 import unittest
 import pathlib
 import tempfile
-from pyschism.mesh.grd import reader, writer, to_gmesh
+from pyschism.mesh.grd import reader, writer, euclidean_mesh
 
 
 class GrdTestCase(unittest.TestCase):
@@ -46,9 +46,9 @@ class GrdTestCase(unittest.TestCase):
             1: {'indexes': ['6',  '5', '10']}
         }
 
-        self.boundaries[1] = { # "interior" boundary
+        self.boundaries[1] = {  # "interior" boundary
             0: {'indexes': ['7', '8', '9', '7']}
-        }  
+        }
 
         self.grd = {
             'nodes': self.nodes,
@@ -80,9 +80,8 @@ class GrdTestCase(unittest.TestCase):
         writer(self.grd, pathlib.Path(tmpfile))
         self.assertDictEqual(reader(pathlib.Path(tmpfile)), self.grd)
 
-    def test_to_gmesh(self):
-        self.grd.pop('boundaries')
-        self.assertIsInstance(to_gmesh(self.grd), dict)
+    def test_euclidean_mesh(self):
+        self.assertIsInstance(euclidean_mesh(self.grd), dict)
 
 
 if __name__ == '__main__':

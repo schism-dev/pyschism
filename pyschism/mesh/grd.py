@@ -3,8 +3,6 @@ import numpy as np
 from collections import defaultdict
 
 
-
-
 def reader(path):
     grd = dict()
     grd['nodes'] = defaultdict(list)
@@ -71,11 +69,13 @@ def writer(grd, path, overwrite=False):
         f.write(string(grd))
     return 0  # for unittests
 
+
 def string(grd):
     f = graph(grd)
     if 'boundaries' in grd.keys():
         f += boundaries(grd)
     return f
+
 
 def graph(grd):
     f = ""
@@ -95,6 +95,7 @@ def graph(grd):
             f += f"{idx} "
         f += "\n"
     return f
+
 
 def boundaries(grd):
     f = ""
@@ -143,7 +144,7 @@ def boundaries(grd):
     return f
 
 
-def to_gmesh(grd):
+def euclidean_mesh(grd):
     # from geomesh.mesh.hgrid import Hgrid
     # cast gr3 inputs into a geomesh structure format
     coords = {id: (x, y) for id, ((x, y), value) in grd['nodes'].items()}
@@ -152,17 +153,16 @@ def to_gmesh(grd):
     quads = {id: geom for id, geom in grd['elements'].items()
              if len(geom) == 4}
     values = [-value for coord, value in grd['nodes'].values()]
-    if 'boundaries' in grd.keys():
-        boundaries = grd['boundaries']
-    else:
-        boundaries = {}
-    description = grd['description']
-    # TODO: try to parse CRS out of description
-    return {
+    description = grd['description']  # TODO: get CRS from description
+    msh = {
         "coords": coords,
         "triangles": triangles,
         "quads": quads,
         "values": values,
-        "boundaries": boundaries,
-        "description": description
+        "description": description,
         }
+    if 'crs' in grd:
+        msh.update({"crs": grd["crs"]})
+    if 'boundaries' in grd.keys():
+        msh.update({'boundaries': grd['boundaries']})
+    return msh

@@ -127,22 +127,6 @@ class EuclideanMesh2DTestCase(unittest.TestCase):
             '9': ['9', '4', '5'],
             '10': ['5', '1', '7']
             }
-
-        boundaries = dict()
-
-        boundaries[None] = {  # "open" boundaries
-                0: {'indexes': ['10', '11', '1', '2']},
-                1: {'indexes': ['2', '3', '4']}
-        }
-
-        boundaries[0] = {  # "land" boundaries
-            0: {'indexes': ['4', '6']},
-            1: {'indexes': ['6',  '5', '10']}
-        }
-
-        boundaries[1] = { # "interior" boundary
-            0: {'indexes': ['7', '8', '9', '7']}
-        }
         f = "test\n"
         f += f'{len(elements):d} '
         f += f'{len(nodes):d}\n'
@@ -157,47 +141,6 @@ class EuclideanMesh2DTestCase(unittest.TestCase):
             for idx in geom:
                 f += f"{idx} "
             f += f"\n"
-        if None in boundaries:
-            f += f"{len(boundaries[None]):d} "
-            f += "! total number of ocean boundaries\n"
-            # count total number of ocean boundaries
-            _sum = 0
-            for bnd in boundaries[None].values():
-                _sum += len(bnd['indexes'])
-            f += f"{int(_sum):d} ! total number of ocean boundary nodes\n"
-            # write ocean boundary indexes
-            for i, boundary in boundaries[None].items():
-                f += f"{len(boundary['indexes']):d}"
-                f += f" ! number of nodes for ocean_boundary_{i}\n"
-                for idx in boundary['indexes']:
-                    f += f"{idx}\n"
-        else:
-            f += "0 ! total number of ocean boundaries\n"
-            f += "0 ! total number of ocean boundary nodes\n"
-        # remaining boundaries
-        _cnt = 0
-        for key in boundaries:
-            if key is not None:
-                for bnd in boundaries[key]:
-                    _cnt += 1
-        f += f"{_cnt:d}  ! total number of non-ocean boundaries\n"
-        # count remaining boundary nodes
-        _cnt = 0
-        for ibtype in boundaries:
-            if ibtype is not None:
-                for bnd in boundaries[ibtype].values():
-                    _cnt += np.asarray(bnd['indexes']).size
-        f += f"{_cnt:d} ! Total number of non-ocean boundary nodes\n"
-        # all additional boundaries
-        for ibtype, boundaries in boundaries.items():
-            if ibtype is None:
-                continue
-            for id, boundary in boundaries.items():
-                f += f"{len(boundary['indexes']):d} "
-                f += f"{ibtype} "
-                f += f"! boundary {ibtype}:{id}\n"
-                for idx in boundary['indexes']:
-                    f += f"{idx}\n"
         tmpdir = tempfile.TemporaryDirectory()
         gr3 = pathlib.Path(tmpdir.name) / 'gr3.gr3'
         with open(gr3.absolute(), 'w') as h:

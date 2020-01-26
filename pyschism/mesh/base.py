@@ -32,35 +32,38 @@ class EuclideanMesh2D:
 
     @classmethod
     def open(cls, path, crs=None, fmt="grd"):
-        assert fmt.lower() in ['grd', 'gr3', 'adcirc', 'schism', '2dm', 'sms',
-                               'msh']
+        assert fmt.lower() in [
+            'grd', 'gr3', 'adcirc', 'schism',
+            # '2dm', 'sms',
+            # 'msh'
+            ]
 
         if fmt.lower() in ['grd', 'gr3', 'adcirc', 'schism']:
             return cls.open_grd(path, crs)
 
-        elif fmt.lower() in ['2dm', 'sms']:
-            return cls.open_2dm(path, crs)
+        # elif fmt.lower() in ['2dm', 'sms']:
+        #     return cls.open_2dm(path, crs)
 
-    @classmethod
-    def open_2dm(cls, path, crs=None):
-        raise NotImplementedError
+    # @classmethod
+    # def open_2dm(cls, path, crs=None):
+    #     raise NotImplementedError
 
     @classmethod
     def open_grd(cls, path, crs=None):
-        _grd = grd.reader(path)
-        _grd.pop('boundaries')
-        return cls.from_grd(_grd, crs)
+        grid = grd.reader(path)
+        grid.update({"crs": crs})
+        return cls.from_grd(grid)
 
     @classmethod
     def open_gr3(cls, path, crs=None):
         return cls.open_grd(path, crs)
 
     @classmethod
-    def from_grd(cls, grid, crs=None):
-        grid = grd.to_gmesh(grid)
-        if 'boundaries' in grid:
-            grid.pop('boundaries')
-        return cls(**grid, crs=crs)
+    def from_grd(cls, grid):
+        """
+        grd is a dictionary of of the form:
+        """
+        return cls(**grd.euclidean_mesh(grid))
 
     def transform_to(self, dst_crs):
         dst_crs = CRS.from_user_input(dst_crs)
@@ -71,9 +74,7 @@ class EuclideanMesh2D:
                 )
             xy = list(zip(*transformer.transform(self.x, self.y)))
             ids = list(self._coords.keys())
-            self._coords = {
-                ids[i]: coord for i, coord in enumerate(xy)
-            }
+            self._coords = {ids[i]: coord for i, coord in enumerate(xy)}
             self._crs = dst_crs
     
     def get_node_index(self, id):
@@ -115,8 +116,8 @@ class EuclideanMesh2D:
     def ascii_string(self, fmt):
         if fmt.lower() in ['grd', 'gr3', 'adcirc', 'schism']:
             return self.grd
-        if fmt.lower() in ['sms', '2dm']:
-            return self.sms
+        # if fmt.lower() in ['sms', '2dm']:
+        #     return self.sms
 
     @_figure
     def tricontourf(self, axes=None, show=True, figsize=None, **kwargs):

@@ -48,9 +48,9 @@ class HgridTestCase(unittest.TestCase):
             1: {'indexes': ['6',  '5', '10']}
         }
 
-        self.boundaries[1] = { # "interior" boundary
+        self.boundaries[1] = {  # "interior" boundary
             0: {'indexes': ['7', '8', '9', '7']}
-        }  
+        }
 
         self.grd = {
             'nodes': self.nodes,
@@ -182,6 +182,18 @@ class HgridTestCase(unittest.TestCase):
             indexes,
         )
 
+    def test_delete_boundary_type(self):
+        msh = Hgrid(self.nodes, self.elements)
+        msh.delete_boundary_type(None)
+
+    def test_delete_boundary_data(self):
+        msh = Hgrid(self.nodes, self.elements, boundaries=self.boundaries)
+        msh.delete_boundary_data(None, 0)
+
+    def test_add_existing_boundary_type_raises(self):
+        msh = Hgrid(self.nodes, self.elements)
+        self.assertRaises(Exception, msh.add_boundary_type, None)
+
     def test_plot_boundaries(self):
         h = Hgrid(self.nodes, self.elements, self.boundaries)
         h.plot_boundaries()
@@ -199,6 +211,36 @@ class HgridTestCase(unittest.TestCase):
         h = Hgrid(self.nodes, self.elements)
         h.fgrid
         assert isinstance(h._fgrid, Fgrid)
+
+    def test_write_boundaries(self):
+        tmpdir = tempfile.TemporaryDirectory()
+        shp = pathlib.Path(tmpdir.name).absolute()
+        msh = Hgrid(
+            self.nodes,
+            self.elements,
+            crs="EPSG:3395",
+            boundaries=self.boundaries)
+        msh.write_boundaries(shp, overwrite=True)
+
+    def test_write_boundaries_raises(self):
+        tmpdir = tempfile.TemporaryDirectory()
+        shp = pathlib.Path(tmpdir.name).absolute()
+        msh = Hgrid(
+            self.nodes,
+            self.elements,
+            crs="EPSG:3395",
+            boundaries=self.boundaries)
+        msh.logger.debug('coverage')
+        self.assertRaises(IOError, msh.write_boundaries, shp)
+
+    def test_sms2dm(self):
+        self.boundaries[None][0].update({'properties': {}})
+        msh = Hgrid(
+            self.nodes,
+            self.elements,
+            crs="EPSG:3395",
+            boundaries=self.boundaries)
+        self.assertIsInstance(msh.sms2dm, str)
 
 
 if __name__ == '__main__':
