@@ -76,7 +76,7 @@ class EuclideanMesh2D:
             ids = list(self._coords.keys())
             self._coords = {ids[i]: coord for i, coord in enumerate(xy)}
             self._crs = dst_crs
-    
+
     def get_node_index(self, id):
         return self.node_index[id]
 
@@ -88,7 +88,7 @@ class EuclideanMesh2D:
 
     def get_element_id(self, index):
         return self.element_id[index]
-    
+
     def get_x(self, crs=None):
         return self.get_xy(crs)[:, 0]
 
@@ -108,10 +108,9 @@ class EuclideanMesh2D:
         path = pathlib.Path(path)
         if path.is_file() and not overwrite:
             msg = 'File exists, use overwrite=True to allow overwrite.'
-            raise Exception(msg)
+            raise IOError(msg)
         with open(path, 'w') as f:
             f.write(self.ascii_string(fmt))
-
 
     def ascii_string(self, fmt):
         if fmt.lower() in ['grd', 'gr3', 'adcirc', 'schism']:
@@ -259,18 +258,15 @@ class EuclideanMesh2D:
     def node_id(self):
         return {index: id for index, id in enumerate(self._coords)}
 
-        
     @property
     @lru_cache
     def element_id(self):
         return {index: id for index, id in enumerate(self._elements)}
 
-
     @property
     @lru_cache
     def node_index(self):
         return {id: index for index, id in enumerate(self._coords)}
-
 
     @property
     @lru_cache
@@ -284,10 +280,6 @@ class EuclideanMesh2D:
         y0 = np.min(self.y)
         y1 = np.max(self.y)
         return Bbox([[x0, y0], [x1, y1]])
-
-    @staticmethod
-    def parse_2dm(path):
-        return sms2dm.reader(path)
 
     @property
     def description(self):
@@ -311,8 +303,8 @@ class EuclideanMesh2D:
 
     @property
     def sms2dm(self):
-        return sms2dm.string(self._sms2dm)        
-    
+        return sms2dm.string(self._sms2dm)
+
     @property
     @lru_cache
     def tria3(self):
@@ -326,15 +318,11 @@ class EuclideanMesh2D:
         return np.array(
             [list(map(self.get_node_index, index))
              for index in self._quads.values()])
-   
+
     @property
+    @lru_cache
     def logger(self):
-        try:
-            return self.__logger
-        except AttributeError:
-            self.__logger = logging.getLogger(
-                __name__ + '.' + self.__class__.__name__)
-            return self.__logger
+        return logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
     @description.setter
     def description(self, description):
@@ -399,7 +387,6 @@ class EuclideanMesh2D:
             elements_id[i]: indexes for i, indexes in enumerate(elements)}
         return elements
 
-
     @property
     @lru_cache
     def _grd(self):
@@ -411,7 +398,6 @@ class EuclideanMesh2D:
             "elements": self._elements,
             "description": description,
         }
-
 
     @property
     @lru_cache
@@ -449,7 +435,7 @@ class EuclideanMesh2D:
                 assert values.shape[1] == self.coords.shape[0]
             else:
                 msg = f"input values has invalid shape: {values.shape}"
-                raise NotImplementedError(msg)
+                raise Exception(msg)
 
         else:
             values = np.full(self.coords.shape[0], np.nan)

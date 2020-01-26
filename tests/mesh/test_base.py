@@ -2,7 +2,6 @@
 import unittest
 import tempfile
 import pathlib
-import numpy as np
 from pyschism.mesh.base import EuclideanMesh2D
 
 
@@ -100,7 +99,6 @@ class EuclideanMesh2DTestCase(unittest.TestCase):
             323105: [179740, 179741, 179731, 179730],
             }
 
-
     def test_open_fmt_grd(self):
         nodes = {
             '1': ((0., 0.), -99999.),
@@ -148,10 +146,175 @@ class EuclideanMesh2DTestCase(unittest.TestCase):
         msh = EuclideanMesh2D.open(gr3.absolute(), fmt='grd')
         self.assertIsInstance(msh, EuclideanMesh2D)
 
+    def test_open_gr3(self):
+        nodes = {
+            '1': ((0., 0.), -99999.),
+            '2': ((.5, 0.), -99999.),
+            '3': ((1., 0.), -99999.),
+            '4': ((1., 1.), -99999.),
+            '5': ((0., 1.), -99999.),
+            '6': ((.5, 1.5), -99999.),
+            '7': ((.33, .33), -99999.),
+            '8': ((.66, .33), -99999.),
+            '9': ((.5, .66), -99999.),
+            '10': ((-1., 1.), -99999.),
+            '11': ((-1., 0.), -99999.),
+            }
+        elements = {
+            '1': ['5', '7', '9'],
+            '2': ['1', '2', '7'],
+            '3': ['2', '3', '8'],
+            '4': ['8', '7', '2'],
+            '5': ['3', '4', '8'],
+            '6': ['4', '9', '8'],
+            '7': ['4', '6', '5'],
+            '8': ['5', '10', '11', '1'],
+            '9': ['9', '4', '5'],
+            '10': ['5', '1', '7']
+            }
+        f = "test\n"
+        f += f'{len(elements):d} '
+        f += f'{len(nodes):d}\n'
+        for id, ((x, y), z) in nodes.items():
+            f += f"{id} "
+            f += f"{x} "
+            f += f"{y} "
+            f += f"{z}\n"
+        for id, geom in elements.items():
+            f += f"{id} "
+            f += f"{len(geom)} "
+            for idx in geom:
+                f += f"{idx} "
+            f += f"\n"
+        tmpdir = tempfile.TemporaryDirectory()
+        gr3 = pathlib.Path(tmpdir.name) / 'gr3.gr3'
+        with open(gr3.absolute(), 'w') as h:
+            h.write(f)
+        msh = EuclideanMesh2D.open_gr3(gr3.absolute())
+        self.assertIsInstance(msh, EuclideanMesh2D)
+
     def test_sms2dm(self):
         m = EuclideanMesh2D(self.coords, self.triangles, self.quads)
         self.assertIsInstance(m.sms2dm, str)
 
+    def test_transform_to(self):
+        # TODO: verify result
+        m = EuclideanMesh2D(
+            self.coords,
+            self.triangles,
+            self.quads,
+            crs="EPSG:3395"
+        )
+        m.transform_to("EPSG:4326")
+
+    def test_get_node_id(self):
+        m = EuclideanMesh2D(self.coords, self.triangles, self.quads)
+        self.assertEquals(m.get_node_id(0), 123964)
+
+    def test_get_node_index(self):
+        m = EuclideanMesh2D(self.coords, self.triangles, self.quads)
+        self.assertEquals(m.get_node_index(123964), 0)
+
+    def test_get_element_id(self):
+        m = EuclideanMesh2D(self.coords, self.triangles, self.quads)
+        self.assertEquals(m.get_element_id(0), 323078)
+
+    def test_get_element_index(self):
+        m = EuclideanMesh2D(self.coords, self.triangles, self.quads)
+        self.assertEquals(m.get_element_index(323078), 0)
+
+    def test_get_x(self):
+        # TODO: verify result
+        m = EuclideanMesh2D(self.coords, self.triangles, self.quads, crs=4326)
+        m.get_x(crs="EPSG:3395")
+
+    def test_get_y(self):
+        # TODO: verify result
+        m = EuclideanMesh2D(self.coords, self.triangles, self.quads, crs=4326)
+        m.get_y(crs="EPSG:3395")
+
+    def test_get_xy(self):
+        # TODO: verify result
+        m = EuclideanMesh2D(self.coords, self.triangles, self.quads)
+        m.get_xy()
+
+    def test_write_raises(self):
+        m = EuclideanMesh2D(self.coords, self.triangles, self.quads)
+        import tempfile
+        f = tempfile.NamedTemporaryFile()
+        self.assertRaises(IOError, m.write, f.name)
+
+    def test_property_nodes(self):
+        # TODO: verify result
+        m = EuclideanMesh2D(self.coords, self.triangles, self.quads)
+        m.nodes
+
+    def test_property_elements(self):
+        # TODO: verify result
+        m = EuclideanMesh2D(self.coords, self.triangles, self.quads, crs=4326)
+        m.elements
+
+    def test_property_triangles_id(self):
+        # TODO: verify result
+        m = EuclideanMesh2D(self.coords, self.triangles, self.quads, crs=4326)
+        m.triangles_id
+
+    def test_property_quads_id(self):
+        # TODO: verify result
+        m = EuclideanMesh2D(self.coords, self.triangles, self.quads, crs=4326)
+        m.quads_id
+
+    def test_property_bbox(self):
+        # TODO: verify result
+        m = EuclideanMesh2D(self.coords, self.triangles, self.quads, crs=4326)
+        m.bbox
+
+    def test_property_logger(self):
+        # TODO: verify result
+        m = EuclideanMesh2D(self.coords, self.triangles, self.quads, crs=4326)
+        m.logger
+
+    def test_property_setter_description(self):
+        # TODO: verify result
+        m = EuclideanMesh2D(self.coords, self.triangles, self.quads, crs=4326)
+        m.description = "test"
+
+    def test_property__grd(self):
+        # TODO: verify result
+        m = EuclideanMesh2D(self.coords, self.triangles, self.quads, crs=4326)
+        m._grd
+
+    def test_property_setter__values_raise_bad_shape(self):
+        m = EuclideanMesh2D(self.coords, self.triangles, self.quads, crs=4326)
+
+        def wrapper():
+            import numpy as np
+            m._values = np.random.rand(100, 1)
+        self.assertRaises(AssertionError, wrapper)
+
+    def test_property_setter__values_time_varying(self):
+        # TODO: verify result
+        m = EuclideanMesh2D(self.coords, self.triangles, self.quads, crs=4326)
+        import numpy as np
+        m._values = np.random.rand(3, len(self.coords), 1)
+
+    def test_property_setter__values_time_varying_bad_shape(self):
+        m = EuclideanMesh2D(self.coords, self.triangles, self.quads, crs=4326)
+
+        def wrapper():
+            import numpy as np
+            m._values = np.random.rand(3, len(self.coords), 1, 5)
+        self.assertRaises(Exception, wrapper)
+
+    def test_property_setter__triangles_None(self):
+        self.assertIsInstance(
+            EuclideanMesh2D(self.coords, None, self.quads),
+            EuclideanMesh2D)
+
+    def test_property_setter__quads_None(self):
+        self.assertIsInstance(
+            EuclideanMesh2D(self.coords, self.triangles, None),
+            EuclideanMesh2D)
 
 
 if __name__ == '__main__':
