@@ -50,7 +50,7 @@ hgrid.make_plot(show=True)
 ```python
 # open mesh as example above
 from pyschism.mesh import Hgrid
-hgrid = Hgrid.open('hgrid.gr3')
+hgrid = Hgrid.open('hgrid.gr3', crs="EPSG:3395")  # For shapefile output, coordinate reference system should be specified.
 hgrid.write_boundaries("/path/to/output/dir", overwrite=True)
 ```
 
