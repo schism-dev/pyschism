@@ -1,4 +1,5 @@
 import pathlib
+from functools import lru_cache
 from datetime import datetime, timedelta
 from pyschism.mesh import Mesh
 from pyschism.driver import SchismRun
@@ -51,53 +52,32 @@ class SchismBaseCommand:
         pass
 
     @property
+    @lru_cache
     def driver(self):
-        try:
-            return self.__driver
-        except AttributeError:
-            driver = SchismRun(
-                self.mesh,
-                self.start_date,
-                self.end_date,
-                self.spinup_time,
-                self.tidal_forcing,
-                self.wind_forcing,
-                self.wave_forcing,
-                # self.args.netcdf,
-                )
-            # self._enable_outputs(driver)
-            self.__driver = driver
-            return self.__driver
+        driver = SchismRun(
+            self.mesh,
+            self.start_date,
+            self.end_date,
+            self.spinup_time,
+            self.tidal_forcing,
+            self.wind_forcing,
+            self.wave_forcing,
+            # self.args.netcdf,
+            )
+        # self._enable_outputs(driver)
+        return driver
 
     @property
     def start_date(self):
-        try:
-            return self.__start_date
-        except AttributeError:
-            self.__start_date = datetime.strptime(
-                self.args.start_date,
-                "%Y-%m-%dT%H:%M"
-                )
-            return self.__start_date
+        return datetime.strptime(self.args.start_date, "%Y-%m-%dT%H:%M")
 
     @property
     def end_date(self):
-        try:
-            return self.__end_date
-        except AttributeError:
-            self.__end_date = datetime.strptime(
-                self.args.end_date,
-                "%Y-%m-%dT%H:%M"
-                )
-            return self.__end_date
+        return datetime.strptime(self.args.end_date, "%Y-%m-%dT%H:%M")
 
     @property
     def spinup_time(self):
-        try:
-            return self.__spinup_time
-        except AttributeError:
-            self.__spinup_time = timedelta(days=self.args.spinup_days)
-            return self.__spinup_time
+        return timedelta(days=self.args.spinup_days)
 
     @property
     def args(self):
@@ -108,15 +88,12 @@ class SchismBaseCommand:
         return self._mesh
 
     @property
+    @lru_cache
     def tidal_forcing(self):
-        try:
-            return self.__tidal_forcing
-        except AttributeError:
-            tidal_forcing = TidalForcing()
-            for constituent in self.constituents:
-                tidal_forcing.use_constituent(constituent)
-            self.__tidal_forcing = tidal_forcing
-            return self.__tidal_forcing
+        tidal_forcing = TidalForcing()
+        for constituent in self.constituents:
+            tidal_forcing.use_constituent(constituent)
+        return tidal_forcing
 
     @property
     def wind_forcing(self):
@@ -132,32 +109,30 @@ class SchismBaseCommand:
             return pathlib.Path(self.args.output_directory).absolute()
 
     @property
+    @lru_cache
     def constituents(self):
-        try:
-            return self.__constituents
-        except AttributeError:
-            # might be better to get these from TidalForcing()
-            _major = ('Q1', 'O1', 'P1', 'K1', 'N2', 'M2', 'S2', 'K2')
-            _all = (*_major, 'Mm', 'Mf', 'M4', 'MN4', 'MS4', '2N2', 'S1')
-            if ('all' in self.args.constituents
-                    and len(self.args.constituents) > 1):
-                msg = 'When using all, must only pass one'
-                raise IOError(msg)
+        # might be better to get these from TidalForcing()
+        _major = ('Q1', 'O1', 'P1', 'K1', 'N2', 'M2', 'S2', 'K2')
+        _all = (*_major, 'Mm', 'Mf', 'M4', 'MN4', 'MS4', '2N2', 'S1')
+        if ('all' in self.args.constituents
+                and len(self.args.constituents) > 1):
+            msg = 'When using all, must only pass one'
+            raise IOError(msg)
 
-            elif ('major' in self.args.constituents
-                    and len(self.args.constituents) > 1):
-                msg = 'When using major, must only pass one'
-                raise IOError(msg)
-            if 'all' in self.args.constituents:
-                constituents = _all
-            elif 'major' in self.args.constituents:
-                constituents = _major
-            else:
-                constituents = self.args.constituents
-            self.__constituents = constituents
-            return self.__constituents
+        elif ('major' in self.args.constituents
+                and len(self.args.constituents) > 1):
+            msg = 'When using major, must only pass one'
+            raise IOError(msg)
+        if 'all' in self.args.constituents:
+            constituents = _all
+        elif 'major' in self.args.constituents:
+            constituents = _major
+        else:
+            constituents = self.args.constituents
+        return constituents
 
     @property
+    @lru_cache
     def server_config(self):
         if self.args.hostname:
             if (not self.args.use_slurm or
@@ -182,25 +157,20 @@ class SchismBaseCommand:
 
         else:
             server_config = None
-
-        self.__server_config = server_config
-        return self.__server_config
+        return server_config
 
     @property
     def _args(self):
         return self.__args
 
     @property
+    @lru_cache
     def _mesh(self):
-        try:
-            return self.__mesh
-        except AttributeError:
-            self.__mesh = Mesh.open(
+        return Mesh.open(
                 hgrid=self.args.hgrid,
                 vgrid=self.args.vgrid,
                 crs=self.args.crs
                 )
-            return self.__mesh
 
     @_args.setter
     def _args(self, args):

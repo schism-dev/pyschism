@@ -456,7 +456,6 @@ class EuclideanMesh2D:
         self._certify_input_geom("quads", quads)
         self.__quads = quads
 
-
     @_crs.setter
     def _crs(self, crs):
         if crs is not None:

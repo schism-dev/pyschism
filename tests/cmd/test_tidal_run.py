@@ -8,13 +8,15 @@ from pyschism.cmd import tidal_run
 
 class TidalRunCmdTestCase(unittest.TestCase):
 
-    def _test_tidal_pr_mesh(self):
-        parent = pathlib.Path(__name__).parent.absolute()
+    def _test_tidal_run_mesh(self):
+        parent = pathlib.Path(__name__).parent
+        hgrid = parent.resolve() / "examples/example_1/hgrid.gr3"
         cmd = ["tidal_run"]
-        cmd += [str(parent / '../hgrid.gr3')]
+        cmd += [str(hgrid.resolve())]
         cmd += ["2017-9-18T12:00"]
         cmd += ["2017-9-23T12:00"]
         cmd += ["--spinup-days=2"]
+        print(" ".join(cmd))
         with patch.object(sys, 'argv', cmd):
             self.assertEqual(tidal_run.main(), 0)
 

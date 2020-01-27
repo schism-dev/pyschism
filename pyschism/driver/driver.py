@@ -199,8 +199,8 @@ class SchismRun:
 
     @_spinup_time.setter
     def _spinup_time(self, spinup_time):
-        msg = f"spinup_time must be a {datetime} instance."
-        assert isinstance(spinup_time, datetime), msg
+        msg = f"spinup_time must be a {timedelta} instance."
+        assert isinstance(spinup_time, timedelta), msg
         self.__spinup_time = spinup_time
 
     @_tidal_forcing.setter
