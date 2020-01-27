@@ -279,15 +279,15 @@
 ! 2: needs [MOD]_vvar_[1,2,...].ic. Format of each file (for each tracer in tis MOD) is similar to ts.ic
 !    (i.e. level #, z-coord., tracer value). Verically varying i.c. is used for each tracer.
 ! 0: model sets own i.c. (EcoSim; TIMOR)
-  flag_ic(3) = 1 !GEN (user defined module)
-!  flag_ic(4) = 1 !Age i.c. flag set inside code
-  flag_ic(5) = 1 !SED3D
-  flag_ic(6) = 1 !EcoSim
-  flag_ic(7) = 1 !ICM
-  flag_ic(8) = 1 !CoSINE
-  flag_ic(9) = 1 !FIB
-  flag_ic(10) = 1 !TIMOR
-  flag_ic(11) = 1 !FABM
+  flag_ic(3) = 0 !GEN (user defined module)
+!  flag_ic(4) = 0 !Age i.c. flag set inside code
+  flag_ic(5) = 0 !SED3D
+  flag_ic(6) = 0 !EcoSim
+  flag_ic(7) = 0 !ICM
+  flag_ic(8) = 0 !CoSINE
+  flag_ic(9) = 0 !FIB
+  flag_ic(10) = 0 !TIMOR
+  flag_ic(11) = 0 !FABM
 
 !  ic_GEN = 1 !user defined module
 !  ic_AGE = 1 !Age
@@ -621,17 +621,17 @@
 ! At moment the scheme has not accounted for bottom 'leaking' (e.g. in SED), 
 ! so iadjust_mass_consv0(5) must =0
 !-----------------------------------------------------------------------
-  iadjust_mass_consv0(1)=0 !T
-  iadjust_mass_consv0(2)=0 !S
-  iadjust_mass_consv0(3)=0 !GEN
-  iadjust_mass_consv0(4)=0 !AGE
-  iadjust_mass_consv0(5)=0 !SED3D (code won't allow non-0 for this module)
-  iadjust_mass_consv0(6)=0 !EcoSim
-  iadjust_mass_consv0(7)=0 !ICM
-  iadjust_mass_consv0(8)=0 !CoSiNE
-  iadjust_mass_consv0(9)=0 !Feco
-  iadjust_mass_consv0(10)=0 !TIMOR
-  iadjust_mass_consv0(11)=0 !FABM
+  iadjust_mass_consv0(1) = 0 !T
+  iadjust_mass_consv0(2) = 0 !S
+  iadjust_mass_consv0(3) = 0 !GEN
+  iadjust_mass_consv0(4) = 0 !AGE
+  iadjust_mass_consv0(5) = 0 !SED3D (code won't allow non-0 for this module)
+  iadjust_mass_consv0(6) = 0 !EcoSim
+  iadjust_mass_consv0(7) = 0 !ICM
+  iadjust_mass_consv0(8) = 0 !CoSiNE
+  iadjust_mass_consv0(9) = 0 !Feco
+  iadjust_mass_consv0(10) = 0 !TIMOR
+  iadjust_mass_consv0(11) = 0 !FABM
 /
 
 &SCHOUT
@@ -655,7 +655,7 @@
 ! Global output options
 ! The variable names that appear in nc output are shown in {}
 !-----------------------------------------------------------------------
-  iof_hydro(1) = 1 !0: off; 1: on - elev. [m]  {elev}
+  iof_hydro(1) = 0 !0: off; 1: on - elev. [m]  {elev}
   iof_hydro(2) = 0 !air pressure [Pa]  {air_pressure}
   iof_hydro(3) = 0 !air temperature [C] {air_temperature}
   iof_hydro(4) = 0 !Specific humidity [-] {specific_humidity}
@@ -679,7 +679,7 @@
   iof_hydro(22) = 0 !eddy viscosity [m^2/s] {viscosity}
   iof_hydro(23) = 0 !turbulent kinetic energy {TKE}
   iof_hydro(24) = 0 !turbulent mixing length [m] {mixing_length}
-  iof_hydro(25) = 1 !horizontal vel vector [m/s] {hvel}
+  iof_hydro(25) = 0 !horizontal vel vector [m/s] {hvel}
 
   iof_hydro(26) = 0 !horizontal vel vector defined @side [m/s] {hvel_side}
   iof_hydro(27) = 0 !vertical vel. @elem [m/s] {wvel_elem}
@@ -692,229 +692,229 @@
 !-----------------------------------------------------------------------
 ! Outputs from WWM (USE_WWM must be on in Makefile)
 !-----------------------------------------------------------------------
-!  iof_wwm(1)  = 1 !sig. height (m) {WWM_1}
-!  iof_wwm(2)  = 1 !Mean average period (sec) - TM01 {WWM_2}
-!  iof_wwm(3)  = 1 !Zero down crossing period for comparison with buoy (s) - TM02 {WWM_3}
-!  iof_wwm(4)  = 1 !Average period of wave runup/overtopping - TM10 {WWM_4}
-!  iof_wwm(5)  = 1 !Mean wave number (1/m) {WWM_5}
-!  iof_wwm(6)  = 1 !Mean wave length (m) {WWM_6}
-!  iof_wwm(7)  = 1 !Mean average energy transport direction (degr) - MWD in NDBC? {WWM_9}
-!  iof_wwm(8) = 1 !Mean directional spreading (degr) {WWM_10}
-!  iof_wwm(9) = 1 !Discrete peak period (sec) - Tp {WWM_11}
-!  iof_wwm(10) = 1 !Continuous peak period based on higher order moments (sec) {WWM_12}
-!  iof_wwm(11) = 1 !Peak phase vel. (m/s) {WWM_13}
-!  iof_wwm(12) = 1 !Peak n-factor {WWM_14}
-!  iof_wwm(13) = 1 !Peak group vel. (m/s) {WWM_15}
-!  iof_wwm(14) = 1 !Peak wave number {WWM_16}
-!  iof_wwm(15) = 1 !Peak wave length {WWM_17}
-!  iof_wwm(16) = 1 !Peak (dominant) direction (degr) {WWM_18}
-!  iof_wwm(17) = 1 !Peak directional spreading {WWM_19}
-!  iof_wwm(18) = 1 !Discrete peak direction (radian?) {WWM_20}
-!  iof_wwm(19) = 1 !Orbital vel. (m/s) {WWM_21}
-!  iof_wwm(20) = 1 !RMS Orbital vel. (m/s) {WWM_22}
-!  iof_wwm(21) = 1 !Bottom excursion period (sec?) {WWM_23}
-!  iof_wwm(22) = 1 !Bottom wave period (sec) {WWM_24}
-!  iof_wwm(23) = 1 !Uresell number based on peak period {WWM_25}
-!  iof_wwm(24) = 0 !Friction velocity (m/s?) {WWM_26}
-!  iof_wwm(25) = 1 !Charnock coefficient {WWM_27}
-!  iof_wwm(26) = 1 !Rougness length {WWM_28}
-!  iof_wwm(27) = 1 !WWM_energy vector {WWM_energy_dir}
-!  iof_wwm(28) = 1 !Wave force vector (m.s-2) computed by wwm @side centers and whole levels {wave_force} 
+  iof_wwm(1) = 0 !sig. height (m) {WWM_1}
+  iof_wwm(2) = 0 !Mean average period (sec) - TM01 {WWM_2}
+  iof_wwm(3) = 0 !Zero down crossing period for comparison with buoy (s) - TM02 {WWM_3}
+  iof_wwm(4) = 0 !Average period of wave runup/overtopping - TM10 {WWM_4}
+  iof_wwm(5) = 0 !Mean wave number (1/m) {WWM_5}
+  iof_wwm(6) = 0 !Mean wave length (m) {WWM_6}
+  iof_wwm(7) = 0 !Mean average energy transport direction (degr) - MWD in NDBC? {WWM_9}
+  iof_wwm(8) = 0 !Mean directional spreading (degr) {WWM_10}
+  iof_wwm(9) = 0 !Discrete peak period (sec) - Tp {WWM_11}
+  iof_wwm(10) = 0 !Continuous peak period based on higher order moments (sec) {WWM_12}
+  iof_wwm(11) = 0 !Peak phase vel. (m/s) {WWM_13}
+  iof_wwm(12) = 0 !Peak n-factor {WWM_14}
+  iof_wwm(13) = 0 !Peak group vel. (m/s) {WWM_15}
+  iof_wwm(14) = 0 !Peak wave number {WWM_16}
+  iof_wwm(15) = 0 !Peak wave length {WWM_17}
+  iof_wwm(16) = 0 !Peak (dominant) direction (degr) {WWM_18}
+  iof_wwm(17) = 0 !Peak directional spreading {WWM_19}
+  iof_wwm(18) = 0 !Discrete peak direction (radian?) {WWM_20}
+  iof_wwm(19) = 0 !Orbital vel. (m/s) {WWM_21}
+  iof_wwm(20) = 0 !RMS Orbital vel. (m/s) {WWM_22}
+  iof_wwm(21) = 0 !Bottom excursion period (sec?) {WWM_23}
+  iof_wwm(22) = 0 !Bottom wave period (sec) {WWM_24}
+  iof_wwm(23) = 0 !Uresell number based on peak period {WWM_25}
+  iof_wwm(24) = 0 !Friction velocity (m/s?) {WWM_26}
+  iof_wwm(25) = 0 !Charnock coefficient {WWM_27}
+  iof_wwm(26) = 0 !Rougness length {WWM_28}
+  iof_wwm(27) = 0 !WWM_energy vector {WWM_energy_dir}
+  iof_wwm(28) = 0 !Wave force vector (m.s-2) computed by wwm @side centers and whole levels {wave_force} 
 
 !-----------------------------------------------------------------------
 ! Tracer module outputs. In most cases, actual # of outputs depends on # of tracers used
 !-----------------------------------------------------------------------
 ! Outputs for user-defined tracer module (USE_GEN)
 !-----------------------------------------------------------------------
-!  iof_gen(1) = 1 !1st tracer {GEN_1}
-!  iof_gen(2) = 1 !2nd tracer {GEN_2}
+  iof_gen(1) = 0 !1st tracer {GEN_1}
+  iof_gen(2) = 0 !2nd tracer {GEN_2}
 
 !-----------------------------------------------------------------------
 ! Outputs for (age). Indices from "1" to "ntracer_age/2"; [days]
 !-----------------------------------------------------------------------
-!  iof_age(1) = 1 !{AGE_1}
-!  iof_age(2) = 1 !{AGE_2}
+  iof_age(1) = 0 !{AGE_1}
+  iof_age(2) = 0 !{AGE_2}
 
 !-----------------------------------------------------------------------
 ! Specific outputs in SED3D (USE_SED must be on in Makefile;
 ! otherwise these are not needed)
 !-----------------------------------------------------------------------
-!  iof_sed(1) = 1 !bottom depth _change_ from init. condition (m) {SED_depth_change}
-!  iof_sed(2) = 1 ! Bed median grain size in the active layer (mm) {SED_D50}
-!  iof_sed(3) = 1 ! Bottom shear stress (Pa) {SED_bed_stress}
-!  iof_sed(4) = 1 ! Bottom roughness lenghth (mm) {SED_bed_roughness}
-!  iof_sed(5) = 1 !total suspended concentration (g/L) {SED_TSC}
-!  iof_sed(6) = 1 ! total bed thickness @elem (m) {bed_thickness}
-!  iof_sed(7) = 1 ! total bed age over all layers @elem (sec) {bed_age}
-!  iof_sed(8) = 1 ! Sediment transport roughness length @elem (m) (z0st_elem) {z0st}
-!  iof_sed(9) = 1 !current-ripples roughness length @elem (m) (z0cr_elem) {z0cr}
-!  iof_sed(10) = 1 !sand-waves roughness length (m) @elem (z0sw_elem) {z0sw}
-!  iof_sed(11) = 1 !wave-ripples roughness length @elem (m) (z0wr_elem) {z0wr}
+  iof_sed(1) = 0 !bottom depth _change_ from init. condition (m) {SED_depth_change}
+  iof_sed(2) = 0 ! Bed median grain size in the active layer (mm) {SED_D50}
+  iof_sed(3) = 0 ! Bottom shear stress (Pa) {SED_bed_stress}
+  iof_sed(4) = 0 ! Bottom roughness lenghth (mm) {SED_bed_roughness}
+  iof_sed(5) = 0 !total suspended concentration (g/L) {SED_TSC}
+  iof_sed(6) = 0 ! total bed thickness @elem (m) {bed_thickness}
+  iof_sed(7) = 0 ! total bed age over all layers @elem (sec) {bed_age}
+  iof_sed(8) = 0 ! Sediment transport roughness length @elem (m) (z0st_elem) {z0st}
+  iof_sed(9) = 0 !current-ripples roughness length @elem (m) (z0cr_elem) {z0cr}
+  iof_sed(10) = 0 !sand-waves roughness length (m) @elem (z0sw_elem) {z0sw}
+  iof_sed(11) = 0 !wave-ripples roughness length @elem (m) (z0wr_elem) {z0wr}
 
 !  Example of using 2 classes
-!  iof_sed(12) = 1 !conc. of 1st class (one output need by each class) [g/L] {SED3D_1}
-!  iof_sed(13) = 1 !Bedload transport rate vector (kg.m-1.s-1) for 1st tracer (one output need by tracer) {SED_bdld_1}
-!  iof_sed(14) = 1 !Bed fraction 1st tracer (one output need by each class) [-] {SED_bedfrac_1}
-!  iof_sed(15) = 1 !conc. of 2nd class {SED3D_2}
-!  iof_sed(16) = 1 !Bedload transport of 2nd class {SED_bdld_2}
-!  iof_sed(17) = 1 !Bed fraction of 2nd class {SED_bedfrac_3}
+  iof_sed(12) = 0 !conc. of 1st class (one output need by each class) [g/L] {SED3D_1}
+  iof_sed(13) = 0 !Bedload transport rate vector (kg.m-1.s-1) for 1st tracer (one output need by tracer) {SED_bdld_1}
+  iof_sed(14) = 0 !Bed fraction 1st tracer (one output need by each class) [-] {SED_bedfrac_1}
+  iof_sed(15) = 0 !conc. of 2nd class {SED3D_2}
+  iof_sed(16) = 0 !Bedload transport of 2nd class {SED_bdld_2}
+  iof_sed(17) = 0 !Bed fraction of 2nd class {SED_bedfrac_3}
 
 !-----------------------------------------------------------------------
 ! EcoSim outputs 
 !-----------------------------------------------------------------------
-!  iof_eco(1) = 1 {ECO_1}
+  iof_eco(1) = 0 ! {ECO_1}
 
 !-----------------------------------------------------------------------
 ! ICM outputs 
 !-----------------------------------------------------------------------
-!  iof_icm(1) = 1 !Chlorophyll {ICM_Chl}
-!  iof_icm(2) = 1 !PH values (ICM_PH on) {ICM_pH}
-!  iof_icm(3) = 1 !ICM primary production @elem [gC/m^3/day] {ICM_PrmPrdt}
-!  iof_icm(4) = 1 !ICM totoal inorganic nitrogen (DIN) @elem [gN/m^3] {ICM_DIN}
-!  iof_icm(5) = 1 !ICM paticulate organic nitrogen (PON) @elem [gN/m^3] {ICM_PON}
+  iof_icm(1) = 0 !Chlorophyll {ICM_Chl}
+  iof_icm(2) = 0 !PH values (ICM_PH on) {ICM_pH}
+  iof_icm(3) = 0 !ICM primary production @elem [gC/m^3/day] {ICM_PrmPrdt}
+  iof_icm(4) = 0 !ICM totoal inorganic nitrogen (DIN) @elem [gN/m^3] {ICM_DIN}
+  iof_icm(5) = 0 !ICM paticulate organic nitrogen (PON) @elem [gN/m^3] {ICM_PON}
 !!  sediment flux @elem
-!  iof_icm(6) = 1 !ICM bed sediment flux arrays: SED_BENDOC (output name:ICM_SED_BENDOC) @elem [gC/(m^2 day)] {ICM_SED_BENDOC}
-!  iof_icm(7) = 1 !ICM bed sediment flux arrays: SED_BENNH4 (output name:ICM_SED_BENNH4) @elem [gC/(m^2 day)] {ICM_SED_BENNH4}
-!  iof_icm(8) = 1 !ICM bed sediment flux arrays: SED_BENNO3 (output name:ICM_SED_BENNO3)@elem [gC/(m^2 day)] {ICM_SED_BENNO3}
-!  iof_icm(9) = 1 !ICM bed sediment flux arrays: SED_BENPO4 (output name:ICM_SED_BENPO4) @elem [gC/(m^2 day)] {ICM_SED_BENPO4}
-!  iof_icm(10) = 1 !ICM bed sediment flux arrays: SED_BENCOD (output name:ICM_SED_BENCOD) @elem [gC/(m^2 day)] {ICM_SED_BENCOD}
-!  iof_icm(11) = 1 !ICM bed sediment flux arrays: SED_BENDO (output name:ICM_SED_BENDO) @elem [gC/(m^2 day)] {ICM_SED_BENDO}
-!  iof_icm(12) = 1 !ICM bed sediment flux arrays: SED_BENSA (output name:ICM_SED_BENSA) @elem [gC/(m^2 day)] {ICM_SED_BENSA}
+  iof_icm(6) = 0 !ICM bed sediment flux arrays: SED_BENDOC (output name:ICM_SED_BENDOC) @elem [gC/(m^2 day)] {ICM_SED_BENDOC}
+  iof_icm(7) = 0 !ICM bed sediment flux arrays: SED_BENNH4 (output name:ICM_SED_BENNH4) @elem [gC/(m^2 day)] {ICM_SED_BENNH4}
+  iof_icm(8) = 0 !ICM bed sediment flux arrays: SED_BENNO3 (output name:ICM_SED_BENNO3)@elem [gC/(m^2 day)] {ICM_SED_BENNO3}
+  iof_icm(9) = 0 !ICM bed sediment flux arrays: SED_BENPO4 (output name:ICM_SED_BENPO4) @elem [gC/(m^2 day)] {ICM_SED_BENPO4}
+  iof_icm(10) = 0 !ICM bed sediment flux arrays: SED_BENCOD (output name:ICM_SED_BENCOD) @elem [gC/(m^2 day)] {ICM_SED_BENCOD}
+  iof_icm(11) = 0 !ICM bed sediment flux arrays: SED_BENDO (output name:ICM_SED_BENDO) @elem [gC/(m^2 day)] {ICM_SED_BENDO}
+  iof_icm(12) = 0 !ICM bed sediment flux arrays: SED_BENSA (output name:ICM_SED_BENSA) @elem [gC/(m^2 day)] {ICM_SED_BENSA}
 !!  sav @elem
-!  iof_icm(13) = 1 !ICM SAV leaf biomass @elem [gC/m^3] (k=1 is surface) {ICM_lfsav}
-!  iof_icm(14) = 1 !ICM SAV stem biomass @elem [gC/m^3] {ICM_stsav}
-!  iof_icm(15) = 1 !ICM SAV root biomass @elem [gC/m^3] {ICM_rtsav}
-!  iof_icm(16) = 1 !ICM SAV total leaf biomass @elem [gC/m^2] {ICM_tlfsav}
-!  iof_icm(17) = 1 !ICM SAV total stem biomass @elem [gC/m^2] {ICM_tstsav}
-!  iof_icm(18) = 1 !ICM SAV total root biomass @elem [gC/m^2] {ICM_trtsav}
-!  iof_icm(19) = 1 !ICM SAV canopy height @elem [m] {ICM_hcansav}
+  iof_icm(13) = 0 !ICM SAV leaf biomass @elem [gC/m^3] (k=1 is surface) {ICM_lfsav}
+  iof_icm(14) = 0 !ICM SAV stem biomass @elem [gC/m^3] {ICM_stsav}
+  iof_icm(15) = 0 !ICM SAV root biomass @elem [gC/m^3] {ICM_rtsav}
+  iof_icm(16) = 0 !ICM SAV total leaf biomass @elem [gC/m^2] {ICM_tlfsav}
+  iof_icm(17) = 0 !ICM SAV total stem biomass @elem [gC/m^2] {ICM_tstsav}
+  iof_icm(18) = 0 !ICM SAV total root biomass @elem [gC/m^2] {ICM_trtsav}
+  iof_icm(19) = 0 !ICM SAV canopy height @elem [m] {ICM_hcansav}
 !!  sediment conc @elem
-!  iof_icm(20) = 1 !bottom NH4 conc {ICM_CNH4}
-!  iof_icm(21) = 1 !bottom NO3 conc {ICM_CNH3}
-!  iof_icm(22) = 1 !bottom P conc {ICM_CPIP}
-!  iof_icm(23) = 1 !bottom Si conc {ICM_CPOS}
-!  iof_icm(24) = 1 !bottom CH4 conc {ICM_CCH4}
-!  iof_icm(25) = 1 !bottom SO4 conc {ICM_CSO4}
-!  iof_icm(26) = 1 !bottom H2S conc {ICM_CH2S}
-!  iof_icm(27) = 1 !bottom PON g1 conc {ICM_SEDPON1}
-!  iof_icm(28) = 1 !bottom PON g2 conc {ICM_SEDPON2}
-!  iof_icm(29) = 1 !bottom PON g3 conc {ICM_SEDPON3}
-!  iof_icm(30) = 1 !bottom POP g1 conc {ICM_SEDPOP1}
-!  iof_icm(31) = 1 !bottom POP g2 conc {ICM_SEDPOP2}
-!  iof_icm(32) = 1 !bottom POP g3 conc {ICM_SEDPOP3}
-!  iof_icm(33) = 1 !bottom POC g1 conc {ICM_SEDPOC1}
-!  iof_icm(34) = 1 !bottom POC g2 conc {ICM_SEDPOC2}
-!  iof_icm(35) = 1 !bottom POC g3 conc {ICM_SEDPOC3}
-!  iof_icm(36) = 1 !erosion flux H2S {ICM_EROH2S}
-!  iof_icm(37) = 1 !ersoion flux LPOC {ICM_EROLPOC}
-!  iof_icm(38) = 1 !ersoion flux RPOC {ICM_ERORPOC}
+  iof_icm(20) = 0 !bottom NH4 conc {ICM_CNH4}
+  iof_icm(21) = 0 !bottom NO3 conc {ICM_CNH3}
+  iof_icm(22) = 0 !bottom P conc {ICM_CPIP}
+  iof_icm(23) = 0 !bottom Si conc {ICM_CPOS}
+  iof_icm(24) = 0 !bottom CH4 conc {ICM_CCH4}
+  iof_icm(25) = 0 !bottom SO4 conc {ICM_CSO4}
+  iof_icm(26) = 0 !bottom H2S conc {ICM_CH2S}
+  iof_icm(27) = 0 !bottom PON g1 conc {ICM_SEDPON1}
+  iof_icm(28) = 0 !bottom PON g2 conc {ICM_SEDPON2}
+  iof_icm(29) = 0 !bottom PON g3 conc {ICM_SEDPON3}
+  iof_icm(30) = 0 !bottom POP g1 conc {ICM_SEDPOP1}
+  iof_icm(31) = 0 !bottom POP g2 conc {ICM_SEDPOP2}
+  iof_icm(32) = 0 !bottom POP g3 conc {ICM_SEDPOP3}
+  iof_icm(33) = 0 !bottom POC g1 conc {ICM_SEDPOC1}
+  iof_icm(34) = 0 !bottom POC g2 conc {ICM_SEDPOC2}
+  iof_icm(35) = 0 !bottom POC g3 conc {ICM_SEDPOC3}
+  iof_icm(36) = 0 !erosion flux H2S {ICM_EROH2S}
+  iof_icm(37) = 0 !ersoion flux LPOC {ICM_EROLPOC}
+  iof_icm(38) = 0 !ersoion flux RPOC {ICM_ERORPOC}
 !!  water column rates @elem
-!  iof_icm(39) = 1 !DO consumption {ICM_DO_consumption}
-!  iof_icm(40) = 1 !PB growth #1 {ICM_GP1}
-!  iof_icm(41) = 1 !PB growth #2 {ICM_GP2}
-!  iof_icm(42) = 1 !PB growth #3 {ICM_GP3}
+  iof_icm(39) = 0 !DO consumption {ICM_DO_consumption}
+  iof_icm(40) = 0 !PB growth #1 {ICM_GP1}
+  iof_icm(41) = 0 !PB growth #2 {ICM_GP2}
+  iof_icm(42) = 0 !PB growth #3 {ICM_GP3}
 !  water column foundamental tracers @nodes
-!  iof_icm(43) = 0 !Zoo. #1 {ICM_1}
-!  iof_icm(44) = 0 !Zoo. #2 {ICM_2}
-!  iof_icm(45) = 1 !phyto #1 {ICM_3}
-!  iof_icm(46) = 1 !phyto #2 {ICM_4}
-!  iof_icm(47) = 1 !phyto #3 {ICM_5}
-!  iof_icm(48) = 1 !RPOC {ICM_6}
-!  iof_icm(49) = 1 !LPOC {ICM_7}
-!  iof_icm(50) = 1 !DOC {ICM_8}
-!  iof_icm(51) = 1 !RPON {ICM_9}
-!  iof_icm(52) = 1 !LPON {ICM_10}
-!  iof_icm(53) = 1 !DON {ICM_11}
-!  iof_icm(54) = 1 !NH4 {ICM_12}
-!  iof_icm(55) = 1 !NO3 {ICM_13}
-!  iof_icm(56) = 1 !RPOP {ICM_14}
-!  iof_icm(57) = 1 !LPOP {ICM_15}
-!  iof_icm(58) = 1 !DOP {ICM_16}
-!  iof_icm(59) = 1 !PO4t {ICM_17}
-!  iof_icm(60) = 0 !Si- biogenic {ICM_18}
-!  iof_icm(61) = 0 !available Si {ICM_19}
-!  iof_icm(62) = 1 !COD: Chemical oxygen demand {ICM_20}
-!  iof_icm(63) = 1 !DO {ICM_21}
+  iof_icm(43) = 0 !Zoo. #1 {ICM_1}
+  iof_icm(44) = 0 !Zoo. #2 {ICM_2}
+  iof_icm(45) = 0 !phyto #1 {ICM_3}
+  iof_icm(46) = 0 !phyto #2 {ICM_4}
+  iof_icm(47) = 0 !phyto #3 {ICM_5}
+  iof_icm(48) = 0 !RPOC {ICM_6}
+  iof_icm(49) = 0 !LPOC {ICM_7}
+  iof_icm(50) = 0 !DOC {ICM_8}
+  iof_icm(51) = 0 !RPON {ICM_9}
+  iof_icm(52) = 0 !LPON {ICM_10}
+  iof_icm(53) = 0 !DON {ICM_11}
+  iof_icm(54) = 0 !NH4 {ICM_12}
+  iof_icm(55) = 0 !NO3 {ICM_13}
+  iof_icm(56) = 0 !RPOP {ICM_14}
+  iof_icm(57) = 0 !LPOP {ICM_15}
+  iof_icm(58) = 0 !DOP {ICM_16}
+  iof_icm(59) = 0 !PO4t {ICM_17}
+  iof_icm(60) = 0 !Si- biogenic {ICM_18}
+  iof_icm(61) = 0 !available Si {ICM_19}
+  iof_icm(62) = 0 !COD: Chemical oxygen demand {ICM_20}
+  iof_icm(63) = 0 !DO {ICM_21}
 !! following requires ICM_PH on
-!  iof_icm(64) = 1 !TIC {ICM_22}
-!  iof_icm(65) = 1 !ALK {ICM_23}
-!  iof_icm(66) = 1 !CA {ICM_24}
-!  iof_icm(67) = 1 !CACO3 {ICM_25}
+  iof_icm(64) = 0 !TIC {ICM_22}
+  iof_icm(65) = 0 !ALK {ICM_23}
+  iof_icm(66) = 0 !CA {ICM_24}
+  iof_icm(67) = 0 !CACO3 {ICM_25}
 
 !-----------------------------------------------------------------------
 ! CoSINE outputs
 !-----------------------------------------------------------------------
-!  iof_cos(1) = 1 ! {COS_1}
-!  iof_cos(2) = 1 ! {COS_2}
-!  iof_cos(3) = 1 ! {COS_3}
-!  iof_cos(4) = 1 ! {COS_4}
-!  iof_cos(5) = 1 ! {COS_5}
-!  iof_cos(6) = 1 ! {COS_6}
-!  iof_cos(7) = 1 ! {COS_7}
-!  iof_cos(8) = 1 ! {COS_8}
-!  iof_cos(9) = 1 ! {COS_9}
-!  iof_cos(10) = 1 ! {COS_10}
-!  iof_cos(11) = 1 ! {COS_11}
-!  iof_cos(12) = 1 ! {COS_12}
-!  iof_cos(13) = 1 ! {COS_13}
+  iof_cos(1) = 0 ! {COS_1}
+  iof_cos(2) = 0 ! {COS_2}
+  iof_cos(3) = 0 ! {COS_3}
+  iof_cos(4) = 0 ! {COS_4}
+  iof_cos(5) = 0 ! {COS_5}
+  iof_cos(6) = 0 ! {COS_6}
+  iof_cos(7) = 0 ! {COS_7}
+  iof_cos(8) = 0 ! {COS_8}
+  iof_cos(9) = 0 ! {COS_9}
+  iof_cos(10) = 0 ! {COS_10}
+  iof_cos(11) = 0 ! {COS_11}
+  iof_cos(12) = 0 ! {COS_12}
+  iof_cos(13) = 0 ! {COS_13}
 
 !-----------------------------------------------------------------------
 ! Fecal indicating bacteria module
 !-----------------------------------------------------------------------
-!  iof_fib(1) = 1 ! {FIB_1}
+  iof_fib(1) = 0 ! {FIB_1}
 
 !-----------------------------------------------------------------------
 ! Specific outputs in SED2D (USE_SED2D must be on in Makefile;
 ! otherwise these are not needed)
 !-----------------------------------------------------------------------
-!  iof_sed2d(1)  = 1 !bottom depth _change_ from init. condition (m) {SED2D_depth_change}
-!  iof_sed2d(2)  = 1 !drag coefficient used in transport formulae SED2D_Cd{}
-!  iof_sed2d(3) = 1 !Courant number (b.qtot.dt / h.dx) {SED2D_cflsed}
-!  iof_sed2d(4)    = 1 !Top layer d50 (m) {SED2D_d50}
-!  iof_sed2d(5)   = 1 !total transport rate vector (kg/m/s) {SED2D_total_transport}
-!  iof_sed2d(6)   = 1 !suspended tranport rate vector (kg/m/s) {SED2D_susp_load}
-!  iof_sed2d(7)   = 1 !bedload transport rate vector (kg/m/s) {SED2D_bed_load}
-!  iof_sed2d(8)    = 1 !time averaged total transport rate vector (kg/m/s) {SED2D_average_transport}
-!  iof_sed2d(9)  = 1 !bottom slope vector (m/m); negative uphill {SED2D_bottom_slope}
-!  iof_sed2d(10) = 1 !Total roughness length @elem (m) (z0eq) {z0eq}
-!  iof_sed2d(11) = 1 !current-ripples roughness length @elem (m) (z0cr) {z0cr}
-!  iof_sed2d(12) = 1 !sand-waves roughness length @elem (m) (z0sw) {z0sw}
-!  iof_sed2d(13) = 1 !wave-ripples roughness length @elem (m) (z0wr) {z0wr}
+  iof_sed2d(1) = 0 !bottom depth _change_ from init. condition (m) {SED2D_depth_change}
+  iof_sed2d(2) = 0 !drag coefficient used in transport formulae SED2D_Cd{}
+  iof_sed2d(3) = 0 !Courant number (b.qtot.dt / h.dx) {SED2D_cflsed}
+  iof_sed2d(4) = 0 !Top layer d50 (m) {SED2D_d50}
+  iof_sed2d(5) = 0 !total transport rate vector (kg/m/s) {SED2D_total_transport}
+  iof_sed2d(6) = 0 !suspended tranport rate vector (kg/m/s) {SED2D_susp_load}
+  iof_sed2d(7) = 0 !bedload transport rate vector (kg/m/s) {SED2D_bed_load}
+  iof_sed2d(8) = 0 !time averaged total transport rate vector (kg/m/s) {SED2D_average_transport}
+  iof_sed2d(9) = 0 !bottom slope vector (m/m); negative uphill {SED2D_bottom_slope}
+  iof_sed2d(10) = 0 !Total roughness length @elem (m) (z0eq) {z0eq}
+  iof_sed2d(11) = 0 !current-ripples roughness length @elem (m) (z0cr) {z0cr}
+  iof_sed2d(12) = 0 !sand-waves roughness length @elem (m) (z0sw) {z0sw}
+  iof_sed2d(13) = 0 !wave-ripples roughness length @elem (m) (z0wr) {z0wr}
  
 !-----------------------------------------------------------------------
 !  marsh flags (USE_MARSH on)
 !-----------------------------------------------------------------------
-!  iof_marsh(1) = 1 ! {marsh_flag}
+  iof_marsh(1) = 0 ! {marsh_flag}
 
 !-----------------------------------------------------------------------
 ! Ice module outputs (if USE_ICE is on)
 !-----------------------------------------------------------------------
-!  iof_ice(1)= 1 !ice advective velcoity vector [m/s] {ICE_velocity}
-!  iof_ice(2)= 1 !strain rate @ elem [1/sec] {ICE_strain_rate}
-!  iof_ice(3)= 1 !net heat flux to ocean (>0 warm up SST) [W/m/m] {ICE_net_heat_flux}
-!  iof_ice(4)= 1 !net fresh water flux to ocean (>0 freshens up SSS) [kg/s/m/m] {ICE_fresh_water_flux}
-!  iof_ice(5)= 1 !ice temperature [C] at air-ice interface {ICE_top_T}
+  iof_ice(1) = 0 !ice advective velcoity vector [m/s] {ICE_velocity}
+  iof_ice(2) = 0 !strain rate @ elem [1/sec] {ICE_strain_rate}
+  iof_ice(3) = 0 !net heat flux to ocean (>0 warm up SST) [W/m/m] {ICE_net_heat_flux}
+  iof_ice(4) = 0 !net fresh water flux to ocean (>0 freshens up SSS) [kg/s/m/m] {ICE_fresh_water_flux}
+  iof_ice(5) = 0 !ice temperature [C] at air-ice interface {ICE_top_T}
 
-!  iof_ice(6)= 1 !ice volume [m] {ICE_tracer_1}
-!  iof_ice(7)= 1 !ice concentration [-] {ICE_tracer_2}
-!  iof_ice(8)= 1 !snow volume [m] {ICE_tracer_3}
+  iof_ice(6) = 0 !ice volume [m] {ICE_tracer_1}
+  iof_ice(7) = 0 !ice concentration [-] {ICE_tracer_2}
+  iof_ice(8) = 0 !snow volume [m] {ICE_tracer_3}
 
 !-----------------------------------------------------------------------
 ! Analysis module outputs (USE_ANALYSIS)
 !-----------------------------------------------------------------------
-!  iof_ana(1) = 1 !x-component of \nabla air_pres /\rho_0 [m/s/s] {ANA_air_pres_grad_x}
-!  iof_ana(2) = 1 !y-component of \nabla air_pres /\rho_0 [m/s/s] {ANA_air_pres_grad_y}
-!  iof_ana(3) = 1  !\alpha*g*\nabla \Psi [m/s/s] (gradient of tidal potential) {ANA_tide_pot_grad_x}
-!  iof_ana(4) = 1  !\alpha*g*\nabla \Psi [m/s/s] {ANA_tide_pot_grad_y}
-!  iof_ana(5) = 1 !\nabla \cdot (\mu \nabla u) [m/s/s] (horizontal viscosity) {ANA_hor_viscosity_x}
-!  iof_ana(6) = 1 !\nabla \cdot (\mu \nabla u) [m/s/s] {ANA_hor_viscosity_y}
-!  iof_ana(7) = 1 !-g/rho0* \int_z^\eta dr_dx dz  [m/s/s] (b-clinic gradient) {ANA_bclinic_force_x}
-!  iof_ana(8) = 1 !-g/rho0* \int_z^\eta dr_dy dz  [m/s/s] {ANA_bclinic_force_y}
-!  iof_ana(9) = 1 !d (\nu du/dz)/dz [m/s/s] - no vegetation effects (vertical viscosity) {ANA_vert_viscosity_x}
-!  iof_ana(10) = 1 !d (\nu dv/dz)/dz [m/s/s] - no vegetation effects {ANA_vert_viscosity_y}
-!  iof_ana(11) = 1 !(u \cdot \nabla) u [m/s/s] (momentum advection) {ANA_mom_advection_x}
-!  iof_ana(12) = 1 !(u \cdot \nabla) u [m/s/s] {ANA_mom_advection_y}
-!  iof_ana(13) = 1 !gradient Richardson number [-] {ANA_Richardson}
-!  iof_ana(14) = 1 !min time step at each element over all 
+  iof_ana(1) = 0 !x-component of \nabla air_pres /\rho_0 [m/s/s] {ANA_air_pres_grad_x}
+  iof_ana(2) = 0 !y-component of \nabla air_pres /\rho_0 [m/s/s] {ANA_air_pres_grad_y}
+  iof_ana(3) = 0  !\alpha*g*\nabla \Psi [m/s/s] (gradient of tidal potential) {ANA_tide_pot_grad_x}
+  iof_ana(4) = 0  !\alpha*g*\nabla \Psi [m/s/s] {ANA_tide_pot_grad_y}
+  iof_ana(5) = 0 !\nabla \cdot (\mu \nabla u) [m/s/s] (horizontal viscosity) {ANA_hor_viscosity_x}
+  iof_ana(6) = 0 !\nabla \cdot (\mu \nabla u) [m/s/s] {ANA_hor_viscosity_y}
+  iof_ana(7) = 0 !-g/rho0* \int_z^\eta dr_dx dz  [m/s/s] (b-clinic gradient) {ANA_bclinic_force_x}
+  iof_ana(8) = 0 !-g/rho0* \int_z^\eta dr_dy dz  [m/s/s] {ANA_bclinic_force_y}
+  iof_ana(9) = 0 !d (\nu du/dz)/dz [m/s/s] - no vegetation effects (vertical viscosity) {ANA_vert_viscosity_x}
+  iof_ana(10) = 0 !d (\nu dv/dz)/dz [m/s/s] - no vegetation effects {ANA_vert_viscosity_y}
+  iof_ana(11) = 0 !(u \cdot \nabla) u [m/s/s] (momentum advection) {ANA_mom_advection_x}
+  iof_ana(12) = 0 !(u \cdot \nabla) u [m/s/s] {ANA_mom_advection_y}
+  iof_ana(13) = 0 !gradient Richardson number [-] {ANA_Richardson}
+  iof_ana(14) = 0 !min time step at each element over all 
                    !subcycles in horizontal transport solver [s]   {ANA_transport_min_dt_elem}
 /
