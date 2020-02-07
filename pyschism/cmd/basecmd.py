@@ -3,7 +3,7 @@ from functools import lru_cache
 from datetime import datetime, timedelta
 from pyschism.mesh import Mesh
 from pyschism.driver import SchismRun
-from pyschism.forcing import TidalForcing
+from pyschism.forcing import Tides
 from pyschism.cmd.server import ServerConfig, SlurmConfig
 
 
@@ -90,7 +90,7 @@ class SchismBaseCommand:
     @property
     @lru_cache
     def tidal_forcing(self):
-        tidal_forcing = TidalForcing()
+        tidal_forcing = Tides()
         for constituent in self.constituents:
             tidal_forcing.use_constituent(constituent)
         return tidal_forcing
@@ -111,7 +111,7 @@ class SchismBaseCommand:
     @property
     @lru_cache
     def constituents(self):
-        # might be better to get these from TidalForcing()
+        # might be better to get these from Tides()
         _major = ('Q1', 'O1', 'P1', 'K1', 'N2', 'M2', 'S2', 'K2')
         _all = (*_major, 'Mm', 'Mf', 'M4', 'MN4', 'MS4', '2N2', 'S1')
         if ('all' in self.args.constituents

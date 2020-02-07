@@ -1,17 +1,12 @@
 from datetime import datetime, timedelta
 import numpy as np
-from ordered_set import OrderedSet
-# from scipy.interpolate import griddata
-# from netCDF4 import Dataset
-# from requests.structures import CaseInsensitiveDict
+from functools import lru_cache
+from collections import OrderedDict
+from pyschism.forcing import bctypes
+from pyschism.forcing.tpxo import TPXO
 
 
-class TidalForcing:
-
-    def __init__(self, start_date=None, end_date=None, spinup_time=None):
-        self.start_date = start_date
-        self.end_date = end_date
-        self.spinup_time = spinup_time
+class Tides(bctypes.ElevBc):
 
     def __call__(self, constituent):
         return self.get_tidal_constituent(constituent)
@@ -23,48 +18,71 @@ class TidalForcing:
     def __len__(self):
         return len(self.active_constituents)
 
-    def use_all(self):
+    def use_all(self, potential=True, forcing=True):
         for constituent in self.constituents:
-            self._active_constituents.add(constituent)
+            if constituent not in self.major_constituents:
+                potential = False
+            self._active_constituents[constituent] = {
+                'potential': potential,
+                'forcing': forcing
+            }
 
-    def use_major(self):
+    def use_major(self, potential=True, forcing=True):
         for constituent in self.major_constituents:
-            self.use_constituent(constituent)
+            self.use_constituent(constituent, potential, forcing)
 
-    def use_constituent(self, constituent):
+    def use_constituent(self, constituent, potential=True, forcing=True):
         msg = "Constituent must be one of "
         msg += f"{self.constituents}"
         assert constituent in self.constituents, msg
-        self._active_constituents.add(constituent)
+        if constituent not in self.major_constituents:
+            potential = False
+        self._active_constituents[constituent] = {
+            "potential": potential,
+            "forcing": forcing,
+        }
 
     def drop_constituent(self, constituent):
         msg = "constituent must be one of: "
         msg += f"{self.active_constituents}"
         assert constituent in self.active_constituents, msg
-        self.__active_constituents = OrderedSet(
-            [c for c in self.active_constituents if c != constituent]
-            )
+        self._active_constituents.pop(constituent)
 
     def get_active_constituents(self):
-        return self.active_constituents
+        return list(self.active_constituents.keys())
+
+    def get_active_forcing_constituents(self):
+        fc = []
+        for c, d in self.active_constituents.items():
+            if d['forcing']:
+                fc.append(c)
+        return fc
+
+    def get_active_potential_constituents(self):
+        fc = []
+        for c, d in self.active_constituents.items():
+            if d['potential']:
+                fc.append(c)
+        return fc
 
     def get_tidal_potential_amplitude(self, constituent):
         if constituent in self.tidal_potential_amplitudes:
             return self.tidal_potential_amplitudes[constituent]
 
-    def get_earth_tidal_potential(self, constituent):
-        if constituent in self.earth_tidal_potentials:
-            return self.earth_tidal_potentials[constituent]
+    def get_tidal_species_type(self, constituent):
+        if constituent in self.tidal_species_type:
+            return self.tidal_species_type[constituent]
+        return 0
 
     def get_orbital_frequency(self, constituent):
         return self.orbital_frequencies[constituent]
 
     def get_tidal_constituent(self, constituent):
-        return (self.get_tidal_potential_amplitude(constituent),
-                self.get_orbital_frequency(constituent),
-                self.get_earth_tidal_potential(constituent),
-                self.get_nodal_factor(constituent),
-                self.get_greenwich_factor(constituent))
+        return (self.get_tidal_species_type(constituent),
+                self.get_tidal_potential_amplitude(constituent),  # TPK
+                self.get_orbital_frequency(constituent),  # FF*
+                self.get_nodal_factor(constituent),  # Amig*
+                self.get_greenwich_factor(constituent))  # FACE*
 
     def get_nodal_factor(self, constituent):
         if constituent == "M2":
@@ -356,7 +374,7 @@ class TidalForcing:
 
     @property
     def active_constituents(self):
-        return tuple(self._active_constituents)
+        return self._active_constituents.copy()
 
     @property
     def major_constituents(self):
@@ -428,16 +446,16 @@ class TidalForcing:
             'Q1': 0.019256}
 
     @property
-    def earth_tidal_potentials(self):
+    def tidal_species_type(self):
         return {
-            'M2': 0.693,
-            'S2': 0.693,
-            'N2': 0.693,
-            'K2': 0.693,
-            'K1': 0.736,
-            'O1': 0.695,
-            'P1': 0.706,
-            'Q1': 0.695}
+            'M2': 2,
+            'S2': 2,
+            'N2': 2,
+            'K2': 2,
+            'K1': 1,
+            'O1': 1,
+            'P1': 1,
+            'Q1': 1}
 
     @property
     def hour_middle(self):
@@ -550,6 +568,32 @@ class TidalForcing:
     def DQ(self):
         return np.rad2deg(self.Q)
 
+    @property
+    def ntip(self):
+        return len(self.get_active_potential_constituents())
+
+    @property
+    def cutoff_depth(self):
+        if self.ntip == 0:
+            return 0
+        try:
+            return self.__cutoff_depth
+        except AttributeError:
+            return 40.
+
+    @property
+    def nbfr(self):
+        return len(self.get_active_forcing_constituents())
+
+    @property
+    def bctype(self):
+        return 3
+
+    @property
+    @lru_cache
+    def tpxo(self):
+        return TPXO()
+
     @start_date.setter
     def start_date(self, start_date):
         if start_date is None:
@@ -588,6 +632,11 @@ class TidalForcing:
         assert isinstance(spinup_time, timedelta), msg
         self.__spinup_time = np.abs(spinup_time)
 
+    @cutoff_depth.setter
+    def cutoff_depth(self, cutoff_depth):
+        assert isinstance(cutoff_depth, (int, float))
+        self.__cutoff_depth = cutoff_depth
+
     @start_date.deleter
     def start_date(self):
         try:
@@ -610,9 +659,6 @@ class TidalForcing:
             pass
 
     @property
+    @lru_cache
     def _active_constituents(self):
-        try:
-            return self.__active_constituents
-        except AttributeError:
-            self.__active_constituents = OrderedSet()
-            return self.__active_constituents
+        return OrderedDict()

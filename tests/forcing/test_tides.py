@@ -1,13 +1,13 @@
 #! /usr/bin/env python
 import unittest
 from datetime import datetime, timedelta
-from pyschism.forcing import TidalForcing
+from pyschism.forcing import Tides
 
 
-class TidalForcingTestCase(unittest.TestCase):
+class TidesTestCase(unittest.TestCase):
 
     def setUp(self):
-        self.tf = TidalForcing()
+        self.tf = Tides()
         self.tf.start_date = datetime(2017, 9, 23)
         self.tf.end_date = datetime(2017, 9, 25)
         self.tf.spinup_time = timedelta(days=7)

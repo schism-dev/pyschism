@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 # import tempfile
 # import pathlib
-# from pyschism.mesh.friction import Fgrid
+from pyschism.mesh.friction import Fgrid
 import unittest
 
 
@@ -39,6 +39,6 @@ class FgridTestCase(unittest.TestCase):
             'elements': self.elements,
         }
 
-    # def test_open(self):
-    #     f = Fgrid.open()
-
+    def test_assert_raises_nchi(self):
+        f = Fgrid(**self.fgrid)
+        self.assertRaises(Exception, getattr, f, "nchi")

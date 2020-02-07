@@ -1,12 +1,9 @@
 import tempfile
-from datetime import datetime, timedelta
 import pathlib
+from functools import lru_cache
 from pyschism.mesh import Mesh
 from pyschism.driver.param import Param
-from pyschism.forcing import (
-    TidalForcing,
-    WindForcing,
-)
+from pyschism.forcing.bctides import Bctides
 
 
 class SchismRun:
@@ -14,28 +11,10 @@ class SchismRun:
     def __init__(
         self,
         mesh,
-        start_date,
-        end_date,
-        spinup_time,
-        tidal_forcing=None,
-        wind_forcing=None,
-        wave_forcing=None,
-        tracers=None,
-        mode='barotropic',
-        transport=False,
-        netcdf=True,
+        param,
     ):
         self._mesh = mesh
-        self._start_date = start_date
-        self._end_date = end_date
-        self._spinup_time = spinup_time
-        self._tidal_forcing = tidal_forcing
-        self._wind_forcing = wind_forcing
-        self._wave_forcing = wave_forcing
-        self._tracers = tracers
-        self._mode = mode
-        self._transport = transport
-        self._netcdf = netcdf
+        self._param = param
 
     def run(
         self,
@@ -102,44 +81,29 @@ class SchismRun:
             self.bctides.write(outdir / bctides, overwrite)
 
     @property
+    def param(self):
+        return self._param
+
+    @property
     def mesh(self):
         return self._mesh
 
     @property
-    def tidal_forcing(self):
-        return self._tidal_forcing
-
-    @property
-    def wind_forcing(self):
-        return self._wind_forcing
-
-    @property
-    def mode(self):
-        return self._mode
-
-    @property
-    def transport(self):
-        return self._transport
-
-    @property
-    def param(self):
-        return Param(
-            self.start_date,
-            self.end_date,
-            self.spinup_time,
-            )
-
-    @property
     def start_date(self):
-        return self._start_date
+        return self.param.start_date
 
     @property
     def end_date(self):
-        return self._end_date
+        return self.param.end_date
 
     @property
     def spinup_time(self):
-        return self._spinup_time
+        return self.param.spinup_time
+
+    @property
+    @lru_cache
+    def bctides(self):
+        return Bctides(self.mesh)
 
     def _run_local(self, nproc, outdir, overwrite):
         self.write(outdir, overwrite)
@@ -152,32 +116,8 @@ class SchismRun:
         return self.__mesh
 
     @property
-    def _start_date(self):
-        return self.__start_date
-
-    @property
-    def _end_date(self):
-        return self.__end_date
-
-    @property
-    def _spinup_time(self):
-        return self.__spinup_time
-
-    @property
-    def _tidal_forcing(self):
-        return self.__tidal_forcing
-
-    @property
-    def _wind_forcing(self):
-        return self.__wind_forcing
-
-    @property
-    def _mode(self):
-        return self.__mode
-
-    @property
-    def _transport(self):
-        return self.__transport
+    def _param(self):
+        return self.__param
 
     @_mesh.setter
     def _mesh(self, mesh):
@@ -185,49 +125,64 @@ class SchismRun:
         assert isinstance(mesh, Mesh), msg
         self.__mesh = mesh
 
-    @_start_date.setter
-    def _start_date(self, start_date):
-        msg = f"start_date must be a {datetime} instance."
-        assert isinstance(start_date, datetime), msg
-        self.__start_date = start_date
+    @_param.setter
+    def _param(self, param):
+        msg = f"param argument must be of type {Param}."
+        assert isinstance(param, Param), msg
+        # set friction
+        param.opt.nchi = self.mesh.fgrid.nchi
+        if param.opt.nchi == 1:
+            param.opt.hmin_man = self.mesh.fgrid.hmin_man
+        if param.opt.nchi == 1:
+            param.opt.dbz_min = self.mesh.fgrid.dbz_min
+            param.opt.dbz_decay = self.mesh.fgrid.dbz_decay
+        # set coordinate system
+        if self.mesh.crs.is_geographic:
+            param.opt.ics = self.mesh.ics
+            param.opt.slam0 = self.mesh.slam0
+            param.opt.sfea0 = self.mesh.sfea0
+        else:
+            param.opt.ics = self.mesh.ics
+        # set coriolis
+        if self.mesh.ics == 2:
+            param.opt.ncor = 1
+        else:
+            msg = "Coriolis parameters have to be tuned for projected meshes."
+            raise NotImplementedError(msg)
+        self.__param = param
 
-    @_end_date.setter
-    def _end_date(self, end_date):
-        msg = f"end_date must be a {datetime} instance."
-        assert isinstance(end_date, datetime), msg
-        self.__end_date = end_date
+    # def run_local(self):
 
-    @_spinup_time.setter
-    def _spinup_time(self, spinup_time):
-        msg = f"spinup_time must be a {timedelta} instance."
-        assert isinstance(spinup_time, timedelta), msg
-        self.__spinup_time = spinup_time
+    #     def config():
+    #         src = pathlib.Path(self.args.config_file).resolve()
+    #         dst = self.output_directory / src.name
+    #         if dst.is_file() and not self.overwrite:
+    #             msg = "Destination file exists and overwrite=False"
+    #             raise Exception(msg)
+    #         shutil.copy2(src, self.output_directory)
 
-    @_tidal_forcing.setter
-    def _tidal_forcing(self, tidal_forcing):
-        if tidal_forcing is not None:
-            assert isinstance(tidal_forcing, TidalForcing)
-            tidal_forcing.start_date = self.start_date
-            tidal_forcing.end_date = self.end_date
-            tidal_forcing.spinup_time = self.spinup_time
-        self.__tidal_forcing = tidal_forcing
+    #     def param():
+    #         self.param.write(self.staging_directory)
 
-    @_wind_forcing.setter
-    def _wind_forcing(self, wind_forcing):
-        if wind_forcing is not None:
-            assert isinstance(wind_forcing, WindForcing)
-            wind_forcing.start_date = self.start_date
-            wind_forcing.end_date = self.end_date
-            wind_forcing.spinup_time = self.spinup_time
-        self.__wind_forcing = wind_forcing
+    #     def mesh():
+    #         self.mesh.write(
+    #             hgrid=self.output_path / 'hgrid.gr3',
+    #             vgrid=self.output_path / 'vgrid.in',
+    #             fgrid=self.output_path / 'fgrid.gr3',
+    #             overwrite=self.overwrite)
 
-    @_mode.setter
-    def _mode(self, mode):
-        msg = "Run mode choices are 'barotropic' or 'baroclinic'."
-        assert mode.lower() in ['barotropic', 'baroclinic'], msg
-        self.__mode = mode
+    #     def bctides():
+    #         pass
 
-    @_transport.setter
-    def _transport(self, transport):
-        assert isinstance(transport, bool)
-        self.__transport = transport
+    #     def pschism_exec(self):
+    #         raise NotImplementedError
+
+    #     config()
+    #     param()
+    #     mesh()
+    #     bctides()
+    #     pschism_exec()
+    #     return 0
+
+    # def run_server(self):
+    #     raise NotImplementedError

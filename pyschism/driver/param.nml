@@ -16,8 +16,8 @@
   ibc = 0 !Baroclinic option
   ibtp = 1 
 
-  rnday = 30 !total run time in days
-  dt = 100. !Time step in sec
+  rnday = 0 !total run time in days
+  dt = 150. !Time step in sec
 
 ! Grid for WWM (USE_WWM)
   msc2 = 24     !same as msc in .nml ... for consitency check between SCHISM and WWM
@@ -30,8 +30,8 @@
   eco_class = 27 !EcoSim (USE_ECO): must be between [25,60]
 
 ! Global output controls
-  nspool = 36 !output step spool
-  ihfskip = 864 !stack spool; every ihfskip steps will be put into 1_*, 2_*, etc...
+  nspool = 0 !output step spool
+  ihfskip = 0 !stack spool; every ihfskip steps will be put into 1_*, 2_*, etc...
 /
 
 &OPT
@@ -45,11 +45,11 @@
   ipre2 = 0
 
 ! Starting time
-  start_year = 2000 !int
-  start_month = 1 !int
-  start_day = 1 !int
-  start_hour = 0 !double
-  utc_start = 8 !double
+  start_year = 1 !int > 0
+  start_month = 1 !int > 0
+  start_day = 1 !int > 0
+  start_hour = 0. !double
+  utc_start = 0. !double
 
 !-----------------------------------------------------------------------
 ! Coordinate option: 1: Cartesian; 2: lon/lat (hgrid.gr3=hgrid.ll in this case,
@@ -76,11 +76,11 @@
 !-----------------------------------------------------------------------
 ! Main ramp option
 !-----------------------------------------------------------------------
-  nramp = 1 !ramp-up option (1: on; 0: off)
-  dramp = 1. !needed if nramp=1; ramp-up period in days
+  nramp = 0 !ramp-up option (1: on; 0: off)
+  dramp = 0. !needed if nramp=1; ramp-up period in days
 
   nrampbc = 0 !ramp-up flag for baroclinic force
-  drampbc = 1. !not used if nrampbc=0
+  drampbc = 0. !not used if nrampbc=0
 
 !-----------------------------------------------------------------------
 ! Method for momentum advection. 0: ELM; 1: upwind (not quite working yet)
@@ -160,8 +160,8 @@
 !-----------------------------------------------------------------------
 ! Reference latitude for beta-plane approximation when ncor=1 (not used if ics=2)
 !-----------------------------------------------------------------------
-  slam0 = -124  !lon - not really used
-  sfea0 = 45 !lat
+  slam0 = 0  !lon - not really used
+  sfea0 = 0 !lat
 
 !-----------------------------------------------------------------------
 ! Option to deal with under resolution near steep slopes in deeper depths

@@ -1,0 +1,38 @@
+{
+    "meta": {
+        "project_name": "schrun example 1",
+        "output_directory": "staging",
+        "comments": "",
+        "overwrite": true,
+        "log_level": "debug",
+        "binary": "$HOME/schism-dev/schism.git/build/bin/pschism_TVD-VL"
+    },
+    "mesh": {
+        "crs": "EPSG:4326",
+        "hgrid": "$PYSCHISM/examples/example_1/hgrid.gr3",
+        "friction": {
+            "constant": {
+                "ftype": "manning",
+                "value": 0.025
+            }
+        }
+    },
+    "forcing": {
+        "tidal_constituents": {
+            "all": {
+                "potential": true,
+                "forcing": true
+            }
+        }
+    },
+    "start_date": "2017-9-18-12T00:00",
+    "utc_start": -4.0,
+    "run_days": 10.0,
+    "timestep": 150.0,
+    "spinup_days": 10.0,
+    "nspool": 3600.0,
+    "outputs": [
+        "elev",
+        "dahv"
+    ]
+}

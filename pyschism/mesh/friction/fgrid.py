@@ -26,3 +26,8 @@ class Fgrid(EuclideanMesh2D):
         msh = grd.reader(path)
         msh.update({"crs": crs})
         return Fgrid(**msh)
+
+    @property
+    def nchi(self):
+        msg = "Child class must implement nchi parameter"
+        raise NotImplementedError(msg)

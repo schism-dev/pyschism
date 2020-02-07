@@ -11,12 +11,12 @@ class MeshTestCase(unittest.TestCase):
 
     def setUp(self):
         nodes = {
-            '1': ((0., 0.), -5.),
+            '1': ((0., 0.), 1),
             '2': ((.5, 0.), -4.),
             '3': ((1., 0.), -3.),
-            '4': ((1., 1.), -2.),
-            '5': ((0., 1.), -1.),
-            '6': ((.5, 1.5), 0.),
+            '4': ((1., 1.), -8.),
+            '5': ((0., 1.), 1.),
+            '6': ((.5, 1.5), -9.),
             '7': ((.33, .33), 1.),
             '8': ((.66, .33), 2.),
             '9': ((.5, .66), 3.),
@@ -35,7 +35,6 @@ class MeshTestCase(unittest.TestCase):
             '9': ['9', '4', '5'],
             '10': ['5', '1', '7']
             }
-
         # write hgrid
         tmpdir = tempfile.TemporaryDirectory()
         hgrid = pathlib.Path(tmpdir.name) / 'hgrid.gr3'
@@ -54,6 +53,7 @@ class MeshTestCase(unittest.TestCase):
                 for idx in geom:
                     f.write(f"{idx} ")
                 f.write(f"\n")
+
         vgrid = pathlib.Path(tmpdir.name) / 'vgrid.gr3'
         with open(vgrid, 'w') as f:
             f.write("2 !ivcor\n")
@@ -107,6 +107,48 @@ class MeshTestCase(unittest.TestCase):
     def test_make_plot_3D(self, mock):
         m = Mesh.open(self.hgrid)
         self.assertRaises(NotImplementedError, m.make_plot)
+
+    def test__fgrid_getter(self):
+        h = Mesh.open(self.hgrid)
+        h.fgrid
+        self.assertIsInstance(h._fgrid, Fgrid)
+
+    def test_set_friction(self):
+        h = Mesh.open(self.hgrid)
+        fric = h.set_friction('manning', 0.025)
+        self.assertIsInstance(fric, Fgrid)
+
+    def test_set_tides_boundary_forcing(self):
+        h = Mesh.open(self.hgrid)
+        from pyschism.forcing import Tides
+        h.hgrid.generate_boundaries()
+        h.set_boundary_forcing(Tides())
+
+    def test_set_tides_boundary_forcing_by_id(self):
+        h = Mesh.open(self.hgrid)
+        from pyschism.forcing import Tides
+        h.hgrid.generate_boundaries()
+        h.set_boundary_forcing(Tides(), 0)
+
+    def test_crs(self):
+        h = Mesh.open(self.hgrid)
+        h.crs
+
+    def test_raise_ics_no_projection(self):
+        h = Mesh.open(self.hgrid)
+        self.assertRaises(Exception, getattr, h, "ics")
+
+    def test_ics_latlon(self):
+        h = Mesh.open(self.hgrid, crs=4326)
+        self.assertEqual(h.ics, 2)
+
+    def test_ics_meters(self):
+        h = Mesh.open(self.hgrid, crs=3395)
+        self.assertEqual(h.ics, 1)
+
+    def test_slma0_sfea0(self):
+        h = Mesh.open(self.hgrid, crs=3395)
+        h.slam0, h.sfea0
 
 
 if __name__ == '__main__':

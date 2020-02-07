@@ -1,5 +1,6 @@
 import pathlib
 
+
 def reader(path):
     sms2dm = dict()
     with open(pathlib.Path(path), 'r') as f:
@@ -23,6 +24,7 @@ def reader(path):
                         )
                     })
     return sms2dm
+
 
 def writer(sms2dm, path, overwrite=False):
     path = pathlib.Path(path)
@@ -48,6 +50,7 @@ def graph(sms2dm):
     f += nodes(sms2dm)
     return f
 
+
 def nodes(sms2dm):
     assert all(int(id) > 0 for id in sms2dm['ND'])
     f = ''
@@ -58,6 +61,7 @@ def nodes(sms2dm):
         f += f"{value:<.16E}\n"
     return f
 
+
 def boundaries(sms2dm):
     f = ''
     if 'boundaries' in sms2dm.keys():
@@ -65,6 +69,7 @@ def boundaries(sms2dm):
             for id, bnd in bnds.items():
                 f += nodestring(bnd['indexes'])
     return f
+
 
 def geom_string(geom_type, sms2dm):
     assert geom_type in ['E3T', 'E4Q', 'E6T', 'E8Q', 'E9Q']
@@ -80,10 +85,14 @@ def geom_string(geom_type, sms2dm):
 
 def nodestring(geom):
     f = "NS "
-    for i in range(len(geom) -1):
+    for i in range(len(geom) - 1):
         f += f"{geom[i]} "
     f += f"-{geom[-1]}\n"
     return f
+
+
+def nodestrings(geom):
+    pass
 
 
 def triangular_elements(geom):
@@ -91,6 +100,7 @@ def triangular_elements(geom):
     if geom is not None:
         f += geom_string("E3T", geom)
     return f
+
 
 def quadrilateral_elements(geom):
     f = ''

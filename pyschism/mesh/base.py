@@ -1,15 +1,18 @@
-import numpy as np
-from pyproj import Proj, CRS, Transformer
-from functools import lru_cache
 import logging
 import uuid
 import pathlib
-from pyschism.mesh import grd, sms2dm
-from pyschism.figures import _figure
+from functools import lru_cache
 from collections.abc import Mapping
+from collections import defaultdict
+import numpy as np
 from matplotlib.tri import Triangulation
+from matplotlib.path import Path
 from matplotlib.collections import PolyCollection
 from matplotlib.transforms import Bbox
+from shapely.geometry import Polygon
+from pyproj import Proj, CRS, Transformer
+from pyschism.mesh import grd, sms2dm
+from pyschism.figures import _figure
 
 
 class EuclideanMesh2D:
@@ -98,11 +101,12 @@ class EuclideanMesh2D:
     def get_xy(self, crs=None):
         if crs is not None:
             crs = CRS.from_user_input(crs)
-            transformer = Transformer.from_crs(self.crs, crs, always_xy=True)
-            x, y = transformer.transform(self.x, self.y)
-            return np.vstack([x, y]).T
-        else:
-            return np.vstack([self.x, self.y]).T
+            if crs.srs != self.srs:
+                transformer = Transformer.from_crs(
+                    self.crs, crs, always_xy=True)
+                x, y = transformer.transform(self.x, self.y)
+                return np.vstack([x, y]).T
+        return np.vstack([self.x, self.y]).T
 
     def write(self, path, overwrite=False, fmt='gr3'):
         path = pathlib.Path(path)
@@ -321,6 +325,96 @@ class EuclideanMesh2D:
 
     @property
     @lru_cache
+    def index_ring_collection(self):
+        # find boundary edges using triangulation neighbors table,
+        # see: https://stackoverflow.com/a/23073229/7432462
+        boundary_edges = list()
+        tri = self.triangulation
+        idxs = np.vstack(
+            list(np.where(tri.neighbors == -1))).T
+        for i, j in idxs:
+            boundary_edges.append(
+                (int(tri.triangles[i, j]),
+                    int(tri.triangles[i, (j+1) % 3])))
+        index_ring_collection = self.sort_edges(boundary_edges)
+        # sort index_rings into corresponding "polygons"
+        areas = list()
+        vertices = self.coords
+        for index_ring in index_ring_collection:
+            e0, e1 = [list(t) for t in zip(*index_ring)]
+            areas.append(float(Polygon(vertices[e0, :]).area))
+
+        # maximum area must be main mesh
+        idx = areas.index(np.max(areas))
+        exterior = index_ring_collection.pop(idx)
+        areas.pop(idx)
+        _id = 0
+        _index_ring_collection = dict()
+        _index_ring_collection[_id] = {
+            'exterior': np.asarray(exterior),
+            'interiors': []
+            }
+        e0, e1 = [list(t) for t in zip(*exterior)]
+        path = Path(vertices[e0 + [e0[0]], :], closed=True)
+        while len(index_ring_collection) > 0:
+            # find all internal rings
+            potential_interiors = list()
+            for i, index_ring in enumerate(index_ring_collection):
+                e0, e1 = [list(t) for t in zip(*index_ring)]
+                if path.contains_point(vertices[e0[0], :]):
+                    potential_interiors.append(i)
+            # filter out nested rings
+            real_interiors = list()
+            for i, p_interior in reversed(list(enumerate(potential_interiors))):
+                _p_interior = index_ring_collection[p_interior]
+                check = [index_ring_collection[_]
+                         for j, _ in reversed(list(enumerate(potential_interiors)))
+                         if i != j]
+                has_parent = False
+                for _path in check:
+                    e0, e1 = [list(t) for t in zip(*_path)]
+                    _path = Path(vertices[e0 + [e0[0]], :], closed=True)
+                    if _path.contains_point(vertices[_p_interior[0][0], :]):
+                        has_parent = True
+                if not has_parent:
+                    real_interiors.append(p_interior)
+            # pop real rings from collection
+            for i in reversed(sorted(real_interiors)):
+                _index_ring_collection[_id]['interiors'].append(
+                    np.asarray(index_ring_collection.pop(i)))
+                areas.pop(i)
+            # if no internal rings found, initialize next polygon
+            if len(index_ring_collection) > 0:
+                idx = areas.index(np.max(areas))
+                exterior = index_ring_collection.pop(idx)
+                areas.pop(idx)
+                _id += 1
+                _index_ring_collection[_id] = {
+                    'exterior': np.asarray(exterior),
+                    'interiors': []
+                    }
+                e0, e1 = [list(t) for t in zip(*exterior)]
+                path = Path(vertices[e0 + [e0[0]], :], closed=True)
+        return _index_ring_collection
+
+    @property
+    @lru_cache
+    def outer_ring_collection(self):
+        outer_ring_collection = defaultdict()
+        for key, ring in self.index_ring_collection.items():
+            outer_ring_collection[key] = ring['exterior']
+        return outer_ring_collection
+
+    @property
+    @lru_cache
+    def inner_ring_collection(self):
+        inner_ring_collection = defaultdict()
+        for key, rings in self.index_ring_collection.items():
+            inner_ring_collection[key] = rings['interiors']
+        return inner_ring_collection
+
+    @property
+    @lru_cache
     def logger(self):
         return logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
@@ -468,3 +562,51 @@ class EuclideanMesh2D:
             description = uuid.uuid4().hex[:8]
         assert isinstance(description, str)
         self.__description = description
+
+    # auxilliary functions
+    @staticmethod
+    def sort_edges(edges):
+        if len(edges) == 0:
+            return edges
+        # start ordering the edges into linestrings
+        edge_collection = list()
+        ordered_edges = [edges.pop(-1)]
+        e0, e1 = [list(t) for t in zip(*edges)]
+        while len(edges) > 0:
+            if ordered_edges[-1][1] in e0:
+                idx = e0.index(ordered_edges[-1][1])
+                ordered_edges.append(edges.pop(idx))
+            elif ordered_edges[0][0] in e1:
+                idx = e1.index(ordered_edges[0][0])
+                ordered_edges.insert(0, edges.pop(idx))
+            elif ordered_edges[-1][1] in e1:
+                idx = e1.index(ordered_edges[-1][1])
+                ordered_edges.append(
+                    list(reversed(edges.pop(idx))))
+            elif ordered_edges[0][0] in e0:
+                idx = e0.index(ordered_edges[0][0])
+                ordered_edges.insert(
+                    0, list(reversed(edges.pop(idx))))
+            else:
+                edge_collection.append(tuple(ordered_edges))
+                idx = -1
+                ordered_edges = [edges.pop(idx)]
+            e0.pop(idx)
+            e1.pop(idx)
+        # finalize
+        if len(edge_collection) == 0 and len(edges) == 0:
+            edge_collection.append(tuple(ordered_edges))
+        else:
+            edge_collection.append(tuple(ordered_edges))
+        return edge_collection
+
+    @staticmethod
+    def signed_polygon_area(vertices):
+        # https://code.activestate.com/recipes/578047-area-of-polygon-using-shoelace-formula/
+        n = len(vertices)  # of vertices
+        area = 0.0
+        for i in range(n):
+            j = (i + 1) % n
+            area += vertices[i][0] * vertices[j][1]
+            area -= vertices[j][0] * vertices[i][1]
+        return area / 2.0

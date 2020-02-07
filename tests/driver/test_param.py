@@ -28,15 +28,15 @@ class ParamTestCase(unittest.TestCase):
         self.assertRaises(OSError, p.write, file.name)
 
     def test_core_ipre(self):
-        self.param.core.ipre = 0
+        self.param.ipre = 0
         self.assertEqual(self.param.core.ipre, 0)
 
     def test_core_ibc(self):
-        self.param.core.ibc = 0
+        self.param.ibc = 0
         self.assertEqual(self.param.core.ibc, 0)
 
     def test_core_ibtp(self):
-        self.param.core.ibtp = 1
+        self.param.ibtp = 1
         self.assertEqual(self.param.core.ibtp, 1)
 
     def test_core_rnday(self):
@@ -44,39 +44,39 @@ class ParamTestCase(unittest.TestCase):
         self.assertEqual(self.param.core.rnday, 30)
 
     def test_core_dt(self):
-        self.param.core.dt = 100.0
+        self.param.timestep = 100.0
         self.assertEqual(self.param.core.dt, 100.0)
 
     def test_core_msc2(self):
-        self.param.core.msc2 = 24
+        self.param.msc2 = 24
         self.assertEqual(self.param.core.msc2, 24)
 
     def test_core_mdc2(self):
-        self.param.core.mdc2 = 30
+        self.param.mdc2 = 30
         self.assertEqual(self.param.core.mdc2, 30)
 
     def test_core_ntracer_gen(self):
-        self.param.core.ntracer_gen = 2
+        self.param.ntracer_gen = 2
         self.assertEqual(self.param.core.ntracer_gen, 2)
 
     def test_core_ntracer_age(self):
-        self.param.core.ntracer_age = 4
+        self.param.ntracer_age = 4
         self.assertEqual(self.param.core.ntracer_age, 4)
 
     def test_core_sed_class(self):
-        self.param.core.sed_class = 5
+        self.param.sed_class = 5
         self.assertEqual(self.param.core.sed_class, 5)
 
     def test_core_eco_class(self):
-        self.param.core.eco_class = 27
+        self.param.eco_class = 27
         self.assertEqual(self.param.core.eco_class, 27)
 
     def test_core_nspool(self):
-        self.param.core.nspool = 36
+        self.param.nspool = 36
         self.assertEqual(self.param.core.nspool, 36)
 
     def test_core_ihfskip(self):
-        self.param.core.ihfskip = 864
+        self.param.ihfskip = 864
         self.assertEqual(self.param.core.ihfskip, 864)
 
     def test_opt_ipre2(self):
@@ -674,6 +674,790 @@ class ParamTestCase(unittest.TestCase):
     def test_schout_iof_ana(self):
         self.param.schout.iof_ana = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         self.assertEqual(self.param.schout.iof_ana, [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+
+    def test_elev(self):
+        self.param.elev = 1
+        self.assertEqual(self.param.elev, 1)
+
+    def test_air_pressure(self):
+        self.param.air_pressure = 1
+        self.assertEqual(self.param.air_pressure, 1)
+
+    def test_air_temperature(self):
+        self.param.air_temperature = 1
+        self.assertEqual(self.param.air_temperature, 1)
+
+    def test_specific_humidity(self):
+        self.param.specific_humidity = 1
+        self.assertEqual(self.param.specific_humidity, 1)
+
+    def test_solar_radiation(self):
+        self.param.solar_radiation = 1
+        self.assertEqual(self.param.solar_radiation, 1)
+
+    def test_sensible_flux(self):
+        self.param.sensible_flux = 1
+        self.assertEqual(self.param.sensible_flux, 1)
+
+    def test_latent_heat(self):
+        self.param.latent_heat = 1
+        self.assertEqual(self.param.latent_heat, 1)
+
+    def test_upward_longwave(self):
+        self.param.upward_longwave = 1
+        self.assertEqual(self.param.upward_longwave, 1)
+
+    def test_downward_longwave(self):
+        self.param.downward_longwave = 1
+        self.assertEqual(self.param.downward_longwave, 1)
+
+    def test_total_heat_flux(self):
+        self.param.total_heat_flux = 1
+        self.assertEqual(self.param.total_heat_flux, 1)
+
+    def test_evaporation(self):
+        self.param.evaporation = 1
+        self.assertEqual(self.param.evaporation, 1)
+
+    def test_precipitation(self):
+        self.param.precipitation = 1
+        self.assertEqual(self.param.precipitation, 1)
+
+    def test_bottom_stress(self):
+        self.param.bottom_stress = 1
+        self.assertEqual(self.param.bottom_stress, 1)
+
+    def test_wind_speed(self):
+        self.param.wind_speed = 1
+        self.assertEqual(self.param.wind_speed, 1)
+
+    def test_wind_stress(self):
+        self.param.wind_stress = 1
+        self.assertEqual(self.param.wind_stress, 1)
+
+    def test_dahv(self):
+        self.param.dahv = 1
+        self.assertEqual(self.param.dahv, 1)
+
+    def test_vertical_velocity(self):
+        self.param.vertical_velocity = 1
+        self.assertEqual(self.param.vertical_velocity, 1)
+
+    def test_temp(self):
+        self.param.temp = 1
+        self.assertEqual(self.param.temp, 1)
+
+    def test_salt(self):
+        self.param.salt = 1
+        self.assertEqual(self.param.salt, 1)
+
+    def test_water_density(self):
+        self.param.water_density = 1
+        self.assertEqual(self.param.water_density, 1)
+
+    def test_diffusivity(self):
+        self.param.diffusivity = 1
+        self.assertEqual(self.param.diffusivity, 1)
+
+    def test_viscosity(self):
+        self.param.viscosity = 1
+        self.assertEqual(self.param.viscosity, 1)
+
+    def test_TKE(self):
+        self.param.TKE = 1
+        self.assertEqual(self.param.TKE, 1)
+
+    def test_mixing_length(self):
+        self.param.mixing_length = 1
+        self.assertEqual(self.param.mixing_length, 1)
+
+    def test_hvel(self):
+        self.param.hvel = 1
+        self.assertEqual(self.param.hvel, 1)
+
+    def test_hvel_side(self):
+        self.param.hvel_side = 1
+        self.assertEqual(self.param.hvel_side, 1)
+
+    def test_wvel_elem(self):
+        self.param.wvel_elem = 1
+        self.assertEqual(self.param.wvel_elem, 1)
+
+    def test_temp_elem(self):
+        self.param.temp_elem = 1
+        self.assertEqual(self.param.temp_elem, 1)
+
+    def test_salt_elem(self):
+        self.param.salt_elem = 1
+        self.assertEqual(self.param.salt_elem, 1)
+
+    def test_pressure_gradient(self):
+        self.param.pressure_gradient = 1
+        self.assertEqual(self.param.pressure_gradient, 1)
+
+    def test_WWM_1(self):
+        self.param.WWM_1 = 1
+        self.assertEqual(self.param.WWM_1, 1)
+
+    def test_WWM_2(self):
+        self.param.WWM_2 = 1
+        self.assertEqual(self.param.WWM_2, 1)
+
+    def test_WWM_3(self):
+        self.param.WWM_3 = 1
+        self.assertEqual(self.param.WWM_3, 1)
+
+    def test_WWM_4(self):
+        self.param.WWM_4 = 1
+        self.assertEqual(self.param.WWM_4, 1)
+
+    def test_WWM_5(self):
+        self.param.WWM_5 = 1
+        self.assertEqual(self.param.WWM_5, 1)
+
+    def test_WWM_6(self):
+        self.param.WWM_6 = 1
+        self.assertEqual(self.param.WWM_6, 1)
+
+    def test_WWM_9(self):
+        self.param.WWM_9 = 1
+        self.assertEqual(self.param.WWM_9, 1)
+
+    def test_WWM_10(self):
+        self.param.WWM_10 = 1
+        self.assertEqual(self.param.WWM_10, 1)
+
+    def test_WWM_11(self):
+        self.param.WWM_11 = 1
+        self.assertEqual(self.param.WWM_11, 1)
+
+    def test_WWM_12(self):
+        self.param.WWM_12 = 1
+        self.assertEqual(self.param.WWM_12, 1)
+
+    def test_WWM_13(self):
+        self.param.WWM_13 = 1
+        self.assertEqual(self.param.WWM_13, 1)
+
+    def test_WWM_14(self):
+        self.param.WWM_14 = 1
+        self.assertEqual(self.param.WWM_14, 1)
+
+    def test_WWM_15(self):
+        self.param.WWM_15 = 1
+        self.assertEqual(self.param.WWM_15, 1)
+
+    def test_WWM_16(self):
+        self.param.WWM_16 = 1
+        self.assertEqual(self.param.WWM_16, 1)
+
+    def test_WWM_17(self):
+        self.param.WWM_17 = 1
+        self.assertEqual(self.param.WWM_17, 1)
+
+    def test_WWM_18(self):
+        self.param.WWM_18 = 1
+        self.assertEqual(self.param.WWM_18, 1)
+
+    def test_WWM_19(self):
+        self.param.WWM_19 = 1
+        self.assertEqual(self.param.WWM_19, 1)
+
+    def test_WWM_20(self):
+        self.param.WWM_20 = 1
+        self.assertEqual(self.param.WWM_20, 1)
+
+    def test_WWM_21(self):
+        self.param.WWM_21 = 1
+        self.assertEqual(self.param.WWM_21, 1)
+
+    def test_WWM_22(self):
+        self.param.WWM_22 = 1
+        self.assertEqual(self.param.WWM_22, 1)
+
+    def test_WWM_23(self):
+        self.param.WWM_23 = 1
+        self.assertEqual(self.param.WWM_23, 1)
+
+    def test_WWM_24(self):
+        self.param.WWM_24 = 1
+        self.assertEqual(self.param.WWM_24, 1)
+
+    def test_WWM_25(self):
+        self.param.WWM_25 = 1
+        self.assertEqual(self.param.WWM_25, 1)
+
+    def test_WWM_26(self):
+        self.param.WWM_26 = 1
+        self.assertEqual(self.param.WWM_26, 1)
+
+    def test_WWM_27(self):
+        self.param.WWM_27 = 1
+        self.assertEqual(self.param.WWM_27, 1)
+
+    def test_WWM_28(self):
+        self.param.WWM_28 = 1
+        self.assertEqual(self.param.WWM_28, 1)
+
+    def test_WWM_energy_dir(self):
+        self.param.WWM_energy_dir = 1
+        self.assertEqual(self.param.WWM_energy_dir, 1)
+
+    def test_wave_force(self):
+        self.param.wave_force = 1
+        self.assertEqual(self.param.wave_force, 1)
+
+    def test_GEN_1(self):
+        self.param.GEN_1 = 1
+        self.assertEqual(self.param.GEN_1, 1)
+
+    def test_GEN_2(self):
+        self.param.GEN_2 = 1
+        self.assertEqual(self.param.GEN_2, 1)
+
+    def test_AGE_1(self):
+        self.param.AGE_1 = 1
+        self.assertEqual(self.param.AGE_1, 1)
+
+    def test_AGE_2(self):
+        self.param.AGE_2 = 1
+        self.assertEqual(self.param.AGE_2, 1)
+
+    def test_SED_depth_change(self):
+        self.param.SED_depth_change = 1
+        self.assertEqual(self.param.SED_depth_change, 1)
+
+    def test_SED_D50(self):
+        self.param.SED_D50 = 1
+        self.assertEqual(self.param.SED_D50, 1)
+
+    def test_SED_bed_stress(self):
+        self.param.SED_bed_stress = 1
+        self.assertEqual(self.param.SED_bed_stress, 1)
+
+    def test_SED_bed_roughness(self):
+        self.param.SED_bed_roughness = 1
+        self.assertEqual(self.param.SED_bed_roughness, 1)
+
+    def test_SED_TSC(self):
+        self.param.SED_TSC = 1
+        self.assertEqual(self.param.SED_TSC, 1)
+
+    def test_bed_thickness(self):
+        self.param.bed_thickness = 1
+        self.assertEqual(self.param.bed_thickness, 1)
+
+    def test_bed_age(self):
+        self.param.bed_age = 1
+        self.assertEqual(self.param.bed_age, 1)
+
+    def test_z0st(self):
+        self.param.z0st = 1
+        self.assertEqual(self.param.z0st, 1)
+
+    def test_z0cr(self):
+        self.param.z0cr = 1
+        self.assertEqual(self.param.z0cr, 1)
+
+    def test_z0sw(self):
+        self.param.z0sw = 1
+        self.assertEqual(self.param.z0sw, 1)
+
+    def test_z0wr(self):
+        self.param.z0wr = 1
+        self.assertEqual(self.param.z0wr, 1)
+
+    def test_SED3D_1(self):
+        self.param.SED3D_1 = 1
+        self.assertEqual(self.param.SED3D_1, 1)
+
+    def test_SED_bdld_1(self):
+        self.param.SED_bdld_1 = 1
+        self.assertEqual(self.param.SED_bdld_1, 1)
+
+    def test_SED_bedfrac_1(self):
+        self.param.SED_bedfrac_1 = 1
+        self.assertEqual(self.param.SED_bedfrac_1, 1)
+
+    def test_SED3D_2(self):
+        self.param.SED3D_2 = 1
+        self.assertEqual(self.param.SED3D_2, 1)
+
+    def test_SED_bdld_2(self):
+        self.param.SED_bdld_2 = 1
+        self.assertEqual(self.param.SED_bdld_2, 1)
+
+    def test_SED_bedfrac_3(self):
+        self.param.SED_bedfrac_3 = 1
+        self.assertEqual(self.param.SED_bedfrac_3, 1)
+
+    def test_ECO_1(self):
+        self.param.ECO_1 = 1
+        self.assertEqual(self.param.ECO_1, 1)
+
+    def test_ICM_Chl(self):
+        self.param.ICM_Chl = 1
+        self.assertEqual(self.param.ICM_Chl, 1)
+
+    def test_ICM_pH(self):
+        self.param.ICM_pH = 1
+        self.assertEqual(self.param.ICM_pH, 1)
+
+    def test_ICM_PrmPrdt(self):
+        self.param.ICM_PrmPrdt = 1
+        self.assertEqual(self.param.ICM_PrmPrdt, 1)
+
+    def test_ICM_DIN(self):
+        self.param.ICM_DIN = 1
+        self.assertEqual(self.param.ICM_DIN, 1)
+
+    def test_ICM_PON(self):
+        self.param.ICM_PON = 1
+        self.assertEqual(self.param.ICM_PON, 1)
+
+    def test_ICM_SED_BENDOC(self):
+        self.param.ICM_SED_BENDOC = 1
+        self.assertEqual(self.param.ICM_SED_BENDOC, 1)
+
+    def test_ICM_SED_BENNH4(self):
+        self.param.ICM_SED_BENNH4 = 1
+        self.assertEqual(self.param.ICM_SED_BENNH4, 1)
+
+    def test_ICM_SED_BENNO3(self):
+        self.param.ICM_SED_BENNO3 = 1
+        self.assertEqual(self.param.ICM_SED_BENNO3, 1)
+
+    def test_ICM_SED_BENPO4(self):
+        self.param.ICM_SED_BENPO4 = 1
+        self.assertEqual(self.param.ICM_SED_BENPO4, 1)
+
+    def test_ICM_SED_BENCOD(self):
+        self.param.ICM_SED_BENCOD = 1
+        self.assertEqual(self.param.ICM_SED_BENCOD, 1)
+
+    def test_ICM_SED_BENDO(self):
+        self.param.ICM_SED_BENDO = 1
+        self.assertEqual(self.param.ICM_SED_BENDO, 1)
+
+    def test_ICM_SED_BENSA(self):
+        self.param.ICM_SED_BENSA = 1
+        self.assertEqual(self.param.ICM_SED_BENSA, 1)
+
+    def test_ICM_lfsav(self):
+        self.param.ICM_lfsav = 1
+        self.assertEqual(self.param.ICM_lfsav, 1)
+
+    def test_ICM_stsav(self):
+        self.param.ICM_stsav = 1
+        self.assertEqual(self.param.ICM_stsav, 1)
+
+    def test_ICM_rtsav(self):
+        self.param.ICM_rtsav = 1
+        self.assertEqual(self.param.ICM_rtsav, 1)
+
+    def test_ICM_tlfsav(self):
+        self.param.ICM_tlfsav = 1
+        self.assertEqual(self.param.ICM_tlfsav, 1)
+
+    def test_ICM_tstsav(self):
+        self.param.ICM_tstsav = 1
+        self.assertEqual(self.param.ICM_tstsav, 1)
+
+    def test_ICM_trtsav(self):
+        self.param.ICM_trtsav = 1
+        self.assertEqual(self.param.ICM_trtsav, 1)
+
+    def test_ICM_hcansav(self):
+        self.param.ICM_hcansav = 1
+        self.assertEqual(self.param.ICM_hcansav, 1)
+
+    def test_ICM_CNH4(self):
+        self.param.ICM_CNH4 = 1
+        self.assertEqual(self.param.ICM_CNH4, 1)
+
+    def test_ICM_CNH3(self):
+        self.param.ICM_CNH3 = 1
+        self.assertEqual(self.param.ICM_CNH3, 1)
+
+    def test_ICM_CPIP(self):
+        self.param.ICM_CPIP = 1
+        self.assertEqual(self.param.ICM_CPIP, 1)
+
+    def test_ICM_CPOS(self):
+        self.param.ICM_CPOS = 1
+        self.assertEqual(self.param.ICM_CPOS, 1)
+
+    def test_ICM_CCH4(self):
+        self.param.ICM_CCH4 = 1
+        self.assertEqual(self.param.ICM_CCH4, 1)
+
+    def test_ICM_CSO4(self):
+        self.param.ICM_CSO4 = 1
+        self.assertEqual(self.param.ICM_CSO4, 1)
+
+    def test_ICM_CH2S(self):
+        self.param.ICM_CH2S = 1
+        self.assertEqual(self.param.ICM_CH2S, 1)
+
+    def test_ICM_SEDPON1(self):
+        self.param.ICM_SEDPON1 = 1
+        self.assertEqual(self.param.ICM_SEDPON1, 1)
+
+    def test_ICM_SEDPON2(self):
+        self.param.ICM_SEDPON2 = 1
+        self.assertEqual(self.param.ICM_SEDPON2, 1)
+
+    def test_ICM_SEDPON3(self):
+        self.param.ICM_SEDPON3 = 1
+        self.assertEqual(self.param.ICM_SEDPON3, 1)
+
+    def test_ICM_SEDPOP1(self):
+        self.param.ICM_SEDPOP1 = 1
+        self.assertEqual(self.param.ICM_SEDPOP1, 1)
+
+    def test_ICM_SEDPOP2(self):
+        self.param.ICM_SEDPOP2 = 1
+        self.assertEqual(self.param.ICM_SEDPOP2, 1)
+
+    def test_ICM_SEDPOP3(self):
+        self.param.ICM_SEDPOP3 = 1
+        self.assertEqual(self.param.ICM_SEDPOP3, 1)
+
+    def test_ICM_SEDPOC1(self):
+        self.param.ICM_SEDPOC1 = 1
+        self.assertEqual(self.param.ICM_SEDPOC1, 1)
+
+    def test_ICM_SEDPOC2(self):
+        self.param.ICM_SEDPOC2 = 1
+        self.assertEqual(self.param.ICM_SEDPOC2, 1)
+
+    def test_ICM_SEDPOC3(self):
+        self.param.ICM_SEDPOC3 = 1
+        self.assertEqual(self.param.ICM_SEDPOC3, 1)
+
+    def test_ICM_EROH2S(self):
+        self.param.ICM_EROH2S = 1
+        self.assertEqual(self.param.ICM_EROH2S, 1)
+
+    def test_ICM_EROLPOC(self):
+        self.param.ICM_EROLPOC = 1
+        self.assertEqual(self.param.ICM_EROLPOC, 1)
+
+    def test_ICM_ERORPOC(self):
+        self.param.ICM_ERORPOC = 1
+        self.assertEqual(self.param.ICM_ERORPOC, 1)
+
+    def test_ICM_DO_consumption(self):
+        self.param.ICM_DO_consumption = 1
+        self.assertEqual(self.param.ICM_DO_consumption, 1)
+
+    def test_ICM_GP1(self):
+        self.param.ICM_GP1 = 1
+        self.assertEqual(self.param.ICM_GP1, 1)
+
+    def test_ICM_GP2(self):
+        self.param.ICM_GP2 = 1
+        self.assertEqual(self.param.ICM_GP2, 1)
+
+    def test_ICM_GP3(self):
+        self.param.ICM_GP3 = 1
+        self.assertEqual(self.param.ICM_GP3, 1)
+
+    def test_ICM_1(self):
+        self.param.ICM_1 = 1
+        self.assertEqual(self.param.ICM_1, 1)
+
+    def test_ICM_2(self):
+        self.param.ICM_2 = 1
+        self.assertEqual(self.param.ICM_2, 1)
+
+    def test_ICM_3(self):
+        self.param.ICM_3 = 1
+        self.assertEqual(self.param.ICM_3, 1)
+
+    def test_ICM_4(self):
+        self.param.ICM_4 = 1
+        self.assertEqual(self.param.ICM_4, 1)
+
+    def test_ICM_5(self):
+        self.param.ICM_5 = 1
+        self.assertEqual(self.param.ICM_5, 1)
+
+    def test_ICM_6(self):
+        self.param.ICM_6 = 1
+        self.assertEqual(self.param.ICM_6, 1)
+
+    def test_ICM_7(self):
+        self.param.ICM_7 = 1
+        self.assertEqual(self.param.ICM_7, 1)
+
+    def test_ICM_8(self):
+        self.param.ICM_8 = 1
+        self.assertEqual(self.param.ICM_8, 1)
+
+    def test_ICM_9(self):
+        self.param.ICM_9 = 1
+        self.assertEqual(self.param.ICM_9, 1)
+
+    def test_ICM_10(self):
+        self.param.ICM_10 = 1
+        self.assertEqual(self.param.ICM_10, 1)
+
+    def test_ICM_11(self):
+        self.param.ICM_11 = 1
+        self.assertEqual(self.param.ICM_11, 1)
+
+    def test_ICM_12(self):
+        self.param.ICM_12 = 1
+        self.assertEqual(self.param.ICM_12, 1)
+
+    def test_ICM_13(self):
+        self.param.ICM_13 = 1
+        self.assertEqual(self.param.ICM_13, 1)
+
+    def test_ICM_14(self):
+        self.param.ICM_14 = 1
+        self.assertEqual(self.param.ICM_14, 1)
+
+    def test_ICM_15(self):
+        self.param.ICM_15 = 1
+        self.assertEqual(self.param.ICM_15, 1)
+
+    def test_ICM_16(self):
+        self.param.ICM_16 = 1
+        self.assertEqual(self.param.ICM_16, 1)
+
+    def test_ICM_17(self):
+        self.param.ICM_17 = 1
+        self.assertEqual(self.param.ICM_17, 1)
+
+    def test_ICM_18(self):
+        self.param.ICM_18 = 1
+        self.assertEqual(self.param.ICM_18, 1)
+
+    def test_ICM_19(self):
+        self.param.ICM_19 = 1
+        self.assertEqual(self.param.ICM_19, 1)
+
+    def test_ICM_20(self):
+        self.param.ICM_20 = 1
+        self.assertEqual(self.param.ICM_20, 1)
+
+    def test_ICM_21(self):
+        self.param.ICM_21 = 1
+        self.assertEqual(self.param.ICM_21, 1)
+
+    def test_ICM_22(self):
+        self.param.ICM_22 = 1
+        self.assertEqual(self.param.ICM_22, 1)
+
+    def test_ICM_23(self):
+        self.param.ICM_23 = 1
+        self.assertEqual(self.param.ICM_23, 1)
+
+    def test_ICM_24(self):
+        self.param.ICM_24 = 1
+        self.assertEqual(self.param.ICM_24, 1)
+
+    def test_ICM_25(self):
+        self.param.ICM_25 = 1
+        self.assertEqual(self.param.ICM_25, 1)
+
+    def test_COS_1(self):
+        self.param.COS_1 = 1
+        self.assertEqual(self.param.COS_1, 1)
+
+    def test_COS_2(self):
+        self.param.COS_2 = 1
+        self.assertEqual(self.param.COS_2, 1)
+
+    def test_COS_3(self):
+        self.param.COS_3 = 1
+        self.assertEqual(self.param.COS_3, 1)
+
+    def test_COS_4(self):
+        self.param.COS_4 = 1
+        self.assertEqual(self.param.COS_4, 1)
+
+    def test_COS_5(self):
+        self.param.COS_5 = 1
+        self.assertEqual(self.param.COS_5, 1)
+
+    def test_COS_6(self):
+        self.param.COS_6 = 1
+        self.assertEqual(self.param.COS_6, 1)
+
+    def test_COS_7(self):
+        self.param.COS_7 = 1
+        self.assertEqual(self.param.COS_7, 1)
+
+    def test_COS_8(self):
+        self.param.COS_8 = 1
+        self.assertEqual(self.param.COS_8, 1)
+
+    def test_COS_9(self):
+        self.param.COS_9 = 1
+        self.assertEqual(self.param.COS_9, 1)
+
+    def test_COS_10(self):
+        self.param.COS_10 = 1
+        self.assertEqual(self.param.COS_10, 1)
+
+    def test_COS_11(self):
+        self.param.COS_11 = 1
+        self.assertEqual(self.param.COS_11, 1)
+
+    def test_COS_12(self):
+        self.param.COS_12 = 1
+        self.assertEqual(self.param.COS_12, 1)
+
+    def test_COS_13(self):
+        self.param.COS_13 = 1
+        self.assertEqual(self.param.COS_13, 1)
+
+    def test_FIB_1(self):
+        self.param.FIB_1 = 1
+        self.assertEqual(self.param.FIB_1, 1)
+
+    def test_SED2D_depth_change(self):
+        self.param.SED2D_depth_change = 1
+        self.assertEqual(self.param.SED2D_depth_change, 1)
+
+    def test_SED2D_cflsed(self):
+        self.param.SED2D_cflsed = 1
+        self.assertEqual(self.param.SED2D_cflsed, 1)
+
+    def test_SED2D_d50(self):
+        self.param.SED2D_d50 = 1
+        self.assertEqual(self.param.SED2D_d50, 1)
+
+    def test_SED2D_total_transport(self):
+        self.param.SED2D_total_transport = 1
+        self.assertEqual(self.param.SED2D_total_transport, 1)
+
+    def test_SED2D_susp_load(self):
+        self.param.SED2D_susp_load = 1
+        self.assertEqual(self.param.SED2D_susp_load, 1)
+
+    def test_SED2D_bed_load(self):
+        self.param.SED2D_bed_load = 1
+        self.assertEqual(self.param.SED2D_bed_load, 1)
+
+    def test_SED2D_average_transport(self):
+        self.param.SED2D_average_transport = 1
+        self.assertEqual(self.param.SED2D_average_transport, 1)
+
+    def test_SED2D_bottom_slope(self):
+        self.param.SED2D_bottom_slope = 1
+        self.assertEqual(self.param.SED2D_bottom_slope, 1)
+
+    def test_z0eq(self):
+        self.param.z0eq = 1
+        self.assertEqual(self.param.z0eq, 1)
+
+    def test_z0cr2d(self):
+        self.param.z0cr2d = 1
+        self.assertEqual(self.param.z0cr2d, 1)
+
+    def test_z0sw2d(self):
+        self.param.z0sw2d = 1
+        self.assertEqual(self.param.z0sw2d, 1)
+
+    def test_z0wr2d(self):
+        self.param.z0wr2d = 1
+        self.assertEqual(self.param.z0wr2d, 1)
+
+    def test_marsh_flag(self):
+        self.param.marsh_flag = 1
+        self.assertEqual(self.param.marsh_flag, 1)
+
+    def test_ICE_velocity(self):
+        self.param.ICE_velocity = 1
+        self.assertEqual(self.param.ICE_velocity, 1)
+
+    def test_ICE_strain_rate(self):
+        self.param.ICE_strain_rate = 1
+        self.assertEqual(self.param.ICE_strain_rate, 1)
+
+    def test_ICE_net_heat_flux(self):
+        self.param.ICE_net_heat_flux = 1
+        self.assertEqual(self.param.ICE_net_heat_flux, 1)
+
+    def test_ICE_fresh_water_flux(self):
+        self.param.ICE_fresh_water_flux = 1
+        self.assertEqual(self.param.ICE_fresh_water_flux, 1)
+
+    def test_ICE_top_T(self):
+        self.param.ICE_top_T = 1
+        self.assertEqual(self.param.ICE_top_T, 1)
+
+    def test_ICE_tracer_1(self):
+        self.param.ICE_tracer_1 = 1
+        self.assertEqual(self.param.ICE_tracer_1, 1)
+
+    def test_ICE_tracer_2(self):
+        self.param.ICE_tracer_2 = 1
+        self.assertEqual(self.param.ICE_tracer_2, 1)
+
+    def test_ICE_tracer_3(self):
+        self.param.ICE_tracer_3 = 1
+        self.assertEqual(self.param.ICE_tracer_3, 1)
+
+    def test_ANA_air_pres_grad_x(self):
+        self.param.ANA_air_pres_grad_x = 1
+        self.assertEqual(self.param.ANA_air_pres_grad_x, 1)
+
+    def test_ANA_air_pres_grad_y(self):
+        self.param.ANA_air_pres_grad_y = 1
+        self.assertEqual(self.param.ANA_air_pres_grad_y, 1)
+
+    def test_ANA_tide_pot_grad_x(self):
+        self.param.ANA_tide_pot_grad_x = 1
+        self.assertEqual(self.param.ANA_tide_pot_grad_x, 1)
+
+    def test_ANA_tide_pot_grad_y(self):
+        self.param.ANA_tide_pot_grad_y = 1
+        self.assertEqual(self.param.ANA_tide_pot_grad_y, 1)
+
+    def test_ANA_hor_viscosity_x(self):
+        self.param.ANA_hor_viscosity_x = 1
+        self.assertEqual(self.param.ANA_hor_viscosity_x, 1)
+
+    def test_ANA_hor_viscosity_y(self):
+        self.param.ANA_hor_viscosity_y = 1
+        self.assertEqual(self.param.ANA_hor_viscosity_y, 1)
+
+    def test_ANA_bclinic_force_x(self):
+        self.param.ANA_bclinic_force_x = 1
+        self.assertEqual(self.param.ANA_bclinic_force_x, 1)
+
+    def test_ANA_bclinic_force_y(self):
+        self.param.ANA_bclinic_force_y = 1
+        self.assertEqual(self.param.ANA_bclinic_force_y, 1)
+
+    def test_ANA_vert_viscosity_x(self):
+        self.param.ANA_vert_viscosity_x = 1
+        self.assertEqual(self.param.ANA_vert_viscosity_x, 1)
+
+    def test_ANA_vert_viscosity_y(self):
+        self.param.ANA_vert_viscosity_y = 1
+        self.assertEqual(self.param.ANA_vert_viscosity_y, 1)
+
+    def test_ANA_mom_advection_x(self):
+        self.param.ANA_mom_advection_x = 1
+        self.assertEqual(self.param.ANA_mom_advection_x, 1)
+
+    def test_ANA_mom_advection_y(self):
+        self.param.ANA_mom_advection_y = 1
+        self.assertEqual(self.param.ANA_mom_advection_y, 1)
+
+    def test_ANA_Richardson(self):
+        self.param.ANA_Richardson = 1
+        self.assertEqual(self.param.ANA_Richardson, 1)
+
+    def test_ANA_transport_min_dt_elem(self):
+        self.param.ANA_transport_min_dt_elem = 1
+        self.assertEqual(self.param.ANA_transport_min_dt_elem, 1)
 
 
 if __name__ == '__main__':

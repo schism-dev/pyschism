@@ -25,10 +25,12 @@ setuptools.setup(
         'ordered_set',
         'psutil',
         'paramiko',
+        'scipy',
     ],
     entry_points={
         'console_scripts': [
             'plot_mesh = pyschism.cmd.plot_mesh:main',
+            "schrun = pyschism.__main__:main",
             'tidal_run = pyschism.cmd.tidal_run:main',
         ]
     },

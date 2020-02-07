@@ -1,0 +1,61 @@
+{
+    "meta": {
+        "_comments": "<> denotes optional parameters.",
+        "project_name": "<can be anything>",
+        "output_directory": "can contain environment variables",
+        "overwrite": "<bool>",
+        "log_level": "<warning | info | debug>",
+        "binary": "pschism_TVD-VL"
+    },
+    "mesh": {
+        "hgrid": "Path to hgrid.",
+        "vgrid": "<Path to vgrid>",
+        "friction": {
+            "ftype": "manning | drag | rough",
+            "fgrid": "path to fgrid | float (constant)"
+        }
+    },
+    "forcing": {
+        "tidal_constituents": {
+            "<constituent | major | all >": {
+                "boundary_id (optional)": [
+                    "list of boundary ids on which to apply forcing."
+                ],
+                "potential (required)": "<bool, use as potential>",
+                "forcing (required)": "<bool, use as boundary forcing>"
+            }
+        },
+        "winds": {
+            "best_track": "<ATCF best track ID>"
+        },
+        "waves": {
+            "properties": "<To be discussed. Disabled for now.>"
+        },
+        "temperature": {
+            "properties": "<To be discussed. Disabled for now.>"
+        },
+        "salinity": {
+            "properties": "<To be discussed. Disabled for now.>"
+        },
+        "tracers": {
+            "properties": "<To be discussed. Disabled for now.>"
+        }
+    },
+    "start_date": "%Y-%m-%dT%H:%M",
+    "utc_start": "<float, defaults to 0.0>",
+    "run_days": "float",
+    "timestep": "float",
+    "spinup_days": "float",
+    "date_formatting": "<%Y-%m-%dT%H:%M>",
+    "outputs": {
+        "nspool": "int | float (seconds)",
+        "ihfskip": "<int>",
+        "variables": [
+            "names of requested outputs"
+        ]
+    },
+    "server": {
+        "hostname": "localhost",
+        "port": 22
+    }
+}

@@ -138,11 +138,6 @@ class HgridTestCase(unittest.TestCase):
         h.write(pathlib.Path(tmpdir.name) / 'test_hgrid.gr3')
         self.assertIsInstance(h, Hgrid)
 
-    def test_set_friction(self):
-        h = Hgrid(self.nodes, self.elements)
-        fric = h.set_friction(0.025, 'manning')
-        self.assertIsInstance(fric, Fgrid)
-
     def test_add_custom_boundary_custom(self):
         h = Hgrid(self.nodes, self.elements)
         h.add_boundary_type('ibtype')
@@ -207,11 +202,6 @@ class HgridTestCase(unittest.TestCase):
         h = Hgrid(nodes, self.elements, self.boundaries)
         h.make_plot()
 
-    def test__fgrid_getter(self):
-        h = Hgrid(self.nodes, self.elements)
-        h.fgrid
-        assert isinstance(h._fgrid, Fgrid)
-
     def test_write_boundaries(self):
         tmpdir = tempfile.TemporaryDirectory()
         shp = pathlib.Path(tmpdir.name).absolute()
@@ -241,6 +231,17 @@ class HgridTestCase(unittest.TestCase):
             crs="EPSG:3395",
             boundaries=self.boundaries)
         self.assertIsInstance(msh.sms2dm, str)
+
+    def test_nan_boundaries_raises(self):
+        self.boundaries[None][0].update({'properties': {}})
+        import numpy as np
+        self.nodes['1'] = ((0., 0.), np.nan)
+        msh = Hgrid(
+            self.nodes,
+            self.elements,
+            crs="EPSG:3395",
+            boundaries=self.boundaries)
+        self.assertRaises(Exception, msh.generate_boundaries)
 
 
 if __name__ == '__main__':

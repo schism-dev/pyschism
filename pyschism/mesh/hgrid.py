@@ -1,8 +1,7 @@
-from collections.abc import Iterable
 from matplotlib.cm import ScalarMappable
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import matplotlib.pyplot as plt
-from pyschism.mesh import grd
+from pyschism.mesh import grd, sms2dm
 import numpy as np
 import pathlib
 import logging
@@ -12,12 +11,6 @@ from functools import lru_cache
 from shapely.geometry import LineString, mapping
 from pyschism import figures as fig
 from pyschism.mesh.base import EuclideanMesh2D
-from pyschism.mesh.friction import (
-    Fgrid,
-    ManningsN,
-    DragCoefficient,
-    RoughnessLength
-)
 
 
 class Hgrid(EuclideanMesh2D):
@@ -107,30 +100,69 @@ class Hgrid(EuclideanMesh2D):
                             })
                     _cnt += 1
 
-    def set_friction(self, value, ftype='manning'):
+    def generate_boundaries(
+        self,
+        threshold=0.,
+        land_ibtype=0,
+        interior_ibtype=1,
+    ):
+        if np.any(np.isnan(self.values)):
+            msg = "Mesh contains invalid values. Raster values must "
+            msg += "be interpolated to the mesh before generating "
+            msg += "boundaries."
+            raise Exception(msg)
 
-        # certify ftype
-        ftypes = {
-            'manning': ManningsN,
-            'drag': DragCoefficient,
-            'rough': RoughnessLength
-        }
-        msg = f"ftype argument must be one of {ftypes.keys()}"
-        assert ftype.lower() in ftypes, msg
-
-        # certify value
-        msg = "value argument must be an instance of type "
-        msg += f"{int}, {float} or an iterable ."
-        assert isinstance(value, (Iterable, int, float, Fgrid)), msg
-
-        if isinstance(value, Fgrid):
-            self._fgrid = value
-
-        elif isinstance(value, (int, float)):
-            if ftype == 'manning':
-                self._fgrid = ftypes[ftype].constant(self, value)
-
-        return self.fgrid
+        # generate exterior boundaries
+        for ring in self.outer_ring_collection.values():
+            # find boundary edges
+            edge_tag = np.full(ring.shape, 0)
+            edge_tag[np.where(self.values[ring[:, 0]] < threshold)[0], 0] = -1
+            edge_tag[np.where(self.values[ring[:, 1]] < threshold)[0], 1] = -1
+            edge_tag[np.where(self.values[ring[:, 0]] >= threshold)[0], 0] = 1
+            edge_tag[np.where(self.values[ring[:, 1]] >= threshold)[0], 1] = 1
+            # sort boundary edges
+            ocean_boundary = list()
+            land_boundary = list()
+            for i, (e0, e1) in enumerate(edge_tag):
+                if np.any(np.asarray((e0, e1)) == -1):
+                    ocean_boundary.append(tuple(ring[i, :]))
+                elif np.any(np.asarray((e0, e1)) == 1):
+                    land_boundary.append(tuple(ring[i, :]))
+            ocean_boundaries = self.sort_edges(ocean_boundary)
+            land_boundaries = self.sort_edges(land_boundary)
+            _bnd_id = len(self.boundaries[None])
+            for bnd in ocean_boundaries:
+                e0, e1 = [list(t) for t in zip(*bnd)]
+                e0 = list(map(self.get_node_id, e0))
+                data = e0 + [self.get_node_id(e1[-1])]
+                self.set_boundary_data(None, _bnd_id, data)
+                _bnd_id += 1
+            # add land boundaries
+            if land_ibtype not in self.boundaries:
+                self.add_boundary_type(land_ibtype)
+            _bnd_id = len(self._boundaries[land_ibtype])
+            for bnd in land_boundaries:
+                e0, e1 = [list(t) for t in zip(*bnd)]
+                e0 = list(map(self.get_node_id, e0))
+                data = e0 + [self.get_node_id(e1[-1])]
+                self.set_boundary_data(land_ibtype, _bnd_id, data)
+                _bnd_id += 1
+        # generate interior boundaries
+        _bnd_id = 0
+        _interior_boundaries = defaultdict()
+        for interiors in self.inner_ring_collection.values():
+            for interior in interiors:
+                e0, e1 = [list(t) for t in zip(*interior)]
+                if self.signed_polygon_area(self.coords[e0, :]) < 0:
+                    e0 = list(reversed(e0))
+                    e1 = list(reversed(e1))
+                e0 = list(map(self.get_node_id, e0))
+                e0 += [e0[0]]
+                _interior_boundaries[_bnd_id] = e0
+                _bnd_id += 1
+        self.add_boundary_type(interior_ibtype)
+        for bnd_id, data in _interior_boundaries.items():
+            self.set_boundary_data(interior_ibtype, bnd_id, data)
 
     @fig._figure
     def make_plot(
@@ -228,14 +260,6 @@ class Hgrid(EuclideanMesh2D):
         return self._boundaries
 
     @property
-    def fgrid(self):
-        try:
-            return self.__fgrid
-        except AttributeError:
-            self._fgrid = ManningsN.constant(self, 0.025)
-            return self.__fgrid
-
-    @property
     @lru_cache
     def logger(self):
         return logging.getLogger(__name__ + '.' + self.__class__.__name__)
@@ -248,25 +272,13 @@ class Hgrid(EuclideanMesh2D):
 
     @property
     def _sms2dm(self):
-        sms2dm = super()._sms2dm
-
-        def nodestrings(boundaries):
-            pass
-        sms2dm.update({'nodestrings': nodestrings(self.boundaries)})
-        return sms2dm
-
-    @property
-    def _fgrid(self):
-        return self.__fgrid
+        _sms2dm = super()._sms2dm
+        _sms2dm.update({'nodestrings': sms2dm.nodestrings(self.boundaries)})
+        return _sms2dm
 
     @property
     def _boundaries(self):
         return self.__boundaries
-
-    @_fgrid.setter
-    def _fgrid(self, fgrid):
-        assert isinstance(fgrid, Fgrid)
-        self.__fgrid = fgrid
 
     @_boundaries.setter
     def _boundaries(self, boundaries):

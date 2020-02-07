@@ -41,6 +41,7 @@ class PlotMeshCommand:
 
     def _show_fig(self):
         if not self.args.no_show:
+            plt.gca().axis('scaled')
             plt.show()
 
     @property

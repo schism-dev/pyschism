@@ -1,7 +1,7 @@
-from pyschism.forcing.tide import TidalForcing
-from pyschism.forcing.wind import WindForcing
+from pyschism.forcing.tides import Tides
+# from pyschism.forcing.wind import WindForcing
 
 __all__ = [
-    "TidalForcing",
-    "WindForcing",
+    "Tides",
+    # "WindForcing",
 ]
