@@ -20,12 +20,12 @@ class PySchism:
         return self.driver.run()
 
     @property
-    @lru_cache
+    @lru_cache(maxsize=None)
     def driver(self):
         return SchismRun(self.mesh, self.param)
 
     @property
-    @lru_cache
+    @lru_cache(maxsize=None)
     def mesh(self):
         return Mesh.open(
             self.hgrid,
@@ -35,13 +35,13 @@ class PySchism:
             )
 
     @property
-    @lru_cache
+    @lru_cache(maxsize=None)
     def hgrid(self):
         return pathlib.Path(
             os.path.expandvars(self.mesh_opts["hgrid"])).resolve()
 
     @property
-    @lru_cache
+    @lru_cache(maxsize=None)
     def vgrid(self):
         vgrid = self.mesh_opts.get("vgrid", None)
         if vgrid is not None:
@@ -56,7 +56,7 @@ class PySchism:
         return fgrid
 
     @property
-    @lru_cache
+    @lru_cache(maxsize=None)
     def mesh_crs(self):
         crs = self.mesh_opts.get('crs', None)
         if crs is None:
@@ -65,7 +65,7 @@ class PySchism:
         return crs
 
     @property
-    @lru_cache
+    @lru_cache(maxsize=None)
     def config(self):
         src = pathlib.Path(self.args.config_file).resolve()
         with open(src, 'r') as json_file:
@@ -73,7 +73,7 @@ class PySchism:
         return config
 
     @property
-    @lru_cache
+    @lru_cache(maxsize=None)
     def mesh_opts(self):
         return self.config["mesh"]
 
@@ -90,7 +90,7 @@ class PySchism:
         return self.meta.get("project_name", False)
 
     @property
-    @lru_cache
+    @lru_cache(maxsize=None)
     def output_directory(self):
         outdir = self.meta.get("output_directory", "'.'")
         outdir = pathlib.Path(os.path.expandvars(outdir)).resolve()
@@ -102,7 +102,7 @@ class PySchism:
         return self.config.get("server", False)
 
     @property
-    @lru_cache
+    @lru_cache(maxsize=None)
     def param(self):
         param = Param()
 

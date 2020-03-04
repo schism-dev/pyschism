@@ -260,7 +260,7 @@ class Hgrid(EuclideanMesh2D):
         return self._boundaries
 
     @property
-    @lru_cache
+    @lru_cache(maxsize=None)
     def logger(self):
         return logging.getLogger(__name__ + '.' + self.__class__.__name__)
 

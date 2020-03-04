@@ -590,7 +590,7 @@ class Tides(bctypes.ElevBc):
         return 3
 
     @property
-    @lru_cache
+    @lru_cache(maxsize=None)
     def tpxo(self):
         return TPXO()
 
@@ -659,6 +659,6 @@ class Tides(bctypes.ElevBc):
             pass
 
     @property
-    @lru_cache
+    @lru_cache(maxsize=None)
     def _active_constituents(self):
         return OrderedDict()

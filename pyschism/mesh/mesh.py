@@ -126,7 +126,7 @@ class Mesh:
         return open_boundaries
 
     @property
-    @lru_cache
+    @lru_cache(maxsize=None)
     def _open_boundaries(self):
         _open_boundaries = self.hgrid.boundaries[None].copy()
         for id in _open_boundaries:
