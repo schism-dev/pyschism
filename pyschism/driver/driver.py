@@ -101,7 +101,7 @@ class SchismRun:
         return self.param.spinup_time
 
     @property
-    @lru_cache
+    @lru_cache(maxsize=None)
     def bctides(self):
         return Bctides(self.mesh)
 

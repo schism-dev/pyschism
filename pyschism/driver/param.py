@@ -42,22 +42,22 @@ class Param:
         f90nml.patch(self.src, self._nml, path)
 
     @property
-    @lru_cache
+    @lru_cache(maxsize=None)
     def core(self):
         return CORE(self._nml)
 
     @property
-    @lru_cache
+    @lru_cache(maxsize=None)
     def opt(self):
         return OPT(self._nml)
 
     @property
-    @lru_cache
+    @lru_cache(maxsize=None)
     def schout(self):
         return SCHOUT(self._nml)
 
     @property
-    @lru_cache
+    @lru_cache(maxsize=None)
     def src(self):
         return pathlib.Path(__file__).parent / 'param.nml'
 
@@ -149,7 +149,7 @@ class Param:
         self.core.dt = timestep
 
     @property
-    @lru_cache
+    @lru_cache(maxsize=None)
     def _nml(self):
         return f90nml.read(self.src.resolve())
 

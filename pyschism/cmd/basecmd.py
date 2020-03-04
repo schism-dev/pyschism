@@ -52,7 +52,7 @@ class SchismBaseCommand:
         pass
 
     @property
-    @lru_cache
+    @lru_cache(maxsize=None)
     def driver(self):
         driver = SchismRun(
             self.mesh,
@@ -88,7 +88,7 @@ class SchismBaseCommand:
         return self._mesh
 
     @property
-    @lru_cache
+    @lru_cache(maxsize=None)
     def tidal_forcing(self):
         tidal_forcing = Tides()
         for constituent in self.constituents:
@@ -109,7 +109,7 @@ class SchismBaseCommand:
             return pathlib.Path(self.args.output_directory).absolute()
 
     @property
-    @lru_cache
+    @lru_cache(maxsize=None)
     def constituents(self):
         # might be better to get these from Tides()
         _major = ('Q1', 'O1', 'P1', 'K1', 'N2', 'M2', 'S2', 'K2')
@@ -132,7 +132,7 @@ class SchismBaseCommand:
         return constituents
 
     @property
-    @lru_cache
+    @lru_cache(maxsize=None)
     def server_config(self):
         if self.args.hostname:
             if (not self.args.use_slurm or
@@ -164,7 +164,7 @@ class SchismBaseCommand:
         return self.__args
 
     @property
-    @lru_cache
+    @lru_cache(maxsize=None)
     def _mesh(self):
         return Mesh.open(
                 hgrid=self.args.hgrid,

@@ -24,7 +24,7 @@ class Vgrid:
         return False
 
     @property
-    @lru_cache
+    @lru_cache(maxsize=None)
     def boilerplate_2D(self):  # TODO: *QUICK HACK*, please fix ASAP.
         return """2 !ivcor
 2 1 1.e6 !nvrt, kz (# of Z-levels); h_s (transition depth between S and Z)
