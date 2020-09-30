@@ -36,13 +36,14 @@ class TPXO:
 
         _tarfile = os.getenv('TPXO_NETCDF_TARFILE')
         if _tarfile is not None:
-            self._tarfile = pathlib.Path(_tarfile)
+            _tarfile = pathlib.Path(_tarfile)
         else:
-            self._tarfile = DATADIR / 'tpxo9.tar.gz'
+            _tarfile = DATADIR / 'tpxo9.tar.gz'
 
-        if not self._tarfile.is_file():
+        if not _tarfile.is_file():
             fetch_tpxo_file()
 
+        self._tarfile = tarfile
         self.x, self.y, _, mask = read_tide_grid(self._gfile)[:4]
         self.mask = ~mask.astype(bool)
 
