@@ -67,7 +67,7 @@ class Hgrid(EuclideanMesh2D):
     def delete_boundary_data(self, ibtype, id):
         del self.__boundaries[ibtype][id]
 
-    def write_boundaries(self, path, overwrite=False):
+    def to_shapefile(self, path, overwrite=False):
         path = pathlib.Path(path)
         if path.exists() and not overwrite:
             msg = "Destination path exists and overwrite=False"

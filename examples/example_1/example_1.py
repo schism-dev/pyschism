@@ -7,6 +7,7 @@ from pyschism import Param, Mesh, forcing, driver
 def main():
     # setup mesh
     mesh = Mesh.open(
+        # pathlib.Path('/ddnas/jreniel/ADCIRC/HSOFS/fort.14'),  # hgrid
         pathlib.Path('hgrid.gr3'),  # hgrid
         vgrid=None,  # optional parameter
         crs="EPSG:4326"
@@ -39,9 +40,7 @@ def main():
     model = driver.SchismRun(mesh, param)
 
     # execute model
-    model.run(nproc=-1, workdir='staging')
-
-    print(model.outputs)
+    model.write('staging', overwrite=True)
 
 
 if __name__ == '__main__':

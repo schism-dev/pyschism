@@ -26,6 +26,8 @@ setuptools.setup(
         'psutil',
         'paramiko',
         'scipy',
+        'wget',
+        'appdirs',
     ],
     entry_points={
         'console_scripts': [

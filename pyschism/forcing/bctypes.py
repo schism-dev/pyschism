@@ -1,47 +1,87 @@
-import abc
+from enum import Enum
 
 
-class BoundaryCondition(metaclass=abc.ABCMeta):
+class BcType(Enum):
+    ELEVATION = 'iettype'
+    FLOW = 'ifltype'
+    TEMPERATURE = 'itetype'
+    SALINITY = 'isatype'
+    TRACER = 'itrtype'
+
+
+class InitialElevationType(Enum):
+    NONE = 0
+    TIME_VARYING = 1
+    CONSTANT = 2
+    TIDAL = 3
+    SPACE_TIME_VARYING = 4
+    TIDAL_AND_SPACE_TIME_VARYING = 5
+
+
+class InitialFlowType(Enum):
+    NONE = 0
+    TIME_VARYING = 1
+    CONSTANT = 2
+    TIDAL = 3
+    SPACE_TIME_VARYING = 4
+    SPACE_TIME_VARYING_3D = -4
+    TIDAL_AND_SPACE_TIME_VARYING_3D = 5
+    FLANTHER = -1
+
+
+class InitialTemperatureType(Enum):
+    NONE = 0
+    TIME_VARYING = 1
+    CONSTANT = 2
+    INITIAL_PROFILE_FOR_INFLOW = 3
+    INPUT_3D = 4
+
+
+class InitialSalinityType(Enum):
+    NONE = 0
+    TIME_VARYING = 1
+    CONSTANT = 2
+    INITIAL_PROFILE_FOR_INFLOW = 3
+    INPUT_3D = 4
+
+
+class InitialTracerType(Enum):
+    NONE = 0
+    TIME_VARYING = 1
+    CONSTANT = 2
+    INITIAL_PROFILE_FOR_INFLOW = 3
+    INPUT_3D = 4
+
+
+class InitialConditionType(Enum):
+    ELEVATION = InitialElevationType
+    FLOW = InitialFlowType
+    TEMPERATURE = InitialTemperatureType
+    SALINITY = InitialSalinityType
+    TRACER = InitialTracerType
+
+
+class BoundaryCondition:
+
+    def __init__(
+            self,
+            iettype: InitialElevationType = InitialElevationType.NONE,
+            ifltype: InitialFlowType = InitialFlowType.NONE,
+            itetype: InitialTemperatureType = InitialTemperatureType.NONE,
+            isatype: InitialSalinityType = InitialSalinityType.NONE,
+            itrtype: InitialTracerType = InitialTracerType.NONE
+    ):
+
+        self.iettype = iettype
+        self.ifltype = ifltype
+        self.itetype = itetype
+        self.isatype = isatype
+        self.itrtype = itrtype
 
     @property
-    @abc.abstractmethod
     def bctype(self):
-        """
-        <int>
-        1: time history file
-        2: constant
-        3: initial condition
-        4: time history 3D
-        5: 3 + 4
-        -1: uv2D
-        -4,-5: UV3D
-        See page 62 of SCHISM v5.7 manual for details
-        """
-
-    @property
-    @abc.abstractproperty
-    def vartype(self):
-        """
-        <str>: <'elev' | 'vel' | 'stt'>
-        """
-
-
-class ElevBc(BoundaryCondition):
-
-    @property
-    def vartype(self):
-        return 'elev'
-
-
-class VelBc(BoundaryCondition):
-
-    @property
-    def vartype(self):
-        return 'vel'
-
-
-class STT(BoundaryCondition):
-
-    @property
-    def vartype(self):
-        return 'stt'
+        return f"{self.iettype.value} " \
+               f"{self.ifltype.value} " \
+               f"{self.itetype.value} " \
+               f"{self.isatype.value} " \
+               f"{self.itrtype.value}"
