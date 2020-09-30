@@ -15,6 +15,8 @@ setuptools.setup(
     url=meta['url'],
     packages=setuptools.find_packages(),
     python_requires='>=3.6',
+    setup_requires=['setuptools_scm'],
+    include_package_data=True,
     install_requires=[
         'matplotlib',
         'netCDF4',
