@@ -1,7 +1,11 @@
-import numpy as np
-from functools import lru_cache
+from collections import namedtuple
 from collections.abc import Iterable
+from functools import lru_cache
+import numpy as np
+
+
 from pyschism.forcing.bctypes import BoundaryCondition
+from ..forcing import bctypes
 from pyschism.mesh.hgrid import Hgrid
 from pyschism.mesh.vgrid import Vgrid
 from pyschism.mesh.friction import (
@@ -20,10 +24,10 @@ class Mesh:
     """
 
     def __init__(
-        self,
-        hgrid,
-        vgrid=None,
-        fgrid=None,
+            self,
+            hgrid,
+            vgrid=None,
+            fgrid=None,
     ):
         self._hgrid = hgrid
         self._vgrid = vgrid
@@ -71,7 +75,7 @@ class Mesh:
                 self.set_boundary_forcing(forcing, i)
         else:
             assert isinstance(forcing, BoundaryCondition)
-            self._open_boundaries[id][forcing.vartype] = forcing
+            self._open_boundaries[id]['forcing'] = forcing
 
     def make_plot(self, **kwargs):
         if self.vgrid.is3D():
@@ -117,23 +121,40 @@ class Mesh:
 
     @property
     def open_boundaries(self):
-        open_boundaries = self._open_boundaries.copy()
-        for id in self._open_boundaries:
-            indexes = list(map(
-                    self.hgrid.get_node_index,
-                    self.hgrid.boundaries[None][id]['indexes']))
-            open_boundaries[id].update({'indexes': indexes})
+        OpenBoundary = namedtuple("OpenBoundary", ['indexes', 'forcing'])
+        open_boundaries = {}
+        for id, data in self._open_boundaries.items():
+            indexes = list(map(self.hgrid.get_node_index, data['indexes']))
+            open_boundaries[id] = OpenBoundary(indexes, data['forcing'])
         return open_boundaries
+
+    @property
+    def land_boundaries(self):
+        LandBoundary = namedtuple("LandBoundary", 'indexes')
+        land_boundaries = {}
+        for id, data in self.hgrid.boundaries[0].items():
+            indexes = list(map(self.hgrid.get_node_index, data['indexes']))
+            land_boundaries[id] = LandBoundary(indexes, data['forcing'])
+        return land_boundaries
+
+    @property
+    def interior_boundaries(self):
+        InteriorBoundary = namedtuple("InteriorBoundary", 'indexes')
+        interior_boundaries = {}
+        for id, data in self.hgrid.boundaries[0].items():
+            indexes = list(map(self.hgrid.get_node_index, data['indexes']))
+            interior_boundaries[id] = InteriorBoundary(indexes,
+                                                       data['forcing'])
+        return interior_boundaries
 
     @property
     @lru_cache(maxsize=None)
     def _open_boundaries(self):
-        _open_boundaries = self.hgrid.boundaries[None].copy()
-        for id in _open_boundaries:
-            _open_boundaries[id]['eta'] = {}
-            _open_boundaries[id]['uv'] = {}
-            _open_boundaries[id]['stt'] = {}
-        return _open_boundaries
+        open_boundaries = self.hgrid.boundaries[None].copy()
+        for id in open_boundaries:
+            for bctype in bctypes.BcType:
+                open_boundaries[id]['forcing'] = None
+        return open_boundaries
 
     @property
     def _hgrid(self):

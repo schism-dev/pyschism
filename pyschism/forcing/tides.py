@@ -6,7 +6,16 @@ from pyschism.forcing import bctypes
 from pyschism.forcing.tpxo import TPXO
 
 
-class Tides(bctypes.ElevBc):
+class Tides(bctypes.BoundaryCondition):
+
+    def __init__(self, elevation: bool = True, velocity: bool = True,
+                 database: str = "TPXO"):
+        self.database = database
+        super().__init__(
+                iettype=bctypes.InitialElevationType.TIDAL
+                if elevation is True else bctypes.InitialElevationType.NONE,
+                ifltype=bctypes.InitialFlowType.TIDAL
+                if velocity is True else bctypes.InitialFlowType.NONE)
 
     def __call__(self, constituent):
         return self.get_tidal_constituent(constituent)
@@ -17,6 +26,12 @@ class Tides(bctypes.ElevBc):
 
     def __len__(self):
         return len(self.active_constituents)
+
+    def get_elevation(self, constituent, vertices):
+        return self.forcing_database.get_elevation(constituent, vertices)
+
+    def get_velocity(self, constituent, vertices):
+        return self.forcing_database.get_velocity(constituent, vertices)
 
     def use_all(self, potential=True, forcing=True):
         for constituent in self.constituents:
@@ -52,18 +67,12 @@ class Tides(bctypes.ElevBc):
         return list(self.active_constituents.keys())
 
     def get_active_forcing_constituents(self):
-        fc = []
-        for c, d in self.active_constituents.items():
-            if d['forcing']:
-                fc.append(c)
-        return fc
+        return [const for const, _ in self.active_constituents.items()
+                if _['forcing'] is True]
 
     def get_active_potential_constituents(self):
-        fc = []
-        for c, d in self.active_constituents.items():
-            if d['potential']:
-                fc.append(c)
-        return fc
+        return [const for const, _ in self.active_constituents.items()
+                if _['potential'] is True]
 
     def get_tidal_potential_amplitude(self, constituent):
         if constituent in self.tidal_potential_amplitudes:
@@ -72,7 +81,6 @@ class Tides(bctypes.ElevBc):
     def get_tidal_species_type(self, constituent):
         if constituent in self.tidal_species_type:
             return self.tidal_species_type[constituent]
-        return 0
 
     def get_orbital_frequency(self, constituent):
         return self.orbital_frequencies[constituent]
@@ -83,6 +91,16 @@ class Tides(bctypes.ElevBc):
                 self.get_orbital_frequency(constituent),  # FF*
                 self.get_nodal_factor(constituent),  # Amig*
                 self.get_greenwich_factor(constituent))  # FACE*
+
+    def get_initial_conditions(self, constituent, vertices):
+        return self.initial_conditions(constituent, vertices)
+
+    def set_Z0(self, Z0, **kwargs):
+        self._active_constituents['Z0'] = {
+                'potential': False,
+                'forcing': True
+            }
+        self.Z0 = Z0
 
     def get_nodal_factor(self, constituent):
         if constituent == "M2":
@@ -159,6 +177,8 @@ class Tides(bctypes.ElevBc):
             return self.EQ78**4
         elif constituent == "MS4":
             return self.EQ78
+        if constituent == "Z0":
+            return self.Z0
         else:
             msg = f'Unrecognized constituent {constituent}'
             raise TypeError(msg)
@@ -253,6 +273,8 @@ class Tides(bctypes.ElevBc):
             return 8.*(self.DT-self.DS+self.DH)+8.*(self.DXI-self.DNU)
         elif constituent == "MS4":
             return 2.*(2.*self.DT-self.DS+self.DH)+2.*(self.DXI-self.DNU)
+        elif constituent == "Z0":
+            return 0
         else:
             msg = f'Unrecognized constituent {constituent}'
             raise TypeError(msg)
@@ -431,7 +453,8 @@ class Tides(bctypes.ElevBc):
             'Ssa':     0.0000003982128677,
             'Sa':      0.0000001991061914,
             'Msf':     0.0000049252018242,
-            'Mf':      0.0000053234146919}
+            'Mf':      0.0000053234146919,
+            'Z0':      0}
 
     @property
     def tidal_potential_amplitudes(self):
@@ -443,7 +466,8 @@ class Tides(bctypes.ElevBc):
             'K1': 0.141565,
             'O1': 0.100514,
             'P1': 0.046843,
-            'Q1': 0.019256}
+            'Q1': 0.019256,
+            'Z0': 0}
 
     @property
     def tidal_species_type(self):
@@ -455,7 +479,8 @@ class Tides(bctypes.ElevBc):
             'K1': 1,
             'O1': 1,
             'P1': 1,
-            'Q1': 1}
+            'Q1': 1,
+            'Z0': 0}
 
     @property
     def hour_middle(self):
@@ -464,7 +489,7 @@ class Tides(bctypes.ElevBc):
             / 3600 / 2)
 
     @property
-    def I(self):  # noqa:E743
+    def I(self):  # noqa:E741,E743
         return np.arccos(.9136949-.0356926*np.cos(self.N))
 
     @property
@@ -586,13 +611,12 @@ class Tides(bctypes.ElevBc):
         return len(self.get_active_forcing_constituents())
 
     @property
-    def bctype(self):
-        return 3
-
-    @property
     @lru_cache(maxsize=None)
-    def tpxo(self):
-        return TPXO()
+    def forcing_database(self):
+        if self.database.upper() == "TPXO":
+            return TPXO()
+        raise NotImplementedError(f'Tidal database {self.database} not '
+                                  'implemented')
 
     @start_date.setter
     def start_date(self, start_date):

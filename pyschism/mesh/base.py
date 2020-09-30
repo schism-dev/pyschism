@@ -4,12 +4,15 @@ import pathlib
 from functools import lru_cache
 from collections.abc import Mapping
 from collections import defaultdict
+import warnings
+
 import numpy as np
 from matplotlib.tri import Triangulation
 from matplotlib.path import Path
 from matplotlib.collections import PolyCollection
 from matplotlib.transforms import Bbox
 from shapely.geometry import Polygon
+
 from pyproj import Proj, CRS, Transformer
 from pyschism.mesh import grd, sms2dm
 from pyschism.figures import _figure
@@ -30,8 +33,8 @@ class EuclideanMesh2D:
         self._triangles = triangles
         self._quads = quads
         self._values = values
-        self._crs = crs
         self._description = description
+        self._crs = crs
 
     @classmethod
     def open(cls, path, crs=None, fmt="grd"):
@@ -508,7 +511,7 @@ class EuclideanMesh2D:
     @_coords.setter
     def _coords(self, coords):
         msg = "coord argument must be a dictionary of the form "
-        msg += "\\{coord_id:  (x, y)\\}"
+        msg += r"{coord_id:  (x, y)}"
         assert isinstance(coords, Mapping), msg
         for coord in coords.values():
             assert len(coord) == 2, msg
@@ -552,8 +555,12 @@ class EuclideanMesh2D:
 
     @_crs.setter
     def _crs(self, crs):
+        if '+init=' in self._description:
+            crs = self._description.split('+init=')[-1].split()[0]
         if crs is not None:
             crs = CRS.from_user_input(crs)
+        else:
+            warnings.warn('Mesh has no CRS defined.')
         self.__crs = crs
 
     @_description.setter

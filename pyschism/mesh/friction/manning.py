@@ -10,7 +10,7 @@ class ManningsN(Fgrid):
             mesh._nodes,
             mesh._elements,
             crs=mesh.crs,
-            description=mesh.description + "_mannings"
+            description=mesh.description + " mannings"
             )
 
     @property

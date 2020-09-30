@@ -103,7 +103,7 @@ class SchismRun:
     @property
     @lru_cache(maxsize=None)
     def bctides(self):
-        return Bctides(self.mesh)
+        return Bctides(self.mesh, self.start_date, self.end_date, self.spinup_time)
 
     def _run_local(self, nproc, outdir, overwrite):
         self.write(outdir, overwrite)
@@ -147,8 +147,7 @@ class SchismRun:
         if self.mesh.ics == 2:
             param.opt.ncor = 1
         else:
-            msg = "Coriolis parameters have to be tuned for projected meshes."
-            raise NotImplementedError(msg)
+            param.opt.ncor = 1
         self.__param = param
 
     # def run_local(self):
