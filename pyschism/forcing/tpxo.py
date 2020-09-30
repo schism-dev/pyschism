@@ -43,7 +43,7 @@ class TPXO:
         if not _tarfile.is_file():
             fetch_tpxo_file()
 
-        self._tarfile = tarfile
+        self._tarfile = _tarfile
         self.x, self.y, _, mask = read_tide_grid(self._gfile)[:4]
         self.mask = ~mask.astype(bool)
 
