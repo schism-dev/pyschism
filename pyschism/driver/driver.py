@@ -1,6 +1,5 @@
 import tempfile
 import pathlib
-from functools import lru_cache
 from pyschism.mesh import Mesh
 from pyschism.driver.param import Param
 from pyschism.forcing.bctides import Bctides
@@ -8,13 +7,10 @@ from pyschism.forcing.bctides import Bctides
 
 class SchismRun:
 
-    def __init__(
-        self,
-        mesh,
-        param,
-    ):
+    def __init__(self, mesh, param):
         self._mesh = mesh
         self._param = param
+        self.__bctides = Bctides(self.mesh, self.start_date, self.end_date)
 
     def run(
         self,
@@ -63,7 +59,7 @@ class SchismRun:
         hgrid='hgrid.gr3',
         vgrid='vgrid.in',
         fgrid='fgrid.gr3',
-        param='param.in',
+        param='param.nml',
         bctides='bctides.in',
     ):
         outdir = pathlib.Path(output_directory).absolute()
@@ -82,11 +78,11 @@ class SchismRun:
 
     @property
     def param(self):
-        return self._param
+        return self.__param
 
     @property
     def mesh(self):
-        return self._mesh
+        return self.__mesh
 
     @property
     def start_date(self):
@@ -97,13 +93,8 @@ class SchismRun:
         return self.param.end_date
 
     @property
-    def spinup_time(self):
-        return self.param.spinup_time
-
-    @property
-    @lru_cache(maxsize=None)
     def bctides(self):
-        return Bctides(self.mesh, self.start_date, self.end_date, self.spinup_time)
+        return self.__bctides
 
     def _run_local(self, nproc, outdir, overwrite):
         self.write(outdir, overwrite)
@@ -115,15 +106,14 @@ class SchismRun:
     def _mesh(self):
         return self.__mesh
 
+    @_mesh.setter
+    def _mesh(self, mesh):
+        assert isinstance(mesh, Mesh), f"mesh argument must be of type {Mesh}."
+        self.__mesh = mesh
+
     @property
     def _param(self):
         return self.__param
-
-    @_mesh.setter
-    def _mesh(self, mesh):
-        msg = f"mesh argument must be of type {Mesh}."
-        assert isinstance(mesh, Mesh), msg
-        self.__mesh = mesh
 
     @_param.setter
     def _param(self, param):
@@ -149,39 +139,3 @@ class SchismRun:
         else:
             param.opt.ncor = 1
         self.__param = param
-
-    # def run_local(self):
-
-    #     def config():
-    #         src = pathlib.Path(self.args.config_file).resolve()
-    #         dst = self.output_directory / src.name
-    #         if dst.is_file() and not self.overwrite:
-    #             msg = "Destination file exists and overwrite=False"
-    #             raise Exception(msg)
-    #         shutil.copy2(src, self.output_directory)
-
-    #     def param():
-    #         self.param.write(self.staging_directory)
-
-    #     def mesh():
-    #         self.mesh.write(
-    #             hgrid=self.output_path / 'hgrid.gr3',
-    #             vgrid=self.output_path / 'vgrid.in',
-    #             fgrid=self.output_path / 'fgrid.gr3',
-    #             overwrite=self.overwrite)
-
-    #     def bctides():
-    #         pass
-
-    #     def pschism_exec(self):
-    #         raise NotImplementedError
-
-    #     config()
-    #     param()
-    #     mesh()
-    #     bctides()
-    #     pschism_exec()
-    #     return 0
-
-    # def run_server(self):
-    #     raise NotImplementedError

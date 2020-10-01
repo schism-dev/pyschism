@@ -1,27 +1,24 @@
-from functools import lru_cache
 import math
-from multiprocessing import Pool, cpu_count
 import os
 import pathlib
 import sys
 import tarfile
 import tempfile
 
-from netCDF4 import Dataset
-import numpy as np
-from scipy.interpolate import griddata
-from appdirs import user_data_dir
-import wget
+import numpy as np  # type: ignore[import]
+from scipy.interpolate import griddata  # type: ignore[import]
+from appdirs import user_data_dir  # type: ignore[import]
+import wget  # type: ignore[import]
 
 DATADIR = pathlib.Path(user_data_dir()) / 'tpxo'
 DATADIR.mkdir(exist_ok=True, parents=True)
 
 
 def polar(z):
-    a= z.real
-    b= z.imag
-    r = math.hypot(a,b)
-    theta = math.atan2(b,a)
+    a = z.real
+    b = z.imag
+    r = math.hypot(a, b)
+    theta = math.atan2(b, a)
     return r, np.rad2deg(theta)
 
 
@@ -44,6 +41,13 @@ class TPXO:
             fetch_tpxo_file()
 
         self._tarfile = _tarfile
+
+        self._gfile = pathlib.Path(self._tmpdir.name) / 'DATA/grid_tpxo9'
+
+        self._hfile = pathlib.Path(self._tmpdir.name) / 'DATA/h_tpxo9.v1'
+
+        self._ufile = pathlib.Path(self._tmpdir.name) / 'DATA/u_tpxo9.v1'
+
         self.x, self.y, _, mask = read_tide_grid(self._gfile)[:4]
         self.mask = ~mask.astype(bool)
 
@@ -66,15 +70,16 @@ class TPXO:
                     )
                 )
         values = np.ma.zeros((len(vertices),), dtype=array.dtype)
-        values.data.real =  griddata((xi[idxq], yi[idxq]),
-                                     array.real.flatten()[idxq],
-                                     (xq, yq), method='nearest')
-        values.data.imag =  griddata((xi[idxq], yi[idxq]),
-                                     array.imag.flatten()[idxq],
-                                     (xq, yq), method='nearest')
+        values.data.real = griddata((xi[idxq], yi[idxq]),
+                                    array.real.flatten()[idxq],
+                                    (xq, yq), method='nearest')
+        values.data.imag = griddata((xi[idxq], yi[idxq]),
+                                    array.imag.flatten()[idxq],
+                                    (xq, yq), method='nearest')
         amp, phase = [list(data) for data in zip(*map(polar, values))]
         phase = np.abs(np.array(phase)-360)
-        phase[np.where(phase>=360)] = phase[np.where(phase>=360)] % 360
+        idx = np.where(phase >= 360)
+        phase[idx] = phase[idx] % 360
         return amp, phase
 
     def get_velocity(self, constituent, vertices):
@@ -98,44 +103,33 @@ class TPXO:
         uval = np.ma.zeros((len(vertices),), dtype=u.dtype)
         vval = np.ma.zeros((len(vertices),), dtype=v.dtype)
 
-        uval.data.real =  griddata((xi[idxq], yi[idxq]),
-                                     u.real.flatten()[idxq],
-                                     (xq, yq), method='nearest')
-        uval.data.imag =  griddata((xi[idxq], yi[idxq]),
-                                     u.imag.flatten()[idxq],
-                                     (xq, yq), method='nearest')
-        vval.data.real =  griddata((xi[idxq], yi[idxq]),
-                                     v.real.flatten()[idxq],
-                                     (xq, yq), method='nearest')
-        vval.data.imag =  griddata((xi[idxq], yi[idxq]),
-                                     v.imag.flatten()[idxq],
-                                     (xq, yq), method='nearest')
+        uval.data.real = griddata((xi[idxq], yi[idxq]),
+                                  u.real.flatten()[idxq],
+                                  (xq, yq), method='nearest')
+        uval.data.imag = griddata((xi[idxq], yi[idxq]),
+                                  u.imag.flatten()[idxq],
+                                  (xq, yq), method='nearest')
+        vval.data.real = griddata((xi[idxq], yi[idxq]),
+                                  v.real.flatten()[idxq],
+                                  (xq, yq), method='nearest')
+        vval.data.imag = griddata((xi[idxq], yi[idxq]),
+                                  v.imag.flatten()[idxq],
+                                  (xq, yq), method='nearest')
+
         uamp, uphase = [list(data) for data in zip(*map(polar, uval))]
         uphase = np.abs(np.array(uphase)-360)
-        uphase[np.where(uphase>=360)] = uphase[np.where(uphase>=360)] % 360
+        uidx = np.where(uphase >= 360)
+        uphase[uidx] = uphase[uidx] % 360
+
         vamp, vphase = [list(data) for data in zip(*map(polar, vval))]
         vphase = np.abs(np.array(vphase)-360)
-        vphase[np.where(vphase>=360)] = vphase[np.where(vphase>=360)] % 360
-        return  uamp, uphase, vamp, vphase
+        vidx = np.where(vphase >= 360)
+        vphase[vidx] = vphase[vidx] % 360
+        return uamp, uphase, vamp, vphase
 
     @property
     def constituents(self):
         return [c.capitalize() for c in read_constituents(self._hfile)[0]]
-
-    @property
-    @lru_cache(maxsize=None)
-    def _gfile(self):
-        return pathlib.Path(self._tmpdir.name) / 'DATA/grid_tpxo9'
-
-    @property
-    @lru_cache(maxsize=None)
-    def _hfile(self):
-        return pathlib.Path(self._tmpdir.name) / 'DATA/h_tpxo9.v1'
-
-    @property
-    @lru_cache(maxsize=None)
-    def _ufile(self):
-        return pathlib.Path(self._tmpdir.name) / 'DATA/u_tpxo9.v1'
 
     @property
     def _tarfile(self):
@@ -148,6 +142,7 @@ class TPXO:
         with tarfile.open(file) as f:
             f.extractall(path=tmpdir)
         self.__tarfile = file
+
 
 def fetch_tpxo_file():
     url = "https://www.dropbox.com/s/tnxflm8xgpiujwb/tpxo9.tar.gz?dl=1"
