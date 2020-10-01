@@ -1,21 +1,41 @@
-from datetime import datetime, timedelta
-import numpy as np
-from functools import lru_cache
 from collections import OrderedDict
-from pyschism.forcing import bctypes
-from pyschism.forcing.tpxo import TPXO
+from datetime import datetime
+from enum import Enum
+from typing import Union
+
+import numpy as np  # type: ignore[import]
+
+from . import bctypes  # type: ignore[import]
+from .tpxo import TPXO  # type: ignore[import]
+
+
+class StrTidalDatabase(Enum):
+    TPXO = 'TPXO'
+
+
+class TidalDatabase(Enum):
+    TPXO = TPXO
 
 
 class Tides(bctypes.BoundaryCondition):
 
-    def __init__(self, elevation: bool = True, velocity: bool = True,
-                 database: str = "TPXO"):
-        self.database = database
+    def __init__(
+            self,
+            start_date: Union[None, datetime] = None,
+            end_date: Union[None, datetime] = None,
+            elevation: bool = True,
+            velocity: bool = True,
+            database: Union[str, TidalDatabase] = TidalDatabase.TPXO,
+    ):
+        self.forcing_database = database
         super().__init__(
                 iettype=bctypes.InitialElevationType.TIDAL
                 if elevation is True else bctypes.InitialElevationType.NONE,
                 ifltype=bctypes.InitialFlowType.TIDAL
                 if velocity is True else bctypes.InitialFlowType.NONE)
+        self._active_constituents: OrderedDict = OrderedDict()
+        self.__start_date = start_date
+        self.__end_date = end_date
 
     def __call__(self, constituent):
         return self.get_tidal_constituent(constituent)
@@ -185,10 +205,10 @@ class Tides(bctypes.BoundaryCondition):
 
     def _normalize_to_360(f):
         def decorator(self, constituent):
-            return f(self, constituent) % 360.
+            return f(self, constituent)
         return decorator
 
-    @_normalize_to_360
+    @_normalize_to_360  # type: ignore[arg-type]
     def get_greenwich_factor(self, constituent):
         if constituent == "M2":
             return 2.*(self.DT-self.DS+self.DH)+2.*(self.DXI-self.DNU)
@@ -289,7 +309,7 @@ class Tides(bctypes.BoundaryCondition):
 
     def get_lunar_mean_longitude(self):
         return (277.0256206 + 129.38482032 * self.DYR + 13.176396768
-                * self.DDAY + .549016532 * self.forcing_start_date.hour)
+                * self.DDAY + .549016532 * self.start_date.hour)
 
     def get_solar_perigee(self):
         return (281.2208569 + .01717836 * self.DYR + .000047064 * self.DDAY
@@ -366,33 +386,6 @@ class Tides(bctypes.BoundaryCondition):
         """ """
         return .001+np.sqrt(19.0444*np.sin(self.I)**4+2.7702*np.sin(self.I)**2
                             * np.cos(2.*self.NU)+.0981)
-
-    @property
-    def start_date(self):
-        try:
-            return self.__start_date
-        except AttributeError:
-            msg = "Must set start_date attribute."
-            raise AttributeError(msg)
-
-    @property
-    def end_date(self):
-        try:
-            return self.__end_date
-        except AttributeError:
-            msg = "Must set end_date attribute."
-            raise AttributeError(msg)
-
-    @property
-    def forcing_start_date(self):
-        return self.start_date - self.spinup_time
-
-    @property
-    def spinup_time(self):
-        try:
-            return self.__spinup_time
-        except AttributeError:
-            return timedelta(0.)
 
     @property
     def active_constituents(self):
@@ -484,8 +477,8 @@ class Tides(bctypes.BoundaryCondition):
 
     @property
     def hour_middle(self):
-        return self.forcing_start_date.hour + (
-            (self.end_date - self.forcing_start_date).total_seconds()
+        return self.start_date.hour + (
+            (self.end_date - self.start_date).total_seconds()
             / 3600 / 2)
 
     @property
@@ -502,12 +495,12 @@ class Tides(bctypes.BoundaryCondition):
 
     @property
     def DYR(self):
-        return self.forcing_start_date.year - 1900.
+        return self.start_date.year - 1900.
 
     @property
     def DDAY(self):
-        return (self.forcing_start_date.timetuple().tm_yday
-                + int((self.forcing_start_date.year-1901.)/4.) - 1)
+        return (self.start_date.timetuple().tm_yday
+                + int((self.start_date.year-1901.)/4.) - 1)
 
     @property
     def NU(self):
@@ -604,85 +597,48 @@ class Tides(bctypes.BoundaryCondition):
         try:
             return self.__cutoff_depth
         except AttributeError:
-            return 40.
-
-    @property
-    def nbfr(self):
-        return len(self.get_active_forcing_constituents())
-
-    @property
-    @lru_cache(maxsize=None)
-    def forcing_database(self):
-        if self.database.upper() == "TPXO":
-            return TPXO()
-        raise NotImplementedError(f'Tidal database {self.database} not '
-                                  'implemented')
-
-    @start_date.setter
-    def start_date(self, start_date):
-        if start_date is None:
-            del(self.start_date)
-            return
-        msg = f"start_date must be an instance of type {datetime}."
-        assert isinstance(start_date, datetime), msg
-        try:
-            msg = "start_date must be smaller than end_date."
-            assert start_date < self.end_date, msg
-        except AttributeError:
-            pass
-        self.__start_date = start_date
-
-    @end_date.setter
-    def end_date(self, end_date):
-        if end_date is None:
-            del(self.end_date)
-            return
-        msg = f"end_date must be an instance of type {datetime}."
-        assert isinstance(end_date, datetime), msg
-        try:
-            msg = f"end_date ({end_date}) must be larger than "
-            msg += f"start_date ({self.start_date})."
-            assert end_date > self.start_date, msg
-        except AttributeError:
-            pass
-        self.__end_date = end_date
-
-    @spinup_time.setter
-    def spinup_time(self, spinup_time):
-        if spinup_time is None:
-            del(self.spinup_time)
-            return
-        msg = f"spinup_time must be of and instance of type {timedelta}."
-        assert isinstance(spinup_time, timedelta), msg
-        self.__spinup_time = np.abs(spinup_time)
+            return 50.
 
     @cutoff_depth.setter
     def cutoff_depth(self, cutoff_depth):
         assert isinstance(cutoff_depth, (int, float))
         self.__cutoff_depth = cutoff_depth
 
-    @start_date.deleter
-    def start_date(self):
-        try:
-            del(self.__start_date)
-        except AttributeError:
-            pass
-
-    @end_date.deleter
-    def end_date(self):
-        try:
-            del(self.__end_date)
-        except AttributeError:
-            pass
-
-    @spinup_time.deleter
-    def spinup_time(self):
-        try:
-            del(self.__spinup_time)
-        except AttributeError:
-            pass
+    @property
+    def nbfr(self):
+        return len(self.get_active_forcing_constituents())
 
     @property
-    @lru_cache(maxsize=None)
-    def _active_constituents(self):
-        return OrderedDict()
+    def forcing_database(self):
+        return self.__forcing_database
+
+    @forcing_database.setter
+    def forcing_database(self, database: Union[str, TidalDatabase]):
+        if isinstance(database, str):
+            database = TidalDatabase[StrTidalDatabase(database).name].value()
+        if isinstance(database, TidalDatabase):
+            database = database.value()
+        self.__forcing_database = database
+
+    @property
+    def start_date(self):
+        return self.__start_date
+
+    @start_date.setter
+    def start_date(self, start_date: Union[None, datetime]):
+        if self.end_date is not None:
+            assert start_date < self.end_date, \
+                "start_date must be smaller than end_date."
+        self.__start_date = start_date
+
+    @property
+    def end_date(self):
+        return self.__end_date
+
+    @end_date.setter
+    def end_date(self, end_date: Union[None, datetime]):
+        if self.start_date is not None:
+            assert end_date > self.start_date, \
+                f"end_date ({end_date}) must be larger than " \
+                f"start_date ({self.start_date})."
+        self.__end_date = end_date
