@@ -1,8 +1,17 @@
 import pathlib
-from functools import lru_cache
 
 
 class Vgrid:
+
+    def __str__(self):
+        return """2 !ivcor
+2 1 1.e6 !nvrt, kz (# of Z-levels); h_s (transition depth between S and Z)
+Z levels
+1  -1.e6
+S levels
+40. 1. 1.e-4  !h_c, theta_b, theta_f
+   1    -1.
+   2    0."""
 
     @classmethod
     def open(cls, path):
@@ -15,22 +24,10 @@ class Vgrid:
             raise Exception(msg)
 
         with open(path, 'w') as f:
-            f.write(self.boilerplate_2D)
+            f.write(str(self))
 
-    def is2D(self):
+    def is_2D(self):
         return True
 
-    def is3D(self):
+    def is_3D(self):
         return False
-
-    @property
-    @lru_cache(maxsize=None)
-    def boilerplate_2D(self):  # TODO: *QUICK HACK*, please fix ASAP.
-        return """2 !ivcor
-2 1 1.e6 !nvrt, kz (# of Z-levels); h_s (transition depth between S and Z)
-Z levels
-1  -1.e6
-S levels
-40. 1. 1.e-4  !h_c, theta_b, theta_f
-   1    -1.
-   2    0."""

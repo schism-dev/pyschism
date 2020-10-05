@@ -1,5 +1,5 @@
-from pyschism.driver import Param
-from pyschism.mesh import Mesh
+from .param import Param
+from .mesh import Mesh
 from .driver import SchismRun
 from importlib import util
 __all__ = [

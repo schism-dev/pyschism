@@ -1,11 +1,11 @@
 from collections import namedtuple
 from collections.abc import Iterable
-from functools import lru_cache
-import numpy as np
+from typing import Union
 
+import numpy as np  # type: ignore[import]
 
 from pyschism.forcing.bctypes import BoundaryCondition
-from ..forcing import bctypes
+from ..forcing import bctypes, tides
 from pyschism.mesh.hgrid import Hgrid
 from pyschism.mesh.vgrid import Vgrid
 from pyschism.mesh.friction import (
@@ -25,13 +25,30 @@ class Mesh:
 
     def __init__(
             self,
-            hgrid,
-            vgrid=None,
-            fgrid=None,
+            hgrid: Hgrid,
+            vgrid: Union[Vgrid, None] = None,
+            fgrid: Union[Fgrid, None] = None,
     ):
-        self._hgrid = hgrid
-        self._vgrid = vgrid
-        self._fgrid = fgrid
+
+        assert isinstance(hgrid, Hgrid)
+        self.__hgrid = hgrid
+
+        if vgrid is not None:
+            assert isinstance(vgrid, Vgrid)
+        else:
+            vgrid = Vgrid()
+        self.__vgrid = vgrid
+
+        if fgrid is None:
+            fgrid = ManningsN.constant(self.hgrid, 0.)
+        assert isinstance(fgrid, Fgrid)
+        self.__fgrid = fgrid
+
+        open_boundaries = self.hgrid.boundaries[None].copy()
+        for id in open_boundaries:
+            for bctype in bctypes.BcType:
+                open_boundaries[id]['forcing'] = None
+        self.__open_boundaries = open_boundaries
 
     @classmethod
     def open(cls, hgrid, vgrid=None, fgrid=None, crs=None):
@@ -65,7 +82,7 @@ class Mesh:
 
         if isinstance(value, (int, float)):
             if ftype == 'manning':
-                self._fgrid = ftypes[ftype].constant(self.hgrid, value)
+                self.__fgrid = ftypes[ftype].constant(self.hgrid, value)
 
         return self.fgrid
 
@@ -75,7 +92,33 @@ class Mesh:
                 self.set_boundary_forcing(forcing, i)
         else:
             assert isinstance(forcing, BoundaryCondition)
-            self._open_boundaries[id]['forcing'] = forcing
+            self.__open_boundaries[id]['forcing'] = forcing
+
+    def get_active_potential_constituents(self):
+        # PySCHISM allows the user to input the tidal potentials individually
+        # for each boundary, however, SCHISM supports only a global
+        # specification. Here, we collect all the activated tidal potentials
+        # on each boundary and activate them all globally
+        const = dict()
+        for id in self.open_boundaries:
+            forcing = self.open_boundaries[id].forcing
+            if isinstance(forcing, tides.Tides):
+                for active in forcing.get_active_potential_constituents():
+                    const[active] = True
+        return tuple(const.keys())
+
+    def get_active_forcing_constituents(self):
+        # PySCHISM allows the user to input the tidal forcings individually
+        # for each boundary, however, SCHISM supports only a global
+        # specification. Here, we collect all the activated tidal forcings
+        # on each boundary and activate them all globally
+        const = dict()
+        for id in self.open_boundaries:
+            forcing = self.open_boundaries[id].forcing
+            if isinstance(forcing, tides.Tides):
+                for active in forcing.get_active_forcing_constituents():
+                    const[active] = True
+        return tuple(const.keys())
 
     def make_plot(self, **kwargs):
         if self.vgrid.is3D():
@@ -86,15 +129,15 @@ class Mesh:
 
     @property
     def hgrid(self):
-        return self._hgrid
+        return self.__hgrid
 
     @property
     def vgrid(self):
-        return self._vgrid
+        return self.__vgrid
 
     @property
     def fgrid(self):
-        return self._fgrid
+        return self.__fgrid
 
     @property
     def crs(self):
@@ -123,7 +166,7 @@ class Mesh:
     def open_boundaries(self):
         OpenBoundary = namedtuple("OpenBoundary", ['indexes', 'forcing'])
         open_boundaries = {}
-        for id, data in self._open_boundaries.items():
+        for id, data in self.__open_boundaries.items():
             indexes = list(map(self.hgrid.get_node_index, data['indexes']))
             open_boundaries[id] = OpenBoundary(indexes, data['forcing'])
         return open_boundaries
@@ -146,44 +189,3 @@ class Mesh:
             interior_boundaries[id] = InteriorBoundary(indexes,
                                                        data['forcing'])
         return interior_boundaries
-
-    @property
-    @lru_cache(maxsize=None)
-    def _open_boundaries(self):
-        open_boundaries = self.hgrid.boundaries[None].copy()
-        for id in open_boundaries:
-            for bctype in bctypes.BcType:
-                open_boundaries[id]['forcing'] = None
-        return open_boundaries
-
-    @property
-    def _hgrid(self):
-        return self.__hgrid
-
-    @property
-    def _vgrid(self):
-        return self.__vgrid
-
-    @property
-    def _fgrid(self):
-        return self.__fgrid
-
-    @_hgrid.setter
-    def _hgrid(self, hgrid):
-        assert isinstance(hgrid, Hgrid)
-        self.__hgrid = hgrid
-
-    @_vgrid.setter
-    def _vgrid(self, vgrid):
-        if vgrid is not None:
-            assert isinstance(vgrid, Vgrid)
-        else:
-            vgrid = Vgrid()
-        self.__vgrid = vgrid
-
-    @_fgrid.setter
-    def _fgrid(self, fgrid):
-        if fgrid is None:
-            fgrid = ManningsN.constant(self.hgrid, 0.)
-        assert isinstance(fgrid, Fgrid)
-        self.__fgrid = fgrid
