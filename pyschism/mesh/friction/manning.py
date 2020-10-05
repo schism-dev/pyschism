@@ -7,7 +7,8 @@ class ManningsN(Fgrid):
     @classmethod
     def constant(cls, mesh, value):
         return cls(
-            mesh._nodes,
+            {id: (coords, float(value))
+             for (id, coords) in mesh._coords.items()},
             mesh._elements,
             crs=mesh.crs,
             description=mesh.description + " mannings"
@@ -27,3 +28,7 @@ class ManningsN(Fgrid):
     @hmin_man.setter
     def hmin_man(self, hmin_man):
         self.__hmin_man = float(hmin_man)
+
+    @property
+    def fname(self):
+        return 'manning.gr3'

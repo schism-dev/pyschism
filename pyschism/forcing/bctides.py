@@ -108,17 +108,28 @@ class itrtypeWritter(Enum):
 
 class Bctides:
 
-    def __init__(self, mesh: Mesh, start_date: datetime, end_date: datetime,
-                 cutoff_depth: float = 50.):
+    def __init__(self, mesh: Mesh, start_date: datetime = None,
+                 end_date: datetime = None, cutoff_depth: float = 50.):
+
         self.__mesh = mesh
         self.__start_date = start_date
         self.__end_date = end_date
         self.cutoff_depth = cutoff_depth
 
-        # PySCHISM allows the user to input the tidal potentials individually
-        # for each boundary, however, SCHISM supports only a global
+        # check if start_date was given in case tidal forcings are requested.
+        # Note: This is done twice so that this class can be used independently
+        # from Param to just write bctides files
+        afc = self.mesh.get_active_forcing_constituents()
+        if len(afc) > 0 and start_date is None:
+            raise Exception('start_date argument is required for simulating '
+                            'tidal forcing.')
+
+        # PySCHISM allows the user to input the tidal potentials and forcings
+        # individually at each boundary, however, SCHISM supports only a global
         # specification. Here, we collect all the activated tidal potentials
         # on each boundary and activate them all globally
+
+        # set active tidal potential constituents
         const = dict()
         for id in self.mesh.open_boundaries:
             forcing = self.mesh.open_boundaries[id].forcing
@@ -127,11 +138,7 @@ class Bctides:
                     const[active] = True
         self.__active_potential_constituents = tuple(const.keys())
 
-        # PySCHISM allows the user to input the tidal forcings individually
-        # for each boundary, however, SCHISM supports only a global
-        # specification. Here, we collect all the activated tidal forcings
-        # on each boundary and activate them all globally
-        const = dict()
+        # set active tidal forcing constituents
         for id in self.mesh.open_boundaries:
             forcing = self.mesh.open_boundaries[id].forcing
             if isinstance(forcing, Tides):
@@ -139,6 +146,7 @@ class Bctides:
                     const[active] = True
         self.__active_forcing_constituents = tuple(const.keys())
 
+        # init the main tidal forcing object
         tides = Tides()
         tides.start_date = self.start_date
         tides.end_date = self.end_date
@@ -152,12 +160,7 @@ class Bctides:
                     )
         self.__tidal_forcing = tides
 
-    def write(self, path, overwrite=False):
-        with open(path, 'w') as f:
-            f.write(self.bctides)
-
-    @property
-    def bctides(self):
+    def __str__(self):
         f = f"{self.start_date}\n" \
             f"{self.ntip} {self.cutoff_depth}\n"
         if self.ntip > 0:
@@ -187,6 +190,10 @@ class Bctides:
                  f'{isatypeWritter[boundary.forcing.isatype.name].value(boundary, self)}' \
                  f'{itrtypeWritter[boundary.forcing.itrtype.name].value(boundary, self)}'
         return f
+
+    def write(self, path, overwrite=False):
+        with open(path, 'w') as f:
+            f.write(str(self))
 
     @property
     def mesh(self):

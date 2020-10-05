@@ -1,5 +1,5 @@
 #! /usr/bin/env python
-import pathlib
+from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from pyschism import Param, Mesh, forcing, SchismRun
 
@@ -7,7 +7,7 @@ from pyschism import Param, Mesh, forcing, SchismRun
 def main():
 
     # setup mesh
-    mesh = Mesh.open('hgrid.gr3')
+    mesh = Mesh.open(Path(__file__).parent / 'hgrid.gr3')
 
     # set mesh friction
     mesh.set_friction('manning', 0.025)
@@ -21,11 +21,13 @@ def main():
     mesh.set_boundary_forcing(elevbc)
 
     #  ------ Param options
-    # rnday and nspool are required arguments
+    # dt, rnday, dramp and nspool are required positional arguments
 
-    # Use a float or int to specify run days or use a timedelta for a
-    # pythonic specification.
-    rnday = timedelta(seconds=864000)
+    # Use int or float for seconds, or timedelta objects for pythonic
+    # specifications
+    dt = timedelta(seconds=150.)
+    rnday = timedelta(days=30.)
+    dramp = 0.5*rnday
 
     # Use an integer for number of steps or a timedelta to approximate
     # number of steps internally based on timestep
@@ -37,12 +39,12 @@ def main():
     # date is provided, the driver will throw an ecxeption.
     # tzinfo is optional, UTC assumed if not provided
     start_date = datetime(2017, 9, 18, 12, 00,
-                          tzinfo=timezone(timedelta(hours=-4)))
+                          tzinfo=timezone(timedelta(hours=-4))) - dramp
 
     # Output requests can be activated as part of the optional arguments.
     # dt is another optional argument (timestep). dt is omitted in this example
     # and thus takes the default value of 150. seconds internally
-    param = Param(rnday, nspool, start_date=start_date, elev=True)
+    param = Param(dt, rnday, dramp, nspool, start_date=start_date, elev=True)
 
     # Output requests, as well as other namelist variables, can be modified
     # post-hoc through their corresponding properties.

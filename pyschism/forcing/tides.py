@@ -24,7 +24,7 @@ class Tides(bctypes.BoundaryCondition):
             start_date: Union[None, datetime] = None,
             end_date: Union[None, datetime] = None,
             elevation: bool = True,
-            velocity: bool = True,
+            velocity: bool = False,
             database: Union[str, TidalDatabase] = TidalDatabase.TPXO,
     ):
         self.forcing_database = database

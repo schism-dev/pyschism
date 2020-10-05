@@ -19,12 +19,12 @@ class Hgrid(EuclideanMesh2D):
     """
 
     def __init__(
-        self,
-        nodes,
-        elements,
-        boundaries=None,
-        crs=None,
-        description=None,
+            self,
+            nodes,
+            elements,
+            boundaries=None,
+            crs=None,
+            description=None,
     ):
         super().__init__(**grd.euclidean_mesh({
             'nodes': nodes,
