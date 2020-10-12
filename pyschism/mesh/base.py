@@ -4,6 +4,7 @@ import pathlib
 from functools import lru_cache
 from collections.abc import Mapping
 from collections import defaultdict
+from typing import List
 import warnings
 
 import numpy as np
@@ -11,7 +12,7 @@ from matplotlib.tri import Triangulation
 from matplotlib.path import Path
 from matplotlib.collections import PolyCollection
 from matplotlib.transforms import Bbox
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon, MultiPolygon
 
 from pyproj import Proj, CRS, Transformer
 from pyschism.mesh import grd, sms2dm
@@ -70,6 +71,16 @@ class EuclideanMesh2D:
         grd is a dictionary of of the form:
         """
         return cls(**grd.euclidean_mesh(grid))
+
+    def get_multipolygon(self, crs=None) -> MultiPolygon:
+        pol_col: List[Polygon] = []
+        for id, ring in self.index_ring_collection.items():
+            outer = self.get_xy(crs)[ring['exterior'][:, 0], :]
+            inner: List[Polygon] = []
+            for inner_ring in ring['interiors']:
+                inner.append(self.get_xy(crs)[inner_ring[:, 0], :])
+            pol_col.append(Polygon(outer, inner))
+        return MultiPolygon(pol_col)
 
     def transform_to(self, dst_crs):
         dst_crs = CRS.from_user_input(dst_crs)

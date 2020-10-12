@@ -4,8 +4,7 @@ from enum import Enum
 import f90nml  # type: ignore[import]
 
 PARAM_TEMPLATE = pathlib.Path(__file__).parent / 'param.nml.template'
-PARAM_DEFAULTS = f90nml.read(PARAM_TEMPLATE)
-OUTPUT_VARIABLES = [key for key in PARAM_DEFAULTS['schout']]
+PARAM_DEFAULTS = f90nml.read(PARAM_TEMPLATE)['schout']
 
 
 class iof_hydro(Enum):
@@ -282,70 +281,285 @@ class SchoutStrType(Enum):
     iof_ana = 'iof_ana'
 
 
+allowed_vars = [
+    "elev",
+    "air_pressure",
+    "air_temperature",
+    "specific_humidity",
+    "solar_radiation",
+    "sensible_flux",
+    "latent_heat",
+    "upward_longwave",
+    "downward_longwave",
+    "total_heat_flux",
+    "evaporation",
+    "precipitation",
+    "bottom_stress",
+    "wind_speed",
+    "wind_stress",
+    "dahv",
+    "vertical_velocity",
+    "temp",
+    "salt",
+    "water_density",
+    "diffusivity",
+    "viscosity",
+    "TKE",
+    "mixing_length",
+    "hvel",
+    "hvel_side",
+    "wvel_elem",
+    "temp_elem",
+    "salt_elem",
+    "pressure_gradient",
+    "DVD_1",
+    "WWM_1",
+    "WWM_2",
+    "WWM_3",
+    "WWM_4",
+    "WWM_5",
+    "WWM_6",
+    "WWM_9",
+    "WWM_10",
+    "WWM_11",
+    "WWM_12",
+    "WWM_13",
+    "WWM_14",
+    "WWM_15",
+    "WWM_16",
+    "WWM_17",
+    "WWM_18",
+    "WWM_19",
+    "WWM_20",
+    "WWM_21",
+    "WWM_22",
+    "WWM_23",
+    "WWM_24",
+    "WWM_25",
+    "WWM_26",
+    "WWM_27",
+    "WWM_28",
+    "WWM_energy_dir",
+    "wave_force",
+    "GEN_1",
+    "GEN_2",
+    "AGE_1",
+    "AGE_2",
+    "SED_depth_change",
+    "SED_D50",
+    "SED_bed_stress",
+    "SED_bed_roughness",
+    "SED_TSC",
+    "bed_thickness",
+    "bed_age",
+    "z0st",
+    "z0cr",
+    "z0sw",
+    "z0wr",
+    "SED3D_1",
+    "SED_bdld_1",
+    "SED_bedfrac_1",
+    "SED3D_2",
+    "SED_bdld_2",
+    "SED_bedfrac_3",
+    "ECO_1",
+    "ICM_Chl",
+    "ICM_pH",
+    "ICM_PrmPrdt",
+    "ICM_DIN",
+    "ICM_PON",
+    "ICM_SED_BENDOC",
+    "ICM_SED_BENNH4",
+    "ICM_SED_BENNO3",
+    "ICM_SED_BENPO4",
+    "ICM_SED_BENCOD",
+    "ICM_SED_BENDO",
+    "ICM_SED_BENSA",
+    "ICM_lfsav",
+    "ICM_stsav",
+    "ICM_rtsav",
+    "ICM_tlfsav",
+    "ICM_tstsav",
+    "ICM_trtsav",
+    "ICM_hcansav",
+    "ICM_CNH4",
+    "ICM_CNH3",
+    "ICM_CPIP",
+    "ICM_CPOS",
+    "ICM_CCH4",
+    "ICM_CSO4",
+    "ICM_CH2S",
+    "ICM_SEDPON1",
+    "ICM_SEDPON2",
+    "ICM_SEDPON3",
+    "ICM_SEDPOP1",
+    "ICM_SEDPOP2",
+    "ICM_SEDPOP3",
+    "ICM_SEDPOC1",
+    "ICM_SEDPOC2",
+    "ICM_SEDPOC3",
+    "ICM_EROH2S",
+    "ICM_EROLPOC",
+    "ICM_ERORPOC",
+    "ICM_DO_consumption",
+    "ICM_GP1",
+    "ICM_GP2",
+    "ICM_GP3",
+    "ICM_1",
+    "ICM_2",
+    "ICM_3",
+    "ICM_4",
+    "ICM_5",
+    "ICM_6",
+    "ICM_7",
+    "ICM_8",
+    "ICM_9",
+    "ICM_10",
+    "ICM_11",
+    "ICM_12",
+    "ICM_13",
+    "ICM_14",
+    "ICM_15",
+    "ICM_16",
+    "ICM_17",
+    "ICM_18",
+    "ICM_19",
+    "ICM_20",
+    "ICM_21",
+    "ICM_22",
+    "ICM_23",
+    "ICM_24",
+    "I6CM_25",
+    "COS_1",
+    "COS_2",
+    "COS_3",
+    "COS_4",
+    "COS_5",
+    "COS_6",
+    "COS_7",
+    "COS_8",
+    "COS_9",
+    "COS_10",
+    "COS_11",
+    "COS_12",
+    "COS_13",
+    "FIB_1",
+    "SED2D_depth_change",
+    "SED2D_drag_coefficient",
+    "SED2D_cflsed",
+    "SED2D_d50",
+    "SED2D_total_transport",
+    "SED2D_susp_load",
+    "SED2D_bed_load",
+    "SED2D_average_transport",
+    "SED2D_bottom_slope",
+    "z0eq",
+    "z0cr2d",
+    "z0sw2d",
+    "z0wr2d",
+    "marsh_flag",
+    "ICE_velocity",
+    "ICE_strain_rate",
+    "ICE_net_heat_flux",
+    "ICE_fresh_water_flux",
+    "ICE_top_T",
+    "ICE_tracer_1",
+    "ICE_tracer_2",
+    "ICE_tracer_3",
+    "ANA_air_pres_grad_x",
+    "ANA_air_pres_grad_y",
+    "ANA_tide_pot_grad_x",
+    "ANA_tide_pot_grad_y",
+    "ANA_hor_viscosity_x",
+    "ANA_hor_viscosity_y",
+    "ANA_bclinic_force_x",
+    "ANA_bclinic_force_y",
+    "ANA_vert_viscosity_x",
+    "ANA_vert_viscosity_y",
+    "ANA_mom_advection_x",
+    "ANA_mom_advection_y",
+    "ANA_Richardson",
+    "ANA_transport_min_dt_elem",
+]
+
+
 class SCHOUT:
     """ Provides error checking implementation for SCHOUT group """
 
-    def __init__(self, nml, **outputs):
-        self.__nml = nml
-        self.__schout = self.__nml['schout']
-        self.__iof_hydro = self.__schout['iof_hydro']
-        self.__iof_dvd = self.__schout['iof_dvd']
-        self.__iof_wwm = self.__schout['iof_wwm']
-        self.__iof_gen = self.__schout['iof_gen']
-        self.__iof_age = self.__schout['iof_age']
-        self.__iof_eco = self.__schout['iof_eco']
-        self.__iof_icm = self.__schout['iof_icm']
-        self.__iof_cos = self.__schout['iof_cos']
-        self.__iof_fib = self.__schout['iof_fib']
-        self.__iof_sed2d = self.__schout['iof_sed2d']
-        self.__iof_marsh = self.__schout['iof_marsh']
-        self.__iof_ice = self.__schout['iof_ice']
-        self.__iof_ana = self.__schout['iof_ana']
+    def __init__(self, **outputs):
+        self.__schout: dict = {}
+        for key, value in PARAM_DEFAULTS.items():
+            if isinstance(value, list):
+                self.__schout[key] = len(value)*[0]
+            else:
+                self.__schout[key] = None
 
-        allowed_vars = []
-        for var in OUTPUT_VARIABLES:
-            if "iof_" in var:
-                for _ in SchoutType[SchoutStrType(var).name].value:
-                    allowed_vars.append(_.name)
+        self.__iof_hydro = self['iof_hydro']
+        self.__iof_dvd = self['iof_dvd']
+        self.__iof_wwm = self['iof_wwm']
+        self.__iof_gen = self['iof_gen']
+        self.__iof_age = self['iof_age']
+        self.__iof_sed = self['iof_sed']
+        self.__iof_eco = self['iof_eco']
+        self.__iof_icm = self['iof_icm']
+        self.__iof_cos = self['iof_cos']
+        self.__iof_fib = self['iof_fib']
+        self.__iof_sed2d = self['iof_sed2d']
+        self.__iof_marsh = self['iof_marsh']
+        self.__iof_ice = self['iof_ice']
+        self.__iof_ana = self['iof_ana']
+
         for var in outputs.copy():
             if var.lower() in allowed_vars:
-                setattr(self, var, bool(outputs.pop(var)))
+                exec(f"self.{var.lower()}={bool(outputs.pop(var))}")
 
         # check for remaining arguments.
         if len(outputs) > 0:
             raise TypeError(f'Unknown outputs: {list(outputs.keys())}')
 
+    def __getitem__(self, key):
+        return self.__schout[key]
+
+    def __setitem__(self, key, value):
+        self.__schout[key] = value
+
+    def __iter__(self):
+        for key, value in self.__schout.items():
+            yield key, value
+
     @property
     def nhot(self):
-        return self.__nml['schout']['nhot']
+        return self['nhot']
 
     @nhot.setter
     def nhot(self, nhot):
-        self.__nml['schout']['nhot'] = nhot
+        self['nhot'] = nhot
 
     @property
     def nhot_write(self):
-        return self.__nml['schout']['nhot_write']
+        return self['nhot_write']
 
     @nhot_write.setter
     def nhot_write(self, nhot_write):
-        self.__nml['schout']['nhot_write'] = nhot_write
+        self['nhot_write'] = nhot_write
 
     @property
     def iout_sta(self):
-        return self.__nml['schout']['iout_sta']
+        return self['iout_sta']
 
     @iout_sta.setter
     def iout_sta(self, iout_sta):
-        self.__nml['schout']['iout_sta'] = iout_sta
+        assert iout_sta in [0, 1]
+        self['iout_sta'] = iout_sta
 
     @property
     def nspool_sta(self):
-        return self.__nml['schout']['nspool_sta']
+        return self['nspool_sta']
 
     @nspool_sta.setter
-    def nspool_sta(self, nspool_sta):
-        self.__nml['schout']['nspool_sta'] = nspool_sta
+    def nspool_sta(self, nspool_sta: int):
+        assert isinstance(nspool_sta, int), 'Can only be set using an int'
+        self['nspool_sta'] = nspool_sta
 
     @property
     def elev(self):

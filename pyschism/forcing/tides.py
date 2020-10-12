@@ -24,7 +24,7 @@ class Tides(bctypes.BoundaryCondition):
             start_date: Union[None, datetime] = None,
             end_date: Union[None, datetime] = None,
             elevation: bool = True,
-            velocity: bool = False,
+            velocity: bool = True,
             database: Union[str, TidalDatabase] = TidalDatabase.TPXO,
     ):
         self.forcing_database = database
@@ -205,7 +205,7 @@ class Tides(bctypes.BoundaryCondition):
 
     def _normalize_to_360(f):
         def decorator(self, constituent):
-            return f(self, constituent)
+            return f(self, constituent) % 360.
         return decorator
 
     @_normalize_to_360  # type: ignore[arg-type]

@@ -50,6 +50,8 @@ class Mesh:
                 open_boundaries[id]['forcing'] = None
         self.__open_boundaries = open_boundaries
 
+        self.__sflux = {}
+
     @classmethod
     def open(cls, hgrid, vgrid=None, fgrid=None, crs=None):
         if vgrid is not None:
@@ -86,13 +88,20 @@ class Mesh:
 
         return self.fgrid
 
-    def set_boundary_forcing(self, forcing, id=None):
+    def add_boundary_condition(self, forcing: BoundaryCondition, id=None):
         if id is None:
             for i in range(len(self.open_boundaries)):
-                self.set_boundary_forcing(forcing, i)
+                self.add_boundary_condition(forcing, i)
         else:
-            assert isinstance(forcing, BoundaryCondition)
+            if not isinstance(forcing, BoundaryCondition):
+                raise TypeError("Argument must be of type "
+                                f"{BoundaryCondition} but got type "
+                                f"{type(forcing)}")
             self.__open_boundaries[id]['forcing'] = forcing
+
+    def add_sflux(self, sflux):
+        """ """
+        raise NotImplementedError('add sflux to mesh')
 
     def get_active_potential_constituents(self):
         # PySCHISM allows the user to input the tidal potentials individually
