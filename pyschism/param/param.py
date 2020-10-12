@@ -7,77 +7,69 @@ import f90nml  # type: ignore[import]
 from .core import CORE, Stratification
 from .opt import OPT
 from .schout import SCHOUT
-
+from ..stations import Stations
 
 PARAM_TEMPLATE = pathlib.Path(__file__).parent / 'param.nml.template'
-PARAM_DEFAULTS = f90nml.read(PARAM_TEMPLATE)
 
 
 class Param:
 
     def __init__(
             self,
-            dt: Union[float, int, timedelta],
+            dt: Union[float, timedelta],
             rnday: Union[float, timedelta],
-            dramp: Union[int, float, timedelta],
-            nspool: Union[int, timedelta],
-            start_date: Union[None, datetime] = None,
+            ihfskip: int = None,
+            dramp: Union[float, timedelta] = None,
+            start_date: datetime = None,
             ibc: Union[Stratification, int, str] = Stratification.BAROTROPIC,
-            ihfskip: Union[int, None] = None,
+            drampbc: Union[float, timedelta] = None,
+            stations: Stations = None,
+            nspool: Union[int, timedelta] = None,
             **outputs
     ):
-        # ---------------------------
-        # initialize main container |
-        # ---------------------------
-        # Blank out all values in template, this program assumes no defaults
-        self.__nml: dict = {'core': {}, 'opt': {}, 'schout': {}}
-        for group, data in PARAM_DEFAULTS.items():
-            for key, value in data.items():
-                if isinstance(value, list):
-                    self.__nml[group][key] = len(value)*[0]
-                else:
-                    self.__nml[group][key] = None
-
         # -----------------
         # initialize core |
         # -----------------
-        self.__core = CORE(self.__nml)
+        self.__core = CORE()
         self.core.rnday = rnday
         self.core.dt = dt
         self.core.nspool = nspool
-        self.core.dramp = dramp
         self.core.ibc = ibc
         self.core.ihfskip = ihfskip
-        # TODO: Must set (when applicable)
-        # msc2
-        # mdc2
-        # ntracer_gen
-        # ntracer_age
-        # sed_class
-        # eco_class
 
         # ---------------
         # intialize opt |
         # ---------------
-        self.__opt = OPT(self.__nml)
+        self.__opt = OPT()
+        self.opt.dramp = dramp
+        self.opt.drampbc = drampbc
         self.opt.start_date = start_date
 
         # -------------------
         # initialize schout |
         # -------------------
-        self.__schout = SCHOUT(self.__nml, **outputs)
+        self.__schout = SCHOUT(**outputs)
+
+        # --------------------
+        # initialize station |
+        # --------------------
+        if stations is not None:
+            if not isinstance(stations, Stations):
+                raise TypeError('stations argument must be of type '
+                                f'{Stations}')
+        self.__stations = stations
 
     def __str__(self):
 
         def append_items(f, group):
-            for var, value in self.__nml[group].items():
+            for var, value in getattr(self, group):
                 if value is not None:
                     if not isinstance(value, list):
                         f.append(f'  {var}={value}')
                     else:
                         for i, state in enumerate(value):
-                            if state == 1:
-                                f.append(f'  {var}({i+1}) = {state}')
+                            if state:
+                                f.append(f'  {var}({i+1}) = 1')
             return f
 
         f = ['&CORE']
@@ -110,3 +102,7 @@ class Param:
     @property
     def schout(self):
         return self.__schout
+
+    @property
+    def stations(self):
+        return self.__stations
