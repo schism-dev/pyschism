@@ -1,0 +1,9 @@
+pyschism
+========
+
+.. toctree::
+   :maxdepth: 4
+
+   pyschism.mesh
+   pyschism.param
+   pyschism.forcing
