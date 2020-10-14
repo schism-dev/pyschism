@@ -1,0 +1,633 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>pyschism.forcing package &mdash; PySCHISM  documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+
+  
+  
+  
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+        <script src="../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="pyschism.forcing.atmosphere package" href="pyschism.forcing.atmosphere.html" />
+    <link rel="prev" title="pyschism.param package" href="pyschism.param.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home" alt="Documentation Home"> PySCHISM
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quickstart guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">API Documentation</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="driver.html">SchismRun</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mesh.html">Mesh</a></li>
+<li class="toctree-l2"><a class="reference internal" href="param.html">Param</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="pyschism.html">pyschism</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="pyschism.mesh.html">pyschism.mesh package</a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyschism.param.html">pyschism.param package</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">pyschism.forcing package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#subpackages">Subpackages</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#module-pyschism.forcing">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="pyschism.html#module-pyschism">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">PySCHISM</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="index.html">API Documentation</a> &raquo;</li>
+        
+          <li><a href="pyschism.html">pyschism</a> &raquo;</li>
+        
+      <li>pyschism.forcing package</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="../_sources/api/pyschism.forcing.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="pyschism-forcing-package">
+<h1>pyschism.forcing package<a class="headerlink" href="#pyschism-forcing-package" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="subpackages">
+<h2>Subpackages<a class="headerlink" href="#subpackages" title="Permalink to this headline">¶</a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="pyschism.forcing.atmosphere.html">pyschism.forcing.atmosphere package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="pyschism.forcing.atmosphere.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyschism.forcing.atmosphere.html#module-pyschism.forcing.atmosphere.atmospheric">pyschism.forcing.atmosphere.atmospheric module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyschism.forcing.atmosphere.html#module-pyschism.forcing.atmosphere.cfconvention">pyschism.forcing.atmosphere.cfconvention module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyschism.forcing.atmosphere.html#module-pyschism.forcing.atmosphere.nws">pyschism.forcing.atmosphere.nws module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyschism.forcing.atmosphere.html#module-pyschism.forcing.atmosphere.unstructured">pyschism.forcing.atmosphere.unstructured module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyschism.forcing.atmosphere.html#module-pyschism.forcing.atmosphere.wind_time_history">pyschism.forcing.atmosphere.wind_time_history module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyschism.forcing.atmosphere.html#module-pyschism.forcing.atmosphere">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="pyschism.forcing.tides.html">pyschism.forcing.tides package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="pyschism.forcing.tides.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyschism.forcing.tides.html#module-pyschism.forcing.tides.tides">pyschism.forcing.tides.api module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyschism.forcing.tides.html#module-pyschism.forcing.tides.bctides">pyschism.forcing.tides.bctides module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyschism.forcing.tides.html#module-pyschism.forcing.tides.bctypes">pyschism.forcing.tides.bctypes module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyschism.forcing.tides.html#module-pyschism.forcing.tides.tpxo">pyschism.forcing.tides.tpxo module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyschism.forcing.tides.html#module-pyschism.forcing.tides">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+<div class="section" id="module-pyschism.forcing">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-pyschism.forcing" title="Permalink to this headline">¶</a></h2>
+<dl class="py class">
+<dt id="pyschism.forcing.Tides">
+<em class="property">class </em><code class="sig-prename descclassname">pyschism.forcing.</code><code class="sig-name descname">Tides</code><span class="sig-paren">(</span><em class="sig-param">elevation: bool = True</em>, <em class="sig-param">velocity: bool = False</em>, <em class="sig-param">database: Union[str</em>, <em class="sig-param">pyschism.forcing.tides.tides.TidalDatabase] = &lt;TidalDatabase.TPXO: &lt;class 'pyschism.forcing.tides.tpxo.TPXO'&gt;&gt;</em><span class="sig-paren">)</span><a class="headerlink" href="#pyschism.forcing.Tides" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="pyschism.forcing.tides.html#pyschism.forcing.tides.bctypes.BoundaryCondition" title="pyschism.forcing.tides.bctypes.BoundaryCondition"><code class="xref py py-class docutils literal notranslate"><span class="pre">pyschism.forcing.tides.bctypes.BoundaryCondition</span></code></a></p>
+<p>Main class for requesting tidal boundary forcing for a SCHISM run.</p>
+<p>The user should add tidal requests to this class via it’s methods.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>elevation</strong> (<em>optional</em>) – Apply elevation forcing to boundary, defaults
+to True.</p></li>
+<li><p><strong>velocity</strong> (<em>optional</em>) – Apply velocity forcing to boundary (currently
+disabled), defaults to False.</p></li>
+<li><p><strong>database</strong> (<em>optional</em>) – Tidal database to use in order to obtain
+boundary initial conditions, defaults to TidalDatabase.TPXO</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.DDAY">
+<em class="property">property </em><code class="sig-name descname">DDAY</code><a class="headerlink" href="#pyschism.forcing.Tides.DDAY" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.DH">
+<em class="property">property </em><code class="sig-name descname">DH</code><a class="headerlink" href="#pyschism.forcing.Tides.DH" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.DN">
+<em class="property">property </em><code class="sig-name descname">DN</code><a class="headerlink" href="#pyschism.forcing.Tides.DN" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.DNU">
+<em class="property">property </em><code class="sig-name descname">DNU</code><a class="headerlink" href="#pyschism.forcing.Tides.DNU" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.DNUP">
+<em class="property">property </em><code class="sig-name descname">DNUP</code><a class="headerlink" href="#pyschism.forcing.Tides.DNUP" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.DNUP2">
+<em class="property">property </em><code class="sig-name descname">DNUP2</code><a class="headerlink" href="#pyschism.forcing.Tides.DNUP2" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.DP">
+<em class="property">property </em><code class="sig-name descname">DP</code><a class="headerlink" href="#pyschism.forcing.Tides.DP" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.DP1">
+<em class="property">property </em><code class="sig-name descname">DP1</code><a class="headerlink" href="#pyschism.forcing.Tides.DP1" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.DPC">
+<em class="property">property </em><code class="sig-name descname">DPC</code><a class="headerlink" href="#pyschism.forcing.Tides.DPC" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.DQ">
+<em class="property">property </em><code class="sig-name descname">DQ</code><a class="headerlink" href="#pyschism.forcing.Tides.DQ" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.DR">
+<em class="property">property </em><code class="sig-name descname">DR</code><a class="headerlink" href="#pyschism.forcing.Tides.DR" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.DS">
+<em class="property">property </em><code class="sig-name descname">DS</code><a class="headerlink" href="#pyschism.forcing.Tides.DS" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.DT">
+<em class="property">property </em><code class="sig-name descname">DT</code><a class="headerlink" href="#pyschism.forcing.Tides.DT" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.DXI">
+<em class="property">property </em><code class="sig-name descname">DXI</code><a class="headerlink" href="#pyschism.forcing.Tides.DXI" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.DYR">
+<em class="property">property </em><code class="sig-name descname">DYR</code><a class="headerlink" href="#pyschism.forcing.Tides.DYR" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.EQ149">
+<em class="property">property </em><code class="sig-name descname">EQ149</code><a class="headerlink" href="#pyschism.forcing.Tides.EQ149" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.EQ197">
+<em class="property">property </em><code class="sig-name descname">EQ197</code><a class="headerlink" href="#pyschism.forcing.Tides.EQ197" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.EQ207">
+<em class="property">property </em><code class="sig-name descname">EQ207</code><a class="headerlink" href="#pyschism.forcing.Tides.EQ207" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.EQ213">
+<em class="property">property </em><code class="sig-name descname">EQ213</code><a class="headerlink" href="#pyschism.forcing.Tides.EQ213" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.EQ215">
+<em class="property">property </em><code class="sig-name descname">EQ215</code><a class="headerlink" href="#pyschism.forcing.Tides.EQ215" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.EQ227">
+<em class="property">property </em><code class="sig-name descname">EQ227</code><a class="headerlink" href="#pyschism.forcing.Tides.EQ227" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.EQ235">
+<em class="property">property </em><code class="sig-name descname">EQ235</code><a class="headerlink" href="#pyschism.forcing.Tides.EQ235" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.EQ73">
+<em class="property">property </em><code class="sig-name descname">EQ73</code><a class="headerlink" href="#pyschism.forcing.Tides.EQ73" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.EQ74">
+<em class="property">property </em><code class="sig-name descname">EQ74</code><a class="headerlink" href="#pyschism.forcing.Tides.EQ74" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.EQ75">
+<em class="property">property </em><code class="sig-name descname">EQ75</code><a class="headerlink" href="#pyschism.forcing.Tides.EQ75" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.EQ76">
+<em class="property">property </em><code class="sig-name descname">EQ76</code><a class="headerlink" href="#pyschism.forcing.Tides.EQ76" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.EQ77">
+<em class="property">property </em><code class="sig-name descname">EQ77</code><a class="headerlink" href="#pyschism.forcing.Tides.EQ77" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.EQ78">
+<em class="property">property </em><code class="sig-name descname">EQ78</code><a class="headerlink" href="#pyschism.forcing.Tides.EQ78" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.I">
+<em class="property">property </em><code class="sig-name descname">I</code><a class="headerlink" href="#pyschism.forcing.Tides.I" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.N">
+<em class="property">property </em><code class="sig-name descname">N</code><a class="headerlink" href="#pyschism.forcing.Tides.N" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.NU">
+<em class="property">property </em><code class="sig-name descname">NU</code><a class="headerlink" href="#pyschism.forcing.Tides.NU" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.NUP">
+<em class="property">property </em><code class="sig-name descname">NUP</code><a class="headerlink" href="#pyschism.forcing.Tides.NUP" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.NUP2">
+<em class="property">property </em><code class="sig-name descname">NUP2</code><a class="headerlink" href="#pyschism.forcing.Tides.NUP2" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.P">
+<em class="property">property </em><code class="sig-name descname">P</code><a class="headerlink" href="#pyschism.forcing.Tides.P" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.PC">
+<em class="property">property </em><code class="sig-name descname">PC</code><a class="headerlink" href="#pyschism.forcing.Tides.PC" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.Q">
+<em class="property">property </em><code class="sig-name descname">Q</code><a class="headerlink" href="#pyschism.forcing.Tides.Q" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.R">
+<em class="property">property </em><code class="sig-name descname">R</code><a class="headerlink" href="#pyschism.forcing.Tides.R" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.XI">
+<em class="property">property </em><code class="sig-name descname">XI</code><a class="headerlink" href="#pyschism.forcing.Tides.XI" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.active_constituents">
+<em class="property">property </em><code class="sig-name descname">active_constituents</code><a class="headerlink" href="#pyschism.forcing.Tides.active_constituents" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.constituents">
+<em class="property">property </em><code class="sig-name descname">constituents</code><a class="headerlink" href="#pyschism.forcing.Tides.constituents" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.cutoff_depth">
+<em class="property">property </em><code class="sig-name descname">cutoff_depth</code><a class="headerlink" href="#pyschism.forcing.Tides.cutoff_depth" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.drop_constituent">
+<code class="sig-name descname">drop_constituent</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">constituent</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyschism.forcing.Tides.drop_constituent" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.forcing_database">
+<em class="property">property </em><code class="sig-name descname">forcing_database</code><a class="headerlink" href="#pyschism.forcing.Tides.forcing_database" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.get_active_constituents">
+<code class="sig-name descname">get_active_constituents</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pyschism.forcing.Tides.get_active_constituents" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.get_active_forcing_constituents">
+<code class="sig-name descname">get_active_forcing_constituents</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pyschism.forcing.Tides.get_active_forcing_constituents" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.get_active_potential_constituents">
+<code class="sig-name descname">get_active_potential_constituents</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pyschism.forcing.Tides.get_active_potential_constituents" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.get_elevation">
+<code class="sig-name descname">get_elevation</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">constituent</span></em>, <em class="sig-param"><span class="n">vertices</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyschism.forcing.Tides.get_elevation" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.get_greenwich_factor">
+<code class="sig-name descname">get_greenwich_factor</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">start_date</span></em>, <em class="sig-param"><span class="n">rnday</span></em>, <em class="sig-param"><span class="n">constituent</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyschism.forcing.Tides.get_greenwich_factor" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.get_initial_conditions">
+<code class="sig-name descname">get_initial_conditions</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">constituent</span></em>, <em class="sig-param"><span class="n">vertices</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyschism.forcing.Tides.get_initial_conditions" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.get_lunar_mean_longitude">
+<code class="sig-name descname">get_lunar_mean_longitude</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pyschism.forcing.Tides.get_lunar_mean_longitude" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.get_lunar_node">
+<code class="sig-name descname">get_lunar_node</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pyschism.forcing.Tides.get_lunar_node" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.get_lunar_perigee">
+<code class="sig-name descname">get_lunar_perigee</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pyschism.forcing.Tides.get_lunar_perigee" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.get_nodal_factor">
+<code class="sig-name descname">get_nodal_factor</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">start_date</span></em>, <em class="sig-param"><span class="n">rnday</span></em>, <em class="sig-param"><span class="n">constituent</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyschism.forcing.Tides.get_nodal_factor" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.get_orbital_frequency">
+<code class="sig-name descname">get_orbital_frequency</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">constituent</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyschism.forcing.Tides.get_orbital_frequency" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.get_solar_mean_longitude">
+<code class="sig-name descname">get_solar_mean_longitude</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pyschism.forcing.Tides.get_solar_mean_longitude" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.get_solar_perigee">
+<code class="sig-name descname">get_solar_perigee</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pyschism.forcing.Tides.get_solar_perigee" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.get_tidal_potential_amplitude">
+<code class="sig-name descname">get_tidal_potential_amplitude</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">constituent</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyschism.forcing.Tides.get_tidal_potential_amplitude" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.get_tidal_species_type">
+<code class="sig-name descname">get_tidal_species_type</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">constituent</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyschism.forcing.Tides.get_tidal_species_type" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.get_velocity">
+<code class="sig-name descname">get_velocity</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">constituent</span></em>, <em class="sig-param"><span class="n">vertices</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyschism.forcing.Tides.get_velocity" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.hour_middle">
+<em class="property">property </em><code class="sig-name descname">hour_middle</code><a class="headerlink" href="#pyschism.forcing.Tides.hour_middle" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.major_constituents">
+<em class="property">property </em><code class="sig-name descname">major_constituents</code><a class="headerlink" href="#pyschism.forcing.Tides.major_constituents" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.nbfr">
+<em class="property">property </em><code class="sig-name descname">nbfr</code><a class="headerlink" href="#pyschism.forcing.Tides.nbfr" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.ntip">
+<em class="property">property </em><code class="sig-name descname">ntip</code><a class="headerlink" href="#pyschism.forcing.Tides.ntip" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.orbital_frequencies">
+<em class="property">property </em><code class="sig-name descname">orbital_frequencies</code><a class="headerlink" href="#pyschism.forcing.Tides.orbital_frequencies" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.set_Z0">
+<code class="sig-name descname">set_Z0</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">Z0</span></em>, <em class="sig-param"><span class="o">**</span><span class="n">kwargs</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyschism.forcing.Tides.set_Z0" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.tidal_potential_amplitudes">
+<em class="property">property </em><code class="sig-name descname">tidal_potential_amplitudes</code><a class="headerlink" href="#pyschism.forcing.Tides.tidal_potential_amplitudes" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.tidal_species_type">
+<em class="property">property </em><code class="sig-name descname">tidal_species_type</code><a class="headerlink" href="#pyschism.forcing.Tides.tidal_species_type" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.use_all">
+<code class="sig-name descname">use_all</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">potential</span><span class="o">=</span><span class="default_value">True</span></em>, <em class="sig-param"><span class="n">forcing</span><span class="o">=</span><span class="default_value">True</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyschism.forcing.Tides.use_all" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.use_constituent">
+<code class="sig-name descname">use_constituent</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">constituent</span></em>, <em class="sig-param"><span class="n">potential</span><span class="o">=</span><span class="default_value">True</span></em>, <em class="sig-param"><span class="n">forcing</span><span class="o">=</span><span class="default_value">True</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyschism.forcing.Tides.use_constituent" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.forcing.Tides.use_major">
+<code class="sig-name descname">use_major</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">potential</span><span class="o">=</span><span class="default_value">True</span></em>, <em class="sig-param"><span class="n">forcing</span><span class="o">=</span><span class="default_value">True</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyschism.forcing.Tides.use_major" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="pyschism.forcing.atmosphere.html" class="btn btn-neutral float-right" title="pyschism.forcing.atmosphere package" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="pyschism.param.html" class="btn btn-neutral float-left" title="pyschism.param package" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        
+        &copy; Copyright 2020, Jaime R Calzada-Marrero
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

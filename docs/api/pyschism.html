@@ -1,0 +1,599 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>pyschism &mdash; PySCHISM  documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+
+  
+  
+  
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+        <script src="../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="pyschism.mesh package" href="pyschism.mesh.html" />
+    <link rel="prev" title="Param" href="param.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home" alt="Documentation Home"> PySCHISM
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quickstart guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">API Documentation</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="driver.html">SchismRun</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mesh.html">Mesh</a></li>
+<li class="toctree-l2"><a class="reference internal" href="param.html">Param</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">pyschism</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="pyschism.mesh.html">pyschism.mesh package</a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyschism.param.html">pyschism.param package</a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyschism.forcing.html">pyschism.forcing package</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#module-pyschism">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">PySCHISM</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="index.html">API Documentation</a> &raquo;</li>
+        
+      <li>pyschism</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="../_sources/api/pyschism.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="pyschism">
+<h1>pyschism<a class="headerlink" href="#pyschism" title="Permalink to this headline">¶</a></h1>
+<div class="toctree-wrapper compound">
+<p class="caption"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="pyschism.mesh.html">pyschism.mesh package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="pyschism.mesh.html#subpackages">Subpackages</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="pyschism.mesh.friction.html">pyschism.mesh.friction package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="pyschism.mesh.friction.html#submodules">Submodules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="pyschism.mesh.friction.html#module-pyschism.mesh.friction.drag">pyschism.mesh.friction.drag module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="pyschism.mesh.friction.html#module-pyschism.mesh.friction.fgrid">pyschism.mesh.friction.fgrid module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="pyschism.mesh.friction.html#module-pyschism.mesh.friction.manning">pyschism.mesh.friction.manning module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="pyschism.mesh.friction.html#module-pyschism.mesh.friction.rough">pyschism.mesh.friction.rough module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="pyschism.mesh.friction.html#module-pyschism.mesh.friction">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="pyschism.mesh.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyschism.mesh.html#module-pyschism.mesh.base">pyschism.mesh.base module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyschism.mesh.html#module-pyschism.mesh.grd">pyschism.mesh.grd module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyschism.mesh.html#module-pyschism.mesh.hgrid">pyschism.mesh.hgrid module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyschism.mesh.html#module-pyschism.mesh.mesh">pyschism.mesh.mesh module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyschism.mesh.html#module-pyschism.mesh.sms2dm">pyschism.mesh.sms2dm module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyschism.mesh.html#module-pyschism.mesh.vgrid">pyschism.mesh.vgrid module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyschism.mesh.html#module-pyschism.mesh">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="pyschism.param.html">pyschism.param package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="pyschism.param.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyschism.param.html#module-pyschism.param.core">pyschism.param.core module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyschism.param.html#module-pyschism.param.opt">pyschism.param.opt module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyschism.param.html#module-pyschism.param.param">pyschism.param.param module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyschism.param.html#module-pyschism.param.schout">pyschism.param.schout module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyschism.param.html#module-pyschism.param">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="pyschism.forcing.html">pyschism.forcing package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="pyschism.forcing.html#subpackages">Subpackages</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="pyschism.forcing.atmosphere.html">pyschism.forcing.atmosphere package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="pyschism.forcing.atmosphere.html#submodules">Submodules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="pyschism.forcing.atmosphere.html#module-pyschism.forcing.atmosphere.atmospheric">pyschism.forcing.atmosphere.atmospheric module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="pyschism.forcing.atmosphere.html#module-pyschism.forcing.atmosphere.cfconvention">pyschism.forcing.atmosphere.cfconvention module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="pyschism.forcing.atmosphere.html#module-pyschism.forcing.atmosphere.nws">pyschism.forcing.atmosphere.nws module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="pyschism.forcing.atmosphere.html#module-pyschism.forcing.atmosphere.unstructured">pyschism.forcing.atmosphere.unstructured module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="pyschism.forcing.atmosphere.html#module-pyschism.forcing.atmosphere.wind_time_history">pyschism.forcing.atmosphere.wind_time_history module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="pyschism.forcing.atmosphere.html#module-pyschism.forcing.atmosphere">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="pyschism.forcing.tides.html">pyschism.forcing.tides package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="pyschism.forcing.tides.html#submodules">Submodules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="pyschism.forcing.tides.html#module-pyschism.forcing.tides.tides">pyschism.forcing.tides.api module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="pyschism.forcing.tides.html#module-pyschism.forcing.tides.bctides">pyschism.forcing.tides.bctides module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="pyschism.forcing.tides.html#module-pyschism.forcing.tides.bctypes">pyschism.forcing.tides.bctypes module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="pyschism.forcing.tides.html#module-pyschism.forcing.tides.tpxo">pyschism.forcing.tides.tpxo module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="pyschism.forcing.tides.html#module-pyschism.forcing.tides">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="pyschism.forcing.html#module-pyschism.forcing">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="section" id="module-pyschism">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-pyschism" title="Permalink to this headline">¶</a></h2>
+<dl class="py class">
+<dt id="pyschism.Mesh">
+<em class="property">class </em><code class="sig-prename descclassname">pyschism.</code><code class="sig-name descname">Mesh</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">hgrid</span><span class="p">:</span> <span class="n"><a class="reference internal" href="pyschism.mesh.html#pyschism.mesh.hgrid.Hgrid" title="pyschism.mesh.hgrid.Hgrid">pyschism.mesh.hgrid.Hgrid</a></span></em>, <em class="sig-param"><span class="n">vgrid</span><span class="p">:</span> <span class="n">Optional<span class="p">[</span><a class="reference internal" href="pyschism.mesh.html#pyschism.mesh.vgrid.Vgrid" title="pyschism.mesh.vgrid.Vgrid">pyschism.mesh.vgrid.Vgrid</a><span class="p">]</span></span> <span class="o">=</span> <span class="default_value">None</span></em>, <em class="sig-param"><span class="n">fgrid</span><span class="p">:</span> <span class="n">Optional<span class="p">[</span><a class="reference internal" href="pyschism.mesh.friction.html#pyschism.mesh.friction.fgrid.Fgrid" title="pyschism.mesh.friction.fgrid.Fgrid">pyschism.mesh.friction.fgrid.Fgrid</a><span class="p">]</span></span> <span class="o">=</span> <span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyschism.Mesh" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Class representing a SCHISM computational domain.
+This class combines the horizontal grid (hgrid), vertical grid (vgrid) and
+friction/drag grids (fgrid).</p>
+<dl class="py method">
+<dt id="pyschism.Mesh.add_boundary_condition">
+<code class="sig-name descname">add_boundary_condition</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">forcing</span><span class="p">:</span> <span class="n"><a class="reference internal" href="pyschism.forcing.tides.html#pyschism.forcing.tides.bctypes.BoundaryCondition" title="pyschism.forcing.tides.bctypes.BoundaryCondition">pyschism.forcing.tides.bctypes.BoundaryCondition</a></span></em>, <em class="sig-param"><span class="n">id</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyschism.Mesh.add_boundary_condition" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.Mesh.add_sflux">
+<code class="sig-name descname">add_sflux</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">sflux</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyschism.Mesh.add_sflux" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.Mesh.crs">
+<em class="property">property </em><code class="sig-name descname">crs</code><a class="headerlink" href="#pyschism.Mesh.crs" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.Mesh.fgrid">
+<em class="property">property </em><code class="sig-name descname">fgrid</code><a class="headerlink" href="#pyschism.Mesh.fgrid" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.Mesh.get_active_forcing_constituents">
+<code class="sig-name descname">get_active_forcing_constituents</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pyschism.Mesh.get_active_forcing_constituents" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.Mesh.get_active_potential_constituents">
+<code class="sig-name descname">get_active_potential_constituents</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pyschism.Mesh.get_active_potential_constituents" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.Mesh.hgrid">
+<em class="property">property </em><code class="sig-name descname">hgrid</code><a class="headerlink" href="#pyschism.Mesh.hgrid" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.Mesh.ics">
+<em class="property">property </em><code class="sig-name descname">ics</code><a class="headerlink" href="#pyschism.Mesh.ics" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.Mesh.interior_boundaries">
+<em class="property">property </em><code class="sig-name descname">interior_boundaries</code><a class="headerlink" href="#pyschism.Mesh.interior_boundaries" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.Mesh.land_boundaries">
+<em class="property">property </em><code class="sig-name descname">land_boundaries</code><a class="headerlink" href="#pyschism.Mesh.land_boundaries" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.Mesh.make_plot">
+<code class="sig-name descname">make_plot</code><span class="sig-paren">(</span><em class="sig-param"><span class="o">**</span><span class="n">kwargs</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyschism.Mesh.make_plot" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.Mesh.open">
+<em class="property">classmethod </em><code class="sig-name descname">open</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">hgrid</span></em>, <em class="sig-param"><span class="n">vgrid</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">fgrid</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">crs</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyschism.Mesh.open" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.Mesh.open_boundaries">
+<em class="property">property </em><code class="sig-name descname">open_boundaries</code><a class="headerlink" href="#pyschism.Mesh.open_boundaries" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.Mesh.set_friction">
+<code class="sig-name descname">set_friction</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">ftype</span></em>, <em class="sig-param"><span class="n">value</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyschism.Mesh.set_friction" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.Mesh.sfea0">
+<em class="property">property </em><code class="sig-name descname">sfea0</code><a class="headerlink" href="#pyschism.Mesh.sfea0" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.Mesh.slam0">
+<em class="property">property </em><code class="sig-name descname">slam0</code><a class="headerlink" href="#pyschism.Mesh.slam0" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.Mesh.vgrid">
+<em class="property">property </em><code class="sig-name descname">vgrid</code><a class="headerlink" href="#pyschism.Mesh.vgrid" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt id="pyschism.Param">
+<em class="property">class </em><code class="sig-prename descclassname">pyschism.</code><code class="sig-name descname">Param</code><span class="sig-paren">(</span><em class="sig-param">dt: Union[float, datetime.timedelta], rnday: Union[float, datetime.timedelta], ihfskip: int = None, dramp: Union[float, datetime.timedelta] = None, start_date: datetime.datetime = None, ibc: Union[pyschism.param.core.Stratification, int, str] = &lt;Stratification.BAROTROPIC: 1&gt;, drampbc: Union[float, datetime.timedelta] = None, stations: pyschism.stations.Stations = None, nspool: Union[int, datetime.timedelta] = None, **outputs</em><span class="sig-paren">)</span><a class="headerlink" href="#pyschism.Param" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<dl class="py method">
+<dt id="pyschism.Param.core">
+<em class="property">property </em><code class="sig-name descname">core</code><a class="headerlink" href="#pyschism.Param.core" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.Param.opt">
+<em class="property">property </em><code class="sig-name descname">opt</code><a class="headerlink" href="#pyschism.Param.opt" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.Param.schout">
+<em class="property">property </em><code class="sig-name descname">schout</code><a class="headerlink" href="#pyschism.Param.schout" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.Param.stations">
+<em class="property">property </em><code class="sig-name descname">stations</code><a class="headerlink" href="#pyschism.Param.stations" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.Param.write">
+<code class="sig-name descname">write</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">path</span></em>, <em class="sig-param"><span class="n">overwrite</span><span class="o">=</span><span class="default_value">False</span></em>, <em class="sig-param"><span class="n">use_template</span><span class="o">=</span><span class="default_value">False</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyschism.Param.write" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt id="pyschism.SchismRun">
+<em class="property">class </em><code class="sig-prename descclassname">pyschism.</code><code class="sig-name descname">SchismRun</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">mesh</span><span class="p">:</span> <span class="n"><a class="reference internal" href="pyschism.mesh.html#pyschism.mesh.mesh.Mesh" title="pyschism.mesh.mesh.Mesh">pyschism.mesh.mesh.Mesh</a></span></em>, <em class="sig-param"><span class="n">param</span><span class="p">:</span> <span class="n"><a class="reference internal" href="pyschism.param.html#pyschism.param.param.Param" title="pyschism.param.param.Param">pyschism.param.param.Param</a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyschism.SchismRun" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Main driver class used to generate SCHISM input files</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>mesh</strong> – <a class="reference internal" href="#pyschism.Mesh" title="pyschism.Mesh"><code class="xref py py-class docutils literal notranslate"><span class="pre">pyschism.Mesh</span></code></a></p></li>
+<li><p><strong>param</strong> – <a class="reference internal" href="#pyschism.Param" title="pyschism.Param"><code class="xref py py-class docutils literal notranslate"><span class="pre">pyschism.Param</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt id="pyschism.SchismRun.write">
+<code class="sig-name descname">write</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">output_directory</span></em>, <em class="sig-param"><span class="n">overwrite</span><span class="o">=</span><span class="default_value">False</span></em>, <em class="sig-param"><span class="n">hgrid</span><span class="o">=</span><span class="default_value">True</span></em>, <em class="sig-param"><span class="n">vgrid</span><span class="o">=</span><span class="default_value">True</span></em>, <em class="sig-param"><span class="n">fgrid</span><span class="o">=</span><span class="default_value">True</span></em>, <em class="sig-param"><span class="n">param</span><span class="o">=</span><span class="default_value">True</span></em>, <em class="sig-param"><span class="n">bctides</span><span class="o">=</span><span class="default_value">True</span></em>, <em class="sig-param"><span class="n">stations</span><span class="o">=</span><span class="default_value">True</span></em>, <em class="sig-param"><span class="n">driver_file</span><span class="o">=</span><span class="default_value">True</span></em>, <em class="sig-param"><span class="n">job_monitor_file</span><span class="o">=</span><span class="default_value">True</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyschism.SchismRun.write" title="Permalink to this definition">¶</a></dt>
+<dd><p>Writes to disk the full set of input files necessary to run SCHISM.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt id="pyschism.Stations">
+<em class="property">class </em><code class="sig-prename descclassname">pyschism.</code><code class="sig-name descname">Stations</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">nspool_sta</span><span class="p">:</span> <span class="n">Union<span class="p">[</span>int<span class="p">, </span>datetime.timedelta<span class="p">]</span></span></em>, <em class="sig-param"><span class="n">crs</span><span class="p">:</span> <span class="n">Union<span class="p">[</span>str<span class="p">, </span>pyproj.crs.crs.CRS<span class="p">]</span></span> <span class="o">=</span> <span class="default_value">None</span></em>, <em class="sig-param"><span class="n">elev</span><span class="p">:</span> <span class="n">bool</span> <span class="o">=</span> <span class="default_value">False</span></em>, <em class="sig-param"><span class="n">air_pressure</span><span class="p">:</span> <span class="n">bool</span> <span class="o">=</span> <span class="default_value">False</span></em>, <em class="sig-param"><span class="n">windx</span><span class="p">:</span> <span class="n">bool</span> <span class="o">=</span> <span class="default_value">False</span></em>, <em class="sig-param"><span class="n">windy</span><span class="p">:</span> <span class="n">bool</span> <span class="o">=</span> <span class="default_value">False</span></em>, <em class="sig-param"><span class="n">T</span><span class="p">:</span> <span class="n">bool</span> <span class="o">=</span> <span class="default_value">False</span></em>, <em class="sig-param"><span class="n">S</span><span class="p">:</span> <span class="n">bool</span> <span class="o">=</span> <span class="default_value">False</span></em>, <em class="sig-param"><span class="n">u</span><span class="p">:</span> <span class="n">bool</span> <span class="o">=</span> <span class="default_value">False</span></em>, <em class="sig-param"><span class="n">v</span><span class="p">:</span> <span class="n">bool</span> <span class="o">=</span> <span class="default_value">False</span></em>, <em class="sig-param"><span class="n">w</span><span class="p">:</span> <span class="n">bool</span> <span class="o">=</span> <span class="default_value">False</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyschism.Stations" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Acts as container for requesting point outputs to SCHISM</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>nspool_sta</strong> – If type is &lt;int&gt;, this refers to output skip, else use
+a timedelta object.</p></li>
+<li><p><strong>crs</strong> – Coordinate reference system for the container. All points
+added using the add_station() method should be in this CRS.</p></li>
+<li><p><strong>remaining arguments activate the outputs for the run.</strong> (<em>The</em>) – </p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt id="pyschism.Stations.S">
+<em class="property">property </em><code class="sig-name descname">S</code><a class="headerlink" href="#pyschism.Stations.S" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.Stations.T">
+<em class="property">property </em><code class="sig-name descname">T</code><a class="headerlink" href="#pyschism.Stations.T" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.Stations.add_station">
+<code class="sig-name descname">add_station</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">x</span><span class="p">:</span> <span class="n">float</span></em>, <em class="sig-param"><span class="n">y</span><span class="p">:</span> <span class="n">float</span></em>, <em class="sig-param"><span class="n">z</span><span class="p">:</span> <span class="n">float</span> <span class="o">=</span> <span class="default_value">0</span></em>, <em class="sig-param"><span class="n">comment</span><span class="p">:</span> <span class="n">str</span> <span class="o">=</span> <span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyschism.Stations.add_station" title="Permalink to this definition">¶</a></dt>
+<dd><p>Adds a station coordinates to the container.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>x</strong> – x-coordinate</p></li>
+<li><p><strong>y</strong> – y-coordinate</p></li>
+<li><p><strong>z</strong> – z-coordinate</p></li>
+<li><p><strong>comment</strong> (<em>optional</em>) – Can be used to store the COOPS id, useful
+during post-processing for validation.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.Stations.air_pressure">
+<em class="property">property </em><code class="sig-name descname">air_pressure</code><a class="headerlink" href="#pyschism.Stations.air_pressure" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.Stations.clip">
+<code class="sig-name descname">clip</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">geometry</span><span class="p">:</span> <span class="n">Union<span class="p">[</span>shapely.geometry.polygon.Polygon<span class="p">, </span>shapely.geometry.multipolygon.MultiPolygon<span class="p">]</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyschism.Stations.clip" title="Permalink to this definition">¶</a></dt>
+<dd><p>Eliminates any stations not contained within the given geometry.</p>
+<p>It is assumed that the input geometry matches the CRS of the
+Stations instance</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>geometry</strong> – Polygon or MultiPolygon used for clipping the
+stations. Normally this comes from Hgrid.get_multipolygon()</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.Stations.crs">
+<em class="property">property </em><code class="sig-name descname">crs</code><a class="headerlink" href="#pyschism.Stations.crs" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.Stations.elev">
+<em class="property">property </em><code class="sig-name descname">elev</code><a class="headerlink" href="#pyschism.Stations.elev" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.Stations.from_file">
+<em class="property">static </em><code class="sig-name descname">from_file</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">file</span><span class="p">:</span> <span class="n">Union<span class="p">[</span>str<span class="p">, </span>pathlib.Path<span class="p">]</span></span></em>, <em class="sig-param"><span class="n">nspool_sta</span><span class="p">:</span> <span class="n">Union<span class="p">[</span>int<span class="p">, </span>datetime.timedelta<span class="p">]</span></span></em>, <em class="sig-param"><span class="n">crs</span><span class="p">:</span> <span class="n">Union<span class="p">[</span>str<span class="p">, </span>pyproj.crs.crs.CRS<span class="p">]</span></span> <span class="o">=</span> <span class="default_value">None</span></em>, <em class="sig-param"><span class="o">**</span><span class="n">kwargs</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyschism.Stations.from_file" title="Permalink to this definition">¶</a></dt>
+<dd><p>Import station.in file as a Stations instance.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>file</strong> – Path to the input.in file to import</p></li>
+<li><p><strong>nspool_sta</strong> – Output frequency request</p></li>
+<li><p><strong>crs</strong> (<em>optional</em>) – Specify CRS of station.in. If no crs is given,
+the program assumes that the file is in the same CRS as the
+Mesh.</p></li>
+<li><p><strong>**kwargs</strong> – state of each output variable</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>instance of Stations</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.Stations.get_active_vars">
+<code class="sig-name descname">get_active_vars</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pyschism.Stations.get_active_vars" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.Stations.nspool_sta">
+<em class="property">property </em><code class="sig-name descname">nspool_sta</code><a class="headerlink" href="#pyschism.Stations.nspool_sta" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.Stations.state">
+<em class="property">property </em><code class="sig-name descname">state</code><a class="headerlink" href="#pyschism.Stations.state" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.Stations.stations">
+<em class="property">property </em><code class="sig-name descname">stations</code><a class="headerlink" href="#pyschism.Stations.stations" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.Stations.transform_to">
+<code class="sig-name descname">transform_to</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">dst_crs</span><span class="p">:</span> <span class="n">Union<span class="p">[</span>str<span class="p">, </span>pyproj.crs.crs.CRS<span class="p">]</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyschism.Stations.transform_to" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.Stations.u">
+<em class="property">property </em><code class="sig-name descname">u</code><a class="headerlink" href="#pyschism.Stations.u" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.Stations.v">
+<em class="property">property </em><code class="sig-name descname">v</code><a class="headerlink" href="#pyschism.Stations.v" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.Stations.w">
+<em class="property">property </em><code class="sig-name descname">w</code><a class="headerlink" href="#pyschism.Stations.w" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.Stations.windx">
+<em class="property">property </em><code class="sig-name descname">windx</code><a class="headerlink" href="#pyschism.Stations.windx" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.Stations.windy">
+<em class="property">property </em><code class="sig-name descname">windy</code><a class="headerlink" href="#pyschism.Stations.windy" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt id="pyschism.Stations.write">
+<code class="sig-name descname">write</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">path</span><span class="p">:</span> <span class="n">Union<span class="p">[</span>str<span class="p">, </span>pathlib.Path<span class="p">]</span></span></em>, <em class="sig-param"><span class="n">overwrite</span><span class="p">:</span> <span class="n">bool</span> <span class="o">=</span> <span class="default_value">False</span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyschism.Stations.write" title="Permalink to this definition">¶</a></dt>
+<dd><p>Writes the SCHISM station.in file to disk.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>path</strong> – Path to output on disk (need to include filename).</p></li>
+<li><p><strong>overwrite</strong> (<em>optional</em>) – Allow/disallow file overwrite.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="pyschism.mesh.html" class="btn btn-neutral float-right" title="pyschism.mesh package" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="param.html" class="btn btn-neutral float-left" title="Param" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        
+        &copy; Copyright 2020, Jaime R Calzada-Marrero
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>
