@@ -8,11 +8,3 @@ pyschism
    pyschism.mesh
    pyschism.param
    pyschism.forcing
-
-Module contents
----------------
-
-.. automodule:: pyschism
-   :members:
-   :undoc-members:
-   :show-inheritance:
