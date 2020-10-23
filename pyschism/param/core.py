@@ -34,6 +34,7 @@ class CORE:
                 self.__core[key] = len(value)*[0]
             else:
                 self.__core[key] = None
+        self.ipre = 0
 
     def __getitem__(self, key):
         return self.__core[key]

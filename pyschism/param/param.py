@@ -27,6 +27,11 @@ class Param:
             nspool: Union[int, timedelta] = None,
             **outputs
     ):
+        """Main interface for Param class
+
+
+
+        """
         # -----------------
         # initialize core |
         # -----------------

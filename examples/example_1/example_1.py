@@ -1,7 +1,8 @@
 #! /usr/bin/env python
 import pathlib
-from datetime import datetime, timezone, timedelta
-from pyschism import Param, Mesh, forcing, SchismRun, Stations
+from datetime import datetime, timedelta, timezone
+from pyschism import Param, Mesh, SchismRun, Stations, forcing
+
 
 SIMPLE_SLURM_DRIVER = """#!/bin/bash --login
 #SBATCH -D .
@@ -66,9 +67,10 @@ if __name__ == '__main__':
     # If using a forcing that requires a start date is invoked, and no start
     # date is provided, the driver will throw an exception.
     # tzinfo is optional, UTC assumed if not provided
-    dramp = (1/3) * rnday
-    start_date = datetime(2017, 9, 18, 12, 00,
-                          tzinfo=timezone(timedelta(hours=-4))) - dramp
+    dramp = 0.1 * rnday
+    start_date = datetime(2017, 9, 18, 4, 0,
+                          tzinfo=timezone(timedelta(hours=-4))
+                          ) - dramp
 
     # Now we add station outputs
     stations = Stations.from_file(PARENT / 'station.in', timedelta(minutes=6.),

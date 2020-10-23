@@ -1,260 +1,120 @@
 #! /usr/bin/env python
-from .cmd import plotting
+import argparse
+from enum import Enum
+import pathlib
+
+from pyschism.cmd.forecastd import Forecastd
+from pyschism.cmd.viewerd import Viewerd
+from pyschism.cmd.plotting import CliOutputPlot
 
 
-def plot():
-    plotting.main()
-
-    
-
-
-
-# import pathlib
-# import argparse
-# import json
-# from functools import lru_cache
-# import os
-# import logging
-# from pyschism import forcing, Mesh, Param
-# from pyschism.driver.driver import SchismRun
+class Dispatch(Enum):
+    FORECASTD_DAEMON = Forecastd
+    PLOTTING = CliOutputPlot
+    VIEWER = Viewerd
 
 
-# class PySchism:
-
-#     def __init__(self, args):
-#         self.args = args
-#         self._init_logger()
-#         self._init_forcings()
-
-#     def main(self):
-#         return self.driver.run()
-
-#     @property
-#     @lru_cache(maxsize=None)
-#     def driver(self):
-#         return SchismRun(self.mesh, self.param)
-
-#     @property
-#     @lru_cache(maxsize=None)
-#     def mesh(self):
-#         return Mesh.open(
-#             self.hgrid,
-#             self.vgrid,
-#             self.fgrid,
-#             crs=self.mesh_crs
-#             )
-
-#     @property
-#     @lru_cache(maxsize=None)
-#     def hgrid(self):
-#         return pathlib.Path(
-#             os.path.expandvars(self.mesh_opts["hgrid"])).resolve()
-
-#     @property
-#     @lru_cache(maxsize=None)
-#     def vgrid(self):
-#         vgrid = self.mesh_opts.get("vgrid", None)
-#         if vgrid is not None:
-#             vgrid = pathlib.Path(os.path.expandvars(vgrid)).resolve()
-#         return vgrid
-
-#     @property
-#     def fgrid(self):
-#         fgrid = self.mesh_opts.get("fgrid", None)
-#         if fgrid is not None:
-#             fgrid = pathlib.Path(os.path.expandvars(fgrid)).resolve()
-#         return fgrid
-
-#     @property
-#     @lru_cache(maxsize=None)
-#     def mesh_crs(self):
-#         crs = self.mesh_opts.get('crs', None)
-#         if crs is None:
-#             msg = "Must specify 'crs' on 'mesh' section of the template."
-#             raise AttributeError(msg)
-#         return crs
-
-#     @property
-#     @lru_cache(maxsize=None)
-#     def config(self):
-#         src = pathlib.Path(self.args.config_file).resolve()
-#         with open(src, 'r') as json_file:
-#             config = json.load(json_file)
-#         return config
-
-#     @property
-#     @lru_cache(maxsize=None)
-#     def mesh_opts(self):
-#         return self.config["mesh"]
-
-#     @property
-#     def meta(self):
-#         return self.config.get("meta", {})
-
-#     @property
-#     def overwrite(self):
-#         return self.meta.get("overwrite", False)
-
-#     @property
-#     def project_name(self):
-#         return self.meta.get("project_name", False)
-
-#     @property
-#     @lru_cache(maxsize=None)
-#     def output_directory(self):
-#         outdir = self.meta.get("output_directory", "'.'")
-#         outdir = pathlib.Path(os.path.expandvars(outdir)).resolve()
-#         outdir.mkdir(parents=True, exist_ok=self.overwrite)
-#         return outdir
-
-#     @property
-#     def server(self):
-#         return self.config.get("server", False)
-
-#     @property
-#     @lru_cache(maxsize=None)
-#     def param(self):
-#         param = Param()
-
-#         return param
-
-#     @property
-#     def hostname(self):
-#         if self.server:
-#             return self.server.get("hostname", "localhost")
-#         return False
-
-#     def _init_forcings(self):
-#         forcings = self.config['forcing'].get("forcing", {})
-#         self._init_elev_forcing(forcings)
-
-#     def _init_elev_forcing(self, forcings):
-#         if "tidal_constituents" in forcings:
-#             tides = forcing.Tides()
-#             if "all" in forcings["tidal_constituents"]:
-#                 tides.use_all(**forcings["tidal_constituents"]["all"])
-#             elif "major" in forcings["tidal_constituents"]:
-#                 tides.use_major(
-#                     tides.use_major(**forcings["tidal_constituents"]["major"]))
-#             else:
-#                 for const, kwargs in forcings["tidal_constituents"].items():
-#                     tides.use_constituent(
-#                         const,
-#                         potential=kwargs.get("potential"),
-#                         forcing=kwargs.get("forcing"),
-#                         )
-#             for data in forcings["tidal_constituents"].values():
-#                 bnd_ids = data.get("boundary_id", [])
-#                 if len(bnd_ids) == 0:
-#                     self.mesh.add_forcing(tides)
-#                 else:
-#                     for bnd_id in bnd_ids:
-#                         self.mesh.add_forcing(tides, id=bnd_id)
-
-#     def _init_logger(self):
-#         # log_level = {
-#         #     "info": logging.INFO,
-#         #     "debug": logging.DEBUG,
-#         #     "warning": logging.WARNING,
-#         # }[self.config["meta"].get("log_level", "info").lower()]
-#         # self.logger = logging.getLogger(__name__)
-#         # self.logger.setLevel(log_level)
-#         # from geomesh import logger
-#         # logger.setLevel(log_level)
-#         logging.basicConfig(level={
-#             "info": logging.INFO,
-#             "debug": logging.DEBUG,
-#             "warning": logging.WARNING,
-#         }[self.config["meta"].get("log_level", "info").lower()])
-#         logging.getLogger('matplotlib').setLevel(logging.WARNING)
-#         logging.getLogger('fiona').setLevel(logging.WARNING)
-#         logging.getLogger('rasterio').setLevel(logging.WARNING)
-#         self.logger = logging.getLogger(__name__)
+class Env(Enum):
+    FORECASTD_DAEMON = 'forecastd'
+    PLOTTING = 'plot'
+    VIEWER = 'viewerd'
 
 
-# def config_template():
-#     config = dict()
-#     config['meta'] = {
-#         "_comments": "<> denotes optional parameters.",
-#         "project_name": "<can be anything>",
-#         "output_directory": "can contain environment variables",
-#         "overwrite": "<bool>",
-#         "log_level": "<warning | info | debug>",
-#         "binary": "pschism_TVD-VL"
-#         }
+def add_forecastd(subparsers):
+    forecastd = subparsers.add_parser('forecastd')
+    actions = forecastd.add_subparsers(dest='action')
+    actions.required = True
+    actions.add_parser('start')
+    actions.add_parser('stop')
+    actions.add_parser('restart')
 
-#     config['mesh'] = {
-#         "hgrid": "Path to hgrid.",
-#         "vgrid": "<Path to vgrid>",
-#         "friction": {
-#             "ftype": "manning | drag | rough",
-#             "fgrid": "path to fgrid | float (constant)",
-#         },
-
-#     }
-
-#     config["forcing"] = {
-#             "tidal_constituents": {
-#                 "<constituent | major | all >": {
-#                     "boundary_id (optional)": [
-#                         "list of boundary ids on which to apply forcing."
-#                     ],
-#                     "potential (required)": "<bool, use as potential>",
-#                     "forcing (required)": "<bool, use as boundary forcing>"
-#                 }
-#             },
-#             "winds": {
-#                 "best_track": "<ATCF best track ID>"
-#                 },
-#             "waves": {
-#                 "properties": "<To be discussed. Disabled for now.>"
-#             },
-#             "temperature": {
-#                 "properties": "<To be discussed. Disabled for now.>"
-#             },
-#             "salinity": {
-#                 "properties": "<To be discussed. Disabled for now.>"
-#             },
-#             "tracers": {
-#                 "properties": "<To be discussed. Disabled for now.>"
-#             }
-#         }
-#     config["start_date"] = r'%Y-%m-%dT%H:%M'
-#     config["utc_start"] = '<float, defaults to 0.0>'
-#     config["run_days"] = "float"
-#     config["timestep"] = "float"
-#     config["spinup_days"] = "float"
-#     config["date_formatting"] = r'<%Y-%m-%dT%H:%M>'
-#     config["outputs"] = {
-#         "nspool": "int | float (seconds)",
-#         "ihfskip": "<int>",
-#         "variables": ["names of requested outputs"]
-
-#     }
-
-#     config['server'] = {
-#         "hostname": "localhost",
-#         "port": 22,
-#     }
-#     return config
+    add = actions.add_parser('add')
+    add.add_argument('hgrid')
+    add.add_argument('--vgrid')
+    add.add_argument('--fgrid')
+    add.add_argument(
+        "-c", "--constituents",
+        action='append',
+        choices=["K1", "O1", "P1", "Q1", "MM", "Mf", "M4", "MN4", "MS4",
+                 "2N2", "S1", "all", "major"],
+        dest='constituents',
+        help="Tidal constituent to be forced in the model. Pass "
+             "--use-constituent='all' to use all available constituents "
+             "(K1, O1, P1, Q1, MM, Mf, M4, MN4, MS4, 2N2, S1) "
+             "or use --constituents='major'. "
+             "For a custom list of forcing constituents, pass -c= for each "
+             "individual constituent to use (case-insensitive). "
+             "Use None for no tidal forcing. Defaults to 'all'."
+    )
+    add.add_argument("-o", "--output-directory", dest='outdir')
+    add.add_argument("--air", "--air-1", dest='air_1')
+    add.add_argument("--prc", "--prc-1", dest='prc_1')
+    add.add_argument("--rad", "--rad-1", dest='rad_1')
+    add.add_argument("--air-2")
+    add.add_argument("--prc-2")
+    add.add_argument("--rad-2")
 
 
-# def parse_args():
-#     parser = argparse.ArgumentParser()
-#     parser.add_argument(
-#         "config_file",
-#         help="Path to configuration file.",
-#         nargs='?')
-#     return parser.parse_args()
+def add_viewerd(subparsers):
+    viewerd = subparsers.add_parser('viewerd')
+    actions = viewerd.add_subparsers(dest='action')
+    actions.required = True
+    start = actions.add_parser('start')
+    start.add_argument('--deploy', action='store_true')
+    actions.add_parser('stop')
+    actions.add_parser('restart')
 
 
-# def main():
-#     args = parse_args()
-#     if args.config_file is None:
-#         print(json.dumps(config_template(), indent=4))
-#         exit()
-#     exit(PySchism(args).main())
+def add_autodocd(subparsers):
+    autodocd = subparsers.add_parser('autodocd')
+    actions = autodocd.add_subparsers(dest='action')
+    actions.required = True
+    actions.add_parser('start')
+    actions.add_parser('stop')
+    actions.add_parser('restart')
 
 
-# if __name__ == '__main__':
-#     main()
+def add_plot(subparsers):
+    plot = subparsers.add_parser('plot')
+    # output directory pointer
+    plot.add_argument(
+        'resource', type=pathlib.Path,
+        help='Filename or directory containing SCHISM outputs.')
+    # which variable to plot
+    plot.add_argument('variable', help='Name of variable to plot.')
+    # Do you want to plot a surface or stations?
+    output_type = plot.add_subparsers(dest='output_type')
+    output_type.required = True
+    # surface plot options
+    surface_plot = output_type.add_parser('surface', help="Plot SCHISM surface"
+                                          " outputs.")
+    surface_plot.add_argument("--start")
+    # station plot options
+    stations = output_type.add_parser('stations', help="Plot SCHISM stations "
+                                      "outputs.")
+    stations.add_argument('-s', '--station', nargs='*', type=int,
+                          help='Station index in station.in to include in '
+                          'plot.')
+
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(dest='mode')
+    add_forecastd(subparsers)
+    add_plot(subparsers)
+    # add_viewerd(subparsers)
+    # add_autodocd(subparsers)
+    return parser.parse_args()
+
+
+def main():
+    args = parse_args()
+    Dispatch[Env(args.mode).name].value(args)
+
+
+def init():
+    if __name__ == '__main__':
+        main()
+
+
+init()
