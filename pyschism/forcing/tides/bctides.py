@@ -1,9 +1,10 @@
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import timedelta, timezone
 from enum import Enum
 
 from .tides import Tides
-from ..mesh.mesh import Mesh
+from ...param.param import Param
+from ...mesh import Mesh
 
 
 class NullWritter:
@@ -108,21 +109,19 @@ class itrtypeWritter(Enum):
 
 class Bctides:
 
-    def __init__(self, mesh: Mesh, start_date: datetime = None,
-                 end_date: datetime = None, cutoff_depth: float = 50.):
-
-        self.__mesh = mesh
-        self.__start_date = start_date
-        self.__end_date = end_date
-        self.cutoff_depth = cutoff_depth
+    def __init__(self, mesh: Mesh, param: Param, cutoff_depth: float = 50.):
 
         # check if start_date was given in case tidal forcings are requested.
         # Note: This is done twice so that this class can be used independently
         # from Param to just write bctides files
-        afc = self.mesh.get_active_forcing_constituents()
-        if len(afc) > 0 and start_date is None:
+        afc = mesh.get_active_forcing_constituents()
+        if len(afc) > 0 and param.opt.start_date is None:
             raise Exception('start_date argument is required for simulating '
                             'tidal forcing.')
+
+        self.__mesh = mesh
+        self.__param = param
+        self.cutoff_depth = cutoff_depth
 
         # PySCHISM allows the user to input the tidal potentials and forcings
         # individually at each boundary, however, SCHISM supports only a global
@@ -148,8 +147,6 @@ class Bctides:
 
         # init the main tidal forcing object
         tides = Tides()
-        tides.start_date = self.start_date
-        tides.end_date = self.end_date
         for const in tides.constituents:
             tides.use_constituent(
                     const,
@@ -165,7 +162,8 @@ class Bctides:
             f"{self.ntip} {self.cutoff_depth}\n"
         if self.ntip > 0:
             for constituent in self.active_potential_constituents:
-                forcing = self.tidal_forcing(constituent)
+                forcing = self.tidal_forcing(
+                    self.start_date, self.rnday, constituent)
                 f += f'{constituent} \n' \
                      f'{forcing[0]:G} ' \
                      f"{forcing[1]:G} " \
@@ -174,7 +172,8 @@ class Bctides:
                      f'{forcing[4]:G}\n'
         f += f'{self.tidal_forcing.nbfr:d}\n'
         for constituent in self.active_forcing_constituents:
-            forcing = self.tidal_forcing(constituent)
+            forcing = self.tidal_forcing(
+                self.start_date, self.rnday, constituent)
             f += f'{constituent} \n' \
                  f"{forcing[2]:G} " \
                  f'{forcing[3]:G} ' \
@@ -201,11 +200,11 @@ class Bctides:
 
     @property
     def start_date(self):
-        return self.__start_date
+        return self.__param.opt.start_date
 
     @property
-    def end_date(self):
-        return self.__end_date
+    def rnday(self):
+        return self.__param.core.rnday
 
     @property
     def active_potential_constituents(self):
@@ -222,3 +221,11 @@ class Bctides:
     @property
     def tidal_forcing(self):
         return self.__tidal_forcing
+
+    @property
+    def start_date_utc(self):
+        if self.start_date.tzinfo is not None and \
+                self.start_date.tzinfo.utcoffset(self.start_date) is not None:
+            return self.__start_date.astimezone(timezone(timedelta(0)))
+        else:
+            return self.__start_date
