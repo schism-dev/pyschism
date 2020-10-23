@@ -1,7 +1,7 @@
 from collections import OrderedDict
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from enum import Enum
-from typing import Union
+from typing import Union, Callable
 
 import numpy as np  # type: ignore[import]
 
@@ -9,24 +9,50 @@ from . import bctypes  # type: ignore[import]
 from .tpxo import TPXO  # type: ignore[import]
 
 
+class TidalDatabase(Enum):
+    TPXO = TPXO
+
+
 class StrTidalDatabase(Enum):
     TPXO = 'TPXO'
 
+    @classmethod
+    def _missing_(self, name):
+        raise ValueError(f"{name} is not a valid tidal database.")
 
-class TidalDatabase(Enum):
-    TPXO = TPXO
+
+class TidalConstituents(Enum):
+    M2 = "M2"
+    # etc...
+
+    @classmethod
+    def _missing_(self, name):
+        raise ValueError(f"{name} is not a valid tidal constituent.")
 
 
 class Tides(bctypes.BoundaryCondition):
 
     def __init__(
             self,
-            start_date: Union[None, datetime] = None,
-            end_date: Union[None, datetime] = None,
             elevation: bool = True,
-            velocity: bool = True,
+            velocity: bool = False,
             database: Union[str, TidalDatabase] = TidalDatabase.TPXO,
     ):
+        """Main class for requesting tidal boundary forcing for a SCHISM run.
+
+        The user should add tidal requests to this class via it's methods.
+
+        Args:
+            elevation (optional): Apply elevation forcing to boundary, defaults
+                to True.
+            velocity (optional): Apply velocity forcing to boundary (currently
+                disabled), defaults to False.
+            database (optional): Tidal database to use in order to obtain
+                boundary initial conditions, defaults to TidalDatabase.TPXO
+        """
+        if velocity:
+            raise NotImplementedError('Boundary velocities are temporarily '
+                                      'disabled.')
         self.forcing_database = database
         super().__init__(
                 iettype=bctypes.InitialElevationType.TIDAL
@@ -34,11 +60,16 @@ class Tides(bctypes.BoundaryCondition):
                 ifltype=bctypes.InitialFlowType.TIDAL
                 if velocity is True else bctypes.InitialFlowType.NONE)
         self._active_constituents: OrderedDict = OrderedDict()
-        self.__start_date = start_date
-        self.__end_date = end_date
 
-    def __call__(self, constituent):
-        return self.get_tidal_constituent(constituent)
+    def __call__(self, start_date: datetime, rnday: Union[int, datetime],
+                 constituent: Union[str, TidalConstituents]):
+        """Returns the tidal characteristic values for a given time period.
+        """
+        return (self.get_tidal_species_type(constituent),
+                self.get_tidal_potential_amplitude(constituent),  # TPK
+                self.get_orbital_frequency(constituent),  # FF*
+                self.get_nodal_factor(start_date, rnday, constituent),  # Amig*
+                self.get_greenwich_factor(start_date, rnday, constituent))  # FACE*
 
     def __iter__(self):
         for constituent in self.active_constituents:
@@ -105,13 +136,6 @@ class Tides(bctypes.BoundaryCondition):
     def get_orbital_frequency(self, constituent):
         return self.orbital_frequencies[constituent]
 
-    def get_tidal_constituent(self, constituent):
-        return (self.get_tidal_species_type(constituent),
-                self.get_tidal_potential_amplitude(constituent),  # TPK
-                self.get_orbital_frequency(constituent),  # FF*
-                self.get_nodal_factor(constituent),  # Amig*
-                self.get_greenwich_factor(constituent))  # FACE*
-
     def get_initial_conditions(self, constituent, vertices):
         return self.initial_conditions(constituent, vertices)
 
@@ -122,7 +146,28 @@ class Tides(bctypes.BoundaryCondition):
             }
         self.Z0 = Z0
 
-    def get_nodal_factor(self, constituent):
+    def _manage_dates(f: Callable):
+        def decorator(self, start_date, rnday, constituent):
+            val = f(self, start_date, rnday, constituent)
+            del(self.start_date_utc)
+            del(self.end_date_utc)
+            return val
+        return decorator
+
+    @_manage_dates
+    def get_nodal_factor(self, start_date: datetime,
+                         rnday: Union[float, timedelta],
+                         constituent: str):
+        if start_date.tzinfo is not None and \
+                start_date.tzinfo.utcoffset(start_date) is not None:
+            self.start_date_utc = start_date.astimezone(timezone(timedelta(0)))
+        else:
+            self.start_date_utc = start_date
+
+        if not isinstance(rnday, timedelta):
+            rnday = timedelta(days=rnday)
+
+        self.end_date_utc = self.start_date_utc + rnday
         if constituent == "M2":
             return self.EQ78
         elif constituent == "S2":
@@ -203,13 +248,26 @@ class Tides(bctypes.BoundaryCondition):
             msg = f'Unrecognized constituent {constituent}'
             raise TypeError(msg)
 
-    def _normalize_to_360(f):
-        def decorator(self, constituent):
-            return f(self, constituent) % 360.
+    def _normalize_to_360(f: Callable):
+        def decorator(self, start_date, rnday, constituent):
+            return f(self, start_date, rnday, constituent) % 360.
         return decorator
 
-    @_normalize_to_360  # type: ignore[arg-type]
-    def get_greenwich_factor(self, constituent):
+    @_manage_dates
+    @_normalize_to_360
+    def get_greenwich_factor(self, start_date: datetime,
+                             rnday: Union[float, timedelta],
+                             constituent: str):
+        if start_date.tzinfo is not None and \
+                start_date.tzinfo.utcoffset(start_date) is not None:
+            self.start_date_utc = start_date.astimezone(timezone(timedelta(0)))
+        else:
+            self.start_date_utc = start_date
+
+        if not isinstance(rnday, timedelta):
+            rnday = timedelta(days=rnday)
+
+        self.end_date_utc = self.start_date_utc + rnday
         if constituent == "M2":
             return 2.*(self.DT-self.DS+self.DH)+2.*(self.DXI-self.DNU)
         elif constituent == "S2":
@@ -309,15 +367,15 @@ class Tides(bctypes.BoundaryCondition):
 
     def get_lunar_mean_longitude(self):
         return (277.0256206 + 129.38482032 * self.DYR + 13.176396768
-                * self.DDAY + .549016532 * self.start_date.hour)
+                * self.DDAY + .549016532 * self.start_date_utc.hour)
 
     def get_solar_perigee(self):
         return (281.2208569 + .01717836 * self.DYR + .000047064 * self.DDAY
-                + .000001961 * self.start_date.hour)
+                + .000001961 * self.start_date_utc.hour)
 
     def get_solar_mean_longitude(self):
         return (280.1895014 - .238724988 * self.DYR + .9856473288 * self.DDAY
-                + .0410686387 * self.start_date.hour)
+                + .0410686387 * self.start_date_utc.hour)
 
     @property
     def EQ73(self):
@@ -391,14 +449,9 @@ class Tides(bctypes.BoundaryCondition):
     def active_constituents(self):
         return self._active_constituents.copy()
 
-    @property
-    def major_constituents(self):
-        return ('Q1', 'O1', 'P1', 'K1', 'N2', 'M2', 'S2', 'K2')
+    major_constituents = ('Q1', 'O1', 'P1', 'K1', 'N2', 'M2', 'S2', 'K2')
 
-    @property
-    def constituents(self):
-        return (
-            *self.major_constituents,
+    minor_constituents = (
             'Mm',
             'Mf',
             'M4',
@@ -407,9 +460,9 @@ class Tides(bctypes.BoundaryCondition):
             '2N2',
             'S1')
 
-    @property
-    def orbital_frequencies(self):
-        return {
+    constituents = (*major_constituents, *minor_constituents)
+
+    orbital_frequencies = {
             'M4':      0.0002810378050173,
             'M6':      0.0004215567080107,
             'MK3':     0.0002134400613513,
@@ -449,9 +502,7 @@ class Tides(bctypes.BoundaryCondition):
             'Mf':      0.0000053234146919,
             'Z0':      0}
 
-    @property
-    def tidal_potential_amplitudes(self):
-        return {
+    tidal_potential_amplitudes = {
             'M2': 0.242334,
             'S2': 0.112841,
             'N2': 0.046398,
@@ -462,9 +513,7 @@ class Tides(bctypes.BoundaryCondition):
             'Q1': 0.019256,
             'Z0': 0}
 
-    @property
-    def tidal_species_type(self):
-        return {
+    tidal_species_type = {
             'M2': 2,
             'S2': 2,
             'N2': 2,
@@ -477,8 +526,8 @@ class Tides(bctypes.BoundaryCondition):
 
     @property
     def hour_middle(self):
-        return self.start_date.hour + (
-            (self.end_date - self.start_date).total_seconds()
+        return self.start_date_utc.hour + (
+            (self.end_date_utc - self.start_date_utc).total_seconds()
             / 3600 / 2)
 
     @property
@@ -495,12 +544,12 @@ class Tides(bctypes.BoundaryCondition):
 
     @property
     def DYR(self):
-        return self.start_date.year - 1900.
+        return self.start_date_utc.year - 1900.
 
     @property
     def DDAY(self):
-        return (self.start_date.timetuple().tm_yday
-                + int((self.start_date.year-1901.)/4.) - 1)
+        return (self.start_date_utc.timetuple().tm_yday
+                + int((self.start_date_utc.year-1901.)/4.) - 1)
 
     @property
     def NU(self):
@@ -508,7 +557,7 @@ class Tides(bctypes.BoundaryCondition):
 
     @property
     def DT(self):
-        return (180.+self.start_date.hour*(360./24))
+        return (180.+self.start_date_utc.hour*(360./24))
 
     @property
     def DS(self):
@@ -619,26 +668,3 @@ class Tides(bctypes.BoundaryCondition):
         if isinstance(database, TidalDatabase):
             database = database.value()
         self.__forcing_database = database
-
-    @property
-    def start_date(self):
-        return self.__start_date
-
-    @start_date.setter
-    def start_date(self, start_date: Union[None, datetime]):
-        if self.end_date is not None:
-            assert start_date < self.end_date, \
-                "start_date must be smaller than end_date."
-        self.__start_date = start_date
-
-    @property
-    def end_date(self):
-        return self.__end_date
-
-    @end_date.setter
-    def end_date(self, end_date: Union[None, datetime]):
-        if self.start_date is not None:
-            assert end_date > self.start_date, \
-                f"end_date ({end_date}) must be larger than " \
-                f"start_date ({self.start_date})."
-        self.__end_date = end_date
