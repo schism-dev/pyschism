@@ -1,3 +1,8 @@
+import os
+from typing import Union
+
+from pyproj import CRS
+
 from pyschism.mesh import grd
 from pyschism.mesh.base import EuclideanMesh2D
 
@@ -6,26 +11,10 @@ class Fgrid(EuclideanMesh2D):
     """
     Base class for all friction types (e.g. manning.grd, drag.grd, etc...)
     """
-    def __init__(
-        self,
-        nodes,
-        elements,
-        crs=None,
-        description=None,
-    ):
-        msh = grd.euclidean_mesh({
-            'nodes': nodes,
-            'elements': elements,
-            'description': description,
-            'crs': crs})
-        msh.update({"crs": crs})
-        super().__init__(**msh)
-
-    @staticmethod
-    def open(path, crs=None):
+    def __init__(self, path: os.PathLike, crs: Union[str, CRS] = None):
         msh = grd.reader(path)
         msh.update({"crs": crs})
-        return Fgrid(**msh)
+        super().__init__(**grd.euclidean_mesh(**msh))
 
     @property
     def nchi(self):
