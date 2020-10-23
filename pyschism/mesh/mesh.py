@@ -4,11 +4,11 @@ from typing import Union
 
 import numpy as np  # type: ignore[import]
 
-from pyschism.forcing.bctypes import BoundaryCondition
-from ..forcing import bctypes, tides
-from pyschism.mesh.hgrid import Hgrid
-from pyschism.mesh.vgrid import Vgrid
-from pyschism.mesh.friction import (
+from ..forcing.tides.bctypes import BoundaryCondition, BcType
+from ..forcing.tides.tides import Tides
+from .hgrid import Hgrid
+from .vgrid import Vgrid
+from .friction import (
     Fgrid,
     ManningsN,
     DragCoefficient,
@@ -46,7 +46,7 @@ class Mesh:
 
         open_boundaries = self.hgrid.boundaries[None].copy()
         for id in open_boundaries:
-            for bctype in bctypes.BcType:
+            for bctype in BcType:
                 open_boundaries[id]['forcing'] = None
         self.__open_boundaries = open_boundaries
 
@@ -111,7 +111,7 @@ class Mesh:
         const = dict()
         for id in self.open_boundaries:
             forcing = self.open_boundaries[id].forcing
-            if isinstance(forcing, tides.Tides):
+            if isinstance(forcing, Tides):
                 for active in forcing.get_active_potential_constituents():
                     const[active] = True
         return tuple(const.keys())
@@ -124,7 +124,7 @@ class Mesh:
         const = dict()
         for id in self.open_boundaries:
             forcing = self.open_boundaries[id].forcing
-            if isinstance(forcing, tides.Tides):
+            if isinstance(forcing, Tides):
                 for active in forcing.get_active_forcing_constituents():
                     const[active] = True
         return tuple(const.keys())

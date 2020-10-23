@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import pathlib
 from typing import Union
 
@@ -36,15 +36,18 @@ class OPT:
 
     @start_date.setter
     def start_date(self, start_date: datetime):
+        if start_date.tzinfo is None or \
+                start_date.tzinfo.utcoffset(start_date) is None:
+            start_date = start_date.replace(tzinfo=timezone(timedelta(0)))
         self['start_year'] = start_date.year
         self['start_month'] = start_date.month
         self['start_day'] = start_date.day
         self['start_hour'] = start_date.hour
         self['start_hour'] += start_date.minute / 60.
-        if start_date.tzinfo is not None:
-            if start_date.tzinfo.utcoffset(start_date) is not None:
-                utc_offset = start_date.utcoffset()
-                self['utc_start'] = -utc_offset.total_seconds() / 3600  # type: ignore[union-attr]  # noqa: E501
+        self['utc_start'] = -start_date.utcoffset().total_seconds() / 3600  # type: ignore[union-attr]  # noqa: E501
+        # get rid of "negative" zero
+        self['utc_start'] = +0. if self['utc_start'] == -0. \
+            else self['utc_start']
         self.__start_date = start_date
 
     @property

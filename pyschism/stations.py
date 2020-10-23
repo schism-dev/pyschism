@@ -3,11 +3,16 @@ import pathlib
 from typing import Union, Dict, List, Any
 
 from pyproj import Transformer, CRS  # type: ignore[import]
-from shapely.geometry import Polygon, MultiPolygon, Point
+from shapely.geometry import (   # type: ignore[import]
+    Polygon,
+    MultiPolygon,
+    Point
+)
 
-
-output_vars = ['elev', 'air_pressure', 'windx', 'windy', 'T', 'S', 'u', 'v',
-               'w']
+from pyschism.enums import (
+    StationOutputVars,
+    StationOutputIndex
+)
 
 
 class Stations:
@@ -24,7 +29,19 @@ class Stations:
                 a timedelta object.
             crs: Coordinate reference system for the container. All points
                 added using the add_station() method should be in this CRS.
-            The remaining arguments activate the outputs for the run.
+            elev (optional): Request elevation output, default: False
+            air_pressure (optional): Request air_pressure output,
+                default: False
+            windx (optional): Request wind zonal output,
+                default: False
+            windy (optional): Request wind meridional output, default: False
+            T (optional): Request temperature output, default: False
+            S (optional): Request salinity output, default: False
+            u (optional): Request zonal fluid velocity output, default: False
+            v (optional): Request meridional fluid velocity output,
+                default: False
+            w (optional): Request vertical fluid velocity output,
+                default: False
         """
 
         if not isinstance(nspool_sta, (int, timedelta)):
@@ -77,7 +94,21 @@ class Stations:
             crs (optional): Specify CRS of station.in. If no crs is given,
                 the program assumes that the file is in the same CRS as the
                 Mesh.
-            **kwargs: state of each output variable
+            elev (optional): Request elevation output, default: False
+            air_pressure (optional): Request air_pressure output,
+                default: False
+            windx (optional): Request wind zonal output,
+                default: False
+            windy (optional): Request wind meridional output,
+                default: False
+            T (optional): Request temperature output, default: False
+            S (optional): Request salinity output, default: False
+            u (optional): Request zonal fluid velocity output,
+                default: False
+            v (optional): Request meridional fluid velocity output,
+                default: False
+            w (optional): Request vertical fluid velocity output,
+                default: False
 
         Returns:
             instance of Stations
@@ -87,10 +118,12 @@ class Stations:
             states = f.readline().split()[:9]
             # override file state with kwargs request
             for i, state in enumerate(states):
-                states[i] = kwargs.get(output_vars[i], False)
+                states[i] = kwargs.get(
+                    StationOutputIndex(i).name.lower(), False)
             stations = Stations(nspool_sta, crs=crs,
-                                **{var: bool(states[i]) for i, var in
-                                    enumerate(output_vars)})
+                                **{var.name.lower(): bool(states[i])
+                                    for i, var in
+                                    enumerate(StationOutputVars)})
             comment: Union[str, None] = None
             for i in range(int(f.readline().split()[0])):
                 line = f.readline().split()
@@ -115,10 +148,21 @@ class Stations:
         """
         self.__stations.append({'x': x, 'y': y, 'z': z, 'comment': comment})
 
-    def get_active_vars(self):
-        return [var for var in output_vars if getattr(self, var) is True]
+    def get_active_vars(self) -> List[str]:
+        """Returns a list of the names of activated output variables.
+
+        Returns:
+            list of strings for each active station output request.
+        """
+        return [var.name.lower() for var in StationOutputVars
+                if getattr(self, var.name.lower()) is True]
 
     def transform_to(self, dst_crs: Union[str, CRS]):
+        """Transforms the horizontal coordinates of the stations.
+
+        If :class:`pyschism.Stations` was instantiated with crs=None, then
+        this function cannot be used.
+        """
         if isinstance(dst_crs, str):
             dst_crs = CRS.from_user_input(dst_crs)
         else:
@@ -145,14 +189,13 @@ class Stations:
             geometry: Polygon or MultiPolygon used for clipping the
                 stations. Normally this comes from Hgrid.get_multipolygon()
         """
-        
+
         eliminate: List[int] = []
         for id, x, y, _, _ in self:
             if not geometry.contains(Point(x, y)):
                 eliminate.insert(id-1, 0)
         for id in eliminate:
             del(self.__stations[id])
-
 
     def write(self, path: Union[str, pathlib.Path], overwrite: bool = False):
         """Writes the SCHISM station.in file to disk.
@@ -168,23 +211,29 @@ class Stations:
             f.write(str(self))
 
     @property
-    def stations(self):
+    def stations(self) -> List[Dict]:
+        """Returns list of currently loaded stations."""
         return self.__stations
 
     @property
-    def nspool_sta(self):
+    def nspool_sta(self) -> Union[int, timedelta]:
+        """Returns output frequency."""
         return self.__nspool_sta
 
     @property
-    def crs(self):
+    def crs(self) -> Union[CRS, None]:
+        """Returns coordinate reference system of the current instance."""
         return self.__crs
 
     @property
-    def state(self):
-        return ' '.join([str(int(getattr(self, var))) for var in output_vars])
+    def state(self) -> str:
+        """Returns corresponding string that goes into bctide.in"""
+        return ' '.join([str(int(getattr(self, var.name.lower())))
+                         for var in StationOutputVars])
 
     @property
-    def elev(self):
+    def elev(self) -> bool:
+        """Returns state (ON/OFF) of variable elev request."""
         return self.__elev
 
     @elev.setter
@@ -193,7 +242,8 @@ class Stations:
         self.__elev = elev
 
     @property
-    def air_pressure(self):
+    def air_pressure(self) -> bool:
+        """Returns state (ON/OFF) of variable air_pressure request."""
         return self.__air_pressure
 
     @air_pressure.setter
@@ -203,7 +253,8 @@ class Stations:
         self.__air_pressure = air_pressure
 
     @property
-    def windx(self):
+    def windx(self) -> bool:
+        """Returns state (ON/OFF) of variable windx request."""
         return self.__windx
 
     @windx.setter
@@ -212,7 +263,8 @@ class Stations:
         self.__windx = windx
 
     @property
-    def windy(self):
+    def windy(self) -> bool:
+        """Returns state (ON/OFF) of variable windy request."""
         return self.__windy
 
     @windy.setter
@@ -221,7 +273,8 @@ class Stations:
         self.__windy = windy
 
     @property
-    def T(self):
+    def T(self) -> bool:
+        """Returns state (ON/OFF) of variable T request."""
         return self.__T
 
     @T.setter
@@ -230,7 +283,8 @@ class Stations:
         self.__T = T
 
     @property
-    def S(self):
+    def S(self) -> bool:
+        """Returns state (ON/OFF) of variable S request."""
         return self.__S
 
     @S.setter
@@ -239,7 +293,8 @@ class Stations:
         self.__S = S
 
     @property
-    def u(self):
+    def u(self) -> bool:
+        """Returns state (ON/OFF) of variable u request."""
         return self.__u
 
     @u.setter
@@ -248,7 +303,8 @@ class Stations:
         self.__u = u
 
     @property
-    def v(self):
+    def v(self) -> bool:
+        """Returns state (ON/OFF) of variable v request."""
         return self.__v
 
     @v.setter
@@ -257,7 +313,8 @@ class Stations:
         self.__v = v
 
     @property
-    def w(self):
+    def w(self) -> bool:
+        """Returns state (ON/OFF) of variable w request."""
         return self.__w
 
     @w.setter

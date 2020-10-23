@@ -25,26 +25,24 @@ setuptools.setup(
                             # 'dunamai',
                             'flake8', 'nose']},
     install_requires=[
-        # 'dunamai',
         'matplotlib',
         'netCDF4',
         'pyproj',
         'shapely',
         'fiona',
         'f90nml',
-        'ordered_set',
         'psutil',
-        'paramiko',
         'scipy',
         'wget',
         'appdirs',
+        'cf-python',
+        'cf-plot',
+        'sqlalchemy',
+        'pyugrid'
     ],
     entry_points={
         'console_scripts': [
-            # 'plot_mesh = pyschism.cmd.plot_mesh:main',
-            # "schrun = pyschism.__main__:main",
-            # 'tidal_run = pyschism.cmd.tidal_run:main',
-            'plot = pyschism.__main__:plot'
+            'pyschism = pyschism.__main__:main'
         ]
     },
     tests_require=['nose'],
