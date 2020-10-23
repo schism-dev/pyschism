@@ -1,7 +1,26 @@
+import os
 import pathlib
+
+from typing import Union
 
 
 class Vgrid:
+
+    def __init__(
+        self,
+        vgrid: Union[str, os.PathLike] = None
+    ):
+        """Represents a SCHISM vertical grid.
+
+        Args:
+            vgrid (optional): A path to a file or None. If vgrid is None, it
+            is assummed that the user wants to use 2D.
+
+        WARNING: This class only support 2D at the moment and it will ignore
+        any inputs. This is so it can be used as a placeholder that outputs at
+        least a 2D grid for minimalistic model configuration.
+        """
+        pass
 
     def __str__(self):
         return """2 !ivcor
@@ -12,10 +31,6 @@ S levels
 40. 1. 1.e-4  !h_c, theta_b, theta_f
    1    -1.
    2    0."""
-
-    @classmethod
-    def open(cls, path):
-        return cls()
 
     def write(self, path, overwrite=False):
         path = pathlib.Path(path)

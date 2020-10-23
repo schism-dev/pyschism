@@ -1,14 +1,14 @@
 from collections import namedtuple
 from collections.abc import Iterable
+import os
 from typing import Union
 
 import numpy as np  # type: ignore[import]
 
-from ..forcing.tides.bctypes import BoundaryCondition, BcType
-from ..forcing.tides.tides import Tides
-from .hgrid import Hgrid
-from .vgrid import Vgrid
-from .friction import (
+from pyschism.forcing import BoundaryCondition, BcType, Tides
+from pyschism.mesh.hgrid import Hgrid
+from pyschism.mesh.vgrid import Vgrid
+from pyschism.mesh.friction import (
     Fgrid,
     ManningsN,
     DragCoefficient,
@@ -17,18 +17,38 @@ from .friction import (
 
 
 class Mesh:
-    """
-    Class representing a SCHISM computational domain.
-    This class combines the horizontal grid (hgrid), vertical grid (vgrid) and
-    friction/drag grids (fgrid).
-    """
 
     def __init__(
             self,
-            hgrid: Hgrid,
-            vgrid: Union[Vgrid, None] = None,
-            fgrid: Union[Fgrid, None] = None,
+            hgrid: Union[Hgrid, os.PathLike],
+            vgrid: Union[Vgrid, os.PathLike] = None,
+            fgrid: Union[Fgrid, os.PathLike] = None,
     ):
+        """Class representing a SCHISM computational domain.
+
+        This class combines the horizontal grid (hgrid), vertical grid (vgrid)
+        and friction/drag grids (fgrid). Additionally, this class holds
+        information about forcings.
+        Args:
+            hgrid: Input horizontal grid. Can be a path to the disk or a
+                :class:`pyschism.mesh.Hgrid` instance.
+            vgrid: Input vertical grid. Can be a path to the disk or a
+                :class:`pyschism.mesh.Vgrid` instance.
+            fgrid: Input friction grid. Can be a path to the disk or a
+                :class:`pyschism.mesh.Fgrid` derived instance.
+        """
+
+        if vgrid is not None:
+            vgrid = Vgrid(vgrid)
+
+        if fgrid is not None:
+            fgrid = Fgrid(fgrid, crs)
+
+        return cls(
+            Hgrid.open(hgrid, crs),
+            vgrid,
+            fgrid
+            )
 
         assert isinstance(hgrid, Hgrid)
         self.__hgrid = hgrid
@@ -51,20 +71,6 @@ class Mesh:
         self.__open_boundaries = open_boundaries
 
         self.__sflux = {}
-
-    @classmethod
-    def open(cls, hgrid, vgrid=None, fgrid=None, crs=None):
-        if vgrid is not None:
-            vgrid = Vgrid.open(vgrid)
-
-        if fgrid is not None:
-            fgrid = Fgrid.open(fgrid, crs)
-
-        return cls(
-            Hgrid.open(hgrid, crs),
-            vgrid,
-            fgrid
-            )
 
     def set_friction(self, ftype, value):
 
