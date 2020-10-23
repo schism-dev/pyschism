@@ -8,4 +8,5 @@ API Documentation
    driver
    mesh
    param
+   stations
    pyschism
