@@ -41,7 +41,7 @@ class CoopsDataCollector:
             datum = 'NAVD'
 
         responses = list()
-        for start_date, end_date in self._get_datetime_segments(
+        for start_date, end_date in self._iter_datetime_segments(
                 start_date, end_date):
             params = self._get_params(station_id, start_date, end_date, datum,
                                       units)
@@ -107,10 +107,22 @@ class CoopsDataCollector:
         params['application'] = 'PySCHISM'
         return params
 
-    def _get_datetime_segments(self, start_date, end_date):
+    def _iter_datetime_segments(self, start_date, end_date):
         """
         https://www.ianwootten.co.uk/2014/07/01/splitting-a-date-range-in-python/
         """
+
+        def get_datespan(interval):
+            start_epoch = calendar.timegm(start_date.timetuple())
+            end_epoch = calendar.timegm(end_date.timetuple())
+            date_diff = end_epoch - start_epoch
+            step = date_diff / interval
+            delta = timedelta(seconds=step)
+            current_date = start_date
+            while current_date + delta <= end_date:
+                to_date = (current_date + delta)
+                yield current_date, to_date
+                current_date += delta
 
         segments = [(start_date, end_date)]
         interval = 2
@@ -119,19 +131,7 @@ class CoopsDataCollector:
                       for _start_date, _end_date in segments]):
             segments = [(from_datetime, to_datetime)
                         for from_datetime, to_datetime
-                        in self._get_datespan(interval)]
+                        in get_datespan(interval)]
             interval += 1
         for _start_date, _end_date in segments:
             yield _start_date, _end_date
-
-    def _get_datespan(self, start_date, end_date, interval):
-        start_epoch = calendar.timegm(self._start_date.timetuple())
-        end_epoch = calendar.timegm(self._end_date.timetuple())
-        date_diff = end_epoch - start_epoch
-        step = date_diff / interval
-        delta = timedelta(seconds=step)
-        current_date = self._start_date
-        while current_date + delta <= self._end_date:
-            to_date = (current_date + delta)
-            yield current_date, to_date
-            current_date += delta
