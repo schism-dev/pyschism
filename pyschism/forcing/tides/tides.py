@@ -69,7 +69,7 @@ class Tides(bctypes.BoundaryCondition):
                 self.get_tidal_potential_amplitude(constituent),  # TPK
                 self.get_orbital_frequency(constituent),  # FF*
                 self.get_nodal_factor(start_date, rnday, constituent),  # Amig*
-                self.get_greenwich_factor(start_date, rnday, constituent))  # FACE*
+                self.get_greenwich_factor(start_date, rnday, constituent))  # FACE* # noqa:E501
 
     def __iter__(self):
         for constituent in self.active_constituents:
@@ -86,7 +86,7 @@ class Tides(bctypes.BoundaryCondition):
 
     def use_all(self, potential=True, forcing=True):
         for constituent in self.constituents:
-            if constituent not in self.major_constituents:
+            if constituent not in self.tidal_potential_amplitudes:
                 potential = False
             self._active_constituents[constituent] = {
                 'potential': potential,
@@ -98,10 +98,9 @@ class Tides(bctypes.BoundaryCondition):
             self.use_constituent(constituent, potential, forcing)
 
     def use_constituent(self, constituent, potential=True, forcing=True):
-        msg = "Constituent must be one of "
-        msg += f"{self.constituents}"
-        assert constituent in self.constituents, msg
-        if constituent not in self.major_constituents:
+        if constituent not in self.constituents:
+            raise ValueError(f"Constituent must be one of {self.constituents}")
+        if constituent not in self.tidal_potential_amplitudes:
             potential = False
         self._active_constituents[constituent] = {
             "potential": potential,
@@ -109,9 +108,9 @@ class Tides(bctypes.BoundaryCondition):
         }
 
     def drop_constituent(self, constituent):
-        msg = "constituent must be one of: "
-        msg += f"{self.active_constituents}"
-        assert constituent in self.active_constituents, msg
+        if constituent not in self.active_constituents:
+            raise ValueError("Argument constituent must be one of "
+                             f"{self.active_constituents}")
         self._active_constituents.pop(constituent)
 
     def get_active_constituents(self):
@@ -451,14 +450,7 @@ class Tides(bctypes.BoundaryCondition):
 
     major_constituents = ('Q1', 'O1', 'P1', 'K1', 'N2', 'M2', 'S2', 'K2')
 
-    minor_constituents = (
-            'Mm',
-            'Mf',
-            'M4',
-            'MN4',
-            'MS4',
-            '2N2',
-            'S1')
+    minor_constituents = ('Mm', 'Mf', 'M4', 'MN4', 'MS4', '2N2', 'S1')
 
     constituents = (*major_constituents, *minor_constituents)
 
