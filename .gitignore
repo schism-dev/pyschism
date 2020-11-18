@@ -2,5 +2,5 @@ examples/example_1/staging
 build/
 dist/
 *.egg*
-**/*/__pycache__
+__pycache__
 
