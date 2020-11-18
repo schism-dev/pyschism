@@ -6,7 +6,7 @@ import numpy as np
 
 from pyschism.outputs import StationsOutput
 from pyschism.utils.coops import CoopsDataCollector
-from pyschism.enums import StationOutputIndex, StationOutputVars
+from pyschism.enums import StationOutputIndex, StationOutputVariables
 
 
 class PlotOutputStations:
@@ -20,7 +20,7 @@ class PlotOutputStations:
     def plot(self, variable, station_index=None):
         filenames = [path.name for path in self.stations._manifest]
         var_index = StationOutputIndex[
-            StationOutputVars(variable).name].value + 1
+            StationOutputVariables(variable).name].value + 1
 
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
@@ -47,7 +47,7 @@ class PlotOutputStations:
                             self.stations.rndays)
                         plt.plot(obs['datetime'], obs['values'])
                         plt.title(obs['name'])
-                        # fig, ax = plt.subplots(figsize=(8,3))
+                        # fig, ax = plt.subplots(figsize=(8, 3))
                         # import matplotlib.dates as mdates
                         # plt.plot_date(obs['datetime'], obs['values'], ls='solid', lw=1.5, aa=True,marker='None',color='g')
                         # ax = plt.gca()

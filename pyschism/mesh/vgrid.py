@@ -22,6 +22,10 @@ class Vgrid:
         """
         pass
 
+    @staticmethod
+    def open(path):
+        raise NotImplementedError('Vgrid.open()')
+
     def __str__(self):
         return """2 !ivcor
 2 1 1.e6 !nvrt, kz (# of Z-levels); h_s (transition depth between S and Z)

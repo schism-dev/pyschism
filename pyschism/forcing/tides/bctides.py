@@ -1,10 +1,11 @@
 from abc import ABC, abstractmethod
 from datetime import timedelta, timezone
 from enum import Enum
+from functools import lru_cache
 
-from .tides import Tides
-from ...param.param import Param
-from ...mesh import Mesh
+from pyschism.forcing.tides.tides import Tides
+from pyschism.param.param import Param
+from pyschism.domain import ModelDomain
 
 
 class NullWritter:
@@ -19,20 +20,20 @@ class NullWritter:
 class NotImplementedWritter:
 
     def __init__(self, *argv):
-        raise NotImplementedError('NotImplementedWritter')
+        raise NotImplementedError('Writter for variable is not implemented.')
 
 
 class TidalVariableWritter(ABC):
 
     def __init__(self, boundary, bctides):
-        self.forcing = boundary.forcing
-        self.indexes = boundary.indexes
-        self.active_constituents = bctides.active_forcing_constituents
-        self.mesh = bctides.mesh
+        self.forcing = boundary['forcing']
+        self.indexes = boundary['indexes']
+        self.active_constituents = bctides.get_active_forcing_constituents()
+        self._model_domain = bctides._model_domain
 
     @abstractmethod
     def __str__(self):
-        raise NotImplementedError
+        raise NotImplementedError(f'str({self.__name__})')
 
 
 class TidalElevationWritter(TidalVariableWritter):
@@ -41,7 +42,7 @@ class TidalElevationWritter(TidalVariableWritter):
         f = ""
         for constituent in self.active_constituents:
             f += f'{constituent}\n'
-            vertices = self.mesh.hgrid.get_xy(
+            vertices = self._model_domain.hgrid.get_xy(
                     crs='EPSG:4326')[self.indexes, :]
             amp, phase = self.forcing.get_elevation(constituent, vertices)
             for i in range(len(vertices)):
@@ -55,7 +56,7 @@ class TidalVelocityWritter(TidalVariableWritter):
         f = ''
         for constituent in self.active_constituents:
             f += f'{constituent}\n'
-            vertices = self.mesh.hgrid.get_xy(
+            vertices = self._model_domain.hgrid.get_xy(
                     crs='EPSG:4326')[self.indexes, :]
             uamp, uphase, vamp, vphase = self.forcing.get_velocity(
                     constituent, vertices)
@@ -109,59 +110,39 @@ class itrtypeWritter(Enum):
 
 class Bctides:
 
-    def __init__(self, mesh: Mesh, param: Param, cutoff_depth: float = 50.):
+    def __init__(self, model_domain: ModelDomain, param: Param,
+                 cutoff_depth: float = 50.):
+        """Provides an interface to write bctides.in to file. """
 
         # check if start_date was given in case tidal forcings are requested.
         # Note: This is done twice so that this class can be used independently
         # from Param to just write bctides files
-        afc = mesh.get_active_forcing_constituents()
+        afc = model_domain.get_active_forcing_constituents()
         if len(afc) > 0 and param.opt.start_date is None:
             raise Exception('start_date argument is required for simulating '
                             'tidal forcing.')
 
-        self.__mesh = mesh
-        self.__param = param
-        self.cutoff_depth = cutoff_depth
-
-        # PySCHISM allows the user to input the tidal potentials and forcings
-        # individually at each boundary, however, SCHISM supports only a global
-        # specification. Here, we collect all the activated tidal potentials
-        # on each boundary and activate them all globally
-
-        # set active tidal potential constituents
-        const = dict()
-        for id in self.mesh.open_boundaries:
-            forcing = self.mesh.open_boundaries[id].forcing
-            if isinstance(forcing, Tides):
-                for active in forcing.get_active_potential_constituents():
-                    const[active] = True
-        self.__active_potential_constituents = tuple(const.keys())
-
-        # set active tidal forcing constituents
-        for id in self.mesh.open_boundaries:
-            forcing = self.mesh.open_boundaries[id].forcing
-            if isinstance(forcing, Tides):
-                for active in forcing.get_active_forcing_constituents():
-                    const[active] = True
-        self.__active_forcing_constituents = tuple(const.keys())
+        self._model_domain = model_domain
+        self._param = param
+        self._cutoff_depth = cutoff_depth
 
         # init the main tidal forcing object
         tides = Tides()
-        for const in tides.constituents:
+        for const in tides.all_constituents:
             tides.use_constituent(
                     const,
                     potential=True if const in
-                    self.active_potential_constituents else False,
+                    self.get_active_potential_constituents() else False,
                     forcing=True if const in
-                    self.active_forcing_constituents else False
+                    self.get_active_forcing_constituents() else False
                     )
         self.__tidal_forcing = tides
 
     def __str__(self):
         f = f"{self.start_date}\n" \
-            f"{self.ntip} {self.cutoff_depth}\n"
+            f"{self.ntip} {self._cutoff_depth}\n"
         if self.ntip > 0:
-            for constituent in self.active_potential_constituents:
+            for constituent in self.get_active_potential_constituents():
                 forcing = self.tidal_forcing(
                     self.start_date, self.rnday, constituent)
                 f += f'{constituent} \n' \
@@ -171,52 +152,66 @@ class Bctides:
                      f'{forcing[3]:G} ' \
                      f'{forcing[4]:G}\n'
         f += f'{self.tidal_forcing.nbfr:d}\n'
-        for constituent in self.active_forcing_constituents:
+        for constituent in self.get_active_forcing_constituents():
             forcing = self.tidal_forcing(
                 self.start_date, self.rnday, constituent)
             f += f'{constituent} \n' \
                  f"{forcing[2]:G} " \
                  f'{forcing[3]:G} ' \
                  f'{forcing[4]:G}\n'
-        f += f"{len(self.mesh.open_boundaries)}\n"  # nope
-        for id in self.mesh.open_boundaries:
-            boundary = self.mesh.open_boundaries[id]
-            f += f"{len(boundary.indexes)} " \
-                 f'{boundary.forcing.bctype}\n' \
-                 f'{iettypeWritter[boundary.forcing.iettype.name].value(boundary, self)}' \
-                 f'{ifltypeWritter[boundary.forcing.ifltype.name].value(boundary, self)}' \
-                 f'{itetypeWritter[boundary.forcing.itetype.name].value(boundary, self)}' \
-                 f'{isatypeWritter[boundary.forcing.isatype.name].value(boundary, self)}' \
-                 f'{itrtypeWritter[boundary.forcing.itrtype.name].value(boundary, self)}'
+        f += f"{len(self._model_domain.open_boundaries)}\n"  # nope
+        for id in self._model_domain.open_boundaries:
+            boundary = self._model_domain.open_boundaries[id]
+            f += f"{len(boundary['indexes'])} " \
+                 f'{str(boundary["forcing"])}\n' \
+                 f'{iettypeWritter[boundary["forcing"].iettype.name].value(boundary, self)}' \
+                 f'{ifltypeWritter[boundary["forcing"].ifltype.name].value(boundary, self)}' \
+                 f'{itetypeWritter[boundary["forcing"].itetype.name].value(boundary, self)}' \
+                 f'{isatypeWritter[boundary["forcing"].isatype.name].value(boundary, self)}' \
+                 f'{itrtypeWritter[boundary["forcing"].itrtype.name].value(boundary, self)}'
         return f
+
+    @lru_cache(maxsize=1)
+    def get_active_potential_constituents(self):
+        # PySCHISM allows the user to input the tidal potentials and forcings
+        # individually at each boundary, however, SCHISM supports only a global
+        # specification. Here, we collect all the activated tidal potentials
+        # on each boundary and activate them all globally
+        # set active tidal potential constituents
+        const = dict()
+        for id in self._model_domain.open_boundaries:
+            forcing = self._model_domain.open_boundaries[id]['forcing']
+            if isinstance(forcing, Tides):
+                for active in forcing.get_active_potential_constituents():
+                    const[active] = True
+        return tuple(const.keys())
+
+    @lru_cache(maxsize=1)
+    def get_active_forcing_constituents(self):
+        # set active tidal forcing constituents
+        const = dict()
+        for id in self._model_domain.open_boundaries:
+            forcing = self._model_domain.open_boundaries[id]['forcing']
+            if isinstance(forcing, Tides):
+                for active in forcing.get_active_forcing_constituents():
+                    const[active] = True
+        return tuple(const.keys())
 
     def write(self, path, overwrite=False):
         with open(path, 'w') as f:
             f.write(str(self))
 
     @property
-    def mesh(self):
-        return self.__mesh
-
-    @property
     def start_date(self):
-        return self.__param.opt.start_date
+        return self._param.opt.start_date
 
     @property
     def rnday(self):
-        return self.__param.core.rnday
-
-    @property
-    def active_potential_constituents(self):
-        return self.__active_potential_constituents
-
-    @property
-    def active_forcing_constituents(self):
-        return self.__active_forcing_constituents
+        return self._param.core.rnday
 
     @property
     def ntip(self):
-        return len(self.active_potential_constituents)
+        return len(self.get_active_potential_constituents())
 
     @property
     def tidal_forcing(self):

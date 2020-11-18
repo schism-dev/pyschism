@@ -71,15 +71,13 @@ class BoundaryCondition:
             isatype: InitialSalinityType = InitialSalinityType.NONE,
             itrtype: InitialTracerType = InitialTracerType.NONE
     ):
-
         self.iettype = iettype
         self.ifltype = ifltype
         self.itetype = itetype
         self.isatype = isatype
         self.itrtype = itrtype
 
-    @property
-    def bctype(self):
+    def __str__(self):
         return f"{self.iettype.value} " \
                f"{self.ifltype.value} " \
                f"{self.itetype.value} " \

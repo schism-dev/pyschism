@@ -38,7 +38,7 @@ setuptools.setup(
         'cf-python',
         'cf-plot',
         'sqlalchemy',
-        'pyugrid'
+        'pyugrid',
     ],
     entry_points={
         'console_scripts': [

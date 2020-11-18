@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+# from datetime import datetime
 
 
 class NWS(ABC):
@@ -7,8 +8,13 @@ class NWS(ABC):
         """Returns string used in param.nml"""
         return f"{self.dtype.value}"
 
+    def __call__(self, model_driver):
+        self._start_date = model_driver.param.opt.start_date
+        self._rnday = model_driver.param.core.rnday
+        model_driver.param.opt.nws = self
+
     @abstractmethod
-    def write(self):
+    def write(self, path, overwrite=False):
         """Provides a method for writting SCHISM atmospherics files to disk.
 
         Since the output is different for each NWS type, the derived class

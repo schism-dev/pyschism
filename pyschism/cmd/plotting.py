@@ -7,7 +7,7 @@ from pyschism.outputs import (
 )
 
 
-class CliOutputPlot:
+class OutputPlotCli:
 
     def __init__(self, args):
 
