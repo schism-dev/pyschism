@@ -2,111 +2,107 @@ from datetime import datetime, timedelta
 import pathlib
 from typing import Union
 
-import f90nml  # type: ignore[import]
-
-from .core import CORE, Stratification
-from .opt import OPT
-from .schout import SCHOUT
-
-
-PARAM_TEMPLATE = pathlib.Path(__file__).parent / 'param.nml.template'
-PARAM_DEFAULTS = f90nml.read(PARAM_TEMPLATE)
+from pyschism.enums import Stratification
+from pyschism.domain import ModelDomain
+from pyschism.param.core import CORE
+from pyschism.param.opt import OPT
+from pyschism.param.schout import SCHOUT
 
 
-class Param:
+class OptDescriptor:
 
-    def __init__(
-            self,
-            dt: Union[float, int, timedelta],
-            rnday: Union[float, timedelta],
-            dramp: Union[int, float, timedelta],
-            nspool: Union[int, timedelta],
-            start_date: Union[None, datetime] = None,
-            ibc: Union[Stratification, int, str] = Stratification.BAROTROPIC,
-            ihfskip: Union[int, None] = None,
-            **outputs
-    ):
-        # ---------------------------
-        # initialize main container |
-        # ---------------------------
-        # Blank out all values in template, this program assumes no defaults
-        self.__nml: dict = {'core': {}, 'opt': {}, 'schout': {}}
-        for group, data in PARAM_DEFAULTS.items():
-            for key, value in data.items():
-                if isinstance(value, list):
-                    self.__nml[group][key] = len(value)*[0]
-                else:
-                    self.__nml[group][key] = None
-
-        # -----------------
-        # initialize core |
-        # -----------------
-        self.__core = CORE(self.__nml)
-        self.core.rnday = rnday
-        self.core.dt = dt
-        self.core.nspool = nspool
-        self.core.dramp = dramp
-        self.core.ibc = ibc
-        self.core.ihfskip = ihfskip
-        # TODO: Must set (when applicable)
+    def __set__(self, obj, opt: OPT):
+        # friction parameters
+        opt.nchi = obj.model_domain.fgrid
+        # set coordinate system
+        opt.ics = obj.model_domain.ics
+        # set coriolis
+        opt.ncor = obj.model_domain.ncor
+        # set atmospheric forcing
+        if obj.model_domain.nws is not None:
+            opt.nws = obj.model_domain.nws
+        # TODO: Set the remaining options:
         # msc2
         # mdc2
         # ntracer_gen
         # ntracer_age
         # sed_class
         # eco_class
+        self._opt = opt
 
-        # ---------------
-        # intialize opt |
-        # ---------------
-        self.__opt = OPT(self.__nml)
-        self.opt.start_date = start_date
+    def __get__(self, obj, val):
+        return self._opt
 
-        # -------------------
-        # initialize schout |
-        # -------------------
-        self.__schout = SCHOUT(self.__nml, **outputs)
+
+class NhotWriteDescriptor:
+
+    def __set__(self, obj, nhot_write: Union[int, bool, timedelta, None]):
+
+        if not isinstance(nhot_write, (int, bool, timedelta, type(None))):
+            raise TypeError(f"Argument nhot_write must be of type {int}, "
+                            f"{bool}, {timedelta}, or None.")
+
+        if nhot_write is True:
+            nhot_write = int(round(obj.core.rnday / obj.core.dt))
+
+        elif isinstance(nhot_write, timedelta):
+            nhot_write = int(round(nhot_write / obj.core.dt))
+
+        if nhot_write is not None:
+            if nhot_write % obj.core.ihfskip != 0:
+                raise ValueError("nhot_write must be a multiple of ihfskip")
+            obj.schout.nhot_write = nhot_write
+
+    def __get__(self, obj, val):
+        return obj.schout.nhot_write
+
+
+class Param:
+
+    _opt = OptDescriptor()
+    _nhot_write = NhotWriteDescriptor()
+
+    def __init__(
+            self,
+            model_domain: ModelDomain,
+            dt: Union[int, float, timedelta],
+            rnday: Union[int, float, timedelta],
+            dramp: Union[int, float, timedelta] = None,
+            start_date: datetime = None,
+            ibc: Union[Stratification, int, str] = Stratification.BAROTROPIC,
+            drampbc: Union[int, float, timedelta] = None,
+            nspool: Union[int, float, timedelta] = None,
+            ihfskip: Union[int, timedelta] = None,
+            nhot_write: Union[int, timedelta, bool] = None,
+            **surface_outputs):
+        self._model_domain = model_domain
+        self._core = CORE(ibc, rnday, dt, nspool, ihfskip)
+        self._opt = OPT(dramp, drampbc, start_date)
+        self._schout = SCHOUT(**surface_outputs)
+        self._nhot_write = nhot_write
 
     def __str__(self):
-
-        def append_items(f, group):
-            for var, value in self.__nml[group].items():
-                if value is not None:
-                    if not isinstance(value, list):
-                        f.append(f'  {var}={value}')
-                    else:
-                        for i, state in enumerate(value):
-                            if state == 1:
-                                f.append(f'  {var}({i+1}) = {state}')
-            return f
-
-        f = ['&CORE']
-        append_items(f, 'core')
-        f.extend(['/\n', '&OPT'])
-        append_items(f, 'opt')
-        f.extend(['/\n', '&SCHOUT'])
-        append_items(f, 'schout')
-        f.append('/\n')
-        return '\n'.join(f)
+        return f"{str(self.core)}\n\n{str(self.opt)}\n\n{str(self.schout)}\n"
 
     def write(self, path, overwrite=False, use_template=False):
         path = pathlib.Path(path)
         if path.is_file() and not overwrite:
             raise IOError(f"File {path} exists and overwrite=False")
-        if use_template:
-            f90nml.patch(PARAM_TEMPLATE, self.__nml, path)
-            return
         with open(path, 'w') as f:
             f.write(str(self))
 
     @property
     def core(self):
-        return self.__core
+        return self._core
 
     @property
     def opt(self):
-        return self.__opt
+        return self._opt
 
     @property
     def schout(self):
-        return self.__schout
+        return self._schout
+
+    @property
+    def model_domain(self):
+        return self._model_domain
