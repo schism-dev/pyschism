@@ -53,13 +53,20 @@ class Tides(bctypes.BoundaryCondition):
         if velocity:
             raise NotImplementedError('Boundary velocities are temporarily '
                                       'disabled.')
-        self.forcing_database = database
         super().__init__(
                 iettype=bctypes.InitialElevationType.TIDAL
                 if elevation is True else bctypes.InitialElevationType.NONE,
                 ifltype=bctypes.InitialFlowType.TIDAL
                 if velocity is True else bctypes.InitialFlowType.NONE)
+        self.forcing_database = database
         self._active_constituents: OrderedDict = OrderedDict()
+
+    def __iter__(self):
+        for constituent in self.active_constituents:
+            yield (constituent, self.get_tidal_constituent(constituent))
+
+    def __len__(self):
+        return len(self.active_constituents)
 
     def __call__(self, start_date: datetime, rnday: Union[int, datetime],
                  constituent: Union[str, TidalConstituents]):
@@ -71,13 +78,6 @@ class Tides(bctypes.BoundaryCondition):
                 self.get_nodal_factor(start_date, rnday, constituent),  # Amig*
                 self.get_greenwich_factor(start_date, rnday, constituent))  # FACE* # noqa:E501
 
-    def __iter__(self):
-        for constituent in self.active_constituents:
-            yield (constituent, self.get_tidal_constituent(constituent))
-
-    def __len__(self):
-        return len(self.active_constituents)
-
     def get_elevation(self, constituent, vertices):
         return self.forcing_database.get_elevation(constituent, vertices)
 
@@ -85,7 +85,7 @@ class Tides(bctypes.BoundaryCondition):
         return self.forcing_database.get_velocity(constituent, vertices)
 
     def use_all(self, potential=True, forcing=True):
-        for constituent in self.constituents:
+        for constituent in self.all_constituents:
             if constituent not in self.tidal_potential_amplitudes:
                 potential = False
             self._active_constituents[constituent] = {
@@ -452,7 +452,7 @@ class Tides(bctypes.BoundaryCondition):
 
     minor_constituents = ('Mm', 'Mf', 'M4', 'MN4', 'MS4', '2N2', 'S1')
 
-    constituents = (*major_constituents, *minor_constituents)
+    all_constituents = (*major_constituents, *minor_constituents)
 
     orbital_frequencies = {
             'M4':      0.0002810378050173,
@@ -660,3 +660,8 @@ class Tides(bctypes.BoundaryCondition):
         if isinstance(database, TidalDatabase):
             database = database.value()
         self.__forcing_database = database
+
+    @property
+    def constituents(self):
+        return self.all_constituents
+

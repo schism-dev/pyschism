@@ -1,7 +1,10 @@
 #! /usr/bin/env python
 import pathlib
 from datetime import datetime, timedelta, timezone
-from pyschism import Param, Mesh, SchismRun, Stations, forcing
+from pyschism.mesh import Hgrid, Vgrid
+from pyschism.mesh.friction import Fgrid
+from pyschism import ModelDomain, ModelDriver, Stations
+from pyschism.forcing import Tides
 
 
 SIMPLE_SLURM_DRIVER = """#!/bin/bash --login
@@ -36,18 +39,33 @@ PARENT = pathlib.Path(__file__).parent
 
 if __name__ == '__main__':
 
-    # setup mesh
-    mesh = Mesh.open(PARENT / 'hgrid.gr3')
+    # open gr3 file
+    hgrid = Hgrid.open(PARENT / 'hgrid.gr3')
+    vgrid = Vgrid()
+    fgrid = Fgrid.open(PARENT / 'manning.gr3')
 
-    # set mesh friction
-    mesh.set_friction('manning', 0.025)
+    # setup model domain
+    domain = ModelDomain(hgrid, vgrid, fgrid)
 
     # set tidal boundary conditions
-    elevbc = forcing.Tides()
+    elevbc = Tides()
     elevbc.use_all()  # activate all forcing constituents
 
-    # connect the boundary condition to the mesh
-    mesh.add_boundary_condition(elevbc)
+    # connect the boundary condition to the domain
+    domain.add_boundary_condition(elevbc)
+
+    # from pyschism.forcing.atmosphere.nws.nws2 import NWS2
+    # from pyschism.forcing.atmosphere.gfs import GlobalForecastSystem as GFS
+
+    # sflux_1 = GFS()
+    # sflux_2 = HWRF()
+
+    # atmos = NWS2(
+    #         sflux_1,
+    #         sflux_2
+    #     )
+
+    # domain.set_atmospheric_forcing(atmos)
 
     #  ------ Param options
     # dt and rnday are required arguments
@@ -76,18 +94,15 @@ if __name__ == '__main__':
     stations = Stations.from_file(PARENT / 'station.in', timedelta(minutes=6.),
                                   elev=True, u=True, v=True)
 
-    # Output requests can be activated as part of the optional arguments.
-    param = Param(dt, rnday, dramp=dramp, start_date=start_date,
-                  stations=stations, nspool=nspool, elev=True)
+    # init the model driver
+    driver = ModelDriver(domain, dt, rnday, dramp=dramp, start_date=start_date,
+                         stations=stations, nspool=nspool, elev=True)
 
     # Output requests, as well as most other namelist variables, can be
-    # modified post-hoc through their corresponding properties.
+    # modified post instantiation through their corresponding properties.
     # For example, the following line activates the depth averaged horizontal
     # velocity output request:
-    param.schout.dahv = True
-
-    # init the model driver
-    driver = SchismRun(mesh, param)
+    driver.param.schout.dahv = True
 
     # write files to disk
     outdir = pathlib.Path('staging')

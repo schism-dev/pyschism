@@ -1,17 +1,14 @@
-from pyschism.forcing.atmosphere.nws import NWS
-from pyschism.forcing.atmosphere.nws2 import Sflux, SfluxServerFiles
-from pyschism.forcing.atmosphere.atmosphere import (
-    load_sflux,
-    load_datasets,
-    fetch_storm_meta
-)
+from pyschism.forcing.atmosphere import nws
+from pyschism.forcing.atmosphere.nws.nws import NWS
+from pyschism.forcing.atmosphere.nws.nws2 import NWS2
+from pyschism.forcing.atmosphere import gfs
+from pyschism.forcing.atmosphere.gfs import GlobalForecastSystem
 
 
 __all__ = [
+    'nws',
     "NWS",
-    "load_sflux",
-    "load_datasets",
-    "fetch_storm_meta",
-    "Sflux",
-    "SfluxServerFiles"
+    "NWS2",
+    'gfs',
+    'GlobalForecastSystem'
 ]

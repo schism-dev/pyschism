@@ -1,6 +1,6 @@
 from argparse import Namespace
 import atexit
-from datetime import timezone, timedelta
+# from datetime import timezone, timedelta
 import hashlib
 import os
 import pathlib
@@ -9,14 +9,15 @@ from typing import List
 from appdirs import user_data_dir  # type: ignore[import]
 from apscheduler.schedulers.blocking import BlockingScheduler  # type: ignore[import]  # noqa: E501
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore  # type: ignore[import]  # noqa: E501
-from apscheduler.job import Job
+from apscheduler.job import Job  # type: ignore[import]
 from daemons.prefab import run  # type: ignore[import]
+import pytz
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy import Column, String
 
-from pyschism.forcing import Tides
+from pyschism.forcing.tides import Tides
 from pyschism.logger import get_logger
 
 LOGGER = get_logger(__file__)
@@ -58,7 +59,7 @@ Base.metadata.create_all(SQLITE_ENGINE)
 SCHEDULER = BlockingScheduler(
             jobstores={'default': SQLAlchemyJobStore(engine=SQLITE_ENGINE)},
             logger=LOGGER,
-            timezone=timezone(timedelta(0.)),  # 'GMT'
+            timezone=pytz.utc,
             # jobstore_retry_interval=,
             # job_defaults=,
             # executors=,

@@ -1,7 +1,314 @@
 from enum import Enum
 
 
-class StationOutputVars(Enum):
+class Stratification(Enum):
+    BAROCLINIC = 0
+    BAROTROPIC = 1
+
+
+class Coriolis(Enum):
+    AUTO = 1
+    CORICOEFF = 0
+    RLATITUDE = -1
+
+
+class IofHydroVariables(Enum):
+    elev = "elev"
+    air_pressure = "air_pressure"
+    air_temperature = "air_temperature"
+    specific_humidity = "specific_humidity"
+    solar_radiation = "solar_radiation"
+    sensible_flux = "sensible_flux"
+    latent_heat = "latent_heat"
+    upward_longwave = "upward_longwave"
+    downward_longwave = "downward_longwave"
+    total_heat_flux = "total_heat_flux"
+    evaporation = "evaporation"
+    precipitation = "precipitation"
+    bottom_stress = "bottom_stress"
+    wind_speed = "wind_speed"
+    wind_stress = "wind_stress"
+    dahv = "dahv"
+    vertical_velocity = "vertical_velocity"
+    temp = "temp"
+    salt = "salt"
+    water_density = "water_density"
+    diffusivity = "diffusivity"
+    viscosity = "viscosity"
+    TKE = "TKE"
+    mixing_length = "mixing_length"
+    hvel = "hvel"
+    hvel_side = "hvel_side"
+    wvel_elem = "wvel_elem"
+    temp_elem = "temp_elem"
+    salt_elem = "salt_elem"
+    pressure_gradient = "pressure_gradient"
+
+    @classmethod
+    def _missing_(cls, name):
+        raise ValueError(f"{name} is not a valid HYDRO output variable.")
+
+
+class IofDvdVariables(Enum):
+    DVD_1 = "DVD_1"
+
+    @classmethod
+    def _missing_(cls, name):
+        raise ValueError(f"{name} is not a valid DVD output variable.")
+
+
+class IofWwmVariables(Enum):
+    WWM_1 = "WWM_1"
+    WWM_2 = "WWM_2"
+    WWM_3 = "WWM_3"
+    WWM_4 = "WWM_4"
+    WWM_5 = "WWM_5"
+    WWM_6 = "WWM_6"
+    WWM_9 = "WWM_9"
+    WWM_10 = "WWM_10"
+    WWM_11 = "WWM_11"
+    WWM_12 = "WWM_12"
+    WWM_13 = "WWM_13"
+    WWM_14 = "WWM_14"
+    WWM_15 = "WWM_15"
+    WWM_16 = "WWM_16"
+    WWM_17 = "WWM_17"
+    WWM_18 = "WWM_18"
+    WWM_19 = "WWM_19"
+    WWM_20 = "WWM_20"
+    WWM_21 = "WWM_21"
+    WWM_22 = "WWM_22"
+    WWM_23 = "WWM_23"
+    WWM_24 = "WWM_24"
+    WWM_25 = "WWM_25"
+    WWM_26 = "WWM_26"
+    WWM_27 = "WWM_27"
+    WWM_28 = "WWM_28"
+    WWM_energy_dir = "WWM_energy_dir"
+    wave_force = "wave_force"
+
+    @classmethod
+    def _missing_(cls, name):
+        raise ValueError(f"{name} is not a valid WWM output variable.")
+
+
+class IofGenVariables(Enum):
+    GEN_1 = "GEN_1"
+    GEN_2 = "GEN_2"
+
+    @classmethod
+    def _missing_(cls, name):
+        raise ValueError(f"{name} is not a valid GEN output variable.")
+
+
+class IofAgeVariables(Enum):
+    AGE_1 = "AGE_1"
+    AGE_2 = "AGE_2"
+
+    @classmethod
+    def _missing_(cls, name):
+        raise ValueError(f"{name} is not a valid AGE output variable.")
+
+
+class IofSedVariables(Enum):
+    SED_depth_change = "SED_depth_change"
+    SED_D50 = "SED_D50"
+    SED_bed_stress = "SED_bed_stress"
+    SED_bed_roughness = "SED_bed_roughness"
+    SED_TSC = "SED_TSC"
+    bed_thickness = "bed_thickness"
+    bed_age = "bed_age"
+    z0st = "z0st"
+    z0cr = "z0cr"
+    z0sw = "z0sw"
+    z0wr = "z0wr"
+    SED3D_1 = "SED3D_1"
+    SED_bdld_1 = "SED_bdld_1"
+    SED_bedfrac_1 = "SED_bedfrac_1"
+    SED3D_2 = "SED3D_2"
+    SED_bdld_2 = "SED_bdld_2"
+    SED_bedfrac_3 = "SED_bedfrac_3"
+
+    @classmethod
+    def _missing_(cls, name):
+        raise ValueError(f"{name} is not a valid SED output variable.")
+
+
+class IofEcoVariables(Enum):
+    ECO_1 = "ECO_1"
+
+    @classmethod
+    def _missing_(cls, name):
+        raise ValueError(f"{name} is not a valid ECO output variable.")
+
+
+class IofIcmVariables(Enum):
+    ICM_Chl = "ICM_Chl"
+    ICM_pH = "ICM_pH"
+    ICM_PrmPrdt = "ICM_PrmPrdt"
+    ICM_DIN = "ICM_DIN"
+    ICM_PON = "ICM_PON"
+    ICM_SED_BENDOC = "ICM_SED_BENDOC"
+    ICM_SED_BENNH4 = "ICM_SED_BENNH4"
+    ICM_SED_BENNO3 = "ICM_SED_BENNO3"
+    ICM_SED_BENPO4 = "ICM_SED_BENPO4"
+    ICM_SED_BENCOD = "ICM_SED_BENCOD"
+    ICM_SED_BENDO = "ICM_SED_BENDO"
+    ICM_SED_BENSA = "ICM_SED_BENSA"
+    ICM_lfsav = "ICM_lfsav"
+    ICM_stsav = "ICM_stsav"
+    ICM_rtsav = "ICM_rtsav"
+    ICM_tlfsav = "ICM_tlfsav"
+    ICM_tstsav = "ICM_tstsav"
+    ICM_trtsav = "ICM_trtsav"
+    ICM_hcansav = "ICM_hcansav"
+    ICM_CNH4 = "ICM_CNH4"
+    ICM_CNH3 = "ICM_CNH3"
+    ICM_CPIP = "ICM_CPIP"
+    ICM_CPOS = "ICM_CPOS"
+    ICM_CCH4 = "ICM_CCH4"
+    ICM_CSO4 = "ICM_CSO4"
+    ICM_CH2S = "ICM_CH2S"
+    ICM_SEDPON1 = "ICM_SEDPON1"
+    ICM_SEDPON2 = "ICM_SEDPON2"
+    ICM_SEDPON3 = "ICM_SEDPON3"
+    ICM_SEDPOP1 = "ICM_SEDPOP1"
+    ICM_SEDPOP2 = "ICM_SEDPOP2"
+    ICM_SEDPOP3 = "ICM_SEDPOP3"
+    ICM_SEDPOC1 = "ICM_SEDPOC1"
+    ICM_SEDPOC2 = "ICM_SEDPOC2"
+    ICM_SEDPOC3 = "ICM_SEDPOC3"
+    ICM_EROH2S = "ICM_EROH2S"
+    ICM_EROLPOC = "ICM_EROLPOC"
+    ICM_ERORPOC = "ICM_ERORPOC"
+    ICM_DO_consumption = "ICM_DO_consumption"
+    ICM_GP1 = "ICM_GP1"
+    ICM_GP2 = "ICM_GP2"
+    ICM_GP3 = "ICM_GP3"
+    ICM_1 = "ICM_1"
+    ICM_2 = "ICM_2"
+    ICM_3 = "ICM_3"
+    ICM_4 = "ICM_4"
+    ICM_5 = "ICM_5"
+    ICM_6 = "ICM_6"
+    ICM_7 = "ICM_7"
+    ICM_8 = "ICM_8"
+    ICM_9 = "ICM_9"
+    ICM_10 = "ICM_10"
+    ICM_11 = "ICM_11"
+    ICM_12 = "ICM_12"
+    ICM_13 = "ICM_13"
+    ICM_14 = "ICM_14"
+    ICM_15 = "ICM_15"
+    ICM_16 = "ICM_16"
+    ICM_17 = "ICM_17"
+    ICM_18 = "ICM_18"
+    ICM_19 = "ICM_19"
+    ICM_20 = "ICM_20"
+    ICM_21 = "ICM_21"
+    ICM_22 = "ICM_22"
+    ICM_23 = "ICM_23"
+    ICM_24 = "ICM_24"
+    ICM_25 = "I6CM_25"
+
+    @classmethod
+    def _missing_(cls, name):
+        raise ValueError(f"{name} is not a valid ICM output variable.")
+
+
+class IofCosVariables(Enum):
+    COS_1 = "COS_1"
+    COS_2 = "COS_2"
+    COS_3 = "COS_3"
+    COS_4 = "COS_4"
+    COS_5 = "COS_5"
+    COS_6 = "COS_6"
+    COS_7 = "COS_7"
+    COS_8 = "COS_8"
+    COS_9 = "COS_9"
+    COS_10 = "COS_10"
+    COS_11 = "COS_11"
+    COS_12 = "COS_12"
+    COS_13 = "COS_13"
+
+    @classmethod
+    def _missing_(cls, name):
+        raise ValueError(f"{name} is not a valid COS output variable.")
+
+
+class IofFibVariables(Enum):
+    FIB_1 = "FIB_1"
+
+    @classmethod
+    def _missing_(cls, name):
+        raise ValueError(f"{name} is not a valid FIB output variable.")
+
+
+class IofSed2dVariables(Enum):
+    SED2D_depth_change = "SED2D_depth_change"
+    SED2D_drag_coefficient = "SED2D_drag_coefficient"
+    SED2D_cflsed = "SED2D_cflsed"
+    SED2D_d50 = "SED2D_d50"
+    SED2D_total_transport = "SED2D_total_transport"
+    SED2D_susp_load = "SED2D_susp_load"
+    SED2D_bed_load = "SED2D_bed_load"
+    SED2D_average_transport = "SED2D_average_transport"
+    SED2D_bottom_slope = "SED2D_bottom_slope"
+    z0eq = "z0eq"
+    z0cr2d = "z0cr2d"
+    z0sw2d = "z0sw2d"
+    z0wr2d = "z0wr2d"
+
+    @classmethod
+    def _missing_(cls, name):
+        raise ValueError(f"{name} is not a valid SED2D output variable.")
+
+
+class IofMarshVariables(Enum):
+    marsh_flag = "marsh_flag"
+
+    @classmethod
+    def _missing_(cls, name):
+        raise ValueError(f"{name} is not a valid MARSH output variable.")
+
+
+class IofIceVariables(Enum):
+    ICE_velocity = "ICE_velocity"
+    ICE_strain_rate = "ICE_strain_rate"
+    ICE_net_heat_flux = "ICE_net_heat_flux"
+    ICE_fresh_water_flux = "ICE_fresh_water_flux"
+    ICE_top_T = "ICE_top_T"
+    ICE_tracer_1 = "ICE_tracer_1"
+    ICE_tracer_2 = "ICE_tracer_2"
+    ICE_tracer_3 = "ICE_tracer_3"
+
+    @classmethod
+    def _missing_(cls, name):
+        raise ValueError(f"{name} is not a valid ICE output variable.")
+
+
+class IofAnaVariables(Enum):
+    ANA_air_pres_grad_x = "ANA_air_pres_grad_x"
+    ANA_air_pres_grad_y = "ANA_air_pres_grad_y"
+    ANA_tide_pot_grad_x = "ANA_tide_pot_grad_x"
+    ANA_tide_pot_grad_y = "ANA_tide_pot_grad_y"
+    ANA_hor_viscosity_x = "ANA_hor_viscosity_x"
+    ANA_hor_viscosity_y = "ANA_hor_viscosity_y"
+    ANA_bclinic_force_x = "ANA_bclinic_force_x"
+    ANA_bclinic_force_y = "ANA_bclinic_force_y"
+    ANA_vert_viscosity_x = "ANA_vert_viscosity_x"
+    ANA_vert_viscosity_y = "ANA_vert_viscosity_y"
+    ANA_mom_advection_x = "ANA_mom_advection_x"
+    ANA_mom_advection_y = "ANA_mom_advection_y"
+    ANA_Richardson = "ANA_Richardson"
+    ANA_transport_min_dt_elem = "ANA_transport_min_dt_elem"
+
+    @classmethod
+    def _missing_(cls, name):
+        raise ValueError(f"{name} is not a valid ANA output variable.")
+
+
+class StationOutputVariables(Enum):
     """Enumeration for stations output variables """
     ELEVATION = 'elev'
     AIR_PRESSURE = 'air_pressure'
@@ -14,7 +321,7 @@ class StationOutputVars(Enum):
     W = 'w'
 
     @classmethod
-    def _missing_(self, name):
+    def _missing_(cls, name):
         raise ValueError(f"{name} is not a valid station output variable.")
 
 
@@ -35,10 +342,6 @@ class OutputVariableUnit(Enum):
     ELEVATION = 'meters'
 
 
-class OutputVariableShortName(Enum):
-    ELEVATION = 'elev'
-
-
 class NWSType(Enum):
     """Atmospheric forcing type required by param.nml"""
     TIME_HISTORY = 1
@@ -49,6 +352,28 @@ class NWSType(Enum):
     @classmethod
     def _missing_(self, name):
         raise ValueError(f"{name} is not a valid NWS type.")
+
+
+class ForecastProduct(Enum):
+    GDAS = 'gdas_0p25'
+    GDAS_0P25 = 'gdas_0p25'
+    GFS = 'gfs_0p25_1hr'
+    GFS_0P25 = 'gfs_0p25'
+    GFS_0P25_1HR = 'gfs_0p25_1hr'
+    GFS_0P50 = 'gfs_0p50'
+    GFS_1P00 = 'gfs_1p00'
+
+    @classmethod
+    def _missing_(self, name):
+        ValueError(f'{name} is not a known atmospheric forecast product for '
+                   'air.')
+
+
+class GFSProduct(Enum):
+    GFS_0P25 = 'gfs_0p25'
+    GFS_0P25_1HR = 'gfs_0p25_1hr'
+    GFS_0P50 = 'gfs_0p50'
+    GFS_1P00 = 'gfs_1p00'
 
 
 class ForecastCycle(Enum):
@@ -339,7 +664,7 @@ class SchoutType(Enum):
     iof_ana = iof_ana
 
 
-class SchoutStrType(Enum):
+class SchoutIofType(str, Enum):
     iof_hydro = 'iof_hydro'
     iof_dvd = 'iof_dvd'
     iof_wwm = 'iof_wwm'
@@ -358,3 +683,13 @@ class SchoutStrType(Enum):
     @classmethod
     def _missing_(self, name):
         raise ValueError(f"{name} is not a valid SCHISM output type.")
+
+
+class OutputVariableShortName(Enum):
+
+    ELEVATION = 'elev'
+
+    @classmethod
+    def _missing_(self, name):
+        raise ValueError(
+            f"{name} is not a valid SCHISM output variable short name")

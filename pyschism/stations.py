@@ -10,7 +10,7 @@ from shapely.geometry import (   # type: ignore[import]
 )
 
 from pyschism.enums import (
-    StationOutputVars,
+    StationOutputVariables,
     StationOutputIndex
 )
 
@@ -121,9 +121,9 @@ class Stations:
                 states[i] = kwargs.get(
                     StationOutputIndex(i).name.lower(), False)
             stations = Stations(nspool_sta, crs=crs,
-                                **{var.name.lower(): bool(states[i])
+                                **{var.value: bool(states[i])
                                     for i, var in
-                                    enumerate(StationOutputVars)})
+                                    enumerate(StationOutputVariables)})
             comment: Union[str, None] = None
             for i in range(int(f.readline().split()[0])):
                 line = f.readline().split()
@@ -154,8 +154,8 @@ class Stations:
         Returns:
             list of strings for each active station output request.
         """
-        return [var.name.lower() for var in StationOutputVars
-                if getattr(self, var.name.lower()) is True]
+        return [var.value for var in StationOutputVariables
+                if getattr(self, var.value) is True]
 
     def transform_to(self, dst_crs: Union[str, CRS]):
         """Transforms the horizontal coordinates of the stations.
@@ -228,8 +228,8 @@ class Stations:
     @property
     def state(self) -> str:
         """Returns corresponding string that goes into bctide.in"""
-        return ' '.join([str(int(getattr(self, var.name.lower())))
-                         for var in StationOutputVars])
+        return ' '.join([str(int(getattr(self, var.value)))
+                         for var in StationOutputVariables])
 
     @property
     def elev(self) -> bool:
