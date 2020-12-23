@@ -9,8 +9,7 @@ from pyschism.forcing.tides.bctypes import BoundaryCondition
 from pyschism.forcing.tides.tides import Tides
 from pyschism.forcing.atmosphere.nws import NWS
 from pyschism.forcing.atmosphere.nws.nws2 import NWS2
-from pyschism.mesh import Hgrid, Vgrid
-from pyschism.mesh.friction import Fgrid
+from pyschism.mesh import Hgrid, Vgrid, Fgrid
 from pyschism.enums import Coriolis
 
 
