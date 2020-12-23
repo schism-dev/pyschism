@@ -3,25 +3,16 @@ import argparse
 from enum import Enum
 import pathlib
 
-from pyschism.cmd.forecastd import Forecastd
-from pyschism.cmd.generate_forecast import GenerateForecastCli
-from pyschism.cmd.viewerd import Viewerd
-from pyschism.cmd.plotting import OutputPlotCli
+from pyschism.cmd.forecast import GenerateForecastCli
 from pyschism.enums import ForecastProduct
 
 
 class Dispatch(Enum):
-    FORECASTD_DAEMON = Forecastd
     GENERATE_FORECAST = GenerateForecastCli
-    PLOTTING = OutputPlotCli
-    VIEWER = Viewerd
 
 
 class Env(Enum):
-    FORECASTD_DAEMON = 'forecastd'
     GENERATE_FORECAST = 'forecast'
-    PLOTTING = 'plot'
-    VIEWER = 'viewerd'
 
 
 def add_forecast(subparsers):

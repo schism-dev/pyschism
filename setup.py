@@ -1,6 +1,7 @@
 #!/usr/bin/env python
-
 import pathlib
+import setuptools  # type: ignore[import]
+
 try:
     from dunamai import Version
 except ImportError:
@@ -11,7 +12,6 @@ except ImportError:
     from dunamai import Version  # type: ignore[import]
 
 
-import setuptools  # type: ignore[import]
 parent = pathlib.Path(__file__).parent.absolute()
 conf = setuptools.config.read_configuration(parent / 'setup.cfg')
 meta = conf['metadata']
@@ -26,7 +26,8 @@ setuptools.setup(
     url=meta['url'],
     packages=setuptools.find_packages(),
     python_requires='>=3.6',
-    setup_requires=['setuptools_scm', 'setuptools>=41.2'],
+    setup_requires=['setuptools_scm', 'setuptools>=41.2',
+                    'netcdf-flattener>=1.2.0'],
     include_package_data=True,
     extras_require={'dev': ['coverage', 'flake8', 'nose']},
     install_requires=[
@@ -43,12 +44,9 @@ setuptools.setup(
         'cf-python',
         'sqlalchemy',
         'pyugrid',
+        'pytz',
     ],
-    entry_points={
-        'console_scripts': [
-            'pyschism = pyschism.__main__:main'
-        ]
-    },
+    entry_points={'console_scripts': ['pyschism = pyschism.__main__:main']},
     tests_require=['nose'],
     test_suite='nose.collector',
 )
