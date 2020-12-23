@@ -136,7 +136,7 @@ def add_plot(subparsers):
 def parse_args():
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest='mode')
-    add_forecastd(subparsers)
+    # add_forecastd(subparsers)
     add_forecast(subparsers)
     add_plot(subparsers)
     # add_viewerd(subparsers)
