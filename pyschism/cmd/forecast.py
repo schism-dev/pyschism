@@ -166,8 +166,8 @@ class ColdstartDomainDescriptor:
                 obj.hgrid_path, obj.fgrid_path,
                 # TODO: Vgrid.open() raises NotImplementedError
                 # obj.vgrid_path,
-                # hgrid_crs=obj.args.hgrid_crs,
-                # fgrid_crs=obj.args.fgrid_crs
+                hgrid_crs=obj.args.hgrid_crs,
+                fgrid_crs=obj.args.fgrid_crs
             )
             if obj.tides is not None:
                 model_domain.add_boundary_condition(obj.tides)
@@ -204,12 +204,12 @@ class HotstartDomainDescriptor:
         model_domain = obj.__dict__.get('hotstart_domain')
         if model_domain is None:
             model_domain = ModelDomain.open(
-                obj.hgrid_path, obj.fgrid_path,
+                obj.hgrid_path,
+                obj.fgrid_path,
                 # TODO: Vgrid.open() raises NotImplementedError
                 # obj.vgrid_path,
-                # hgrid_crs=obj.args.hgrid_crs,
-                # fgrid_crs=obj.args.fgrid_crs
-            )
+                hgrid_crs=obj.args.hgrid_crs,
+                fgrid_crs=obj.args.fgrid_crs)
             if obj.tides is not None:
                 model_domain.add_boundary_condition(obj.tides)
             if obj.nws2 is not None:
