@@ -50,7 +50,7 @@ class Fgrid(Gr3):
         filename = pathlib.Path(file).name
         return FrictionDispatch[
             FrictionFilename(filename).name].value(
-                **grd.read(pathlib.Path(file), boundaries=False))
+                **grd.read(pathlib.Path(file), boundaries=False, crs=crs))
 
 
 class ManningsN(Fgrid):

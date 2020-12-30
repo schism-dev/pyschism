@@ -2,7 +2,7 @@ from importlib import util
 from pyschism.param import Param
 from pyschism.stations import Stations
 from pyschism.domain import ModelDomain
-from pyschism.model import ModelDriver
+from pyschism.driver import ModelDriver
 
 __all__ = ["Param", "ModelDomain", 'ModelDriver', 'Stations']
 

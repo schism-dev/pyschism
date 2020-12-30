@@ -160,15 +160,14 @@ class Bctides:
                  f'{forcing[3]:G} ' \
                  f'{forcing[4]:G}\n'
         f += f"{len(self._model_domain.open_boundaries)}\n"  # nope
-        for id in self._model_domain.open_boundaries:
-            boundary = self._model_domain.open_boundaries[id]
-            f += f"{len(boundary['indexes'])} " \
-                 f'{str(boundary["forcing"])}\n' \
-                 f'{iettypeWritter[boundary["forcing"].iettype.name].value(boundary, self)}' \
-                 f'{ifltypeWritter[boundary["forcing"].ifltype.name].value(boundary, self)}' \
-                 f'{itetypeWritter[boundary["forcing"].itetype.name].value(boundary, self)}' \
-                 f'{isatypeWritter[boundary["forcing"].isatype.name].value(boundary, self)}' \
-                 f'{itrtypeWritter[boundary["forcing"].itrtype.name].value(boundary, self)}'
+        for id, data in self._model_domain.open_boundaries:
+            f += f"{len(data['indexes'])} " \
+                 f'{str(data["forcing"])}\n' \
+                 f'{iettypeWritter[data["forcing"].iettype.name].value(data, self)}' \
+                 f'{ifltypeWritter[data["forcing"].ifltype.name].value(data, self)}' \
+                 f'{itetypeWritter[data["forcing"].itetype.name].value(data, self)}' \
+                 f'{isatypeWritter[data["forcing"].isatype.name].value(data, self)}' \
+                 f'{itrtypeWritter[data["forcing"].itrtype.name].value(data, self)}'
         return f
 
     @lru_cache(maxsize=1)
@@ -179,8 +178,8 @@ class Bctides:
         # on each boundary and activate them all globally
         # set active tidal potential constituents
         const = dict()
-        for id in self._model_domain.open_boundaries:
-            forcing = self._model_domain.open_boundaries[id]['forcing']
+        for id, data in self._model_domain.open_boundaries:
+            forcing = data['forcing']
             if isinstance(forcing, Tides):
                 for active in forcing.get_active_potential_constituents():
                     const[active] = True
@@ -190,8 +189,8 @@ class Bctides:
     def get_active_forcing_constituents(self):
         # set active tidal forcing constituents
         const = dict()
-        for id in self._model_domain.open_boundaries:
-            forcing = self._model_domain.open_boundaries[id]['forcing']
+        for id, data in self._model_domain.open_boundaries:
+            forcing = data['forcing']
             if isinstance(forcing, Tides):
                 for active in forcing.get_active_forcing_constituents():
                     const[active] = True

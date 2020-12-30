@@ -47,7 +47,8 @@ class WindRotDescriptor:
                             f'not type {type(grd)}.')
         data = grd.to_dict()
         data.pop("boundaries", None)
-        data["values"] = [0. for i in range(len(data["values"]))]
+        data["nodes"] = {id: (coord, 0.) for id, (coord, _)
+                         in data["nodes"].items()}
         obj.__dict__['windrot'] = Gr3(**data)
 
     def __get__(self, obj, val):

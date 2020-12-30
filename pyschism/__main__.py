@@ -3,8 +3,10 @@ import argparse
 from enum import Enum
 import pathlib
 
-from pyschism.cmd.forecast import GenerateForecastCli
-from pyschism.enums import ForecastProduct
+from psutil import cpu_count  # type: ignore[import]
+
+from .cmd.forecast import GenerateForecastCli
+from .enums import ForecastProduct
 
 
 class Dispatch(Enum):
@@ -15,12 +17,7 @@ class Env(Enum):
     GENERATE_FORECAST = 'forecast'
 
 
-def add_forecast(subparsers):
-    forecast = subparsers.add_parser('forecast')
-    forecast.add_argument(
-            "--overwrite", action="store_true",
-            help="Allow overwrite of output directory.")
-    actions = forecast.add_subparsers(dest="action")
+def add_forecast_init(actions):
     init = actions.add_parser("init")
     init.add_argument("project_directory")
     init.add_argument('hgrid', help='Horizontal grid file.')
@@ -45,6 +42,7 @@ def add_forecast(subparsers):
     init.add_argument(
             "--skip-run", action="store_true",
             help="Skips running the model.")
+    init.add_argument('--nproc', type=int, default=cpu_count(logical=False))
     _add_tidal_constituents(init)
     _add_atmospheric_forcing(init)
     _add_source_forcing(init)
@@ -57,10 +55,9 @@ def add_forecast(subparsers):
     server_config = init.add_subparsers(dest="server_config")
     slurm = server_config.add_parser(
         'slurm', help="Add options for slurm run configuration.")
-    slurm.add_argument('account')
-    slurm.add_argument('ntasks', type=int)
-    slurm.add_argument('partition')
-    slurm.add_argument('walltime', type=float, help="In hours, float.")
+    slurm.add_argument('--account')
+    slurm.add_argument('--partition')
+    slurm.add_argument('--walltime', type=float, help="In hours, float.")
     slurm.add_argument('--slurm-filename')
     slurm.add_argument('--slurm-rundir')
     slurm.add_argument('--run-name')
@@ -77,8 +74,20 @@ def add_forecast(subparsers):
         action='append',
         dest='modules')
 
+
+def add_forecast_update(actions):
     update = actions.add_parser("update")
     update.add_argument("project_directory")
+
+
+def add_forecast(subparsers):
+    forecast = subparsers.add_parser('forecast')
+    forecast.add_argument(
+            "--overwrite", action="store_true",
+            help="Allow overwrite of output directory.")
+    actions = forecast.add_subparsers(dest="action")
+    add_forecast_init(actions)
+    add_forecast_update(actions)
 
 
 def add_forecastd(subparsers):
