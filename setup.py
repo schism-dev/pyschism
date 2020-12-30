@@ -43,6 +43,7 @@ setuptools.setup(
         'appdirs',
         'cf-python',
         'sqlalchemy',
+        'geopandas',
         'pyugrid',
         'pytz',
     ],

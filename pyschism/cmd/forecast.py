@@ -8,14 +8,14 @@ import subprocess
 
 from dateutil.parser import parse as parse_datetime
 import numpy as np  # type: ignore[import]
-import psutil  # type: ignore[import]
+# import psutil  # type: ignore[import]
 import pytz
 
 from pyschism.forcing import GlobalForecastSystem as GFS
 from pyschism.forcing import Tides
 from pyschism.mesh import Vgrid
 from pyschism.server.slurm import SlurmConfig
-from pyschism.model import ModelDriver
+from pyschism.driver import ModelDriver
 from pyschism.domain import ModelDomain
 from pyschism.forcing.atmosphere import NWS2
 from pyschism.param.schout import SurfaceOutputVars
@@ -101,7 +101,7 @@ class ProjectDirectory:
         project_directory = obj.__dict__.get('project_directory')
         if project_directory is None:
             project_directory = pathlib.Path(obj.args.project_directory)
-            project_directory.mkdir(exist_ok=True)
+            project_directory.mkdir(parents=True, exist_ok=True)
             obj.__dict__['project_directory'] = project_directory
         return project_directory
 
@@ -233,6 +233,7 @@ class HotstartModelDriver:
                 # stations=obj.stations,
                 nspool=obj.nspool,
                 combine_hotstart=obj.previous_run_directory / 'outputs',
+                server_config=obj.server_config,
                 **obj.surface_outputs
                 )
             obj.__dict__['hotstart_driver'] = hotstart_driver
@@ -387,8 +388,8 @@ class WindrotPath:
             if obj.args.overwrite is True and windrot_path.exists():
                 windrot_path.unlink()
             if not windrot_path.exists():
-                obj.hotstart._nws._windrot = obj.hotstart_domain.hgrid
-                obj.hotstart._nws._windrot.write(
+                obj.hotstart.nws._windrot = obj.hotstart_domain.hgrid
+                obj.hotstart.nws._windrot.write(
                     windrot_path, overwrite=obj.args.overwrite)
             obj.__dict__['windrot_path'] = windrot_path
         return windrot_path
@@ -405,14 +406,14 @@ class ServerConfigDescriptor:
             if obj.args.server_config == "slurm":
                 kwargs = {
                     "account": obj.args.account,
-                    "ntasks": obj.args.ntasks,
+                    "ntasks": obj.args.nproc,
                     "partition": obj.args.partition,
-                    "walltime": timedelta(hours=obj.args.walltime),
+                    "walltime": obj.args.walltime,
                     "mail_type": obj.args.mail_type,
                     "mail_user": obj.args.mail_user,
                     "log_filename": obj.args.log_filename,
                     "modules": obj.args.modules,
-                    "path_prefix": obj.args.path_prefix,
+                    # "schism_binary": obj.args.schism_binary,
                     "extra_commands": obj.args.extra_commands,
                     "launcher": obj.args.slurm_launcher,
                     "nodes": obj.args.slurm_nodes}
@@ -489,17 +490,17 @@ class GenerateForecastCli:
 
     def __init__(self, args: Namespace):
         self.args = args
+        # self.run()
 
     def generate_coldstart(self):
         self._symlink_files(self.coldstart_directory,
                             self.coldstart_domain.ics)
         self.coldstart.write(self.coldstart_directory, hgrid=False,
-                             vgrid=False, fgrid=False, driver_file=False,
+                             vgrid=False, fgrid=False,
                              overwrite=self.args.overwrite)
-        if self.server_config is None:
+        if self.args.skip_run is False:
             subprocess.check_call(
-                ['mpiexec', '-n', f"{psutil.cpu_count(logical=False)}",
-                 'pschism_TVD-VL'], cwd=self.coldstart_directory)
+                ["make", "run"], cwd=self.coldstart_directory)
 
     def generate_forecast(self):
         self._symlink_files(self.target_output_directory,
@@ -507,13 +508,12 @@ class GenerateForecastCli:
                             windrot=True
                             )
         self.hotstart.write(self.target_output_directory, hgrid=False,
-                            vgrid=False, fgrid=False, driver_file=False,
-                            wind_rot=False,
+                            vgrid=False, fgrid=False, wind_rot=False,
                             overwrite=self.args.overwrite)
-        if self.server_config is None:
+
+        if self.args.skip_run is False:
             subprocess.check_call(
-                ['mpiexec', '-n', f"{psutil.cpu_count(logical=False)}",
-                 'pschism_TVD-VL'], cwd=self.target_output_directory)
+                ["make", "run"], cwd=self.target_output_directory)
 
     def _symlink_files(self, target_directory, ics, windrot=False):
         hgrid_lnk = target_directory / 'hgrid.gr3'

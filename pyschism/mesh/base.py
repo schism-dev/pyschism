@@ -1,110 +1,30 @@
 from abc import ABC
 from collections import defaultdict
+from functools import lru_cache
+from itertools import permutations
 import os
 import pathlib
-from typing import Union, Sequence, Hashable, List
+from typing import Union, Sequence, Hashable, List, Dict
 
+import geopandas as gpd  # type: ignore[import]
 from matplotlib.collections import PolyCollection  # type: ignore[import]
 from matplotlib.path import Path  # type: ignore[import]
 from matplotlib.tri import Triangulation  # type: ignore[import]
 from matplotlib.transforms import Bbox  # type: ignore[import]
 import numpy as np  # type: ignore[import]
 from pyproj import Transformer, CRS  # type: ignore[import]
-from shapely.geometry import MultiPolygon, Polygon  # type: ignore[import]
+from shapely.geometry import (  # type: ignore[import]
+    MultiPolygon,
+    Polygon,
+    LineString,
+    LinearRing,
+)
 
 from pyschism.mesh.parsers import grd
-from pyschism import figures as fig
+from pyschism.figures import figure
 
 
-class Vertices:
-
-    def __set__(self, obj, vertices):
-        vertices = np.array(vertices)
-        if vertices.shape[1] != 2:
-            raise ValueError('Argument vertices must be castable to a Nx2 '
-                             'matrix, that is, only 2-dimensional meshes are '
-                             f'supported. Got shape {vertices.shape}')
-        obj.__dict__['vertices'] = vertices
-
-    def __get__(self, obj, val):
-        return obj.__dict__['vertices']
-
-
-class VertexId:
-
-    def __set__(self, obj, vertex_id):
-        vertex_id = np.array(vertex_id).flatten()
-        if np.max(vertex_id.shape) != np.max(obj.vertices.shape):
-            raise ValueError(f'Argument vertex_id has dimension mismatch with '
-                             f'vertices attribute. Got shape {vertex_id.shape}'
-                             ' but vertices attribute has shape '
-                             f'{self.vertices.shape}.')
-        obj.__dict__['vertex_id'] = vertex_id.tolist()
-
-    def __get__(self, obj, val):
-        return obj.__dict__['vertex_id']
-
-
-class Elements:
-
-    def __set__(self, obj, elements: Sequence):
-        if not isinstance(elements, Sequence):
-            raise TypeError('Argument elements must be iterable.')
-        vertex_id_set = set(obj.vertex_id)
-        for i, element in enumerate(elements):
-            if not isinstance(element, Sequence):
-                raise TypeError(f'Element with index {i} of the elements '
-                                f'argument must be of type {Sequence}, not '
-                                f'type {type(element)}.')
-            if not set(element).issubset(vertex_id_set):
-                ValueError(f'Element with index {i} is not a subset of the '
-                           "coordinate id's.")
-        obj.__dict__['elements'] = elements
-
-    def __get__(self, obj, val):
-        return obj.__dict__['elements']
-
-
-class ElementId:
-
-    def __set__(self, obj, element_id: Union[Sequence, None]):
-        if element_id is None:
-            element_id = list(range(len(obj._elements)))
-        else:
-            if not isinstance(element_id, Sequence):
-                raise TypeError('Argument element_id must be iterable.')
-            if len(element_id) != len(obj.elements):
-                ValueError(
-                    "Argument element_id has dimension mismatch with elements "
-                    f'table. There are {obj.elements.shape[0]} elements, but '
-                    f"{len(element_id)} element id's were given.")
-        obj.__dict__['element_id'] = element_id
-
-    def __get__(self, obj, val):
-        return obj.__dict__['element_id']
-
-
-class Values:
-
-    def __set__(self, obj, values):
-        if values is not None:
-            if not isinstance(values, Sequence):
-                raise TypeError('Argument values must be a sequence type, not '
-                                f'type {type(values)}.')
-            values = np.array(values)
-            if obj._vertices.shape[0] != values.shape[0]:
-                raise TypeError('Dimension mismatch: First dimension of values '
-                                'argument must match the first dimension of the '
-                                'vertices.')
-        else:
-            values = np.full(obj._vertices.shape, np.nan)
-        obj.__dict__['values'] = np.ma.masked_equal(values, np.nan)
-
-    def __get__(self, obj, val):
-        return obj.__dict__['values']
-
-
-class Header:
+class Description:
 
     def __set__(self, obj, description):
         if description is None:
@@ -118,6 +38,147 @@ class Header:
         return obj.__dict__['description']
 
 
+class Nodes:
+
+    def __set__(self, obj: "Gr3", nodes: Dict[Hashable, List[List]]):
+        """Setter for the nodes attribute.
+
+        Argument nodes must be of the form:
+            {id: [(x0, y0), z0]}
+            or
+            {id: [(x0, y0), [z0, ..., zn]}
+
+        Gr3 format is assumed to be exclusively a 2D format that can hold
+        triangles or quads.
+
+        """
+        for coords, _ in nodes.values():
+            if len(coords) != 2:
+                raise ValueError(
+                    'Coordinate vertices for a gr3 type must be 2D, but got '
+                    f'coordinates {coords}.')
+        obj.__dict__['nodes'] = nodes
+        self.gr3 = obj
+        # self.ball = NodeBall(self.gr3)
+
+        obj.__dict__['id_to_index'] = {
+            self.id()[i]: i for i in range(len(self.id()))}
+
+        obj.__dict__['index_to_id'] = {
+            i: self.id()[i] for i in range(len(self.id()))}
+
+    def __call__(self):
+        return self.gr3.__dict__['nodes']
+
+    @lru_cache(maxsize=1)
+    def id(self):
+        return list(self().keys())
+
+    @lru_cache(maxsize=1)
+    def index(self):
+        return np.arange(len(self()))
+
+    @lru_cache(maxsize=1)
+    def coord(self):
+        return np.array([coords for coords, _ in self().values()])
+
+    @lru_cache(maxsize=1)
+    def values(self):
+        return np.array([val for _, val in self().values()])
+
+    def get_index_by_id(self, id: Hashable):
+        return self.gr3.__dict__['id_to_index'][id]
+
+    def get_id_by_index(self, index: int):
+        return self.gr3.__dict__['index_to_id'][index]
+
+    def get_indexes_around_index(self, index):
+        indexes_around_index = self.__dict__.get('indexes_around_index')
+        if indexes_around_index is None:
+            def append(geom):
+                for simplex in geom:
+                    for i, j in permutations(simplex, 2):
+                        indexes_around_index[i].add(j)
+            indexes_around_index = defaultdict(set)
+            append(self.gr3.elements.triangles())
+            append(self.gr3.elements.quads())
+            self.__dict__['indexes_around_index'] = indexes_around_index
+        return list(indexes_around_index[index])
+
+
+class Elements:
+
+    def __set__(self, obj: "Gr3", elements: Dict[Hashable, Sequence]):
+        if not isinstance(elements, dict):
+            raise TypeError('Argument elements must be a dict.')
+        vertex_id_set = set(obj.nodes.id())
+        for i, element in enumerate(elements):
+            if not isinstance(element, Sequence):
+                raise TypeError(f'Element with index {i} of the elements '
+                                f'argument must be of type {Sequence}, not '
+                                f'type {type(element)}.')
+            if not set(element).issubset(vertex_id_set):
+                ValueError(f'Element with index {i} is not a subset of the '
+                           "coordinate id's.")
+        obj.__dict__['elements'] = elements
+        self.gr3 = obj
+
+    def __call__(self):
+        return self.gr3.__dict__["elements"]
+
+    @lru_cache(maxsize=1)
+    def id(self):
+        return list(self().keys())
+
+    @lru_cache(maxsize=1)
+    def index(self):
+        return np.arange(len(self()))
+
+    @lru_cache(maxsize=1)
+    def array(self):
+        rank = int(max(map(len, self().values())))
+        array = np.full((len(self()), rank), -1)
+        for i, element in enumerate(self().values()):
+            row = np.array(list(map(self.gr3.nodes.get_index_by_id, element)))
+            array[i, :len(row)] = row
+        return np.ma.masked_equal(array, -1)
+
+    @lru_cache(maxsize=1)
+    def triangles(self):
+        return np.array(
+            [list(map(self.gr3.nodes.get_index_by_id, element))
+             for element in self().values()
+             if len(element) == 3])
+
+    @lru_cache(maxsize=1)
+    def quads(self):
+        return np.array(
+            [list(map(self.gr3.nodes.get_index_by_id, element))
+             for element in self().values()
+             if len(element) == 4])
+
+    @lru_cache(maxsize=1)
+    def triangulation(self):
+        triangles = self.triangles().tolist()
+        for quad in self.quads():
+            triangles.append([quad[0], quad[1], quad[3]])
+            triangles.append([quad[1], quad[2], quad[3]])
+        return Triangulation(
+            self.gr3.nodes.coord()[:, 0],
+            self.gr3.nodes.coord()[:, 1],
+            triangles)
+
+    def geodataframe(self):
+        data = []
+        for id, element in self().items():
+            data.append({
+                'geometry': Polygon(
+                    self.gr3.nodes.coord()[list(
+                        map(self.gr3.nodes.get_index_by_id, element))]),
+                'id': id})
+        return gpd.GeoDataFrame(data, crs=self.gr3.crs)
+
+
 class Crs:
 
     def __set__(self, obj, val):
@@ -128,188 +189,152 @@ class Crs:
         return obj.__dict__.get('crs')
 
 
-class Tria3:
+class Edges:
 
-    def __get__(self, obj, val):
-        tria3 = obj.__dict__.get("tria3")
-        if tria3 is None:
-            tria3 = np.array(
-                [list(map(obj.get_vertex_index_by_id, element)) for element
-                 in obj.elements if len(element) == 3])
-            obj.__dict__['tria3'] = tria3
-        return tria3
+    def __init__(self, grd: "Gr3"):
+        self.gr3 = grd
+
+    @lru_cache(maxsize=1)
+    def __call__(self) -> gpd.GeoDataFrame:
+        data = []
+        for ring in self.gr3.hull.rings().itertuples():
+            coords = ring.geometry.coords
+            for i in range(1, len(coords)):
+                data.append({
+                    "geometry": LineString([coords[i-1], coords[i]]),
+                    "bnd_id": ring.bnd_id,
+                    "type": ring.type})
+        return gpd.GeoDataFrame(data, crs=self.gr3.crs)
+
+    @lru_cache(maxsize=1)
+    def exterior(self):
+        return self().loc[self()['type'] == 'exterior']
+
+    @lru_cache(maxsize=1)
+    def interior(self):
+        return self().loc[self()['type'] == 'interior']
 
 
-class Quad4:
+class Rings:
 
-    def __get__(self, obj, val):
-        if obj.__dict__.get("quad4") is None:
-            obj.__dict__["quad4"] = np.array(
-                [list(map(obj.get_vertex_index_by_id, element)) for element
-                 in obj.elements if len(element) == 4])
-        return obj.__dict__["quad4"]
+    def __init__(self, grd: "Gr3"):
+        self.gr3 = grd
 
-
-class IndexRingCollection:
-
-    def __get__(self, obj, val):
-
-        if obj.__dict__.get("index_ring_collection") is not None:
-            return obj.__dict__.get("index_ring_collection")
-
-        boundary_edges = list()
-        tri = obj.triangulation
-        idxs = np.vstack(
-            list(np.where(tri.neighbors == -1))).T
+    @lru_cache(maxsize=1)
+    def __call__(self) -> gpd.GeoDataFrame:
+        tri = self.gr3.elements.triangulation()
+        idxs = np.vstack(list(np.where(tri.neighbors == -1))).T
+        boundary_edges = []
         for i, j in idxs:
             boundary_edges.append(
-                (int(tri.triangles[i, j]),
-                    int(tri.triangles[i, (j+1) % 3])))
-        index_ring_collection = sort_edges(boundary_edges)
-        # sort index_rings into corresponding "polygons"
-        areas = list()
-        for index_ring in index_ring_collection:
-            e0, e1 = [list(t) for t in zip(*index_ring)]
-            areas.append(float(Polygon(obj.vertices[e0, :]).area))
+                (tri.triangles[i, j], tri.triangles[i, (j+1) % 3]))
+        sorted_rings = sort_rings(edges_to_rings(boundary_edges),
+                                  self.gr3.nodes.coord())
+        data = []
+        for bnd_id, rings in sorted_rings.items():
+            coords = self.gr3.nodes.coord()[rings['exterior'][:, 0], :]
+            geometry = LinearRing(coords)
+            data.append({
+                    "geometry": geometry,
+                    "bnd_id": bnd_id,
+                    "type": 'exterior'
+                })
+            for interior in rings['interiors']:
+                coords = self.gr3.nodes.coord()[interior[:, 0], :]
+                geometry = LinearRing(coords)
+                data.append({
+                    "geometry": geometry,
+                    "bnd_id": bnd_id,
+                    "type": 'interior'
+                })
+        return gpd.GeoDataFrame(data, crs=self.gr3.crs)
 
-        # maximum area must be main mesh
-        idx = areas.index(np.max(areas))
-        exterior = index_ring_collection.pop(idx)
-        areas.pop(idx)
-        _id = 0
-        _index_ring_collection = dict()
-        _index_ring_collection[_id] = {
-            'exterior': np.asarray(exterior),
-            'interiors': []
-            }
-        e0, e1 = [list(t) for t in zip(*exterior)]
-        path = Path(obj.vertices[e0 + [e0[0]], :], closed=True)
-        while len(index_ring_collection) > 0:
-            # find all internal rings
-            potential_interiors = list()
-            for i, index_ring in enumerate(index_ring_collection):
-                e0, e1 = [list(t) for t in zip(*index_ring)]
-                if path.contains_point(obj.vertices[e0[0], :]):
-                    potential_interiors.append(i)
-            # filter out nested rings
-            real_interiors = list()
-            for i, p_interior in reversed(
-                    list(enumerate(potential_interiors))):
-                _p_interior = index_ring_collection[p_interior]
-                check = [index_ring_collection[_]
-                         for j, _ in reversed(
-                            list(enumerate(potential_interiors)))
-                         if i != j]
-                has_parent = False
-                for _path in check:
-                    e0, e1 = [list(t) for t in zip(*_path)]
-                    _path = Path(obj.vertices[e0 + [e0[0]], :], closed=True)
-                    if _path.contains_point(
-                            obj.vertices[_p_interior[0][0], :]):
-                        has_parent = True
-                if not has_parent:
-                    real_interiors.append(p_interior)
-            # pop real rings from collection
-            for i in reversed(sorted(real_interiors)):
-                _index_ring_collection[_id]['interiors'].append(
-                    np.asarray(index_ring_collection.pop(i)))
-                areas.pop(i)
-            # if no internal rings found, initialize next polygon
-            if len(index_ring_collection) > 0:
-                idx = areas.index(np.max(areas))
-                exterior = index_ring_collection.pop(idx)
-                areas.pop(idx)
-                _id += 1
-                _index_ring_collection[_id] = {
-                    'exterior': np.asarray(exterior),
-                    'interiors': []
-                    }
-                e0, e1 = [list(t) for t in zip(*exterior)]
-                path = Path(obj.vertices[e0 + [e0[0]], :], closed=True)
-        obj.__dict__['index_ring_collection'] = _index_ring_collection
-        return obj.__dict__['index_ring_collection']
+    def exterior(self):
+        return self().loc[self()['type'] == 'exterior']
+
+    def interior(self):
+        return self().loc[self()['type'] == 'interior']
 
 
-class OuterRingCollection:
+class Hull:
 
-    def __get__(self, obj, val):
-        if obj.__dict__.get('outer_ring_collection') is None:
-            obj.__dict__['outer_ring_collection'] = defaultdict()
-            for key, ring in obj.index_ring_collection.items():
-                obj.__dict__['outer_ring_collection'][key] = ring['exterior']
-        return obj.__dict__['outer_ring_collection']
+    def __init__(self, grd: "Gr3"):
+        self.gr3 = grd
+        self.edges = Edges(grd)
+        self.rings = Rings(grd)
 
+    @lru_cache(maxsize=1)
+    def __call__(self) -> gpd.GeoDataFrame:
+        data = []
+        for bnd_id in np.unique(self.rings()['bnd_id'].tolist()):
+            exterior = self.rings().loc[
+                (self.rings()['bnd_id'] == bnd_id) &
+                (self.rings()['type'] == 'exterior')]
+            interiors = self.rings().loc[
+                (self.rings()['bnd_id'] == bnd_id) &
+                (self.rings()['type'] == 'interior')]
+            data.append({
+                    "geometry": Polygon(
+                        exterior.iloc[0].geometry.coords,
+                        [row.geometry.coords for _, row
+                            in interiors.iterrows()]),
+                    "bnd_id": bnd_id
+                })
+        return gpd.GeoDataFrame(data, crs=self.gr3.crs)
 
-class InnerRingCollection:
+    @lru_cache(maxsize=1)
+    def exterior(self):
+        data = []
+        for exterior in self.rings().loc[
+                self.rings()['type'] == 'exterior'].itertuples():
+            data.append({"geometry": Polygon(exterior.geometry.coords)})
+        return gpd.GeoDataFrame(data, crs=self.gr3.crs)
 
-    def __get__(self, obj, val):
-        if obj.__dict__.get('inner_ring_collection') is None:
-            obj.__dict__['inner_ring_collection'] = defaultdict()
-            for key, rings in obj.index_ring_collection.items():
-                obj.__dict__['inner_ring_collection'][key] = rings['interiors']
-        return obj.__dict__['inner_ring_collection']
+    @lru_cache(maxsize=1)
+    def interior(self):
+        data = []
+        for interior in self.rings().loc[
+                self.rings()['type'] == 'interior'].itertuples():
+            data.append({"geometry": Polygon(interior.geometry.coords)})
+        return gpd.GeoDataFrame(data, crs=self.gr3.crs)
 
+    @lru_cache(maxsize=1)
+    def implode(self) -> gpd.GeoDataFrame:
+        return gpd.GeoDataFrame(
+            {"geometry": MultiPolygon([polygon.geometry for polygon
+                                       in self().itertuples()])},
+            crs=self.gr3.crs)
 
-class TriangulationDescriptor:
-
-    def __get__(self, obj, val):
-        if obj.__dict__.get('triangulation') is None:
-            obj.__dict__['triangulation'] = Triangulation(
-                obj.vertices[:, 0], obj.vertices[:, 1],
-                triangles=obj.tria3)
-        return obj.__dict__['triangulation']
+    def multipolygon(self) -> MultiPolygon:
+        return self.implode().iloc[0].geometry
 
 
 class Gr3(ABC):
 
-    _vertices = Vertices()
-    _vertex_id = VertexId()
+    _description = Description()
+    _nodes = Nodes()
     _elements = Elements()
-    _element_id = ElementId()
-    _values = Values()
-    _description = Header()
     _crs = Crs()
-    _tria3 = Tria3()
-    _quad4 = Quad4()
-    _index_ring_collection = IndexRingCollection()
-    _outer_ring_collection = OuterRingCollection()
-    _inner_ring_collection = InnerRingCollection()
-    _triangulation = TriangulationDescriptor()
 
-    def __init__(self, vertices, elements=None, values=None,
-                 vertex_id=None, element_id=None, description=None, crs=None):
-        self._vertices = vertices
-        self._vertex_id = vertex_id
+    def __init__(self, nodes, elements=None, description=None, crs=None):
+        self._nodes = nodes
         self._elements = elements
-        self._values = values
-        self._element_id = element_id
         self._description = description
         self._crs = crs
-        self._vertex_id_to_index = {self.vertex_id[i]: i for i in
-                                    range(len(self.vertex_id))}
-        self._vertex_index_to_id = {i: self.vertex_id[i] for i in
-                                    range(len(self.vertex_id))}
+        self._hull = Hull(self)
 
     def __str__(self):
-        return grd.dict_to_string(self.to_dict())
+        return grd.to_string(**self.to_dict())
 
     def to_dict(self):
         return {
             "description": self.description,
-            "vertices": self.vertices,
-            "elements": self.elements,
-            "vertex_id": self.vertex_id,
-            "element_id": self.element_id,
-            "values": self.values}
+            "nodes": self.nodes(),
+            "elements": self.elements(),
+            "crs": self.crs}
 
     def write(self, path, overwrite=False):
         grd.write(self.to_dict(), path, overwrite)
-
-    def get_vertex_index_by_id(self, id: Hashable):
-        return self._vertex_id_to_index[id]
-
-    def get_vertex_id_by_index(self, index: int):
-        return self._vertex_index_to_id[index]
 
     def get_x(self, crs: Union[CRS, str] = None):
         return self.get_xy(crs)[:, 0]
@@ -327,16 +352,6 @@ class Gr3(ABC):
                 return np.vstack([x, y]).T
         return np.vstack([self.x, self.y]).T
 
-    def get_multipolygon(self, crs: Union[CRS, str] = None) -> MultiPolygon:
-        pol_col: List[Polygon] = []
-        for id, ring in self.index_ring_collection.items():
-            outer = self.get_xy(crs)[ring['exterior'][:, 0], :]
-            inner: List[Polygon] = []
-            for inner_ring in ring['interiors']:
-                inner.append(self.get_xy(crs)[inner_ring[:, 0], :])
-            pol_col.append(Polygon(outer, inner))
-        return MultiPolygon(pol_col)
-
     def get_bbox(self, crs: Union[CRS, str] = None) -> Bbox:
         vertices = self.get_xy(crs)
         x0 = np.min(vertices[:, 0])
@@ -345,24 +360,39 @@ class Gr3(ABC):
         y1 = np.max(vertices[:, 1])
         return Bbox([[x0, y0], [x1, y1]])
 
+    def transform_to(self, dst_crs):
+        """Transforms coordinate system of mesh in-place.
+        """
+        dst_crs = CRS.from_user_input(dst_crs)
+        if not self.crs.equals(dst_crs):
+            xy = self.get_xy(dst_crs)
+            self.nodes.coord.cache_clear()
+            self._nodes = {self.nodes.id()[i]:
+                           (coord.tolist(), self.nodes.values()[i])
+                           for i, coord in enumerate(xy)}
+            self._crs = dst_crs
+
+    def vertices_around_vertex(self, index):
+        return self.nodes.vertices_around_vertex(index)
+
     @classmethod
     def open(cls, file: Union[str, os.PathLike],
              crs: Union[str, CRS] = None):
         return cls(**grd.read(pathlib.Path(file), boundaries=False))
 
-    @fig._figure
+    @figure
     def tricontourf(self, axes=None, show=True, figsize=None, **kwargs):
-        if len(self.tria3) > 0:
+        if len(self.triangles) > 0:
             axes.tricontourf(self.triangulation, self.values, **kwargs)
         return axes
 
-    @fig._figure
+    @figure
     def tripcolor(self, axes=None, show=True, figsize=None, **kwargs):
-        if len(self.tria3) > 0:
+        if len(self.triangles) > 0:
             axes.tripcolor(self.triangulation, self.values, **kwargs)
         return axes
 
-    @fig._figure
+    @figure
     def triplot(
         self,
         axes=None,
@@ -378,7 +408,7 @@ class Gr3(ABC):
             axes.triplot(self.triangulation, **kwargs)
         return axes
 
-    @fig._figure
+    @figure
     def quadplot(
         self,
         axes=None,
@@ -395,11 +425,11 @@ class Gr3(ABC):
                 facecolor=facecolor,
                 edgecolor=edgecolor,
                 linewidth=0.07,
-                )
+            )
             axes.add_collection(pc)
         return axes
 
-    @fig._figure
+    @figure
     def quadface(
         self,
         axes=None,
@@ -407,33 +437,37 @@ class Gr3(ABC):
         figsize=None,
         **kwargs
     ):
-        if len(self.quad4) > 0:
+        if len(self.quads) > 0:
             pc = PolyCollection(
-                self.coords[self.quad4],
+                self.coords[self.quads],
                 **kwargs
-                )
-            quad_value = np.mean(self.values[self.quad4], axis=1)
+            )
+            quad_value = np.mean(self.values[self.quads], axis=1)
             pc.set_array(quad_value)
             axes.add_collection(pc)
         return axes
 
-    @fig._figure
+    @figure
     def plot_wireframe(self, axes=None, show=False, **kwargs):
         axes = self.triplot(axes=axes, **kwargs)
         axes = self.quadplot(axes=axes, **kwargs)
         return axes
 
     @property
+    def nodes(self):
+        return self._nodes
+
+    @property
     def coords(self):
-        return self._vertices
+        return self._nodes.coord()
 
     @property
     def vertices(self):
-        return self._vertices
+        return self._nodes.coord()
 
     @property
     def vertex_id(self):
-        return self._vertex_id
+        return self._nodes.id()
 
     @property
     def elements(self):
@@ -441,11 +475,11 @@ class Gr3(ABC):
 
     @property
     def element_id(self):
-        return self._element_id
+        return self._elements.id()
 
     @property
     def values(self):
-        return self._values
+        return self._nodes.values()
 
     @property
     def description(self):
@@ -457,42 +491,34 @@ class Gr3(ABC):
 
     @property
     def x(self):
-        return self._vertices[:, 0]
+        return self._nodes.coord()[:, 0]
 
     @property
     def y(self):
-        return self._vertices[:, 1]
+        return self._nodes.coord()[:, 1]
 
     @property
-    def tria3(self):
-        return self._tria3
+    def hull(self):
+        return self._hull
 
     @property
-    def quad4(self):
-        return self._quad4
+    def triangles(self):
+        return self._elements.triangles()
 
     @property
-    def index_ring_collection(self):
-        return self._index_ring_collection
-
-    @property
-    def outer_ring_collection(self):
-        return self._outer_ring_collection
-
-    @property
-    def inner_ring_collection(self):
-        return self._inner_ring_collection
+    def quads(self):
+        return self._elements.quads()
 
     @property
     def triangulation(self):
-        return self._triangulation
+        return self._elements.triangulation()
 
     @property
     def bbox(self):
         return self.get_bbox()
 
 
-def sort_edges(edges):
+def edges_to_rings(edges):
     if len(edges) == 0:
         return edges
     # start ordering the edges into linestrings
@@ -526,6 +552,79 @@ def sort_edges(edges):
     else:
         edge_collection.append(tuple(ordered_edges))
     return edge_collection
+
+
+def sort_rings(index_rings, vertices):
+    """Sorts a list of index-rings.
+
+    Takes a list of unsorted index rings and sorts them into an "exterior" and
+    "interior" components. Any doubly-nested rings are considered exterior
+    rings.
+
+    TODO: Refactor and optimize. Calls that use :class:matplotlib.path.Path can
+    probably be optimized using shapely.
+    """
+
+    # sort index_rings into corresponding "polygons"
+    areas = list()
+    for index_ring in index_rings:
+        e0, e1 = [list(t) for t in zip(*index_ring)]
+        areas.append(float(Polygon(vertices[e0, :]).area))
+
+    # maximum area must be main mesh
+    idx = areas.index(np.max(areas))
+    exterior = index_rings.pop(idx)
+    areas.pop(idx)
+    _id = 0
+    _index_rings = dict()
+    _index_rings[_id] = {
+        'exterior': np.asarray(exterior),
+        'interiors': []
+    }
+    e0, e1 = [list(t) for t in zip(*exterior)]
+    path = Path(vertices[e0 + [e0[0]], :], closed=True)
+    while len(index_rings) > 0:
+        # find all internal rings
+        potential_interiors = list()
+        for i, index_ring in enumerate(index_rings):
+            e0, e1 = [list(t) for t in zip(*index_ring)]
+            if path.contains_point(vertices[e0[0], :]):
+                potential_interiors.append(i)
+        # filter out nested rings
+        real_interiors = list()
+        for i, p_interior in reversed(
+                list(enumerate(potential_interiors))):
+            _p_interior = index_rings[p_interior]
+            check = [index_rings[k]
+                     for j, k in
+                     reversed(list(enumerate(potential_interiors)))
+                     if i != j]
+            has_parent = False
+            for _path in check:
+                e0, e1 = [list(t) for t in zip(*_path)]
+                _path = Path(vertices[e0 + [e0[0]], :], closed=True)
+                if _path.contains_point(vertices[_p_interior[0][0], :]):
+                    has_parent = True
+            if not has_parent:
+                real_interiors.append(p_interior)
+        # pop real rings from collection
+        for i in reversed(sorted(real_interiors)):
+            _index_rings[_id]['interiors'].append(
+                np.asarray(index_rings.pop(i)))
+            areas.pop(i)
+        # if no internal rings found, initialize next polygon
+        if len(index_rings) > 0:
+            idx = areas.index(np.max(areas))
+            exterior = index_rings.pop(idx)
+            areas.pop(idx)
+            _id += 1
+            _index_rings[_id] = {
+                'exterior': np.asarray(exterior),
+                'interiors': []
+            }
+            e0, e1 = [list(t) for t in zip(*exterior)]
+            path = Path(vertices[e0 + [e0[0]], :], closed=True)
+    return _index_rings
 
 
 def signed_polygon_area(vertices):

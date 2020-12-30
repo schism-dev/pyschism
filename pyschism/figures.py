@@ -77,7 +77,7 @@ class FixPointNormalize(Normalize):
         return np.ma.masked_where(value.mask, np.interp(value, x, y))
 
 
-def _figure(f):
+def figure(f):
     def decorator(*argv, **kwargs):
         axes = get_axes(
             kwargs.get('axes', None),
