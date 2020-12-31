@@ -112,7 +112,7 @@ class ForecastsDirectory:
         forecasts_directory = obj.__dict__.get('forecasts_directory')
         if forecasts_directory is None:
             forecasts_directory = obj.project_directory / 'forecasts'
-            forecasts_directory.mkdir(exist_ok=obj.args.overwrite)
+            forecasts_directory.mkdir(exist_ok=True)
             obj.__dict__['forecasts_directory'] = forecasts_directory
         return forecasts_directory
 
@@ -126,7 +126,7 @@ class ColdstartDirectory:
             coldstart_directory = obj.project_directory / \
                 'coldstart' / f'{timestamp}'
             coldstart_directory.mkdir(
-                parents=True, exist_ok=obj.args.overwrite)
+                parents=True, exist_ok=True)
             obj.__dict__['coldstart_directory'] = coldstart_directory
         return coldstart_directory
 
@@ -137,7 +137,7 @@ class StaticFilesDirectory:
         static_files = obj.__dict__.get('static_files')
         if static_files is None:
             static_files = obj.project_directory / 'static'
-            static_files.mkdir(exist_ok=obj.args.overwrite)
+            static_files.mkdir(exist_ok=True)
             obj.__dict__['static_files'] = static_files
         return static_files
 
@@ -149,10 +149,8 @@ class TargetOutputDirectory:
         if target_output_directory is None:
             timestamp = str(obj.target_datetime).replace(' ', 'T')
             target_output_directory = obj.forecasts_directory / f'{timestamp}'
-            target_output_directory.parent.mkdir(
-                exist_ok=obj.args.overwrite)
-            target_output_directory.mkdir(
-                exist_ok=obj.args.overwrite)
+            target_output_directory.parent.mkdir(exist_ok=True)
+            target_output_directory.mkdir(exist_ok=True)
             obj.__dict__['target_output_directory'] = target_output_directory
         return target_output_directory
 

@@ -314,75 +314,19 @@ class RadComponent(BaseComponent):
         return ['dlwrf', 'dswrf']
 
 
-class Resource:
-
-    def __set__(self, obj, resource: Union[str, os.PathLike]):
-        obj.__dict__['resource'] = resource
-
-    def __get__(self, obj, val):
-        return obj.__dict__['resource']
-
-
-class Fields:
-
-    def __get__(self, obj, val):
-        fields = obj.__dict__.get('fields')
-        if fields is None:
-            fields = cf.read(obj.resource, ignore_read_error=True)
-            # check lon
-            try:
-                lon = fields.select_by_ncvar('lon')[0]
-            except IndexError:
-                raise ValueError(f"Resource {obj.resource} does not contain a "
-                                 "'lon' variable.")
-            if len(lon.get_data_axes()) != 2:
-                raise ValueError("'lon' variable must be a 2-dimensional "
-                                 "array")
-            fnames = lon.get_filenames()
-            lons = fields.select_by_ncvar('lon')
-            for i in range(len(lons) - 1):
-                if not lon.equals(lons[i+1]):
-                    raise ValueError(
-                        "Invalid sflux dataset. Found two different 'lon' "
-                        f"fields on files {fnames} and "
-                        f'{lons[i+1].get_filenames()}')
-            # check lat
-            try:
-                lat = fields.select_by_ncvar('lat')[0]
-            except IndexError:
-                raise ValueError(f"Resource {obj.resource} does not contain a "
-                                 "'lat' variable.")
-            if len(lat.get_data_axes()) != 2:
-                raise ValueError("'lat' variable must be a 2-dimensional "
-                                 "array")
-            fnames = lat.get_filenames()
-            lats = fields.select_by_ncvar('lat')
-            for i in range(len(lats) - 1):
-                if not lat.equals(lats[i+1]):
-                    raise ValueError(
-                        "Invalid sflux dataset. Found two different 'lat' "
-                        f"fields on files {fnames} and "
-                        f'{lats[i+1].get_filenames()}')
-            obj.__dict__['fields'] = fields
-        return fields
-
-
 class SfluxDataset:
-
-    resource = Resource()
-    fields = Fields()
 
     def __init__(self, resource: Union[str, os.PathLike], prmsl_name='prmsl',
                  spfh_name='spfh', stmp_name='stmp', uwind_name='uwind',
                  vwind_name='vwind', prate_name='prate', dlwrf_name='dlwrf',
                  dswrf_name='dswrf'):
-        self.resource = resource
-        self.air = AirComponent(self.fields, prmsl_name=prmsl_name,
-                                spfh_name=spfh_name, stmp_name=stmp_name,
-                                uwind_name=uwind_name, vwind_name=vwind_name)
-        self.prc = PrcComponent(self.fields, prate_name=prate_name)
-        self.rad = RadComponent(self.fields, dlwrf_name=dlwrf_name,
-                                dswrf_name=dswrf_name)
+        self._resource = resource
+        self._air = AirComponent(self.fields, prmsl_name=prmsl_name,
+                                 spfh_name=spfh_name, stmp_name=stmp_name,
+                                 uwind_name=uwind_name, vwind_name=vwind_name)
+        self._prc = PrcComponent(self.fields, prate_name=prate_name)
+        self._rad = RadComponent(self.fields, dlwrf_name=dlwrf_name,
+                                 dswrf_name=dswrf_name)
 
     def __call__(self, model_driver):
         pass
@@ -393,137 +337,71 @@ class SfluxDataset:
         outdir = pathlib.Path(outdir)
         if outdir.name != 'sflux':
             outdir /= 'sflux'
-        outdir.mkdir(exist_ok=overwrite)
+        outdir.mkdir(exist_ok=True)
         self.air.write(outdir, level, overwrite, start_date, rnday)
         self.prc.write(outdir, level, overwrite, start_date, rnday)
         self.rad.write(outdir, level, overwrite, start_date, rnday)
 
+    @property
+    def air(self):
+        return self._air
 
+    @property
+    def prc(self):
+        return self._prc
 
+    @property
+    def rad(self):
+        return self._rad
 
+    @property
+    def fields(self):
+        return self._fields
 
+    @property
+    def resource(self):
+        return self._resource
 
+    @property
+    def _resource(self):
+        return self.__resource
 
-
-
-
-# class ComponentDescriptor:
-
-#     # file_names = ComponentFileNames()
-
-#     def __init__(self, var_name: str, default_vars: List[str]):
-#         self.default_name = default_name
-#         setattr(self, f'{default_name}_name', default_name)
-
-#     def __get__(self, obj, val):
-#         component = obj.__dict__.get(self.default_name)
-#         if component is None:
-#             varname = getattr(self, f"{self.default_name}_name")
-#             component = obj.fields.select_by_ncvar(varname)
-#             if len(component) == 0:
-#                 warnings.warn(f"No data with name {varname} exists "
-#                               'on the input dataset.')
-#             obj.__dict__[f"{self.default_name}"] = component
-#         return component
-
-
-
-
-
-
-    # def __init__(self):
-    #     start_date = set()
-    #     for vartype in self.var_types:
-    #         start_date.add(getattr(self, vartype).start_date)
-    #     if len(start_date) > 1:
-    #         raise ValueError("dimension mistmatch between variables of the "
-    #                          "same type.")
-
-
-            # datetime_array = variable
-            # start_date.add(np.min(
-            # setattr(f"start_date = np.min(variable.datetime_array)
-
-
-
-    # def __init__
-
-    # def __init__(self, fields: cf.FieldList, **kwargs):
-    #     self.fields = fields
-    #     self.nc_date_ranges = []
-
-    #     for var_name, value in kwargs.items():
-    #         var = var_name.split('_name')[0]
-    #         setattr(self, f'{var}.name', value)
-    #     date_ranges = defaultdict(list)
-    #     for var in self.variables:  # type: ignore[attr-defined]
-    #         for field in getattr(self, var):
-    #             time = field.construct('time')
-    #             date_ranges[f"{var}"].append(time.datetime_array)
-    #     self.nc_date_ranges = date_ranges[f"{var}"]
-    #     # self.nc_reference_datetime = time.reference_datetime
-    #     self.nc_start_date = self.nc_date_ranges[0][0]
-    #     self.nc_end_date = self.nc_date_ranges[-1][-2]
-    #     self.nc_time_resolution = self.nc_start_date - time.reference_datetime
-    #     # self.nc_rnday = self.nc_date_ranges[-1][-2] - self.nc_start_date
-    #     self.nx_grids = self.fields.select_by_ncvar('lon')
-    #     self.ny_grids = self.fields.select_by_ncvar('lat')
-
-
-        # if start_date is None:
-        #     start_date = self.nc_start_date
-
-        # if not isinstance(rnday, timedelta):
-        #     if rnday is None:
-        #         rnday = self.nc_rnday
-        #     else:
-        #         rnday = timedelta(days=rnday)
-
-        # cfdata = getattr(self, f"{self.variables[0]}")  # type: ignore[attr-defined]  # noqa: E501
-        # ordered_indexes = np.argsort(
-        #     [field.construct('time').reference_datetime for field
-        #      in cfdata])
-        # start_index = None
-        # for i, current_idx in enumerate(ordered_indexes):
-        #     next_idx = ordered_indexes[(i+1) % len(ordered_indexes)]
-        #     current_start_date = self.nc_date_ranges[current_idx][0]
-        #     next_start_date = self.nc_date_ranges[next_idx][0]
-        #     if next_start_date < current_start_date:
-        #         break
-        #     if start_date >= current_start_date \
-        #             and next_start_date > start_date:
-        #         start_index = current_idx
-        #         break
-        # if start_index is None:
-        #     if len(ordered_indexes) == 1:
-        #         if start_date < self.nc_start_date \
-        #                 or start_date > self.nc_end_date:
-        #             raise ValueError("Date out of range")
-        #         start_index = 0
-        #     else:
-        #         raise ValueError(
-        #             f'No data found for the specified start_date = {start_date}. '
-        #             f'Earliest start_date must be > {self.nc_start_date}.')
-
-        # end_date = start_date + rnday  # type: ignore[operator]
-        # end_index = None
-        # for i, current_idx in enumerate(reversed(ordered_indexes)):
-        #     next_idx = ordered_indexes[(i+1) % len(ordered_indexes)]
-        #     current_end_date = self.nc_date_ranges[current_idx][-2]
-        #     next_end_date = self.nc_date_ranges[next_idx][-2]
-        #     if end_date <= current_end_date \
-        #             and next_end_date > end_date:
-        #         end_index = current_idx
-        #         break
-        #     if next_end_date < current_end_date:
-        #         end_index = current_idx
-        # if end_index is None:
-        #     end_index = np.max(ordered_indexes)
-
-        # start_index = np.min(ordered_indexes)
-        # end_index = np.max(ordered_indexes)
-
-        # tzinfo = pytz.timezone('utc') if not hasattr(start_date, 'tzinfo') \
-        #     else start_date.tzinfo
-
-        # for i in range(start_index, end_index+1):
+    @_resource.setter
+    def _resource(self, resource: Union[str, os.PathLike]):
+        fields = cf.read(resource, ignore_read_error=True)
+        # check lon
+        try:
+            lon = fields.select_by_ncvar('lon')[0]
+        except IndexError:
+            raise ValueError(f"Resource {self.resource} does not contain a "
+                             "'lon' variable.")
+        if len(lon.get_data_axes()) != 2:
+            raise ValueError("'lon' variable must be a 2-dimensional "
+                             "array")
+        fnames = lon.get_filenames()
+        lons = fields.select_by_ncvar('lon')
+        for i in range(len(lons) - 1):
+            if not lon.equals(lons[i+1]):
+                raise ValueError(
+                    "Invalid sflux dataset. Found two different 'lon' "
+                    f"fields on files {fnames} and "
+                    f'{lons[i+1].get_filenames()}')
+        # check lat
+        try:
+            lat = fields.select_by_ncvar('lat')[0]
+        except IndexError:
+            raise ValueError(f"Resource {resource} does not contain a "
+                             "'lat' variable.")
+        if len(lat.get_data_axes()) != 2:
+            raise ValueError("'lat' variable must be a 2-dimensional "
+                             "array")
+        fnames = lat.get_filenames()
+        lats = fields.select_by_ncvar('lat')
+        for i in range(len(lats) - 1):
+            if not lat.equals(lats[i+1]):
+                raise ValueError(
+                    "Invalid sflux dataset. Found two different 'lat' "
+                    f"fields on files {fnames} and "
+                    f'{lats[i+1].get_filenames()}')
+        self._fields = fields
+        self.__resource = resource
