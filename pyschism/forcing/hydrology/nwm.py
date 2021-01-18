@@ -41,8 +41,8 @@ class NWMGeoDataFrame:
             bbox = obj._hgrid.bbox
             gdf = gpd.read_file(
                 NWM_FILE,
-                # bbox=(bbox.xmin, bbox.ymin, bbox.xmax, bbox.ymax),
-                bbox=(-75.889435, 38.895308, -74.604034, 39.477546),  # Delaware Bay, debug  # noqa: E501
+                bbox=(bbox.xmin, bbox.ymin, bbox.xmax, bbox.ymax),
+                # bbox=(-75.889435, 38.895308, -74.604034, 39.477546),  # Delaware Bay, debug  # noqa: E501
                 )
             obj.__dict__['gdf'] = gdf
         return gdf
