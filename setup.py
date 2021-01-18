@@ -46,6 +46,8 @@ setuptools.setup(
         'geopandas',
         'pyugrid',
         'pytz',
+        'boto3',
+        'rtree'
     ],
     entry_points={'console_scripts': ['pyschism = pyschism.__main__:main']},
     tests_require=['nose'],

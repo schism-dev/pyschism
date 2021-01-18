@@ -379,8 +379,6 @@ class GlobalForecastSystem(SfluxDataset):
         if rad:
             self.rad = RadComponent(self.fields)
 
-    # def get_inventory(self, start_date, )
-
     @property
     def forecast_interval(self):
         return timedelta(hours=6)

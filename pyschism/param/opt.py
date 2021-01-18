@@ -5,9 +5,10 @@ from typing import Union
 import f90nml  # type: ignore[import]
 import pytz
 
+from pyschism.enums import Coriolis
 from pyschism.forcing.atmosphere.nws import NWS
 from pyschism.forcing.atmosphere.nws.nws2 import NWS2
-from pyschism.enums import Coriolis
+from pyschism.logger import logging, get_logger
 
 PARAM_TEMPLATE = pathlib.Path(__file__).parent / 'param.nml.template'
 PARAM_DEFAULTS = f90nml.read(PARAM_TEMPLATE)['opt']
@@ -191,6 +192,7 @@ class OPT(metaclass=OptMeta):
             drampbc: Union[int, float, timedelta] = None,
             # drampwind:,
             start_date: datetime = None):
+        self.logger.info('Iniatializing OPT.')
         self.dramp = dramp
         self.drampbc = drampbc
         self.start_date = start_date
@@ -218,3 +220,16 @@ class OPT(metaclass=OptMeta):
                             current.append(f'  {current}({i+1}) = 1')
         data = '\n'.join(data)
         return f"&OPT\n{data}\n/"
+
+    @property
+    def logger(self):
+        try:
+            return self._logger
+        except AttributeError:
+            self._logger = get_logger()
+            return self._logger
+
+    @logger.setter
+    def logger(self, logger):
+        assert isinstance(logger, logging.Logger)
+        self._logger = logger

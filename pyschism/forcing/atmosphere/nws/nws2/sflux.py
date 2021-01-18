@@ -393,7 +393,7 @@ class SfluxDataset:
         outdir = pathlib.Path(outdir)
         if outdir.name != 'sflux':
             outdir /= 'sflux'
-        outdir.mkdir(exist_ok=overwrite)
+        outdir.mkdir(exist_ok=True)
         self.air.write(outdir, level, overwrite, start_date, rnday)
         self.prc.write(outdir, level, overwrite, start_date, rnday)
         self.rad.write(outdir, level, overwrite, start_date, rnday)

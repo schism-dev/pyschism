@@ -126,11 +126,9 @@ class Elements:
     def __call__(self):
         return self.gr3.__dict__["elements"]
 
-    @lru_cache(maxsize=1)
     def id(self):
         return list(self().keys())
 
-    @lru_cache(maxsize=1)
     def index(self):
         return np.arange(len(self()))
 
@@ -206,11 +204,9 @@ class Edges:
                     "type": ring.type})
         return gpd.GeoDataFrame(data, crs=self.gr3.crs)
 
-    @lru_cache(maxsize=1)
     def exterior(self):
         return self().loc[self()['type'] == 'exterior']
 
-    @lru_cache(maxsize=1)
     def interior(self):
         return self().loc[self()['type'] == 'interior']
 
@@ -325,6 +321,13 @@ class Gr3(ABC):
 
     def __str__(self):
         return grd.to_string(**self.to_dict())
+
+    def __repr__(self):
+        return ", ".join([
+            f"{self.nodes()}",
+            f"elements={self.elements()}",
+            f"description={self.description}",
+            f"crs={self.crs}"])
 
     def to_dict(self):
         return {

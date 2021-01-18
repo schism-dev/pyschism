@@ -3,9 +3,10 @@ from datetime import timedelta, timezone
 from enum import Enum
 from functools import lru_cache
 
-from pyschism.forcing.tides.tides import Tides
-from pyschism.param.param import Param
 from pyschism.domain import ModelDomain
+from pyschism.forcing.tides.tides import Tides
+from pyschism.logger import logging, get_logger
+from pyschism.param.param import Param
 
 
 class NullWritter:
@@ -113,7 +114,7 @@ class Bctides:
     def __init__(self, model_domain: ModelDomain, param: Param,
                  cutoff_depth: float = 50.):
         """Provides an interface to write bctides.in to file. """
-
+        self.logger.info('Initializing Bctides.')
         # check if start_date was given in case tidal forcings are requested.
         # Note: This is done twice so that this class can be used independently
         # from Param to just write bctides files
@@ -223,3 +224,16 @@ class Bctides:
             return self.__start_date.astimezone(timezone(timedelta(0)))
         else:
             return self.__start_date
+
+    @property
+    def logger(self):
+        try:
+            return self._logger
+        except AttributeError:
+            self._logger = get_logger()
+            return self._logger
+
+    @logger.setter
+    def logger(self, logger):
+        assert isinstance(logger, logging.Logger)
+        self._logger = logger
