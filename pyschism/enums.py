@@ -693,3 +693,14 @@ class OutputVariableShortName(Enum):
     def _missing_(self, name):
         raise ValueError(
             f"{name} is not a valid SCHISM output variable short name")
+
+
+class NationalWaterModelDataSource(Enum):
+    AWS = 'AWS'
+    FTP = 'FTP'
+    NOMADS = 'NOMADS'
+
+    @classmethod
+    def _missing_(self, name):
+        raise ValueError(
+            f"{name} is not a valid National Water Model data source.")

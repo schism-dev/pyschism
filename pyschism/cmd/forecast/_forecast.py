@@ -18,30 +18,8 @@ from pyschism.server.slurm import SlurmConfig
 from pyschism.driver import ModelDriver
 from pyschism.domain import ModelDomain
 from pyschism.forcing.atmosphere import NWS2
+from pyschism.forcing.hydrology import NationalWaterModel
 from pyschism.param.schout import SurfaceOutputVars
-
-
-class Args:
-
-    def __set__(self, obj, args: Namespace):
-        obj.__dict__['args'] = args
-        if args.action == 'init':
-            if obj.config_file.is_file() and args.overwrite is False:
-                raise IOError(
-                    f'The given directory {str(obj.project_directory)} has '
-                    'been initialized previously. Use `pyschism forecast '
-                    '--overwrite init [...]` to allow overwrite of previous '
-                    'initialization options.')
-            with open(obj.config_file, 'w') as fp:
-                json.dump(obj.args.__dict__, fp, indent=4)
-            obj.generate_forecast()
-        elif args.action == 'update':
-            raise NotImplementedError('update action')
-        else:
-            raise Exception(f"Unknown argument action {args.action}.")
-
-    def __get__(self, obj, val):
-        return obj.__dict__['args']
 
 
 class ConfigFile:
@@ -169,6 +147,10 @@ class ColdstartDomainDescriptor:
             )
             if obj.tides is not None:
                 model_domain.add_boundary_condition(obj.tides)
+            # TODO: Adding hydrology here temporarily.
+            if obj.hydrology is not None:
+                for hydrology in obj.hydrology:
+                    model_domain.add_hydrology(hydrology)
             obj.__dict__['coldstart_domain'] = model_domain
         return model_domain
 
@@ -212,6 +194,9 @@ class HotstartDomainDescriptor:
                 model_domain.add_boundary_condition(obj.tides)
             if obj.nws2 is not None:
                 model_domain.set_atmospheric_forcing(obj.nws2)
+            if obj.hydrology is not None:
+                for hydrology in obj.hydrology:
+                    model_domain.add_hydrology(hydrology)
             obj.__dict__['hotstart_domain'] = model_domain
         return model_domain
 
@@ -258,12 +243,6 @@ class TidesDescriptor:
                         tides.use_constituent(constituent)
             obj.__dict__['tides'] = tides
         return tides
-
-
-class SrcSnkDescriptor:
-
-    def __get__(self, obj, val):
-        return obj.__dict__.get('srcsnk')
 
 
 class Sflux1:
@@ -414,7 +393,8 @@ class ServerConfigDescriptor:
                     # "schism_binary": obj.args.schism_binary,
                     "extra_commands": obj.args.extra_commands,
                     "launcher": obj.args.slurm_launcher,
-                    "nodes": obj.args.slurm_nodes}
+                    "nodes": obj.args.slurm_nodes
+                }
                 # if obj.args.slurm_filename is not None:
                 #     kwargs.update({"filename": obj.args.ntasks})
                 # if obj.args.slurm_rundir is not None:
@@ -458,9 +438,45 @@ class Nspool:
         return nspool
 
 
+class HydrologicalForcing:
+
+    def __get__(self, obj, val):
+        hydrology = obj.__dict__.get('hydrology')
+        if hydrology is None:
+            if obj.args.hydrology is not None:
+                hydrology = []
+                if 'NWM' in obj.args.hydrology:
+                    hydrology.append(NationalWaterModel())
+                else:
+                    raise NotImplementedError(obj.args.hydrology)
+            obj.__dict__['hydrology'] = hydrology
+        return hydrology
+
+
+# class UpdateForecast:
+
+#     def __init__(self, args):
+#         self._args = args
+#         previous_rundir = self._get_previous_rundir()
+
+#     def _get_previous_rundir(self):
+#         # if there is no previous rundir then we should raise and ask the user
+#         # to re-run the init command
+
+#         return
+
+#     @property
+#     def current_target_time(self):
+#         try:
+#             return self._current_target_time
+#         except AttributeError:
+#             self._current_target_time = pytz.timezone('UTC').localize(
+#                 datetime.utcnow())
+#             return self._current_target_time
+
+
 class GenerateForecastCli:
 
-    args = Args()
     config_file = ConfigFile()
     project_directory = ProjectDirectory()
     forecasts_directory = ForecastsDirectory()
@@ -469,13 +485,13 @@ class GenerateForecastCli:
     target_output_directory = TargetOutputDirectory()
     target_datetime = TargetDatetime()
     previous_run_directory = PreviousRunDirectory()
-    srcsnk = SrcSnkDescriptor()
     coldstart_domain = ColdstartDomainDescriptor()
     hotstart_domain = HotstartDomainDescriptor()
     coldstart = ColdstartModelDriver()
     hotstart = HotstartModelDriver()
     tides = TidesDescriptor()
     nws2 = Nws2Descriptor()
+    hydrology = HydrologicalForcing()
     hgrid_path = HgridPath()
     fgrid_path = FgridPath()
     vgrid_path = VgridPath()
@@ -488,7 +504,40 @@ class GenerateForecastCli:
 
     def __init__(self, args: Namespace):
         self.args = args
-        # self.run()
+
+        if args.action == 'init':
+            self.init_project_directory()
+
+        elif args.action == 'update':
+            pass
+
+        self.generate_forecast()
+
+    def init_project_directory(self):
+        # check if the target directory has been initialized before.
+        if self.config_file.is_file() and self.args.overwrite is False:
+            raise IOError(
+                f'The given directory {str(self.project_directory)} has '
+                'been initialized previously. Please use\npyschism '
+                'forecast --overwrite init [...]\nto allow overwrite of '
+                'previous initialization options.')
+        # write configuration options to file so we can run update later.
+        with open(self.config_file, 'w') as fp:
+            json.dump(self.args.__dict__, fp, indent=4)
+
+    def generate_forecast(self):
+        # TODO: Make coldstart generation explicit rather than implicit.
+        self._symlink_files(self.target_output_directory,
+                            self.hotstart_domain.ics,
+                            windrot=True if self.nws2 is not None else False,
+                            )
+        self.hotstart.write(self.target_output_directory, hgrid=False,
+                            vgrid=False, fgrid=False, wind_rot=False,
+                            overwrite=self.args.overwrite)
+
+        if self.args.skip_run is False:
+            subprocess.check_call(
+                ["make", "run"], cwd=self.target_output_directory)
 
     def generate_coldstart(self):
         self._symlink_files(self.coldstart_directory,
@@ -499,19 +548,6 @@ class GenerateForecastCli:
         if self.args.skip_run is False:
             subprocess.check_call(
                 ["make", "run"], cwd=self.coldstart_directory)
-
-    def generate_forecast(self):
-        self._symlink_files(self.target_output_directory,
-                            self.hotstart_domain.ics,
-                            windrot=True
-                            )
-        self.hotstart.write(self.target_output_directory, hgrid=False,
-                            vgrid=False, fgrid=False, wind_rot=False,
-                            overwrite=self.args.overwrite)
-
-        if self.args.skip_run is False:
-            subprocess.check_call(
-                ["make", "run"], cwd=self.target_output_directory)
 
     def _symlink_files(self, target_directory, ics, windrot=False):
         hgrid_lnk = target_directory / 'hgrid.gr3'

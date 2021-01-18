@@ -6,6 +6,29 @@ import uuid
 from pyschism.server.base import ServerConfig
 
 
+# class SlurmJobList:
+
+#     def __init__(self):
+#         self.jobs = []
+
+#     def __get__(self, obj, val):
+#         return self.jobs
+
+
+# class SlurmQueue:
+#     jobs = SlurmJobList()
+
+#     def __call__(self):
+#         for job in self.jobs:
+#             if job["depends_on"]
+
+
+#     def add(self, callable, job_id=None, depends_on=None):
+#         self.jobs.append({
+#             id(callable) if job_id is None else job_id: callable,
+#             "depends_on": depends_on})
+
+
 class SlurmConfig(ServerConfig):
     """Configuration object for SLURM-enabled servers"""
 

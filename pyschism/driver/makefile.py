@@ -73,7 +73,7 @@ default: symlinks
     def run(self):
         return r"""
 run: default
-    set -m;\
+    @set -e;\
     eval 'tail -f outputs/mirror.out  outputs/fatal.error &';\
     tail_pid=$${!};\
     ${MPI_LAUNCHER} ${NPROC} ${SCHISM_BINARY};\
