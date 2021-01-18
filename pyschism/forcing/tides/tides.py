@@ -8,6 +8,8 @@ import numpy as np  # type: ignore[import]
 from . import bctypes  # type: ignore[import]
 from .tpxo import TPXO  # type: ignore[import]
 
+from pyschism.logger import logging, get_logger
+
 
 class TidalDatabase(Enum):
     TPXO = TPXO
@@ -50,6 +52,7 @@ class Tides(bctypes.BoundaryCondition):
             database (optional): Tidal database to use in order to obtain
                 boundary initial conditions, defaults to TidalDatabase.TPXO
         """
+        self.logger.info('Initializing tidal boundary conditions.')
         if velocity:
             raise NotImplementedError('Boundary velocities are temporarily '
                                       'disabled.')
@@ -72,6 +75,9 @@ class Tides(bctypes.BoundaryCondition):
                  constituent: Union[str, TidalConstituents]):
         """Returns the tidal characteristic values for a given time period.
         """
+        self.logger.debug(
+            f'Computing tidal factors for start_date={start_date} and '
+            f'constituent {constituent}')
         return (self.get_tidal_species_type(constituent),
                 self.get_tidal_potential_amplitude(constituent),  # TPK
                 self.get_orbital_frequency(constituent),  # FF*
@@ -665,3 +671,15 @@ class Tides(bctypes.BoundaryCondition):
     def constituents(self):
         return self.all_constituents
 
+    @property
+    def logger(self):
+        try:
+            return self._logger
+        except AttributeError:
+            self._logger = get_logger()
+            return self._logger
+
+    @logger.setter
+    def logger(self, logger):
+        assert isinstance(logger, logging.Logger)
+        self._logger = logger

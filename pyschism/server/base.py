@@ -17,10 +17,10 @@ class ServerConfig:
 
     def __str__(self):
         f = []
-        f.append(f"NPROC={self.nproc}")
-        f.append(f"SCHISM_BINARY={self.schism_binary}")
+        f.append(self.MPI_LAUNCHER)
+        f.append(self.SCHISM_BINARY)
         if self.symlink_outputs is not None:
-            f.append(f"SYMLINK_OUTPUTS={self.symlink_outputs}")
+            f.append(self.SYMLINK_OUTPUTS)
         return "\n".join(f)
 
     @property
@@ -33,9 +33,12 @@ class ServerConfig:
             else mpi_launcher
 
     @property
-    def NPROC(self):
-        cpu_count(logical=False) if nproc is None else nproc
-        return self._NPROC
+    def nproc(self):
+        return self.__nproc
+
+    @nproc.setter
+    def nproc(self, nproc):
+        self.__nproc = cpu_count(logical=False) if nproc is None else nproc
 
     @property
     def SCHISM_BINARY(self):
@@ -54,6 +57,6 @@ class ServerConfig:
     @property
     def MPI_LAUNCHER(self):
         f = "MPI_LAUNCHER="
-        if self.mpi_launcher is None:
-            f += "mpiexec -n"
+        if self.mpi_launcher is not None:
+            f += f'mpiexec -n {self.nproc}'
         return f

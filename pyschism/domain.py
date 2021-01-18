@@ -1,6 +1,6 @@
 from functools import lru_cache
 import os
-from typing import Union
+from typing import Union, List
 
 import numpy as np  # type: ignore[import]
 from pyproj import CRS  # type: ignore[import]
@@ -8,6 +8,7 @@ from pyproj import CRS  # type: ignore[import]
 from pyschism.forcing.tides.bctypes import BoundaryCondition
 from pyschism.forcing.tides.tides import Tides
 from pyschism.forcing.atmosphere.nws import NWS
+from pyschism.forcing.hydrology.base import Hydrology
 # from pyschism.forcing.atmosphere.nws.nws2 import NWS2
 from pyschism.mesh import Hgrid, Vgrid, Fgrid
 from pyschism.enums import Coriolis
@@ -188,7 +189,8 @@ class ModelDomain:
         self._fgrid = fgrid
         self._open_boundaries = OpenBoundaries(hgrid)
         self._ncor = Coriolis.AUTO
-        self._nws = None
+        self._nws: Union[NWS, None] = None
+        self._hydrology: List[Hydrology] = []
 
     @staticmethod
     def open(hgrid: Union[str, os.PathLike], fgrid: Union[str, os.PathLike],
@@ -216,6 +218,12 @@ class ModelDomain:
 
     def set_coriolis(self, ncor: Coriolis):
         self._ncor = ncor
+
+    def add_hydrology(self, hydrology: Hydrology):
+        assert isinstance(hydrology, Hydrology), \
+            f"Argument hydrology must be of type {Hydrology}, " \
+            f"not type {type(hydrology)}."
+        self._hydrology.append(hydrology)
 
     @lru_cache(maxsize=1)
     def get_active_potential_constituents(self):
@@ -254,7 +262,7 @@ class ModelDomain:
 
     @property
     def hgrid(self):
-        return self.__hgrid
+        return self._hgrid
 
     @property
     def vgrid(self):
@@ -269,6 +277,10 @@ class ModelDomain:
         return self._nws
 
     @property
+    def hydrology(self):
+        return self._hydrology
+
+    @property
     def ics(self):
         if self.hgrid.crs is None:
             return None
@@ -279,7 +291,7 @@ class ModelDomain:
 
     @property
     def ncor(self):
-        return self.__ncor
+        return self._ncor
 
     @property
     def open_boundaries(self):

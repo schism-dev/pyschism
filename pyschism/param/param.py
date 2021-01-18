@@ -4,6 +4,7 @@ from typing import Union
 
 from pyschism.domain import ModelDomain
 from pyschism.enums import Stratification
+from pyschism.logger import logging, get_logger
 from pyschism.param.core import CORE
 from pyschism.param.opt import OPT
 from pyschism.param.schout import SCHOUT
@@ -26,6 +27,8 @@ class Param:
             nhot_write: Union[int, timedelta, bool] = None,
             stations: Stations = None,
             **surface_outputs):
+
+        self.logger.info('Initializing param')
         self._model_domain = model_domain
         self._core = CORE(ibc, rnday, dt, nspool, ihfskip)
         self._opt = OPT(dramp, drampbc, start_date)
@@ -66,6 +69,19 @@ class Param:
     @property
     def stations(self):
         return self.__stations
+
+    @property
+    def logger(self):
+        try:
+            return self._logger
+        except AttributeError:
+            self._logger = get_logger()
+            return self._logger
+
+    @logger.setter
+    def logger(self, logger):
+        assert isinstance(logger, logging.Logger)
+        self._logger = logger
 
     @property
     def _model_domain(self):
