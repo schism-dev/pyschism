@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+import logging
 import os
 import pathlib
 import subprocess
@@ -7,13 +8,14 @@ from typing import Union
 import numpy as np  # type: ignore[import]
 
 from pyschism.domain import ModelDomain
-from pyschism.stations import Stations
-from pyschism.param import Param
-from pyschism.server import ServerConfig
+from pyschism.driver.makefile import MakefileDriver
 from pyschism.enums import Stratification
 from pyschism.forcing.tides.bctides import Bctides
 from pyschism.forcing.atmosphere import NWS2
-from pyschism.driver.makefile import MakefileDriver
+from pyschism.logger import get_logger
+from pyschism.param import Param
+from pyschism.server import ServerConfig
+from pyschism.stations import Stations
 
 
 class CombineHotstartBinary:
@@ -62,12 +64,16 @@ class ModelDriver:
         self._param = Param(model_domain, dt, rnday, dramp, start_date, ibc,
                             drampbc, nspool, ihfskip, nhot_write, stations,
                             **surface_outputs)
+
         # init bctides.in
         self._bctides = Bctides(model_domain, self.param,
                                 cutoff_depth=cutoff_depth)
 
         # init atmospheric data.
         self._nws = model_domain.nws
+
+        # init hydrology data
+        self._hydrology = model_domain.hydrology
 
         # init hotstart file
         self._combine_hotstart = combine_hotstart
@@ -132,6 +138,9 @@ class ModelDriver:
                 stations = 'station.in' if stations is True else stations
                 self.stations.write(outdir / stations, overwrite)
 
+        for hydrology in self._hydrology:
+            hydrology.write(outdir, overwrite)
+
         if self.hotstart_file is not None:
             hotstart_lnk = outdir / 'hotstart.nc'
             if overwrite is True:
@@ -160,7 +169,11 @@ class ModelDriver:
 
     @property
     def nws(self):
-        return self.__nws
+        return self._nws
+
+    @property
+    def hydrology(self):
+        return self._hydrology
 
     @property
     def hotstart_file(self):
@@ -170,6 +183,19 @@ class ModelDriver:
     @property
     def makefile(self):
         return self._makefile
+
+    @property
+    def logger(self):
+        try:
+            return self._logger
+        except AttributeError:
+            self._logger = get_logger()
+            return self._logger
+
+    @logger.setter
+    def logger(self, logger: logging.Logger):
+        assert isinstance(logger, logging.Logger)
+        self._logger = logger
 
     @property
     def _nws(self):
@@ -191,3 +217,14 @@ class ModelDriver:
             combine_hotstart = CombineHotstartBinary(combine_hotstart)
             self.param.opt.ihot = 1
         self.__combine_hotstart = combine_hotstart
+
+    @property
+    def _hydrology(self):
+        return self.__hydrology
+
+    @_hydrology.setter
+    def _hydrology(self, hydrology):
+        for forcing in hydrology:
+            if callable(forcing):
+                forcing(self)
+        self.__hydrology = hydrology

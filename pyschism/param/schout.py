@@ -18,6 +18,7 @@ from pyschism.enums import (
         IofAnaVariables,
         SchoutType
     )
+from pyschism.logger import logging, get_logger
 
 
 class OutputVariableDescriptor:
@@ -141,7 +142,7 @@ class SCHOUT(metaclass=SchoutMeta):
     nspool_sta = NspoolSta()
 
     def __init__(self, **outputs):
-
+        self.logger.info('Initializing SCHOUT.')
         for key, val in outputs.items():
             setattr(self, key, val)
 
@@ -164,3 +165,16 @@ class SCHOUT(metaclass=SchoutMeta):
                         schout.append(f'  {var[1:]}({i+1})={state}')
         schout.append('/')
         return '\n'.join(schout)
+
+    @property
+    def logger(self):
+        try:
+            return self._logger
+        except AttributeError:
+            self._logger = get_logger()
+            return self._logger
+
+    @logger.setter
+    def logger(self, logger):
+        assert isinstance(logger, logging.Logger)
+        self._logger = logger

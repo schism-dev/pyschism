@@ -3,7 +3,7 @@ from os import PathLike
 import sys
 
 
-def get_logger(name: str, log_filename: PathLike = None,
+def get_logger(name: str = 'pyschism', log_filename: PathLike = None,
                file_level: int = None, console_level: int = None,
                log_format: str = None) -> logging.Logger:
     if file_level is None:
@@ -50,3 +50,6 @@ def get_logger(name: str, log_filename: PathLike = None,
         handler.setFormatter(log_formatter)
 
     return logger
+
+
+logger = get_logger()

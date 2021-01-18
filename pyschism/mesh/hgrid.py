@@ -187,6 +187,7 @@ class HgridBoundaries:
         self._land = gpd.GeoDataFrame(land_boundaries)
         self._interior = gpd.GeoDataFrame(interior_boundaries)
         self._hgrid = hgrid
+        self._data = boundaries
 
     def ocean(self):
         return self._ocean
@@ -196,6 +197,10 @@ class HgridBoundaries:
 
     def interior(self):
         return self._interior
+
+    @property
+    def data(self):
+        return self._data
 
     @lru_cache(maxsize=1)
     def __call__(self):
@@ -252,7 +257,7 @@ class Hgrid(Gr3):
         _grd.update({
             "nodes": {id: (coord, -val) for id, (coord, val)
                       in self.nodes().items()},
-            "boundaries": self.boundaries})
+            "boundaries": self.boundaries.data})
         return _grd
 
     @figure
