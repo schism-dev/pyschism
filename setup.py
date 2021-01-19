@@ -1,16 +1,16 @@
 #!/usr/bin/env python
 import pathlib
 import setuptools  # type: ignore[import]
+import subprocess
+import sys
 
 try:
     from dunamai import Version
 except ImportError:
-    import sys
-    import subprocess
-
     subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'dunamai'])
     from dunamai import Version  # type: ignore[import]
 
+subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'wheel'])
 
 parent = pathlib.Path(__file__).parent.absolute()
 conf = setuptools.config.read_configuration(parent / 'setup.cfg')
