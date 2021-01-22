@@ -1,33 +1,56 @@
 from datetime import timedelta
-from typing import List
+from typing import List, Union
 import uuid
 
 
 from pyschism.server.base import ServerConfig
 
 
+# class SlurmJobList:
+
+#     def __init__(self):
+#         self.jobs = []
+
+#     def __get__(self, obj, val):
+#         return self.jobs
+
+
+# class SlurmQueue:
+#     jobs = SlurmJobList()
+
+#     def __call__(self):
+#         for job in self.jobs:
+#             if job["depends_on"]
+
+
+#     def add(self, callable, job_id=None, depends_on=None):
+#         self.jobs.append({
+#             id(callable) if job_id is None else job_id: callable,
+#             "depends_on": depends_on})
+
+
 class SlurmConfig(ServerConfig):
-    """
-    Object instance of a Slurm shell script (`*.job`).
-    """
+    """Configuration object for SLURM-enabled servers"""
 
     def __init__(
             self,
-            account: str,
-            ntasks: int,
-            partition: str,
-            walltime: timedelta,
-            filename: str = 'slurm.job',
-            run_directory: str = '.',
+            account: str = None,
+            ntasks: int = None,
+            partition: str = None,
+            walltime: timedelta = None,
+            filename: str = None,
+            run_directory: str = None,
             run_name: str = None,
             mail_type: str = None,
             mail_user: str = None,
             log_filename: str = None,
             modules: List[str] = None,
-            path_prefix: str = None,
+            schism_binary: str = None,
             extra_commands: List[str] = None,
-            launcher: str = 'srun',
-            nodes: int = None
+            launcher: str = None,
+            nodes: int = None,
+            symlink_outputs: str = None,
+            mpi_launcher: str = None,
     ):
         """
         Instantiate a new Slurm shell script (`*.job`).
@@ -47,110 +70,194 @@ class SlurmConfig(ServerConfig):
         :param extra_commands: list of extra shell commands to insert into script
         :param launcher: command to start processes on target system (`srun`, `ibrun`, etc.)
         :param nodes: number of total nodes
+        :param schism_binary: path to schism binary to use
         """
-        self._account = account
-        self._slurm_ntasks = ntasks
-        self._run_name = run_name
-        self._partition = partition
-        self._walltime = walltime
-        self._filename = filename
-        self._run_directory = run_directory
-        self._mail_type = mail_type
-        self._mail_user = mail_user
-        self._log_filename = log_filename
-        self._modules = modules
-        self._path_prefix = path_prefix
-        self._extra_commands = extra_commands
-        self._launcher = launcher
-        self._nodes = nodes
+        self.account = account
+        self.nproc = ntasks
+        self.run_name = run_name
+        self.partition = partition
+        self.walltime = walltime
+        self.filename = filename
+        self.run_directory = run_directory
+        self.mail_type = mail_type
+        self.mail_user = mail_user
+        self.log_filename = log_filename
+        self.modules = modules
+        self.schism_binary = schism_binary
+        self.extra_commands = extra_commands
+        self.launcher = launcher
+        self.nodes = nodes
+        self.symlink_outputs = symlink_outputs
+        self.mpi_launcher = mpi_launcher
 
     def __str__(self):
-        f = ["#!/bin/bash --login",
-             f'#SBATCH -D {self._run_directory}',
-             f'#SBATCH -J {self._run_name}']
+        f = [
+            self.MPI_LAUNCHER,
+            self.SCHISM_BINARY,
+            self.SYMLINK_OUTPUTS,
+            self.SLURM_NTASKS,
+            self.SYMLINK_OUTPUTS,
+            self.SLURM_ACCOUNT,
+            self.SLURM_RUN_NAME,
+            self.SLURM_PARTITION,
+            self.SLURM_WALLTIME,
+            self.SLURM_RUN_DIRECTORY,
+            self.SLURM_MAIL_TYPE,
+            self.SLURM_MAIL_USER,
+            self.SLURM_LOG_FILE,
+            self.SLURM_JOB_FILE,
+        ]
 
-        if self._account is not None:
-            f.append(f'#SBATCH -A {self._account}')
-        if self._mail_type is not None:
-            f.append(f'#SBATCH --mail-type={self._mail_type}')
-        if self._mail_user is not None:
-            f.append(f'#SBATCH --mail-user={self._mail_user}')
-        if self._log_filename is not None:
-            f.append(f'#SBATCH --output={self._log_filename}')
+        # self.modules = modules
+        # self.path_prefix = path_prefix
+        # self.extra_commands = extra_commands
+        # self.launcher = launcher
+        # self.nodes = nodes
 
-        f.append(f'#SBATCH -n {self._slurm_ntasks}')
-        if self._nodes is not None:
-            f.append(f'#SBATCH -N {self._nodes}')
-
-        f.extend([f'#SBATCH --time={self._walltime}',
-                  f'#SBATCH --partition={self._partition}',
-                  'ulimit -s unlimited',
-                  'set -e'])
-
-        if len(self._modules) > 0:
-            f.append(
-                f'module load {" ".join(module for module in self._modules)}')
-
-        if self._path_prefix is not None:
-            f.append(f'PATH={self._path_prefix}:$PATH')
-
-        if self._extra_commands is not None:
-            for command in self._extra_commands:
-                f.append(f'{command}')
-
-        return '\n'.join(f)
+        # f.extend([
+        #     f if ,
+        #     f,
+        #     f"SLURM_JOB_FILE:={self.log_filename}",
+        #     self.slurm,
+        #     ])
+        # f.append(self.slurm)
+        return "\n".join(f)
 
     @property
-    def nprocs(self):
-        return self._slurm_ntasks
-
-    @property
-    def _walltime(self):
+    def walltime(self):
+        if isinstance(self.__walltime, timedelta):
+            hours, remainder = divmod(self.__walltime, timedelta(hours=1))
+            minutes, remainder = divmod(remainder, timedelta(minutes=1))
+            seconds = round(remainder / timedelta(seconds=1))
+            return f'{hours:02}:{minutes:02}:{seconds:02}'
         return self.__walltime
 
-    @_walltime.setter
-    def _walltime(self, walltime):
-        hours, remainder = divmod(walltime, timedelta(hours=1))
-        minutes, remainder = divmod(remainder, timedelta(minutes=1))
-        seconds = round(remainder / timedelta(seconds=1))
-        self.__walltime = f'{hours:02}:{minutes:02}:{seconds:02}'
+    @walltime.setter
+    def walltime(self, walltime: Union[timedelta, None]):
+        self.__walltime = walltime
 
     @property
-    def _filename(self):
+    def filename(self):
         return self.__filename
 
-    @_filename.setter
-    def _filename(self, filename):
+    @filename.setter
+    def filename(self, filename):
         if filename is None:
             filename = 'slurm.job'
         self.__filename = filename
 
     @property
-    def _run_name(self):
+    def run_name(self):
         return self.__run_name
 
-    @_run_name.setter
-    def _run_name(self, run_name):
+    @run_name.setter
+    def run_name(self, run_name):
         if run_name is None:
             run_name = uuid.uuid4().hex
         self.__run_name = run_name
 
     @property
-    def _run_directory(self):
+    def run_directory(self):
         return self.__run_directory
 
-    @_run_directory.setter
-    def _run_directory(self, run_directory):
+    @run_directory.setter
+    def run_directory(self, run_directory):
         if run_directory is None:
             run_directory = '.'
         self.__run_directory = run_directory
 
     @property
-    def _log_filename(self):
+    def log_filename(self):
         return self.__log_filename
 
-    @_log_filename.setter
-    def _log_filename(self, log_filename):
+    @log_filename.setter
+    def log_filename(self, log_filename):
         if log_filename is None:
-            log_filename = "slurm.log"
+            log_filename = r"slurm.log"
         self.__log_filename = log_filename
+
+    @property
+    def mpi_launcher(self):
+        return self.__mpi_launcher
+
+    @mpi_launcher.setter
+    def mpi_launcher(self, mpi_launcher):
+        self.__mpi_launcher = "srun" if mpi_launcher is None \
+            else mpi_launcher
+
+    @property
+    def SLURM_NTASKS(self):
+        f = "SLURM_NTASKS="
+        if self.nproc is not None:
+            f += f"{self.nproc}"
+        return f
+
+    @property
+    def SLURM_ACCOUNT(self):
+        f = "SLURM_ACCOUNT="
+        if self.account is not None:
+            f += f"{self.account}"
+        return f
+
+    @property
+    def SLURM_RUN_NAME(self):
+        f = "SLURM_RUN_NAME="
+        if self.run_name is not None:
+            f += f"{self.run_name}"
+        return f
+
+    @property
+    def SLURM_PARTITION(self):
+        f = "SLURM_PARTITION="
+        if self.partition is not None:
+            f += f"{self.partition}"
+        return f
+
+    @property
+    def SLURM_WALLTIME(self):
+        f = "SLURM_WALLTIME="
+        if self.walltime is not None:
+            f += f"{self.walltime}"
+        return f
+
+    @property
+    def SLURM_RUN_DIRECTORY(self):
+        f = "SLURM_RUN_DIRECTORY="
+        if self.run_directory is not None:
+            f += f"{self.run_directory}"
+        return f
+
+    @property
+    def SLURM_MAIL_TYPE(self):
+        f = "SLURM_MAIL_TYPE="
+        if self.mail_type is not None:
+            f += f"{self.mail_type}"
+        return f
+
+    @property
+    def SLURM_MAIL_USER(self):
+        f = "SLURM_MAIL_USER="
+        if self.mail_user is not None:
+            f += f"{self.mail_user}"
+        return f
+
+    @property
+    def SLURM_LOG_FILE(self):
+        f = "SLURM_LOG_FILE="
+        if self.log_filename is not None:
+            f += f"{self.log_filename}"
+        return f
+
+    @property
+    def SLURM_JOB_FILE(self):
+        f = "SLURM_JOB_FILE="
+        if self.filename is not None:
+            f += f"{self.filename}"
+        return f
+
+    @property
+    def MPI_LAUNCHER(self):
+        f = "MPI_LAUNCHER="
+        if self.mpi_launcher is not None:
+            f += f"{self.mpi_launcher}"
+        return f
