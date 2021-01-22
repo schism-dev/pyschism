@@ -1,13 +1,23 @@
 #!/usr/bin/env python
 import pathlib
-# from dunamai import Version  # type: ignore[import]
 import setuptools  # type: ignore[import]
+import subprocess
+import sys
+
+try:
+    from dunamai import Version
+except ImportError:
+    subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'dunamai'])
+    from dunamai import Version  # type: ignore[import]
+
+subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'wheel'])
+
 parent = pathlib.Path(__file__).parent.absolute()
 conf = setuptools.config.read_configuration(parent / 'setup.cfg')
 meta = conf['metadata']
 setuptools.setup(
     name=meta['name'],
-    # version=Version.from_any_vcs().serialize(),
+    version=Version.from_any_vcs().serialize(),
     author=meta['author'],
     author_email=meta['author_email'],
     description=meta['description'],
@@ -16,14 +26,10 @@ setuptools.setup(
     url=meta['url'],
     packages=setuptools.find_packages(),
     python_requires='>=3.6',
-    setup_requires=['setuptools_scm',
-                    # 'dunamai',
-                    'setuptools>=41.2'
-                    ],
+    setup_requires=['setuptools_scm', 'setuptools>=41.2',
+                    'netcdf-flattener>=1.2.0'],
     include_package_data=True,
-    extras_require={'dev': ['coverage',
-                            # 'dunamai',
-                            'flake8', 'nose']},
+    extras_require={'dev': ['coverage', 'flake8', 'nose']},
     install_requires=[
         'matplotlib',
         'netCDF4',
@@ -36,15 +42,14 @@ setuptools.setup(
         'wget',
         'appdirs',
         'cf-python',
-        'cf-plot',
         'sqlalchemy',
+        'geopandas',
         'pyugrid',
+        'pytz',
+        'boto3',
+        'rtree'
     ],
-    entry_points={
-        'console_scripts': [
-            'pyschism = pyschism.__main__:main'
-        ]
-    },
+    entry_points={'console_scripts': ['pyschism = pyschism.__main__:main']},
     tests_require=['nose'],
     test_suite='nose.collector',
 )

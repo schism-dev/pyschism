@@ -3,9 +3,10 @@ from datetime import timedelta, timezone
 from enum import Enum
 from functools import lru_cache
 
-from pyschism.forcing.tides.tides import Tides
-from pyschism.param.param import Param
 from pyschism.domain import ModelDomain
+from pyschism.forcing.tides.tides import Tides
+from pyschism.logger import logging, get_logger
+from pyschism.param.param import Param
 
 
 class NullWritter:
@@ -113,7 +114,7 @@ class Bctides:
     def __init__(self, model_domain: ModelDomain, param: Param,
                  cutoff_depth: float = 50.):
         """Provides an interface to write bctides.in to file. """
-
+        self.logger.info('Initializing Bctides.')
         # check if start_date was given in case tidal forcings are requested.
         # Note: This is done twice so that this class can be used independently
         # from Param to just write bctides files
@@ -160,15 +161,14 @@ class Bctides:
                  f'{forcing[3]:G} ' \
                  f'{forcing[4]:G}\n'
         f += f"{len(self._model_domain.open_boundaries)}\n"  # nope
-        for id in self._model_domain.open_boundaries:
-            boundary = self._model_domain.open_boundaries[id]
-            f += f"{len(boundary['indexes'])} " \
-                 f'{str(boundary["forcing"])}\n' \
-                 f'{iettypeWritter[boundary["forcing"].iettype.name].value(boundary, self)}' \
-                 f'{ifltypeWritter[boundary["forcing"].ifltype.name].value(boundary, self)}' \
-                 f'{itetypeWritter[boundary["forcing"].itetype.name].value(boundary, self)}' \
-                 f'{isatypeWritter[boundary["forcing"].isatype.name].value(boundary, self)}' \
-                 f'{itrtypeWritter[boundary["forcing"].itrtype.name].value(boundary, self)}'
+        for id, data in self._model_domain.open_boundaries:
+            f += f"{len(data['indexes'])} " \
+                 f'{str(data["forcing"])}\n' \
+                 f'{iettypeWritter[data["forcing"].iettype.name].value(data, self)}' \
+                 f'{ifltypeWritter[data["forcing"].ifltype.name].value(data, self)}' \
+                 f'{itetypeWritter[data["forcing"].itetype.name].value(data, self)}' \
+                 f'{isatypeWritter[data["forcing"].isatype.name].value(data, self)}' \
+                 f'{itrtypeWritter[data["forcing"].itrtype.name].value(data, self)}'
         return f
 
     @lru_cache(maxsize=1)
@@ -179,8 +179,8 @@ class Bctides:
         # on each boundary and activate them all globally
         # set active tidal potential constituents
         const = dict()
-        for id in self._model_domain.open_boundaries:
-            forcing = self._model_domain.open_boundaries[id]['forcing']
+        for id, data in self._model_domain.open_boundaries:
+            forcing = data['forcing']
             if isinstance(forcing, Tides):
                 for active in forcing.get_active_potential_constituents():
                     const[active] = True
@@ -190,8 +190,8 @@ class Bctides:
     def get_active_forcing_constituents(self):
         # set active tidal forcing constituents
         const = dict()
-        for id in self._model_domain.open_boundaries:
-            forcing = self._model_domain.open_boundaries[id]['forcing']
+        for id, data in self._model_domain.open_boundaries:
+            forcing = data['forcing']
             if isinstance(forcing, Tides):
                 for active in forcing.get_active_forcing_constituents():
                     const[active] = True
@@ -224,3 +224,16 @@ class Bctides:
             return self.__start_date.astimezone(timezone(timedelta(0)))
         else:
             return self.__start_date
+
+    @property
+    def logger(self):
+        try:
+            return self._logger
+        except AttributeError:
+            self._logger = get_logger()
+            return self._logger
+
+    @logger.setter
+    def logger(self, logger):
+        assert isinstance(logger, logging.Logger)
+        self._logger = logger

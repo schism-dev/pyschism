@@ -47,7 +47,8 @@ class WindRotDescriptor:
                             f'not type {type(grd)}.')
         data = grd.to_dict()
         data.pop("boundaries", None)
-        data["values"] = [0. for i in range(len(data["values"]))]
+        data["nodes"] = {id: (coord, 0.) for id, (coord, _)
+                         in data["nodes"].items()}
         obj.__dict__['windrot'] = Gr3(**data)
 
     def __get__(self, obj, val):
@@ -123,51 +124,3 @@ class NWS2(NWS):
     @property
     def sflux_2(self) -> SfluxDataset:
         return self._sflux_2
-   
-
-# class Sflux(NWS2):
-
-#     def __init__(self, level_1, air_1=None, prc_1=None, rad_1=None,
-#                  level_2=None, air_2=None, prc_2=None, rad_2=None):
-#         """Creates symlinks to the atmospheric wind files.
-
-#         It will not
-
-#         """
-#         self._level_1 = level_1
-#         self._air_1 = air_1
-#         self._prc_1 = prc_1
-#         self._rad_1 = rad_1
-#         self._level_2 = level_2
-#         self._air_2 = air_2
-#         self._prc_2 = prc_2
-#         self._rad_2 = rad_2
-#         # TODO: Run sanity check here
-#         super().__init__(cf.read())
-
-#     @staticmethod
-#     def load(path: Union[str, pathlib.Path]):
-#         pass
-
-
-# class SfluxServerFiles(NWS2):
-
-#     def __init__(self, level_1, air_1=None, prc_1=None, rad_1=None,
-#                  level_2=None, air_2=None, prc_2=None, rad_2=None):
-#         """Creates symlinks to the atmospheric wind files.
-
-#         It will not
-
-#         """
-#         # set level_1
-
-#         self._level_1 = level_1
-#         self._air_1 = air_1
-#         self._prc_1 = prc_1
-#         self._rad_1 = rad_1
-#         self._level_2 = level_2
-#         self._air_2 = air_2
-#         self._prc_2 = prc_2
-#         self._rad_2 = rad_2
-#         # Send an empty cf.FileList()
-#         super().__init__(cf.FileList())

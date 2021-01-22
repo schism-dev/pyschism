@@ -2,65 +2,16 @@ from datetime import datetime, timedelta
 import pathlib
 from typing import Union
 
-from pyschism.enums import Stratification
 from pyschism.domain import ModelDomain
+from pyschism.enums import Stratification
+from pyschism.logger import logging, get_logger
 from pyschism.param.core import CORE
 from pyschism.param.opt import OPT
 from pyschism.param.schout import SCHOUT
-
-
-class OptDescriptor:
-
-    def __set__(self, obj, opt: OPT):
-        # friction parameters
-        opt.nchi = obj.model_domain.fgrid
-        # set coordinate system
-        opt.ics = obj.model_domain.ics
-        # set coriolis
-        opt.ncor = obj.model_domain.ncor
-        # set atmospheric forcing
-        if obj.model_domain.nws is not None:
-            opt.nws = obj.model_domain.nws
-        # TODO: Set the remaining options:
-        # msc2
-        # mdc2
-        # ntracer_gen
-        # ntracer_age
-        # sed_class
-        # eco_class
-        self._opt = opt
-
-    def __get__(self, obj, val):
-        return self._opt
-
-
-class NhotWriteDescriptor:
-
-    def __set__(self, obj, nhot_write: Union[int, bool, timedelta, None]):
-
-        if not isinstance(nhot_write, (int, bool, timedelta, type(None))):
-            raise TypeError(f"Argument nhot_write must be of type {int}, "
-                            f"{bool}, {timedelta}, or None.")
-
-        if nhot_write is True:
-            nhot_write = int(round(obj.core.rnday / obj.core.dt))
-
-        elif isinstance(nhot_write, timedelta):
-            nhot_write = int(round(nhot_write / obj.core.dt))
-
-        if nhot_write is not None:
-            if nhot_write % obj.core.ihfskip != 0:
-                raise ValueError("nhot_write must be a multiple of ihfskip")
-            obj.schout.nhot_write = nhot_write
-
-    def __get__(self, obj, val):
-        return obj.schout.nhot_write
+from pyschism.stations import Stations
 
 
 class Param:
-
-    _opt = OptDescriptor()
-    _nhot_write = NhotWriteDescriptor()
 
     def __init__(
             self,
@@ -74,12 +25,16 @@ class Param:
             nspool: Union[int, float, timedelta] = None,
             ihfskip: Union[int, timedelta] = None,
             nhot_write: Union[int, timedelta, bool] = None,
+            stations: Stations = None,
             **surface_outputs):
+
+        self.logger.info('Initializing param')
         self._model_domain = model_domain
         self._core = CORE(ibc, rnday, dt, nspool, ihfskip)
         self._opt = OPT(dramp, drampbc, start_date)
         self._schout = SCHOUT(**surface_outputs)
         self._nhot_write = nhot_write
+        self._stations = stations
 
     def __str__(self):
         return f"{str(self.core)}\n\n{str(self.opt)}\n\n{str(self.schout)}\n"
@@ -105,4 +60,95 @@ class Param:
 
     @property
     def model_domain(self):
-        return self._model_domain
+        return self.__model_domain
+
+    @property
+    def nhot_write(self):
+        return self.schout.nhot_write
+
+    @property
+    def stations(self):
+        return self.__stations
+
+    @property
+    def logger(self):
+        try:
+            return self._logger
+        except AttributeError:
+            self._logger = get_logger()
+            return self._logger
+
+    @logger.setter
+    def logger(self, logger):
+        assert isinstance(logger, logging.Logger)
+        self._logger = logger
+
+    @property
+    def _model_domain(self):
+        return self.__model_domain
+
+    @_model_domain.setter
+    def _model_domain(self, model_domain):
+        assert isinstance(model_domain, ModelDomain), \
+            f"Argument model_domain must be of type {ModelDomain}, " \
+            f"not {type(model_domain)}."
+        self.__model_domain = model_domain
+
+    @property
+    def _opt(self):
+        return self.__opt
+
+    @_opt.setter
+    def _opt(self, opt: OPT):
+        # friction parameters
+        opt.nchi = self.model_domain.fgrid
+        # set coordinate system
+        opt.ics = self.model_domain.ics
+        # set coriolis
+        opt.ncor = self.model_domain.ncor
+        # set atmospheric forcing
+        if self.model_domain.nws is not None:
+            opt.nws = self.model_domain.nws
+        # TODO: Set the remaining options:
+        # msc2
+        # mdc2
+        # ntracer_gen
+        # ntracer_age
+        # sed_class
+        # eco_class
+        self.__opt = opt
+
+    @property
+    def _nhot_write(self):
+        return self.__nhot_write
+
+    @_nhot_write.setter
+    def _nhot_write(self, nhot_write: Union[int, timedelta, bool, None]):
+
+        if not isinstance(nhot_write, (int, bool, timedelta, type(None))):
+            raise TypeError(f"Argument nhot_write must be of type {int}, "
+                            f"{bool}, {timedelta}, or None.")
+
+        if nhot_write is True:
+            nhot_write = int(round(self.core.rnday / self.core.dt))
+
+        elif isinstance(nhot_write, timedelta):
+            nhot_write = int(round(nhot_write / self.core.dt))
+
+        if nhot_write is not None:
+            if nhot_write % self.core.ihfskip != 0:
+                raise ValueError("nhot_write must be a multiple of ihfskip")
+            self.schout.nhot_write = nhot_write
+
+    @property
+    def _stations(self):
+        return self.__stations
+
+    @_stations.setter
+    def _stations(self, stations: Union[Stations, None]):
+        assert isinstance(stations, (Stations, type(None))), \
+            f"Argument stations must be of type {Stations} or None, " \
+            f"not type {type(stations)}."
+        if isinstance(stations, Stations):
+            raise NotImplementedError("Do something!")
+        self.__stations = stations

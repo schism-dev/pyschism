@@ -1,35 +1,24 @@
 #! /usr/bin/env python
 import argparse
 from enum import Enum
+import logging
 import pathlib
 
-from pyschism.cmd.forecastd import Forecastd
-from pyschism.cmd.generate_forecast import GenerateForecastCli
-from pyschism.cmd.viewerd import Viewerd
-from pyschism.cmd.plotting import OutputPlotCli
+from psutil import cpu_count  # type: ignore[import]
+
+from pyschism.cmd.forecast import ForecastCli
 from pyschism.enums import ForecastProduct
 
 
 class Dispatch(Enum):
-    FORECASTD_DAEMON = Forecastd
-    GENERATE_FORECAST = GenerateForecastCli
-    PLOTTING = OutputPlotCli
-    VIEWER = Viewerd
+    FORECAST_CLI = ForecastCli
 
 
 class Env(Enum):
-    FORECASTD_DAEMON = 'forecastd'
-    GENERATE_FORECAST = 'forecast'
-    PLOTTING = 'plot'
-    VIEWER = 'viewerd'
+    FORECAST_CLI = 'forecast'
 
 
-def add_forecast(subparsers):
-    forecast = subparsers.add_parser('forecast')
-    forecast.add_argument(
-            "--overwrite", action="store_true",
-            help="Allow overwrite of output directory.")
-    actions = forecast.add_subparsers(dest="action")
+def add_forecast_init(actions):
     init = actions.add_parser("init")
     init.add_argument("project_directory")
     init.add_argument('hgrid', help='Horizontal grid file.')
@@ -54,9 +43,10 @@ def add_forecast(subparsers):
     init.add_argument(
             "--skip-run", action="store_true",
             help="Skips running the model.")
+    init.add_argument('--nproc', type=int, default=cpu_count(logical=False))
     _add_tidal_constituents(init)
     _add_atmospheric_forcing(init)
-    _add_source_forcing(init)
+    _add_hydrologic_forcing(init)
     # TODO: Additional forcings.
     # _add_wave_forcing(forecast)
     model_outputs = init.add_argument_group('model_outputs')
@@ -66,10 +56,9 @@ def add_forecast(subparsers):
     server_config = init.add_subparsers(dest="server_config")
     slurm = server_config.add_parser(
         'slurm', help="Add options for slurm run configuration.")
-    slurm.add_argument('account')
-    slurm.add_argument('ntasks', type=int)
-    slurm.add_argument('partition')
-    slurm.add_argument('walltime', type=float, help="In hours, float.")
+    slurm.add_argument('--account')
+    slurm.add_argument('--partition')
+    slurm.add_argument('--walltime', type=float, help="In hours, float.")
     slurm.add_argument('--slurm-filename')
     slurm.add_argument('--slurm-rundir')
     slurm.add_argument('--run-name')
@@ -86,8 +75,23 @@ def add_forecast(subparsers):
         action='append',
         dest='modules')
 
+
+def add_forecast_update(actions):
     update = actions.add_parser("update")
     update.add_argument("project_directory")
+
+
+def add_forecast(subparsers):
+    forecast = subparsers.add_parser('forecast')
+    forecast.add_argument(
+            "--overwrite", action="store_true",
+            help="Allow overwrite of output directory.")
+    forecast.add_argument(
+        "--log-level",
+        choices=[name.lower() for name in logging._nameToLevel])
+    actions = forecast.add_subparsers(dest="action")
+    add_forecast_init(actions)
+    add_forecast_update(actions)
 
 
 def add_forecastd(subparsers):
@@ -102,7 +106,7 @@ def add_forecastd(subparsers):
     _add_mesh_options(add)
     _add_tidal_constituents(add)
     _add_atmospheric_forcing(add)
-    _add_source_forcing(add)
+    _add_hydrologic_forcing(add)
 
 
 def add_viewerd(subparsers):
@@ -140,22 +144,6 @@ def add_plot(subparsers):
     stations.add_argument('-s', '--station', nargs='*', type=int,
                           help='Station index in station.in to include in '
                           'plot.')
-
-
-def parse_args():
-    parser = argparse.ArgumentParser()
-    subparsers = parser.add_subparsers(dest='mode')
-    add_forecastd(subparsers)
-    add_forecast(subparsers)
-    add_plot(subparsers)
-    # add_viewerd(subparsers)
-    # add_autodocd(subparsers)
-    return parser.parse_args()
-
-
-def main():
-    args = parse_args()
-    Dispatch[Env(args.mode).name].value(args)
 
 
 def _add_mesh_options(parser):
@@ -228,10 +216,11 @@ def _add_atmospheric_forcing(parser):
         help="Disables solar radiation flux option.")
 
 
-def _add_source_forcing(parser):
+def _add_hydrologic_forcing(parser):
     src_snk = parser.add_argument_group('Sources and sinks')
-    src_snk.add_argument("-s", "--src", action="append", dest='sources',
-                         help="Add source and sink flow.", choices=['NWM'])
+    src_snk.add_argument("--hydrology", action="append",
+                         help="Add source and sink flow.",
+                         choices=['NWM'])
 
 
 def _add_wave_forcing(parser):
@@ -612,6 +601,22 @@ def _add_surface_outputs(parser):
                 help=help_msg,
                 action='store_true'
                 )
+
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(dest='mode')
+    # add_forecastd(subparsers)
+    add_forecast(subparsers)
+    add_plot(subparsers)
+    # add_viewerd(subparsers)
+    # add_autodocd(subparsers)
+    return parser.parse_args()
+
+
+def main():
+    args = parse_args()
+    Dispatch[Env(args.mode).name].value(args)
 
 
 if __name__ == '__main__':
