@@ -1,7 +1,7 @@
 from argparse import Namespace
 from datetime import datetime, timedelta
 import json
-import logging
+# import logging
 import os
 import pathlib
 import shutil
@@ -16,7 +16,7 @@ from pyschism.forcing import Tides
 from pyschism.mesh.vgrid import Vgrid
 from pyschism.server import SlurmConfig
 
-from pyschism.logger import get_logger
+# from pyschism.logger import get_logger
 
 
 class ProjectDirectory:
@@ -267,7 +267,7 @@ class ForecastInit:
         self._write_config_file()
         self._symlink_files(self.coldstart_directory,
                             self.coldstart_domain.ics)
-        self.logger.info('Writting coldstart files to disk...')
+        # self.logger.info('Writting coldstart files to disk...')
         self.coldstart_driver.write(
             self.coldstart_directory,
             hgrid=False,
@@ -279,19 +279,19 @@ class ForecastInit:
 
         if self.args.skip_run is False:
             # release memory before launching SCHISM.
-            self.logger.info('Releasing memory before calling SCHISM...')
+            # self.logger.info('Releasing memory before calling SCHISM...')
             for item in list(self.__dict__.keys()):
                 if not item.startswith('_'):
                     del self.__dict__[item]
-            self.logger.info('Calling SCHISM using make.')
+            # self.logger.info('Calling SCHISM using make.')
             subprocess.check_call(
                 ["make", "run"],
                 cwd=self.coldstart_directory
             )
-        else:
-            self.logger.info("Skipping coldstart run.")
+        # else:
+            # self.logger.info("Skipping coldstart run.")
 
-        self.logger.info("Finished coldstart sequence.")
+        # self.logger.info("Finished coldstart sequence.")
 
     @property
     def args(self):
@@ -304,14 +304,14 @@ class ForecastInit:
                 'been initialized previously. Please use\npyschism '
                 'forecast --overwrite init [...]\nto allow overwrite of '
                 'previous initialization options.')
-        self.logger.info(
-            f"Writting configuration file to path {self.config_file}")
+        # self.logger.info(
+            # f"Writting configuration file to path {self.config_file}")
         with open(self.config_file, 'w') as fp:
             json.dump(self.args.__dict__, fp, indent=4)
 
-    def _symlink_files(self, target_directory, ics, windrot=False):
-        self.logger.info(
-            f"Establishing symlinks to target_directory: {target_directory}")
+    def _symlink_files(self, target_directory, ics):
+        # self.logger.info(
+            # f"Establishing symlinks to target_directory: {target_directory}")
         hgrid_lnk = target_directory / 'hgrid.gr3'
         vgrid_lnk = target_directory / 'vgrid.in'
         fgrid_lnk = target_directory / f'{self.fgrid_path.name}'
@@ -345,13 +345,13 @@ class ForecastInit:
         os.symlink(os.path.relpath(
             self.hgrid_path, target_directory), hgridll_lnk)
 
-    @property
-    def logger(self):
-        try:
-            return self._logger
-        except AttributeError:
-            self._logger = get_logger(
-                console_level=logging._nameToLevel[self.args.log_level.upper()]
-                )
-            self._logger.propagate = 0
-            return self._logger
+    # @property
+    # def logger(self):
+    #     try:
+    #         return self._logger
+    #     except AttributeError:
+    #         self._logger = get_logger(
+    #             console_level=logging._nameToLevel[self.args.log_level.upper()]
+    #             )
+    #         self._logger.propagate = 0
+    #         return self._logger

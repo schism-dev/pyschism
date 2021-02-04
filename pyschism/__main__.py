@@ -220,7 +220,8 @@ def _add_hydrologic_forcing(parser):
     src_snk = parser.add_argument_group('Sources and sinks')
     src_snk.add_argument("--hydrology", action="append",
                          help="Add source and sink flow.",
-                         choices=['NWM'])
+                         choices=['NWM'],
+                         default=[])
 
 
 def _add_wave_forcing(parser):
