@@ -70,19 +70,15 @@ class Nodes:
     def __call__(self):
         return self.gr3.__dict__['nodes']
 
-    @lru_cache(maxsize=1)
     def id(self):
         return list(self().keys())
 
-    @lru_cache(maxsize=1)
     def index(self):
         return np.arange(len(self()))
 
-    @lru_cache(maxsize=1)
     def coord(self):
         return np.array([coords for coords, _ in self().values()])
 
-    @lru_cache(maxsize=1)
     def values(self):
         return np.array([val for _, val in self().values()])
 
@@ -132,7 +128,6 @@ class Elements:
     def index(self):
         return np.arange(len(self()))
 
-    @lru_cache(maxsize=1)
     def array(self):
         rank = int(max(map(len, self().values())))
         array = np.full((len(self()), rank), -1)
@@ -141,21 +136,18 @@ class Elements:
             array[i, :len(row)] = row
         return np.ma.masked_equal(array, -1)
 
-    @lru_cache(maxsize=1)
     def triangles(self):
         return np.array(
             [list(map(self.gr3.nodes.get_index_by_id, element))
              for element in self().values()
              if len(element) == 3])
 
-    @lru_cache(maxsize=1)
     def quads(self):
         return np.array(
             [list(map(self.gr3.nodes.get_index_by_id, element))
              for element in self().values()
              if len(element) == 4])
 
-    @lru_cache(maxsize=1)
     def triangulation(self):
         triangles = self.triangles().tolist()
         for quad in self.quads():
