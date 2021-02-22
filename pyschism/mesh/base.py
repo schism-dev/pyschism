@@ -361,7 +361,6 @@ class Gr3(ABC):
         dst_crs = CRS.from_user_input(dst_crs)
         if not self.crs.equals(dst_crs):
             xy = self.get_xy(dst_crs)
-            self.nodes.coord.cache_clear()
             self._nodes = {self.nodes.id()[i]:
                            (coord.tolist(), self.nodes.values()[i])
                            for i, coord in enumerate(xy)}
