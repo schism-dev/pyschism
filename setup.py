@@ -4,11 +4,21 @@ import setuptools  # type: ignore[import]
 import subprocess
 import sys
 
+
 try:
     from dunamai import Version
 except ImportError:
-    subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'dunamai'])
+    subprocess.check_call(
+            [sys.executable, '-m', 'pip', 'install', 'dunamai']
+    )
     from dunamai import Version  # type: ignore[import]
+
+try:
+    version = Version.from_any_vcs(
+            pattern='^(?P<base>\d+\.\d+\.\d+)(-?((?P<stage>[a-zA-Z]+)\.?(?P<revision>\d+)?))?$'
+    ).serialize()
+except RuntimeError:
+    version = '0.0.0'
 
 subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'wheel'])
 
@@ -17,7 +27,7 @@ conf = setuptools.config.read_configuration(parent / 'setup.cfg')
 meta = conf['metadata']
 setuptools.setup(
     name=meta['name'],
-    version=Version.from_any_vcs().serialize(),
+    version=version,
     author=meta['author'],
     author_email=meta['author_email'],
     description=meta['description'],
@@ -25,7 +35,7 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url=meta['url'],
     packages=setuptools.find_packages(),
-    python_requires='>=3.6',
+    python_requires='>=3.6, <=3.8',
     setup_requires=['setuptools_scm', 'setuptools>=41.2',
                     'netcdf-flattener>=1.2.0'],
     include_package_data=True,
