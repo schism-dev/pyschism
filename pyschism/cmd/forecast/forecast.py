@@ -22,4 +22,6 @@ class ForecastCli:
         if args.action == "init":
             ForecastUpdate(Namespace(
                 project_directory=args.project_directory,
-                log_level=args.log_level))
+                # log_level=args.log_level
+                )
+            )

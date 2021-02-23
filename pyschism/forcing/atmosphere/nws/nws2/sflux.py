@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 # from enum import Enum
 from datetime import datetime, timedelta
+import logging
 import os
 import pathlib
 from typing import Union, List
@@ -13,6 +14,8 @@ from netCDF4 import Dataset  # type: ignore[import]
 import numpy as np  # type: ignore[import]
 import pytz
 
+
+_logger = logging.getLogger(__name__)
 
 class FieldsDescriptor:
 
@@ -340,8 +343,9 @@ class Fields:
                                  "array")
             fnames = lon.get_filenames()
             lons = fields.select_by_ncvar('lon')
+            _logger.info(f'fields.select_by_var() returned {lons}')
             for i in range(len(lons) - 1):
-                if not lon.equals(lons[i+1]):
+                if not (lon.array == lons[i+1].array).all():
                     raise ValueError(
                         "Invalid sflux dataset. Found two different 'lon' "
                         f"fields on files {fnames} and "
@@ -358,7 +362,7 @@ class Fields:
             fnames = lat.get_filenames()
             lats = fields.select_by_ncvar('lat')
             for i in range(len(lats) - 1):
-                if not lat.equals(lats[i+1]):
+                if not (lat.array == lats[i+1].array).all():
                     raise ValueError(
                         "Invalid sflux dataset. Found two different 'lat' "
                         f"fields on files {fnames} and "

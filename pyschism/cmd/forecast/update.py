@@ -2,7 +2,8 @@ from argparse import Namespace
 from collections import namedtuple
 from datetime import timedelta
 import json
-import logging
+import os
+# import logging
 import subprocess
 
 from pyschism.cmd.forecast.init import ForecastInit
@@ -13,7 +14,7 @@ from pyschism.forcing.atmosphere import GlobalForecastSystem as GFS
 from pyschism.forcing.hydrology import NationalWaterModel as NWM
 from pyschism.param.schout import SurfaceOutputVars
 
-logger = logging.getLogger()
+# logger = logging.getLogger()
 
 
 class HotstartDirectory:
@@ -66,7 +67,7 @@ class HotstartDriver:
     def __get__(self, obj, val):
         hotstart_driver = obj.__dict__.get('hotstart_driver')
         if hotstart_driver is None:
-            logger.debug('Creating hotstart driver.')
+            # logger.debug('Creating hotstart driver.')
             hotstart_driver = ModelDriver(
                 model_domain=obj.hotstart_domain,
                 dt=obj.args.timestep,
@@ -181,10 +182,25 @@ class HydrologyDescriptor:
             hydrology = []
             for hydro in obj.args.hydrology:
                 if hydro == "NWM":
-                    obj.logger.debug('Append NWM object.')
+                    # obj.logger.debug('Append NWM object.')
                     hydrology.append(NWM())
             obj.__dict__['hydrology'] = hydrology
         return hydrology
+
+
+class WindrotPath:
+    def __get__(self, obj, val):
+        windrot_path = obj.__dict__.get('windrot_path')
+        if windrot_path is None:
+            windrot_path = obj.static_files_directory / 'windrot_geo2proj.gr3'
+            if obj.args.overwrite is True and windrot_path.exists():
+                windrot_path.unlink()
+            if not windrot_path.exists():
+                obj.hotstart_domain.nws._windrot = obj.hotstart_domain.hgrid
+                obj.hotstart_domain.nws._windrot.write(
+                    windrot_path, overwrite=obj.args.overwrite)
+            obj.__dict__['windrot_path'] = windrot_path
+        return windrot_path
 
 
 class ForecastUpdate(ForecastInit):
@@ -196,10 +212,11 @@ class ForecastUpdate(ForecastInit):
     forcings = Forcings()
     nws2 = NWS2Descriptor()
     hydrology = HydrologyDescriptor()
+    windrot_path = WindrotPath()
 
     def __init__(self, args: Namespace):
         self._args = args
-        logger.info("Starting forecast update sequence.")
+        # logger.info("Starting forecast update sequence.")
         self._load_config()
 
         """
@@ -215,10 +232,11 @@ class ForecastUpdate(ForecastInit):
         self._symlink_files(
             self.hotstart_directory,
             self.hotstart_domain.ics,
-            windrot=(True if isinstance(self.forcings.atmosphere, NWS2)
-                     else False),
             )
-        logger.info("Calling hotstart write sequence.")
+        if isinstance(self.forcings.atmosphere, NWS2):
+            self._symlink_windrot(self.hotstart_directory)
+
+        # logger.info("Calling hotstart write sequence.")
         self.hotstart_driver.write(
             self.hotstart_directory,
             hgrid=False,
@@ -228,7 +246,7 @@ class ForecastUpdate(ForecastInit):
             overwrite=self.args.overwrite
         )
         if self.args.skip_run is False:
-            self.logger.info("Executing SCHISM.")
+            # self.logger.info("Executing SCHISM.")
             subprocess.check_call(
                 ["make", "run"],
                 cwd=self.hotstart_directory
@@ -240,6 +258,15 @@ class ForecastUpdate(ForecastInit):
             config = json.load(json_file)
         config.update(self.args.__dict__)
         self._args = Namespace(**config)
+
+    def _symlink_windrot(self, target_directory):
+        windrot_lnk = target_directory / 'windrot_geo2proj.gr3'
+        if self.args.overwrite is True:
+            if windrot_lnk.exists():
+                windrot_lnk.unlink()
+        os.symlink(
+            os.path.relpath(
+                self.windrot_path, target_directory), windrot_lnk)
 
     @property
     def nspool(self):
