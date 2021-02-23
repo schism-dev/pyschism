@@ -2,10 +2,13 @@
 import pathlib
 from datetime import datetime, timedelta, timezone
 import logging
+from time import time
 
 from pyschism.mesh import Hgrid, Vgrid, Fgrid
 from pyschism import ModelDomain, ModelDriver, Stations
 from pyschism.forcing import Tides
+from pyschism.forcing.atmosphere.nws.nws2 import NWS2
+from pyschism.forcing.atmosphere.gfs import GlobalForecastSystem as GFS
 
 
 
@@ -43,7 +46,6 @@ logging.basicConfig(level=logging.INFO)
 _logger = logging.getLogger(__name__)
 
 if __name__ == '__main__':
-    from time import time
     # open gr3 file
     _logger.info('Reading hgrid file...')
     _tic = time()
@@ -51,7 +53,7 @@ if __name__ == '__main__':
     _logger.info(f'Reading hgrind file took {time()-_tic}.')
 
     vgrid = Vgrid()
-    fgrid = Fgrid.open(PARENT / 'manning.gr3',crs='EPSG:4326')
+    fgrid = Fgrid.open(PARENT / 'drag.gr3',crs='EPSG:4326')
 
     # setup model domain
     domain = ModelDomain(hgrid, vgrid, fgrid)
@@ -63,18 +65,15 @@ if __name__ == '__main__':
     # connect the boundary condition to the domain
     domain.add_boundary_condition(elevbc)
 
-    # from pyschism.forcing.atmosphere.nws.nws2 import NWS2
-    # from pyschism.forcing.atmosphere.gfs import GlobalForecastSystem as GFS
-
-    # sflux_1 = GFS()
+    sflux_1 = GFS()
     # sflux_2 = HWRF()
 
-    # atmos = NWS2(
-    #         sflux_1,
+    atmos = NWS2(
+             sflux_1,
     #         sflux_2
-    #     )
+         )
 
-    # domain.set_atmospheric_forcing(atmos)
+    domain.set_atmospheric_forcing(atmos)
 
     #  ------ Param options
     # dt and rnday are required arguments
@@ -82,7 +81,7 @@ if __name__ == '__main__':
     # Use int or float for seconds, or timedelta objects for pythonic
     # specifications
     dt = timedelta(seconds=150.)
-    rnday = timedelta(days=30.)
+    rnday = timedelta(days=4.)
 
     # Use an integer for number of steps or a timedelta to approximate
     # number of steps internally based on timestep
@@ -95,9 +94,9 @@ if __name__ == '__main__':
     # date is provided, the driver will throw an exception.
     # tzinfo is optional, UTC assumed if not provided
     dramp = 0.1 * rnday
-    start_date = datetime(2017, 9, 18, 4, 0,
-                          tzinfo=timezone(timedelta(hours=-4))
-                          ) - dramp
+    dramp = timedelta(0.0)
+
+    start_date = datetime.utcnow() - dramp
 
     # Now we add station outputs
 #    stations = Stations.from_file(PARENT / 'station.in', timedelta(minutes=6.),
@@ -118,6 +117,3 @@ if __name__ == '__main__':
     outdir = pathlib.Path('staging')
     driver.write(outdir, overwrite=True)
 
-    # This will go as part of the writter
-    with open(outdir / 'slurm.job', 'w') as f:
-        f.write(SIMPLE_SLURM_DRIVER)
