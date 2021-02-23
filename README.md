@@ -63,5 +63,5 @@ hgrid.write("/path/to/output/file.2dm", fmt='2dm')
 ```
 ---
 Questions, comments and suggestions are welcome. Please follow the instructions on the `CONTRIBUTING.md` file for contributions. For bug reports and feature requests, please open an issue using the issue tracker.
-Author contact: Jaime.Calzada@noaa.gov
+Author contact: jrcalzada@wm.edu
 

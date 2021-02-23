@@ -32,7 +32,7 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url=meta['url'],
     packages=setuptools.find_packages(),
-    python_requires='>=3.6, <=3.8',
+    python_requires='>=3.6, <3.9',
     setup_requires=['wheel', 'setuptools_scm', 'setuptools>=41.2'],
     include_package_data=True,
     extras_require={'dev': ['coverage', 'flake8', 'nose']},
