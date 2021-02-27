@@ -25,7 +25,6 @@ import wget  # type: ignore[import]
 
 from pyschism.mesh import Hgrid, Gr3
 from pyschism.forcing.hydrology.base import Hydrology, Sources, Sinks
-from pyschism.logger import logging, get_logger
 
 
 DATADIR = pathlib.Path(user_data_dir()) / 'nwm'
@@ -108,8 +107,8 @@ class NWMElementPairings:
         centroids = []
         for element in hgrid.elements().values():
             cent = LinearRing(hgrid.nodes.coord()[list(
-                        map(hgrid.nodes.get_index_by_id, element))]
-                                       ).centroid
+                map(hgrid.nodes.get_index_by_id, element))]
+            ).centroid
             centroids.append((cent.x, cent.y))
         tree = cKDTree(centroids)
         del centroids
@@ -214,11 +213,11 @@ def streamflow_lookup(file, pairings):
     # TODO: read scaling factor directly from netcdf file?
     for element_id, features in pairings.sources.items():
         sources.append(0.01*np.sum(nc['streamflow'][
-                np.where(np.isin(nc['feature_id'], list(features)))]))
+            np.where(np.isin(nc['feature_id'], list(features)))]))
     sinks = []
     for element_id, features in pairings.sinks.items():
         sinks.append(-0.01*np.sum(nc['streamflow'][
-                np.where(np.isin(nc['feature_id'], list(features)))]))
+            np.where(np.isin(nc['feature_id'], list(features)))]))
     return (sources, sinks)
 
 
@@ -227,8 +226,8 @@ def pivot_time(input_datetime=None, period=6):
         input_datetime = pytz.timezone('UTC').localize(datetime.utcnow())
     current_cycle = int(period * np.floor(input_datetime.hour / period))
     return pytz.timezone('UTC').localize(
-            datetime(input_datetime.year, input_datetime.month,
-                     input_datetime.day, current_cycle))
+        datetime(input_datetime.year, input_datetime.month,
+                 input_datetime.day, current_cycle))
 
 
 class AWSDataInventory:
@@ -321,7 +320,7 @@ class AWSDataInventory:
         files = sorted(list(pathlib.Path(self.tmpdir.name).glob('*')))
         with multiprocessing.Pool(
                 processes=cpu_count() if nprocs == -1 else nprocs
-                ) as pool:
+        ) as pool:
             res = pool.starmap(
                 streamflow_lookup, [(file, pairings) for file in files])
         pool.join()
@@ -359,7 +358,6 @@ class AWSDataGetter(NWMDataGetter):
 
     def __call__(self, product: str = 'medium_range_mem1',
                  verbose: bool = False, h0=1e-1, nprocs=-1):
-
         """
         We just picked up a server_config. This part must be slurm-aware and
         potentially

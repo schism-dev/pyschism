@@ -1,12 +1,14 @@
 from datetime import timedelta
 from enum import Enum
+import logging
 import pathlib
 from typing import Union
 
 import f90nml  # type: ignore[import]
 
 from pyschism.enums import Stratification
-from pyschism.logger import logging, get_logger
+
+_logger = logging.getLogger(__name__)
 
 PARAM_TEMPLATE = pathlib.Path(__file__).parent / 'param.nml.template'
 PARAM_DEFAULTS = f90nml.read(PARAM_TEMPLATE)['core']
@@ -181,8 +183,8 @@ class CORE(metaclass=CoreMeta):
             dt: Union[int, float, timedelta],
             nspool: Union[int, float, timedelta] = None,
             ihfskip: Union[int, timedelta] = None,
-    ):  
-        self.logger.info('Initializing CORE')
+    ):
+        _logger.info('Initializing CORE')
         self.ibc = ibc
         self.rnday = rnday
         self.dt = dt
@@ -205,16 +207,3 @@ class CORE(metaclass=CoreMeta):
                 data.append(f"  {key}={str(current)}")
         data = '\n'.join(data)
         return f"&CORE\n{data}\n/"
-
-    @property
-    def logger(self):
-        try:
-            return self._logger
-        except AttributeError:
-            self._logger = get_logger()
-            return self._logger
-
-    @logger.setter
-    def logger(self, logger):
-        assert isinstance(logger, logging.Logger)
-        self._logger = logger

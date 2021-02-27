@@ -7,8 +7,6 @@ from typing import Union  # , Dict
 # import numpy as np  # type: ignore[import]
 import pandas as pd  # type: ignore[import]
 
-from pyschism.logger import get_logger
-
 
 class TimeHistoryFile:
 

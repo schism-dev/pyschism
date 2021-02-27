@@ -1,22 +1,26 @@
 from collections import OrderedDict
 from datetime import datetime, timedelta, timezone
 from enum import Enum
+import logging
 from typing import Union, Callable
 
-import numpy as np  # type: ignore[import]
+import numpy as np
 
-from . import bctypes  # type: ignore[import]
-from .tpxo import TPXO  # type: ignore[import]
+from pyschism.forcing.tides import bctypes
+from pyschism.forcing.tides.tpxo import TPXO
+from pyschism.forcing.tides.hamtide import HAMTIDE
 
-from pyschism.logger import logging, get_logger
+_logger = logging.getLogger(__name__)
 
 
 class TidalDatabase(Enum):
     TPXO = TPXO
+    HAMTIDE = HAMTIDE
 
 
 class StrTidalDatabase(Enum):
     TPXO = 'TPXO'
+    HAMTIDE = 'HAMTIDE'
 
     @classmethod
     def _missing_(self, name):
@@ -32,13 +36,28 @@ class TidalConstituents(Enum):
         raise ValueError(f"{name} is not a valid tidal constituent.")
 
 
+class ActiveConstituents:
+
+    def __get__(self, obj, val):
+        active_constituents = obj.__dict__.get('active_constituents')
+        if active_constituents is None:
+            active_constituents = OrderedDict()
+            obj.__dict__['active_constituents'] = active_constituents
+        return active_constituents
+
+    def __set__(self, obj, val):
+        return obj.__dict__['active_constituents']
+
+
 class Tides(bctypes.BoundaryCondition):
+
+    _active_constituents = ActiveConstituents()
 
     def __init__(
             self,
             elevation: bool = True,
             velocity: bool = False,
-            database: Union[str, TidalDatabase] = TidalDatabase.TPXO,
+            database: Union[str, TidalDatabase] = TidalDatabase.HAMTIDE,
     ):
         """Main class for requesting tidal boundary forcing for a SCHISM run.
 
@@ -52,17 +71,17 @@ class Tides(bctypes.BoundaryCondition):
             database (optional): Tidal database to use in order to obtain
                 boundary initial conditions, defaults to TidalDatabase.TPXO
         """
-        self.logger.info('Initializing tidal boundary conditions.')
-        if velocity:
-            raise NotImplementedError('Boundary velocities are temporarily '
-                                      'disabled.')
+        _logger.info('Initializing tidal boundary conditions.')
+        if velocity is True and database == 'tpxo':
+            raise NotImplementedError(
+                'Boundary velocities are temporarily disabled for TPXO.')
         super().__init__(
-                iettype=bctypes.InitialElevationType.TIDAL
-                if elevation is True else bctypes.InitialElevationType.NONE,
-                ifltype=bctypes.InitialFlowType.TIDAL
-                if velocity is True else bctypes.InitialFlowType.NONE)
+            iettype=bctypes.InitialElevationType.TIDAL
+            if elevation is True else bctypes.InitialElevationType.NONE,
+            ifltype=bctypes.InitialFlowType.TIDAL
+            if velocity is True else bctypes.InitialFlowType.NONE)
+
         self.forcing_database = database
-        self._active_constituents: OrderedDict = OrderedDict()
 
     def __iter__(self):
         for constituent in self.active_constituents:
@@ -75,7 +94,7 @@ class Tides(bctypes.BoundaryCondition):
                  constituent: Union[str, TidalConstituents]):
         """Returns the tidal characteristic values for a given time period.
         """
-        self.logger.debug(
+        _logger.debug(
             f'Computing tidal factors for start_date={start_date} and '
             f'constituent {constituent}')
         return (self.get_tidal_species_type(constituent),
@@ -146,9 +165,9 @@ class Tides(bctypes.BoundaryCondition):
 
     def set_Z0(self, Z0, **kwargs):
         self._active_constituents['Z0'] = {
-                'potential': False,
-                'forcing': True
-            }
+            'potential': False,
+            'forcing': True
+        }
         self.Z0 = Z0
 
     def _manage_dates(f: Callable):
@@ -458,69 +477,78 @@ class Tides(bctypes.BoundaryCondition):
 
     minor_constituents = ('Mm', 'Mf', 'M4', 'MN4', 'MS4', '2N2', 'S1')
 
-    all_constituents = (*major_constituents, *minor_constituents)
+    @property
+    def all_constituents(self):
+        if isinstance(self.forcing_database, HAMTIDE):
+            return self.major_constituents
+        elif isinstance(self.forcing_database, TPXO):
+            return (*self.major_constituents, *self.minor_constituents)
+        else:
+            raise NotImplementedError(
+                'Unhandled forcing database instance of type '
+                f'{type(self.forcing_database)}')
 
     orbital_frequencies = {
-            'M4':      0.0002810378050173,
-            'M6':      0.0004215567080107,
-            'MK3':     0.0002134400613513,
-            'S4':      0.0002908882086657,
-            'MN4':     0.0002783986019952,
-            'S6':      0.0004363323129986,
-            'M3':      0.0002107783537630,
-            '2MK3':    0.0002081166466594,
-            'M8':      0.0005620756090649,
-            'MS4':     0.0002859630068415,
-            'M2':      0.0001405189025086,
-            'S2':      0.0001454441043329,
-            'N2':      0.0001378796994865,
-            'Nu2':     0.0001382329037065,
-            'MU2':     0.0001355937006844,
-            '2N2':     0.0001352404964644,
-            'lambda2': 0.0001428049013108,
-            'T2':      0.0001452450073529,
-            'R2':      0.0001456432013128,
-            '2SM2':    0.0001503693061571,
-            'L2':      0.0001431581055307,
-            'K2':      0.0001458423172006,
-            'K1':      0.0000729211583579,
-            'O1':      0.0000675977441508,
-            'OO1':     0.0000782445730498,
-            'S1':      0.0000727220521664,
-            'M1':      0.0000702594512543,
-            'J1':      0.0000755603613800,
-            'RHO':     0.0000653117453487,
-            'Q1':      0.0000649585411287,
-            '2Q1':     0.0000623193381066,
-            'P1':      0.0000725229459750,
-            'Mm':      0.0000026392030221,
-            'Ssa':     0.0000003982128677,
-            'Sa':      0.0000001991061914,
-            'Msf':     0.0000049252018242,
-            'Mf':      0.0000053234146919,
-            'Z0':      0}
+        'M4':      0.0002810378050173,
+        'M6':      0.0004215567080107,
+        'MK3':     0.0002134400613513,
+        'S4':      0.0002908882086657,
+        'MN4':     0.0002783986019952,
+        'S6':      0.0004363323129986,
+        'M3':      0.0002107783537630,
+        '2MK3':    0.0002081166466594,
+        'M8':      0.0005620756090649,
+        'MS4':     0.0002859630068415,
+        'M2':      0.0001405189025086,
+        'S2':      0.0001454441043329,
+        'N2':      0.0001378796994865,
+        'Nu2':     0.0001382329037065,
+        'MU2':     0.0001355937006844,
+        '2N2':     0.0001352404964644,
+        'lambda2': 0.0001428049013108,
+        'T2':      0.0001452450073529,
+        'R2':      0.0001456432013128,
+        '2SM2':    0.0001503693061571,
+        'L2':      0.0001431581055307,
+        'K2':      0.0001458423172006,
+        'K1':      0.0000729211583579,
+        'O1':      0.0000675977441508,
+        'OO1':     0.0000782445730498,
+        'S1':      0.0000727220521664,
+        'M1':      0.0000702594512543,
+        'J1':      0.0000755603613800,
+        'RHO':     0.0000653117453487,
+        'Q1':      0.0000649585411287,
+        '2Q1':     0.0000623193381066,
+        'P1':      0.0000725229459750,
+        'Mm':      0.0000026392030221,
+        'Ssa':     0.0000003982128677,
+        'Sa':      0.0000001991061914,
+        'Msf':     0.0000049252018242,
+        'Mf':      0.0000053234146919,
+        'Z0':      0}
 
     tidal_potential_amplitudes = {
-            'M2': 0.242334,
-            'S2': 0.112841,
-            'N2': 0.046398,
-            'K2': 0.030704,
-            'K1': 0.141565,
-            'O1': 0.100514,
-            'P1': 0.046843,
-            'Q1': 0.019256,
-            'Z0': 0}
+        'M2': 0.242334,
+        'S2': 0.112841,
+        'N2': 0.046398,
+        'K2': 0.030704,
+        'K1': 0.141565,
+        'O1': 0.100514,
+        'P1': 0.046843,
+        'Q1': 0.019256,
+        'Z0': 0}
 
     tidal_species_type = {
-            'M2': 2,
-            'S2': 2,
-            'N2': 2,
-            'K2': 2,
-            'K1': 1,
-            'O1': 1,
-            'P1': 1,
-            'Q1': 1,
-            'Z0': 0}
+        'M2': 2,
+        'S2': 2,
+        'N2': 2,
+        'K2': 2,
+        'K1': 1,
+        'O1': 1,
+        'P1': 1,
+        'Q1': 1,
+        'Z0': 0}
 
     @property
     def hour_middle(self):
@@ -609,7 +637,7 @@ class Tides(bctypes.BoundaryCondition):
     @property
     def R(self):
         return (np.arctan(np.sin(2.*self.PC)
-                / ((1./6.)*(1./np.tan(.5*self.I))**2 - np.cos(2.*self.PC))))
+                          / ((1./6.)*(1./np.tan(.5*self.I))**2 - np.cos(2.*self.PC))))
 
     @property
     def DR(self):
@@ -618,7 +646,7 @@ class Tides(bctypes.BoundaryCondition):
     @property
     def NUP2(self):
         return (np.arctan(np.sin(2.*self.NU)
-                / (np.cos(2.*self.NU)+.0726184 / np.sin(self.I)**2))/2.)
+                          / (np.cos(2.*self.NU)+.0726184 / np.sin(self.I)**2))/2.)
 
     @property
     def DNUP2(self):
@@ -657,29 +685,22 @@ class Tides(bctypes.BoundaryCondition):
 
     @property
     def forcing_database(self):
-        return self.__forcing_database
+        return self._forcing_database
 
     @forcing_database.setter
     def forcing_database(self, database: Union[str, TidalDatabase]):
+        database = 'hamtide' if database is None else database
         if isinstance(database, str):
-            database = TidalDatabase[StrTidalDatabase(database).name].value()
+            database = TidalDatabase[
+                StrTidalDatabase(database.upper()).name].value()
         if isinstance(database, TidalDatabase):
             database = database.value()
-        self.__forcing_database = database
+        self._forcing_database = database
 
     @property
     def constituents(self):
         return self.all_constituents
 
     @property
-    def logger(self):
-        try:
-            return self._logger
-        except AttributeError:
-            self._logger = get_logger()
-            return self._logger
-
-    @logger.setter
-    def logger(self, logger):
-        assert isinstance(logger, logging.Logger)
-        self._logger = logger
+    def active_constituents(self):
+        return self._active_constituents.copy()

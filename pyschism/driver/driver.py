@@ -5,14 +5,13 @@ import pathlib
 import subprocess
 from typing import Union
 
-import numpy as np  # type: ignore[import]
+import numpy as np
 
 from pyschism.domain import ModelDomain
 from pyschism.driver.makefile import MakefileDriver
 from pyschism.enums import Stratification
 from pyschism.forcing.tides.bctides import Bctides
 from pyschism.forcing.atmosphere import NWS2
-from pyschism.logger import get_logger
 from pyschism.param import Param
 from pyschism.server import ServerConfig
 from pyschism.stations import Stations
