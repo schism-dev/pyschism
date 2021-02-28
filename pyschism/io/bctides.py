@@ -124,7 +124,7 @@ class Bctides:
         path = pathlib.Path(path)
         if path.exists() and not overwrite:
             raise IOError('path exists and overwrite is False')
-        open(path.resolve(), 'w').write(str(self))
+        open(path, 'w').write(str(self))
 
     def get_forcing(self, boundary):
 
