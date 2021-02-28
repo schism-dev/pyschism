@@ -54,4 +54,5 @@ def add_bctides(subparsers):
         help="Allow overwrite of output file.")
     bctides.add_argument(
         "--log-level",
-        choices=[name.lower() for name in logging._nameToLevel])
+        choices=[name.lower() for name in logging._nameToLevel],
+        default='warning')

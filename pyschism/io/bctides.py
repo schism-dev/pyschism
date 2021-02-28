@@ -5,10 +5,12 @@ from typing import Union
 import pytz
 
 from pyschism.forcing.tides.tides import Tides
-from pyschism.mesh import Hgrid, hgrid
+from pyschism.mesh import Hgrid
+
 
 def datetime_is_naive(d) -> bool:
     return d.tzinfo is None or d.tzinfo.utcoffset(d) is None
+
 
 def datetime_is_aware(d) -> bool:
     return d.tzinfo is not None and d.tzinfo.utcoffset(d) is not None
@@ -25,6 +27,7 @@ class HgridDescriptor:
     def __get__(self, obj, val):
         return obj.__dict__['hgrid']
 
+
 class StartDateDescriptor:
 
     def __set__(self, obj, val: datetime):
@@ -38,7 +41,8 @@ class StartDateDescriptor:
 
     def __get__(self, obj, val):
         return obj.__dict__['start_date']
-        
+
+
 class RndayDescriptor:
 
     def __set__(self, obj, val: Union[int, float, timedelta]):
@@ -48,10 +52,11 @@ class RndayDescriptor:
                 f'{timedelta}, not type {type(val)}.')
         if not isinstance(val, timedelta):
             val = timedelta(days=val)
-        obj.__dict__['rnday'] = val 
+        obj.__dict__['rnday'] = val
 
     def __get__(self, obj, val) -> timedelta:
         return obj.__dict__['rnday']
+
 
 class Bctides:
 
@@ -119,7 +124,7 @@ class Bctides:
         path = pathlib.Path(path)
         if path.exists() and not overwrite:
             raise IOError('path exists and overwrite is False')
-        open(path, 'w').write(str(self))
+        open(path.resolve(), 'w').write(str(self))
 
     def get_forcing(self, boundary):
 
@@ -161,12 +166,14 @@ class Bctides:
 
             else:
                 raise ValueError(f'Unhandled argument pos={pos}.')
-        
+
         def get_forcing(pos, digit):
-            f =[]
-            if pos == 1: # elevation
-                if digit == 3: # tides
-                    if self.elevation is True: # default tidal elevation
+
+            f = []
+
+            if pos == 1:  # elevation
+                if digit == 3:  # tides
+                    if self.elevation is True:  # default tidal elevation
                         for constituent in \
                                 self.tides.get_active_forcing_constituents():
                             f.append(f'{constituent}')
@@ -183,8 +190,8 @@ class Bctides:
                 else:
                     raise ValueError(
                         f'Unhandled elevation forcing digit={digit}')
-            elif pos == 2: # velocity
-                if self.velocity is True: # default tidal velocity
+            elif pos == 2:  # velocity
+                if self.velocity is True:  # default tidal velocity
                     for constituent in \
                             self.tides.get_active_forcing_constituents():
                         f.append(f'{constituent}')
@@ -193,8 +200,8 @@ class Bctides:
                         uamp, uphase, vamp, vphase = self.tides.get_velocity(
                             constituent, vertices)
                         for i in range(len(vertices)):
-                            f.append(f'{uamp[i]:.8e} {uphase[i]:.8e} ' \
-                                        f'{vamp[i]:.8e} {vphase[i]:.8e}')
+                            f.append(f'{uamp[i]:.8e} {uphase[i]:.8e} '
+                                     f'{vamp[i]:.8e} {vphase[i]:.8e}')
                     return '\n'.join(f)
                 else:
                     raise TypeError(
@@ -202,20 +209,17 @@ class Bctides:
             else:
                 raise TypeError('Unhandled forcing at pos={pos}.')
 
-
         f = [' '.join(list(map(forcing_digit, range(5 + len(self._tracers)))))]
+
         for i in range(1, 5 + len(self._tracers)):
             if int(forcing_digit(i)) > 0:
                 f.append(get_forcing(i, int(forcing_digit(i))))
         return '\n'.join(f)
 
-
-
-
     @property
     def hgrid(self):
         return self._hgrid
-    
+
     @property
     def tides(self):
         return self._tides
@@ -235,7 +239,7 @@ class Bctides:
     @property
     def velocity(self):
         return self._velocity
-    
+
     @property
     def temperature(self):
         return self._temperature
