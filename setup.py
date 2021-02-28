@@ -37,8 +37,7 @@ setuptools.setup(
     url=meta['url'],
     packages=setuptools.find_packages(),
     python_requires='>=3.6, <3.9',
-    setup_requires=['wheel', 'setuptools_scm', 'setuptools>=41.2',
-                    'netcdf-flattener>=1.2.0'],
+    setup_requires=['wheel', 'setuptools_scm', 'setuptools>=41.2'],
     include_package_data=True,
     extras_require={'dev': ['coverage', 'flake8', 'nose']},
     install_requires=[
