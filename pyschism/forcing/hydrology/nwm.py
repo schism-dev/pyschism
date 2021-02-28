@@ -1,27 +1,27 @@
 from collections import defaultdict
 from datetime import datetime, timedelta
-# from enum import Enum
+import logging
 import multiprocessing
 import pathlib
 import tempfile
 import warnings
 from typing import Union
 
-from appdirs import user_data_dir  # type: ignore[import]
-import boto3  # type: ignore[import]
-from botocore import UNSIGNED  # type: ignore[import]
-from botocore.config import Config  # type: ignore[import]
-import geopandas as gpd  # type: ignore[import]
-from netCDF4 import Dataset  # type: ignore[import]
-import numpy as np  # type: ignore[import]
-from psutil import cpu_count  # type: ignore[import]
+from appdirs import user_data_dir
+import boto3
+from botocore import UNSIGNED
+from botocore.config import Config
+import geopandas as gpd
+from netCDF4 import Dataset
+import numpy as np
+from psutil import cpu_count
 import pytz
-from scipy.spatial import cKDTree  # type: ignore[import]
-from shapely import ops  # type: ignore[import]
-from shapely.geometry import (  # type: ignore[import]
+from scipy.spatial import cKDTree
+from shapely import ops
+from shapely.geometry import (
     LinearRing, Point, MultiPoint, LineString)
-# from tqdm import tqdm  # type: ignore[import]
-import wget  # type: ignore[import]
+# from tqdm import tqdm
+import wget
 
 from pyschism.mesh import Hgrid, Gr3
 from pyschism.forcing.hydrology.base import Hydrology, Sources, Sinks
@@ -30,6 +30,8 @@ from pyschism.forcing.hydrology.base import Hydrology, Sources, Sinks
 DATADIR = pathlib.Path(user_data_dir()) / 'nwm'
 DATADIR.mkdir(exist_ok=True, parents=True)
 NWM_FILE = DATADIR / 'nwm_v12.gdb.zip'
+
+_logger = logging.getLogger(__name__)
 
 
 class NWMGeoDataFrame:
@@ -55,8 +57,8 @@ class NWMElementPairings:
     _gdf = NWMGeoDataFrame()
 
     def __init__(self, hgrid):
-        self.logger.info('Initiliaze NWMElementPairings')
-        self.logger.debug('This debug message should also appear.')
+        _logger.info('Initiliaze NWMElementPairings')
+        _logger.debug('This debug message should also appear.')
         self._hgrid = hgrid
 
         # An STR-Index returns the reaches that are near the boundaries of the
@@ -246,7 +248,7 @@ class AWSDataInventory:
         The AWS data goes back 30 days. For requesting hindcast data from
         before we need a different data source
         """
-        self.logger.info('Initialize AWSDataInventory')
+        _logger.info('Initialize AWSDataInventory')
         self.start_date = start_date
         self.rnday = rnday
 
@@ -314,7 +316,7 @@ class AWSDataInventory:
                     break
 
     def __call__(self, pairings: NWMElementPairings, h0=1e-1, nprocs=-1):
-        self.logger.info('Will pair NWM data to elements...')
+        _logger.info('Will pair NWM data to elements...')
         from time import time as _time
         start = _time()
         files = sorted(list(pathlib.Path(self.tmpdir.name).glob('*')))
@@ -337,21 +339,8 @@ class AWSDataInventory:
                 sources.add_data(time, element_id, res[i][0][j], -9999, 0.)
             for k, element_id in enumerate(pairings.sinks.keys()):
                 sinks.add_data(time, element_id, res[i][1][k])
-        self.logger.info(f'Done pairing, took {_time()-start} seconds...')
+        _logger.info(f'Done pairing, took {_time()-start} seconds...')
         return sources, sinks
-
-    @property
-    def logger(self):
-        try:
-            return self._logger
-        except AttributeError:
-            self._logger = get_logger()
-            return self._logger
-
-    @logger.setter
-    def logger(self, logger):
-        assert isinstance(logger, logging.Logger)
-        self._logger = logger
 
 
 class AWSDataGetter(NWMDataGetter):
@@ -381,7 +370,7 @@ class NationalWaterModel(Hydrology):
     def __init__(self):
         self._nwm_file = NWM_FILE
         if not self._nwm_file.exists():
-            self.logger.warning(
+            _logger.warning(
                 "Downloading National Water Model stream network file to "
                 "the pyschism cache...")
             wget.download(
@@ -399,12 +388,12 @@ class NationalWaterModel(Hydrology):
         more than 1 data source.
         """
         super().__call__(model_driver)
-        self.logger.info('NationalWaterModel.__call__')
+        _logger.info('NationalWaterModel.__call__')
         pairings = NWMElementPairings(model_driver.model_domain.hgrid)
         start_date = model_driver.param.opt.start_date
         rnday = model_driver.param.core.rnday
         if start_date >= pivot_time() - timedelta(days=30):
-            self.logger.info('Fetching NWM data.')
+            _logger.info('Fetching NWM data.')
             AWSData = AWSDataGetter(pairings, start_date, rnday)
             sources, sinks = AWSData(h0=h0, nprocs=nprocs)
 
