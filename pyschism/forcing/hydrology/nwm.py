@@ -178,19 +178,6 @@ class NWMElementPairings:
     def _hgrid(self):
         del self.__hgrid
 
-    @property
-    def logger(self):
-        try:
-            return self._logger
-        except AttributeError:
-            self._logger = get_logger()
-            return self._logger
-
-    @logger.setter
-    def logger(self, logger):
-        assert isinstance(logger, logging.Logger)
-        self._logger = logger
-
 
 class NWMDataGetter:
 
