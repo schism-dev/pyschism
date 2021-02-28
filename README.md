@@ -42,13 +42,7 @@ pip install -e .
 ### Usage examples:
 
 #### Using the Library
-Hint: You can test the library functions from the command line (without having to write a .py file) by using `python -c` and wrapping the commands between a pair of quotes, for example:
-```bash
-python -c "
-from pyschism.mesh import Hgrid
-print(Hgrid.open('/path/to/hgrid.gr3'))
-"
-```
+
 ##### Example 1: Full domain Hgrid plot:
 ``` python
 from pyschism.mesh import Hgrid
