@@ -3,6 +3,7 @@ from enum import Enum
 import pathlib
 import tempfile
 from typing import Union
+import logging
 # import warnings
 
 import pytz
@@ -19,6 +20,8 @@ from pyschism.forcing.atmosphere.nws.nws2.sflux import (
 )
 
 BASE_URL = 'https://nomads.ncep.noaa.gov/dods'
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 class BaseURL(Enum):

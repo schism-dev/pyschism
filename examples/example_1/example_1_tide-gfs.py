@@ -10,7 +10,13 @@ from pyschism.forcing import Tides
 from pyschism.forcing.atmosphere.nws.nws2 import NWS2
 from pyschism.forcing.atmosphere.gfs import GlobalForecastSystem as GFS
 
+#logging.basicConfig(filename='test.log',
+#                    level=logging.INFO, 
+#                    format='%(asctime)s:%(levelnames'
+#                   )
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 SIMPLE_SLURM_DRIVER = """#!/bin/bash --login
 #SBATCH -D .
@@ -41,26 +47,25 @@ main
 
 PARENT = pathlib.Path(__file__).parent
 
-logging.basicConfig(level=logging.INFO)
-
-_logger = logging.getLogger(__name__)
 
 if __name__ == '__main__':
     # open gr3 file
-    _logger.info('Reading hgrid file...')
+    logger.info('Reading hgrid file...')
     _tic = time()
     hgrid = Hgrid.open(PARENT / 'hgrid.gr3',crs='EPSG:4326')
-    _logger.info(f'Reading hgrind file took {time()-_tic}.')
+    logger.info(f'Reading hgrind file took {time()-_tic}.')
 
     vgrid = Vgrid()
     fgrid = Fgrid.open(PARENT / 'drag.gr3',crs='EPSG:4326')
 
     # setup model domain
     domain = ModelDomain(hgrid, vgrid, fgrid)
+    logger.info('Model domain setup finished')
 
     # set tidal boundary conditions
     elevbc = Tides()
     elevbc.use_all()  # activate all forcing constituents
+    logger.info('Tidal boundary setup finished')
 
     # connect the boundary condition to the domain
     domain.add_boundary_condition(elevbc)
