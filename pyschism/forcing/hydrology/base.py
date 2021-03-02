@@ -1,13 +1,12 @@
-# from abc import ABC
 import logging
 import os
 import pathlib
-from typing import Union  # , Dict
+from typing import Union
 
-# import numpy as np  # type: ignore[import]
-import pandas as pd  # type: ignore[import]
+import pandas as pd
 
-from pyschism.logger import get_logger
+
+_logger = logging.getLogger(__name__)
 
 
 class TimeHistoryFile:
@@ -226,12 +225,10 @@ class SourceSink:
 class Hydrology:
 
     def __init__(self):
-        self.logger.debug("Hydrology.__init__")
         self._sources = Sources()
         self._sinks = Sinks()
 
     def __call__(self, model_driver):
-        self.logger.debug("Hydrology.__call__")
         self._model_driver = model_driver
 
     def write(
@@ -243,7 +240,6 @@ class Hydrology:
             vsink: Union[str, bool] = True,
             source_sink: Union[str, bool] = True,
     ):
-        self.logger.debug("Hydrology.write")
 
         start_date = self.model_driver.param.opt.start_date
         rnday = self.model_driver.param.core.rnday
@@ -294,16 +290,3 @@ class Hydrology:
     @property
     def model_driver(self):
         return self._model_driver
-
-    @property
-    def logger(self):
-        try:
-            return self._logger
-        except AttributeError:
-            self._logger = get_logger()
-            return self._logger
-
-    @logger.setter
-    def logger(self, logger):
-        assert isinstance(logger, logging.Logger)
-        self._logger = logger

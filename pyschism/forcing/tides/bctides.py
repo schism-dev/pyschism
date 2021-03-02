@@ -2,12 +2,13 @@ from abc import ABC, abstractmethod
 from datetime import timedelta, timezone
 from enum import Enum
 from functools import lru_cache
+import logging
 
 from pyschism.domain import ModelDomain
 from pyschism.forcing.tides.tides import Tides
-from pyschism.logger import logging, get_logger
 from pyschism.param.param import Param
 
+_logger = logging.getLogger(__name__)
 
 class NullWritter:
 
@@ -44,7 +45,7 @@ class TidalElevationWritter(TidalVariableWritter):
         for constituent in self.active_constituents:
             f += f'{constituent}\n'
             vertices = self._model_domain.hgrid.get_xy(
-                    crs='EPSG:4326')[self.indexes, :]
+                crs='EPSG:4326')[self.indexes, :]
             amp, phase = self.forcing.get_elevation(constituent, vertices)
             for i in range(len(vertices)):
                 f += f'{amp[i]:.8e} {phase[i]:.8e}\n'
@@ -58,9 +59,9 @@ class TidalVelocityWritter(TidalVariableWritter):
         for constituent in self.active_constituents:
             f += f'{constituent}\n'
             vertices = self._model_domain.hgrid.get_xy(
-                    crs='EPSG:4326')[self.indexes, :]
+                crs='EPSG:4326')[self.indexes, :]
             uamp, uphase, vamp, vphase = self.forcing.get_velocity(
-                    constituent, vertices)
+                constituent, vertices)
             for i in range(len(vertices)):
                 f += f'{uamp[i]:.8e} {uphase[i]:.8e} ' \
                      f'{vamp[i]:.8e} {vphase[i]:.8e}\n'
@@ -114,7 +115,7 @@ class Bctides:
     def __init__(self, model_domain: ModelDomain, param: Param,
                  cutoff_depth: float = 50.):
         """Provides an interface to write bctides.in to file. """
-        self.logger.info('Initializing Bctides.')
+        _logger.info('Initializing Bctides.')
         # check if start_date was given in case tidal forcings are requested.
         # Note: This is done twice so that this class can be used independently
         # from Param to just write bctides files
@@ -131,12 +132,12 @@ class Bctides:
         tides = Tides()
         for const in tides.all_constituents:
             tides.use_constituent(
-                    const,
-                    potential=True if const in
-                    self.get_active_potential_constituents() else False,
-                    forcing=True if const in
-                    self.get_active_forcing_constituents() else False
-                    )
+                const,
+                potential=True if const in
+                self.get_active_potential_constituents() else False,
+                forcing=True if const in
+                self.get_active_forcing_constituents() else False
+            )
         self.__tidal_forcing = tides
 
     def __str__(self):
@@ -224,16 +225,3 @@ class Bctides:
             return self.__start_date.astimezone(timezone(timedelta(0)))
         else:
             return self.__start_date
-
-    @property
-    def logger(self):
-        try:
-            return self._logger
-        except AttributeError:
-            self._logger = get_logger()
-            return self._logger
-
-    @logger.setter
-    def logger(self, logger):
-        assert isinstance(logger, logging.Logger)
-        self._logger = logger

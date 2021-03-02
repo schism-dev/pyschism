@@ -1,18 +1,16 @@
 from datetime import datetime, timedelta
-import logging
 import os
 import pathlib
 import subprocess
 from typing import Union
 
-import numpy as np  # type: ignore[import]
+import numpy as np
 
 from pyschism.domain import ModelDomain
 from pyschism.driver.makefile import MakefileDriver
 from pyschism.enums import Stratification
 from pyschism.forcing.tides.bctides import Bctides
 from pyschism.forcing.atmosphere import NWS2
-from pyschism.logger import get_logger
 from pyschism.param import Param
 from pyschism.server import ServerConfig
 from pyschism.stations import Stations
@@ -183,19 +181,6 @@ class ModelDriver:
     @property
     def makefile(self):
         return self._makefile
-
-    @property
-    def logger(self):
-        try:
-            return self._logger
-        except AttributeError:
-            self._logger = get_logger()
-            return self._logger
-
-    @logger.setter
-    def logger(self, logger: logging.Logger):
-        assert isinstance(logger, logging.Logger)
-        self._logger = logger
 
     @property
     def _nws(self):

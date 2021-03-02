@@ -189,7 +189,7 @@ def read(resource: Union[str, os.PathLike], boundaries: bool = True, crs=True):
                 pass
     if crs is None:
         warnings.warn(f'File {str(resource)} does not contain CRS '
-                      'information.')
+                      'information and no CRS was given.')
     if crs is not False:
         grd.update({'crs': crs})
     return grd
