@@ -5,10 +5,11 @@ import sys
 import tarfile
 import tempfile
 
-import numpy as np  # type: ignore[import]
-from scipy.interpolate import griddata  # type: ignore[import]
-from appdirs import user_data_dir  # type: ignore[import]
-import wget  # type: ignore[import]
+from appdirs import user_data_dir
+import numpy as np
+from scipy.interpolate import griddata
+
+from pyschism.forcing.tides.base import TidalDataProvider
 
 DATADIR = pathlib.Path(user_data_dir()) / 'tpxo'
 DATADIR.mkdir(exist_ok=True, parents=True)
@@ -22,12 +23,7 @@ def polar(z):
     return r, np.rad2deg(theta)
 
 
-class TPXO:
-    """
-    Egbert, Gary D., and Svetlana Y. Erofeeva. "Efficient inverse modeling
-        of barotropic ocean tides." Journal of Atmospheric and Oceanic
-        Technology 19.2 (2002): 183-204
-    """
+class TPXO(TidalDataProvider):
 
     def __init__(self):
 
@@ -38,7 +34,15 @@ class TPXO:
             _tarfile = DATADIR / 'tpxo9.tar.gz'
 
         if not _tarfile.is_file():
-            fetch_tpxo_file()
+            raise FileNotFoundError(
+                'No TPXO file found.\nUsers interested in using the TPXO data '
+                'as forcing source for the model will need to register and '
+                'request a copy of the TPXO9 binary files (specifically '
+                'the binary version tpxo9.tar.gz) from the authors at '
+                'https://www.tpxo.net. Once you obtain this copy, you can set '
+                'you can set the environment variable TPXO_NETCDF_TARFILE '
+                'to point to the path of the tpxo9.tar.gz file or you may '
+                f'symlink this file manually to {_tarfile.resolve()} path.')
 
         self._tarfile = _tarfile
 
@@ -143,92 +147,6 @@ class TPXO:
         with tarfile.open(file) as f:
             f.extractall(path=tmpdir)
         self.__tarfile = file
-
-
-def fetch_tpxo_file():
-    url = "https://www.dropbox.com/s/tnxflm8xgpiujwb/tpxo9.tar.gz?dl=1"
-
-    def query_yes_no(question: str, default: str = "yes") -> bool:
-        """
-        Ask a yes/no question via raw_input() and return their answer.
-
-        :param question: string presented to the user
-        :param default: presumed answer if the user just hits <Enter>; must be "yes" (the default), "no", or None (meaning an answer is required of the user) # noqa: E501
-        :returns: whether 'yes' or 'no' was selected by the user
-        """
-
-        valid = {
-            "yes": True,
-            "y": True,
-            "ye": True,
-            "no": False,
-            "n": False
-        }
-        if default is None:
-            prompt = " [y/n] "
-        elif default == "yes":
-            prompt = " [Y/n] "
-        elif default == "no":
-            prompt = " [y/N] "
-        else:
-            raise ValueError("invalid default answer: '%s'" % default)
-
-        while 1:
-            sys.stdout.write(question + prompt)
-            choice = input().lower()
-            if default is not None and choice == '':
-                return valid[default]
-            elif choice in valid.keys():
-                return valid[choice]
-            else:
-                sys.stdout.write(
-                    "Please respond with 'yes' or 'no' (or 'y' or 'n').\n")
-    q = "******* PLEASE READ *******\n" \
-        "A function that is being invoked requires the use of the TPXO" \
-        " file which is copyrighted by the " \
-        "State of Oregon acting by and through the State Board of Higher " \
-        "Education on behalf of Oregon State University.\n" \
-        "This data is licensed for non-commercial use.\n" \
-        'This software can automatically fetch the TPXO file for you ' \
-        'using your internet connection.\n' \
-        "By downloading this file and using this software, you are " \
-        "accepting the licensing agreement for the TPXO file found here" \
-        ":\nhttps://drive.google.com/file/d/1f00WojHqu7_VE5Hg9OdiVBjymH" \
-        "76dFCy/view\n" \
-        "Do you accept the license terms exposed in the link above and " \
-        "approve that this software downloads and install the TPXO file " \
-        "using the internet?\n"
-    a = query_yes_no(q)
-    if a is False:
-        raise RuntimeError('No TPXO database found.')
-    else:
-        print(f'Downloading TPXO database to {str(DATADIR.resolve())}/'
-              'tpxo9.tar.gz, please wait... \n')
-        wget.download(url, out=str(DATADIR / "tpxo9.tar.gz"))
-
-
-# def get_elevation_amplitude(constituent, vertices):
-    # """
-    # tpxo_index_key is either 'ha' or 'hp' based on the keys used internally
-    # on the TPXO netcdf file.
-    # """        
-    # constituent = self.tpxo_constituents.index(constituent)
-    # array = tpxo_array[constituent, :, :].flatten()
-    # _x = np.asarray([x + 360. for x in vertices[:, 0] if x < 0]).flatten()
-    # _y = vertices[:, 1].flatten()
-    # x, y = np.meshgrid(self.x, self.y, indexing='ij')
-    # x = x.flatten()
-    # y = y.flatten()
-    # dx = np.mean(np.diff(self.x))
-    # dy = np.mean(np.diff(self.y))
-    # _idx = np.where(
-        # np.logical_and(  # buffer the bbox by 2 difference units
-            # np.logical_and(x >= np.min(_x) - 2 * dx,
-                           # x <= np.max(_x) + 2 * dx),
-            # np.logical_and(y >= np.min(_y) - 2 * dy,
-                           # y <= np.max(_y) + 2 * dy)))
-    # return griddata(
-        # (x[_idx], y[_idx]), array[_idx], (_x, _y), method='nearest')
 
 
 def install():

@@ -4,6 +4,10 @@ import setuptools  # type: ignore[import]
 import subprocess
 import sys
 
+subprocess.check_call(
+    [sys.executable, '-m', 'pip', 'install', '--upgrade', 'pip'])
+
+subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'wheel'])
 
 try:
     from dunamai import Version
@@ -14,13 +18,10 @@ except ImportError:
     from dunamai import Version  # type: ignore[import]
 
 try:
-    version = Version.from_any_vcs(
-            pattern='^(?P<base>\d+\.\d+\.\d+)(-?((?P<stage>[a-zA-Z]+)\.?(?P<revision>\d+)?))?$'
-    ).serialize()
+    version = Version.from_any_vcs().serialize()
 except RuntimeError:
     version = '0.0.0'
 
-subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'wheel'])
 
 parent = pathlib.Path(__file__).parent.absolute()
 conf = setuptools.config.read_configuration(parent / 'setup.cfg')
@@ -35,13 +36,13 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url=meta['url'],
     packages=setuptools.find_packages(),
-    python_requires='>=3.6, <=3.8',
-    setup_requires=['setuptools_scm', 'setuptools>=41.2',
-                    'netcdf-flattener>=1.2.0'],
+    python_requires='>=3.6, <3.9',
+    setup_requires=['wheel', 'setuptools_scm', 'setuptools>=41.2'],
     include_package_data=True,
     extras_require={'dev': ['coverage', 'flake8', 'nose']},
     install_requires=[
         'matplotlib',
+        'netcdf-flattener>=1.2.0',
         'netCDF4',
         'pyproj',
         'shapely',

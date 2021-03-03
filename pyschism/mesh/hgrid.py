@@ -1,10 +1,7 @@
-# type: ignore[import]
-# from collections import defaultdict, namedtuple
-# import pathlib
 from functools import lru_cache
-from typing import Union  # , List, Dict
+import logging
+from typing import Union
 
-# import fiona
 import geopandas as gpd
 from matplotlib.cm import ScalarMappable
 import matplotlib.pyplot as plt
@@ -16,115 +13,7 @@ from pyschism.figures import figure, get_topobathy_kwargs
 from pyschism.mesh.parsers import grd
 from pyschism.mesh.base import Gr3  # , sort_edges, signed_polygon_area
 
-
-#     def auto_generate(
-#         self,
-#         threshold=0.,
-#         land_ibtype=0,
-#         interior_ibtype=1,
-#     ):
-#         values = self._obj.values
-#         if np.any(np.isnan(values)):
-#             raise Exception("Mesh contains invalid values. Raster values must"
-#                             "be interpolated to the mesh before generating "
-#                             "boundaries.")
-
-#         # drop current boundaries
-#         self._obj.__dict__['boundaries'] = {}
-#         self._obj.__dict__['boundaries'][None] = {}
-
-#         # generate exterior boundaries
-#         for ring in self._obj.outer_ring_collection.values():
-#             # find boundary edges
-#             edge_tag = np.full(ring.shape, 0)
-#             edge_tag[np.where(values[ring[:, 0]] < threshold)[0], 0] = -1
-#             edge_tag[np.where(values[ring[:, 1]] < threshold)[0], 1] = -1
-#             edge_tag[np.where(values[ring[:, 0]] >= threshold)[0], 0] = 1
-#             edge_tag[np.where(values[ring[:, 1]] >= threshold)[0], 1] = 1
-#             # sort boundary edges
-#             ocean_boundary = list()
-#             land_boundary = list()
-#             for i, (e0, e1) in enumerate(edge_tag):
-#                 if np.any(np.asarray((e0, e1)) == -1):
-#                     ocean_boundary.append(tuple(ring[i, :]))
-#                 elif np.any(np.asarray((e0, e1)) == 1):
-#                     land_boundary.append(tuple(ring[i, :]))
-#             ocean_boundaries = sort_edges(ocean_boundary)
-#             land_boundaries = sort_edges(land_boundary)
-#             _bnd_id = len(self._obj.boundaries[None])
-#             for bnd in ocean_boundaries:
-#                 e0, e1 = [list(t) for t in zip(*bnd)]
-#                 e0 = list(map(self._obj.get_vertex_id_by_index, e0))
-#                 data = e0 + [self._obj.get_vertex_id_by_index(e1[-1])]
-#                 self._set_boundary_data(self._obj.vertex_id,
-#                                         None, _bnd_id, data)
-#                 _bnd_id += 1
-#             # add land boundaries
-#             if land_ibtype not in self._obj.boundaries:
-#                 self._add_boundary_type(land_ibtype)
-#             _bnd_id = len(self._obj.boundaries[land_ibtype])
-#             for bnd in land_boundaries:
-#                 e0, e1 = [list(t) for t in zip(*bnd)]
-#                 e0 = list(map(self._obj.get_vertex_id_by_index, e0))
-#                 data = e0 + [self._obj.get_vertex_id_by_index(e1[-1])]
-#                 self._set_boundary_data(self._obj.vertex_id, land_ibtype,
-#                                         _bnd_id, data)
-#                 _bnd_id += 1
-#         # generate interior boundaries
-#         _bnd_id = 0
-#         _interior_boundaries = defaultdict()
-#         for interiors in self._obj.inner_ring_collection.values():
-#             for interior in interiors:
-#                 e0, e1 = [list(t) for t in zip(*interior)]
-#                 if signed_polygon_area(self._obj._vertices[e0, :]) < 0:
-#                     e0 = list(reversed(e0))
-#                     e1 = list(reversed(e1))
-#                 e0 = list(map(self._obj.get_vertex_id_by_index, e0))
-#                 e0.append(e0[0])
-#                 _interior_boundaries[_bnd_id] = e0
-#                 _bnd_id += 1
-#         self._add_boundary_type(interior_ibtype)
-#         for bnd_id, data in _interior_boundaries.items():
-#             self._set_boundary_data(self._obj._vertex_id, interior_ibtype,
-#                                     bnd_id, data)
-
-#     @figure
-#     def plot(
-#         self,
-#         ibtype,
-#         id,
-#         tags=True,
-#         axes=None,
-#         show=False,
-#         figsize=None,
-#         **kwargs
-#     ):
-#         boundary = list(map(self._obj.get_vertex_index_by_id,
-#                             self._obj.boundaries[ibtype][id].indexes))
-#         p = axes.plot(self._obj.x[boundary], self._obj.y[boundary], **kwargs)
-#         if tags:
-#             axes.text(
-#                 self._obj.x[boundary[len(boundary)//2]],
-#                 self._obj.y[boundary[len(boundary)//2]],
-#                 f"ibtype={ibtype}\nid={id}",
-#                 color=p[-1].get_color()
-#                 )
-#         return axes
-
-#     @figure
-#     def make_plot(
-#         self,
-#         axes=None,
-#         show=False,
-#         figsize=None,
-#         **kwargs
-#     ):
-#         kwargs.update({'axes': axes})
-#         for ibtype, bnds in self._obj.boundaries.items():
-#             for id in bnds:
-#                 axes = self.plot(ibtype, id, **kwargs)
-#                 kwargs.update({'axes': axes})
-#         return kwargs['axes']
+_logger = logging.getLogger(__name__)
 
 
 class HgridBoundaries:
@@ -247,6 +136,8 @@ class Hgrid(Gr3):
 
     @staticmethod
     def open(path, crs=None):
+        if str(path).endswith('.ll') and crs is None:
+            crs = 'epsg:4326'
         _grd = grd.read(path, crs=crs)
         _grd['nodes'] = {id: (coords, -val) for id, (coords, val)
                          in _grd['nodes'].items()}
@@ -327,3 +218,114 @@ class Hgrid(Gr3):
     @property
     def interior_boundaries(self):
         return self.boundaries.interior
+
+
+#     def auto_generate(
+#         self,
+#         threshold=0.,
+#         land_ibtype=0,
+#         interior_ibtype=1,
+#     ):
+#         values = self._obj.values
+#         if np.any(np.isnan(values)):
+#             raise Exception("Mesh contains invalid values. Raster values must"
+#                             "be interpolated to the mesh before generating "
+#                             "boundaries.")
+
+#         # drop current boundaries
+#         self._obj.__dict__['boundaries'] = {}
+#         self._obj.__dict__['boundaries'][None] = {}
+
+#         # generate exterior boundaries
+#         for ring in self._obj.outer_ring_collection.values():
+#             # find boundary edges
+#             edge_tag = np.full(ring.shape, 0)
+#             edge_tag[np.where(values[ring[:, 0]] < threshold)[0], 0] = -1
+#             edge_tag[np.where(values[ring[:, 1]] < threshold)[0], 1] = -1
+#             edge_tag[np.where(values[ring[:, 0]] >= threshold)[0], 0] = 1
+#             edge_tag[np.where(values[ring[:, 1]] >= threshold)[0], 1] = 1
+#             # sort boundary edges
+#             ocean_boundary = list()
+#             land_boundary = list()
+#             for i, (e0, e1) in enumerate(edge_tag):
+#                 if np.any(np.asarray((e0, e1)) == -1):
+#                     ocean_boundary.append(tuple(ring[i, :]))
+#                 elif np.any(np.asarray((e0, e1)) == 1):
+#                     land_boundary.append(tuple(ring[i, :]))
+#             ocean_boundaries = sort_edges(ocean_boundary)
+#             land_boundaries = sort_edges(land_boundary)
+#             _bnd_id = len(self._obj.boundaries[None])
+#             for bnd in ocean_boundaries:
+#                 e0, e1 = [list(t) for t in zip(*bnd)]
+#                 e0 = list(map(self._obj.get_vertex_id_by_index, e0))
+#                 data = e0 + [self._obj.get_vertex_id_by_index(e1[-1])]
+#                 self._set_boundary_data(self._obj.vertex_id,
+#                                         None, _bnd_id, data)
+#                 _bnd_id += 1
+#             # add land boundaries
+#             if land_ibtype not in self._obj.boundaries:
+#                 self._add_boundary_type(land_ibtype)
+#             _bnd_id = len(self._obj.boundaries[land_ibtype])
+#             for bnd in land_boundaries:
+#                 e0, e1 = [list(t) for t in zip(*bnd)]
+#                 e0 = list(map(self._obj.get_vertex_id_by_index, e0))
+#                 data = e0 + [self._obj.get_vertex_id_by_index(e1[-1])]
+#                 self._set_boundary_data(self._obj.vertex_id, land_ibtype,
+#                                         _bnd_id, data)
+#                 _bnd_id += 1
+#         # generate interior boundaries
+#         _bnd_id = 0
+#         _interior_boundaries = defaultdict()
+#         for interiors in self._obj.inner_ring_collection.values():
+#             for interior in interiors:
+#                 e0, e1 = [list(t) for t in zip(*interior)]
+#                 if signed_polygon_area(self._obj._vertices[e0, :]) < 0:
+#                     e0 = list(reversed(e0))
+#                     e1 = list(reversed(e1))
+#                 e0 = list(map(self._obj.get_vertex_id_by_index, e0))
+#                 e0.append(e0[0])
+#                 _interior_boundaries[_bnd_id] = e0
+#                 _bnd_id += 1
+#         self._add_boundary_type(interior_ibtype)
+#         for bnd_id, data in _interior_boundaries.items():
+#             self._set_boundary_data(self._obj._vertex_id, interior_ibtype,
+#                                     bnd_id, data)
+
+#     @figure
+#     def plot(
+#         self,
+#         ibtype,
+#         id,
+#         tags=True,
+#         axes=None,
+#         show=False,
+#         figsize=None,
+#         **kwargs
+#     ):
+#         boundary = list(map(self._obj.get_vertex_index_by_id,
+#                             self._obj.boundaries[ibtype][id].indexes))
+#         p = axes.plot(self._obj.x[boundary], self._obj.y[boundary], **kwargs)
+#         if tags:
+#             axes.text(
+#                 self._obj.x[boundary[len(boundary)//2]],
+#                 self._obj.y[boundary[len(boundary)//2]],
+#                 f"ibtype={ibtype}\nid={id}",
+#                 color=p[-1].get_color()
+#                 )
+#         return axes
+
+#     @figure
+#     def make_plot(
+#         self,
+#         axes=None,
+#         show=False,
+#         figsize=None,
+#         **kwargs
+#     ):
+#         kwargs.update({'axes': axes})
+#         for ibtype, bnds in self._obj.boundaries.items():
+#             for id in bnds:
+#                 axes = self.plot(ibtype, id, **kwargs)
+#                 kwargs.update({'axes': axes})
+#         return kwargs['axes']
+

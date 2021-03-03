@@ -3,4 +3,5 @@ build/
 dist/
 *.egg*
 __pycache__
+*_env
 

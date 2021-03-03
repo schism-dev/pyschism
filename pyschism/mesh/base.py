@@ -1,6 +1,7 @@
 from abc import ABC
 from collections import defaultdict
 from functools import lru_cache
+import logging
 from itertools import permutations
 import os
 import pathlib
@@ -23,6 +24,7 @@ from shapely.geometry import (  # type: ignore[import]
 from pyschism.mesh.parsers import grd
 from pyschism.figures import figure
 
+_logger = logging.getLogger(__name__)
 
 class Description:
 
@@ -71,16 +73,32 @@ class Nodes:
         return self.gr3.__dict__['nodes']
 
     def id(self):
-        return list(self().keys())
+        node_id = self.gr3.__dict__.get('node_id')
+        if node_id is None:
+            node_id = list(self().keys())
+            self.gr3.__dict__['node_id'] = node_id
+        return node_id
 
     def index(self):
-        return np.arange(len(self()))
+        node_index = self.gr3.__dict__.get('node_index')
+        if node_index is None:
+            node_index = np.arange(len(self()))
+            self.gr3.__dict__['node_index'] = node_index
+        return node_index
 
     def coord(self):
-        return np.array([coords for coords, _ in self().values()])
+        coord = self.gr3.__dict__.get('coord')
+        if coord is None:
+            coord = np.array([coords for coords, _ in self().values()])
+            self.gr3.__dict__['coord'] = coord
+        return coord
 
     def values(self):
-        return np.array([val for _, val in self().values()])
+        values = self.gr3.__dict__.get('values')
+        if values is None:
+            values = np.array([val for _, val in self().values()])
+            self.gr3.__dict__['values'] = values
+        return values
 
     def get_index_by_id(self, id: Hashable):
         return self.gr3.__dict__['id_to_index'][id]
@@ -123,30 +141,50 @@ class Elements:
         return self.gr3.__dict__["elements"]
 
     def id(self):
-        return list(self().keys())
+        element_id = self.gr3.__dict__.get('element_id')
+        if element_id is None:
+            element_id = list(self().keys())
+            self.gr3.__dict__['element_id'] = element_id
+        return element_id
 
     def index(self):
-        return np.arange(len(self()))
+        element_index = self.gr3.__dict__.get('element_index')
+        if element_index is None:
+            element_index = np.arange(len(self()))
+            self.gr3.__dict__['element_index'] = element_index
+        return element_index
 
     def array(self):
-        rank = int(max(map(len, self().values())))
-        array = np.full((len(self()), rank), -1)
-        for i, element in enumerate(self().values()):
-            row = np.array(list(map(self.gr3.nodes.get_index_by_id, element)))
-            array[i, :len(row)] = row
-        return np.ma.masked_equal(array, -1)
+        element_array = self.gr3.__dict__.get('element_array')
+        if element_array is None:
+            rank = int(max(map(len, self().values())))
+            element_array = np.full((len(self()), rank), -1)
+            for i, element in enumerate(self().values()):
+                row = np.array(list(map(self.gr3.nodes.get_index_by_id, element)))
+                element_array[i, :len(row)] = row
+                element_array = np.ma.masked_equal(element_array, -1)
+                self.gr3.__dict__['element_array'] = element_array
+        return element_array
 
     def triangles(self):
-        return np.array(
-            [list(map(self.gr3.nodes.get_index_by_id, element))
-             for element in self().values()
-             if len(element) == 3])
+        triangles = self.gr3.__dict__.get('triangles')
+        if triangles is None:
+            triangles = np.array(
+                [list(map(self.gr3.nodes.get_index_by_id, element))
+                for element in self().values()
+                if len(element) == 3])
+            self.gr3.__dict__['triangles'] = triangles
+        return triangles
 
     def quads(self):
-        return np.array(
-            [list(map(self.gr3.nodes.get_index_by_id, element))
-             for element in self().values()
-             if len(element) == 4])
+        quads = self.gr3.__dict__.get('quads')
+        if quads is None:
+            quads = np.array(
+                [list(map(self.gr3.nodes.get_index_by_id, element))
+                for element in self().values()
+                if len(element) == 4])
+            self.gr3.__dict__['quads'] = quads
+        return quads
 
     def triangulation(self):
         triangles = self.triangles().tolist()
