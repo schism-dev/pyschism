@@ -4,4 +4,4 @@ dist/
 *.egg*
 __pycache__
 *_env
-
+.ipynb_checkpoints

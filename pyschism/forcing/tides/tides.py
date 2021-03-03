@@ -57,7 +57,7 @@ class Tides(bctypes.BoundaryCondition):
             self,
             elevation: bool = True,
             velocity: bool = False,
-            database: Union[str, TidalDatabase] = TidalDatabase.HAMTIDE,
+            database: Union[str, TidalDatabase] = TidalDatabase.TPXO,
     ):
         """Main class for requesting tidal boundary forcing for a SCHISM run.
 
