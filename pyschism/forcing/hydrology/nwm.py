@@ -198,16 +198,18 @@ class NWMDataGetter:
 
 def streamflow_lookup(file, pairings):
     nc = Dataset(file)
+    streamflow = nc['streamflow'][:]
+    feature_id = nc['feature_id'][:]
     sources = []
     # TODO: read scaling factor directly from netcdf file?
-    for element_id, features in pairings.sources.items():
-        sources.append(0.01*np.sum(nc['streamflow'][
-            np.where(np.isin(nc['feature_id'], list(features)))]))
+    for features in pairings.sources.values():
+        in_file = np.in1d(feature_id, list(features), assume_unique=True)
+        sources.append(0.01*np.sum(streamflow[np.where(in_file)]))
     sinks = []
-    for element_id, features in pairings.sinks.items():
-        sinks.append(-0.01*np.sum(nc['streamflow'][
-            np.where(np.isin(nc['feature_id'], list(features)))]))
-    return (sources, sinks)
+    for features in pairings.sinks.values():
+        in_file = np.in1d(feature_id, list(features), assume_unique=True)
+        sinks.append(-0.01*np.sum(streamflow[np.where(in_file)]))
+    return sources, sinks
 
 
 def pivot_time(input_datetime=None, period=6):
