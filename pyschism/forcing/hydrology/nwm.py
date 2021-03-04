@@ -5,6 +5,7 @@ import multiprocessing
 import pathlib
 import tempfile
 import warnings
+from time import time as _time
 from typing import Union
 
 from appdirs import user_data_dir
@@ -225,8 +226,8 @@ class AWSDataInventory:
 
     def __init__(
             self,
-            start_date: datetime,
-            rnday: Union[int, float, timedelta] = None,
+            start_date: datetime = None,
+            rnday: Union[int, float, timedelta] = timedelta(days=5.),
             product='medium_range_mem1',
             verbose=False,
             fallback=True,
@@ -237,11 +238,15 @@ class AWSDataInventory:
         The AWS data goes back 30 days. For requesting hindcast data from
         before we need a different data source
         """
-        logger.info('Initialize AWSDataInventory')
-        self.start_date = start_date
+        utc_now = pytz.timezone('UTC').localize(datetime.utcnow())
+        current_cycle = int(6 * np.floor(utc_now.hour/6))
+        self.start_date = pytz.timezone('UTC').localize(datetime(
+            utc_now.year, utc_now.month, utc_now.day, current_cycle)) \
+            if start_date is None else start_date
+
         self.rnday = rnday
 
-        requested_time = pivot_time(start_date) - timedelta(days=1)
+        requested_time = pivot_time(utc_now) - timedelta(days=1)
 
         while requested_time <= self.pivot_time:
             self._get_data_from_bucket(requested_time, product, fallback)
@@ -306,18 +311,17 @@ class AWSDataInventory:
 
     def __call__(self, pairings: NWMElementPairings, h0=1e-1, nprocs=-1):
         logger.info('Will pair NWM data to elements...')
-        from time import time as _time
         start = _time()
-        files = sorted(list(pathlib.Path(self.tmpdir.name).glob('*')))
         with multiprocessing.Pool(
                 processes=cpu_count() if nprocs == -1 else nprocs
         ) as pool:
             res = pool.starmap(
-                streamflow_lookup, [(file, pairings) for file in files])
+                streamflow_lookup, [(file, pairings) for file in self.files])
         pool.join()
+
         sources = Sources()
         sinks = Sinks()
-        for i, file in enumerate(files):
+        for i, file in enumerate(self.files):
             nc = Dataset(file)
             time = pytz.timezone('UTC').localize(
                 datetime.strptime(
@@ -330,6 +334,10 @@ class AWSDataInventory:
                 sinks.add_data(time, element_id, res[i][1][k])
         logger.info(f'Done pairing, took {_time()-start} seconds...')
         return sources, sinks
+
+    @property
+    def files(self):
+        return sorted(list(pathlib.Path(self.tmpdir.name).glob('*')))
 
 
 class AWSDataGetter(NWMDataGetter):

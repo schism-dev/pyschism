@@ -23,6 +23,13 @@ except RuntimeError:
     version = '0.0.0'
 
 
+# INSTALL_PATH='$HOME/.local'
+# export PATH=$INSTALL_PATH/bin:$PATH
+# export LD_LIBRARY_PATH=$INSTALL_PATH/lib:$LD_LIBRARY_PATH
+# export CFLAGS=-I$INSTALL_PATH/include
+# export CPPFLAGS="-I$INSTALL_PATH/include" LDFLAGS="-L$INSTALL_PATH/lib"
+
+
 parent = pathlib.Path(__file__).parent.absolute()
 conf = setuptools.config.read_configuration(parent / 'setup.cfg')
 meta = conf['metadata']
@@ -37,7 +44,8 @@ setuptools.setup(
     url=meta['url'],
     packages=setuptools.find_packages(),
     python_requires='>=3.6, <3.9',
-    setup_requires=['wheel', 'setuptools_scm', 'setuptools>=41.2'],
+    setup_requires=['wheel', 'setuptools_scm', 'setuptools>=41.2',
+                    'netcdf-flattener>=1.2.0'],
     include_package_data=True,
     extras_require={'dev': ['coverage', 'flake8', 'nose']},
     install_requires=[
