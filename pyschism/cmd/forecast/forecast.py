@@ -52,8 +52,6 @@ def add_forecast_init(actions):
         help="Number of days used for model initialization. "
         "Defaults to 15 days spinup.",
         type=float, default=15.)
-    init.add_argument("--forecast-interval", type=float, default=24)
-    init.add_argument("--timezone", default='UTC')
     init.add_argument(
         "--skip-run", action="store_true",
         help="Skips running the model.")
@@ -102,7 +100,9 @@ def add_forecast(subparsers):
         help="Allow overwrite of output directory.")
     forecast.add_argument(
         "--log-level",
-        choices=[name.lower() for name in logging._nameToLevel])
+        choices=['info', 'warning', 'debug'],
+        default='info'
+    )
     actions = forecast.add_subparsers(dest="action")
     add_forecast_init(actions)
     add_forecast_update(actions)
@@ -173,6 +173,8 @@ def _add_tidal_constituents(parser):
     tides = parser.add_argument_group('tides')
     options = tides.add_mutually_exclusive_group()
     options.required = True
+    options.add_argument("--tidal-database", choices=['tpxo', 'hamtide'],
+                         default='hamtide')
     options.add_argument("--all-constituents", action="store_true")
     options.add_argument("--major-constituents", action="store_true")
     options.add_argument(

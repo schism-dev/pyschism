@@ -5,7 +5,7 @@ import multiprocessing
 import pathlib
 import tempfile
 import warnings
-from time import time as _time
+from time import time
 from typing import Union
 
 from appdirs import user_data_dir
@@ -19,21 +19,20 @@ from psutil import cpu_count
 import pytz
 from scipy.spatial import cKDTree
 from shapely import ops
-from shapely.geometry import (
-    LinearRing, Point, MultiPoint, LineString)
-# from tqdm import tqdm
+from shapely.geometry import LinearRing, Point, MultiPoint, LineString
 import wget
 
+from pyschism.dates import localize_datetime, nearest_cycle_date, pivot_time
 from pyschism.mesh import Hgrid, Gr3
 from pyschism.forcing.hydrology.base import Hydrology, Sources, Sinks
 
 
-DATADIR = pathlib.Path(user_data_dir()) / 'nwm'
+DATADIR = pathlib.Path(user_data_dir('nwm'))
 DATADIR.mkdir(exist_ok=True, parents=True)
 NWM_FILE = DATADIR / 'nwm_v12.gdb.zip'
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+
 
 class NWMGeoDataFrame:
 
@@ -58,41 +57,53 @@ class NWMElementPairings:
     _gdf = NWMGeoDataFrame()
 
     def __init__(self, hgrid):
-        logger.info('Initiliaze NWMElementPairings')
-        logger.debug('This debug message should also appear.')
+
+        logger.info('Computing NWMElementPairings...')
         self._hgrid = hgrid
 
         # An STR-Index returns the reaches that are near the boundaries of the
         # mesh. This subsamples the NWM network, but also is not the exact
         # result. This is used to speed-up computations by filtering the input
         # data.
+        logger.info('Computing r_index.')
+        start = time()
         nwm_r_index = self._gdf.sindex
+        logger.info(f'Computing r_index took {time() - start}.')
 
         # The r-index is used to find intersections between mesh boundary edges
         # and NWM reaches (approximate results)
+        logger.info('Use r_index to filter features.')
+        start = time()
         possible_indexes = set()
         for edge in hgrid.hull.edges().itertuples():
             for index in list(nwm_r_index.intersection(edge.geometry.bounds)):
                 possible_indexes.add(index)
         possible_matches = self._gdf.iloc[list(possible_indexes)]
+        logger.info(f'Filtering features took {time()-start}.')
         del possible_indexes
         del nwm_r_index
 
         # The hull rings itersections is used to find the exact NWM reaches
         # that intersect the mesh's hull.
+        logger.info('Finding exact features intersections.')
+        start = time()
         exact_indexes = set()
         for pm in possible_matches.itertuples():
             if hgrid.hull.rings().geometry.intersects(pm.geometry).any():
                 exact_indexes.add(pm.Index)
         reaches = self._gdf.iloc[list(exact_indexes)]
+        logger.info(f'Finding exact features took {start-time()}.')
 
         # release some memory
         del possible_matches
         del exact_indexes
         del self._gdf
 
+        logger.info('Pairing features to corresponding element.')
+
         # Pair each reach with corresponding element.
         # 1) Find reach-hull intersections.
+        start = time()
         data = []
         intersections: gpd.GeoDataFrame
         for i, reach in enumerate(reaches.itertuples()):
@@ -127,10 +138,18 @@ class NWMElementPairings:
                 _, idx = tree.query(point)
                 element_index[inters.reachIndex].append(idx)
         del tree
+        logger.info(
+            'Pairing features to corresponding element took '
+            f'{start-time()}.')
 
+        start = time()
         elements = hgrid.elements.geodataframe()
+        logger.info(
+            'Generating mesh-element geodataframe took: '
+            f'{start-time()}.')
         del self._hgrid  # release
 
+        start = time()
         sources = defaultdict(set)
         sinks = defaultdict(set)
         for reach_index, paired_elements_idxs in element_index.items():
@@ -154,6 +173,9 @@ class NWMElementPairings:
                         else:
                             sinks[element.id].add(reach.featureID)
                         break
+        logger.info(
+            'Sorting features into sources and sinks took: '
+            f'{start-time()}.')
         self._sources = sources
         self._sinks = sinks
 
@@ -213,15 +235,6 @@ def streamflow_lookup(file, pairings):
     return sources, sinks
 
 
-def pivot_time(input_datetime=None, period=6):
-    if input_datetime is None:
-        input_datetime = pytz.timezone('UTC').localize(datetime.utcnow())
-    current_cycle = int(period * np.floor(input_datetime.hour / period))
-    return pytz.timezone('UTC').localize(
-        datetime(input_datetime.year, input_datetime.month,
-                 input_datetime.day, current_cycle))
-
-
 class AWSDataInventory:
 
     def __init__(
@@ -238,27 +251,41 @@ class AWSDataInventory:
         The AWS data goes back 30 days. For requesting hindcast data from
         before we need a different data source
         """
-        utc_now = pytz.timezone('UTC').localize(datetime.utcnow())
-        current_cycle = int(6 * np.floor(utc_now.hour/6))
-        self.start_date = pytz.timezone('UTC').localize(datetime(
-            utc_now.year, utc_now.month, utc_now.day, current_cycle)) \
-            if start_date is None else start_date
+        self.start_date = nearest_cycle_date() if start_date is None \
+            else localize_datetime(start_date).astimezone(pytz.utc)
+        self.rnday = rnday if isinstance(rnday, timedelta) \
+            else timedelta(days=rnday)
+        self.product = product
+        self.fallback = fallback
 
-        self.rnday = rnday
+        # if the model start_date aligns to a  "zero" with the NWM data, then
+        # fetching the data is trivial
+        self._files = {dt: None for dt in self.timevector}
+        if self.start_date == nearest_cycle_date(self.start_date):
+            self._fetch_data()
 
-        requested_time = pivot_time(utc_now) - timedelta(days=1)
-
-        while requested_time <= self.pivot_time:
-            self._get_data_from_bucket(requested_time, product, fallback)
-            requested_time += timedelta(days=1)
+        # if they don't align then we need to inject a "zero" entry at the
+        # beginning. My suggestion is to repeat the first value. Program will
+        # raise if that is the case, so we can address this special case later.
+        # TODO: Put a "zero" entry if start_date and NWM dates do not align.
+        else:
+            raise NotImplementedError(
+                f'Model start_date={str(self.start_date)} is not a "pivot" '
+                'time.')
 
     @property
-    def Bucket(self):
+    def bucket(self):
         return 'noaa-nwm-pds'
 
     @property
-    def pivot_time(self):
-        return pivot_time()
+    def nearest_cycle_date(self) -> datetime:
+        return nearest_cycle_date(self.start_date)
+
+    @property
+    def output_interval(self) -> timedelta:
+        return {
+            'medium_range_mem1': timedelta(hours=3)
+        }[self.product]
 
     @property
     def s3(self):
@@ -277,67 +304,127 @@ class AWSDataInventory:
             self._tmpdir = tempfile.TemporaryDirectory()
             return self._tmpdir
 
-    def _get_data_from_bucket(self, requested_time, product, fallback):
-        end_date = self.start_date + self.rnday
-        nwm_time = requested_time.strftime('%Y%m%d')
-        res = self.s3.list_objects_v2(Bucket=self.Bucket, Delimiter='/',
-                                      Prefix=f'nwm.{nwm_time}/{product}/')
+    @property
+    def timevector(self):
+        return np.arange(
+                    self.start_date,
+                    self.start_date + self.rnday + self.output_interval,
+                    self.output_interval
+                ).astype(datetime)
 
-        if requested_time == pivot_time() and res['KeyCount'] == 0:
-            if fallback is True:
-                warnings.warn('NWM data is late, defaulting to previous.')
-                requested_time -= timedelta(days=1)
-                nwm_time = requested_time.strftime('%Y%m%d')
-                res = self.s3.list_objects_v2(
-                    Bucket=self.Bucket,
-                    Delimiter='/',
-                    Prefix=f'nwm.{nwm_time}/{product}/'
-                )
+    def _fetch_data(self):
+
+        # this needs to be checked if there is no "zero" alignment
+        requested_time = pivot_time(self.start_date)
+
+        # This download here could be more robust. Right now it tries the
+        # "nowcast" first and since it is expected to fail (NWM is 6 hours
+        # offset from nowcast) then immediately downloads the previous nowcast.
+        # This has been kept like this as a reminder that the "nowcast" never
+        # exists for NWM, but this is not true for other models with shorter
+        # lags (for example GFS).
+        nwm_time = requested_time.strftime('%Y%m%d')
+        res = self.s3.list_objects_v2(
+            Bucket=self.bucket,
+            Delimiter='/',
+            Prefix=f'nwm.{nwm_time}/{self.product}/'
+                   )
+
+        if 'Contents' in res:
+            # contents will be empty when t00z is called.
+            data = list(reversed(sorted([
+                data['Key'] for data in res['Contents'] if 'channel' in data['Key']
+                ])))
+        else:
+            data = []
+
+        # In reality the previous will always fail, so we need to get the pivot
+        # time
+        nwm_time = (requested_time - timedelta(days=1)).strftime('%Y%m%d')
+        res = self.s3.list_objects_v2(
+            Bucket=self.bucket,
+            Delimiter='/',
+            Prefix=f'nwm.{nwm_time}/{self.product}/'
+                   )
+
+        data.extend(list(reversed(sorted([
+            data['Key'] for data in res['Contents'] if 'channel' in data['Key']
+            ]))))
+
+        nearest_cycle = int(6 * np.floor(requested_time.hour/6))
+        previous_cycle = (nearest_cycle - 6) % 24
+
+        if f't{nearest_cycle:02d}z' not in data[0] \
+                and f't{previous_cycle:02d}z' in data[0]:
+            if self.fallback is True:
+                warnings.warn(
+                        f'NWM data for cycle t{nearest_cycle:02d}z is not yet '
+                        'on the server, defaulting to previous cycle.')
             else:
                 raise IOError(
-                    'NWM data is "late", no NWM-data for current cycle.')
-        for data in res['Contents']:
-            if 'channel' in data['Key']:
-                filename = pathlib.Path(
-                    self.tmpdir.name) / data['Key'].split('/')[-1]
-                with open(filename, 'wb') as f:
-                    self.s3.download_fileobj(self.Bucket, data['Key'], f)
-                nc = Dataset(filename)
-                # TODO: Will crash if the user localized with timedelta object.
-                if end_date.tzinfo.localize(
-                    datetime.strptime(nc.model_output_valid_time,
-                                      '%Y-%m-%d_%H:%M:%S')) > end_date:
-                    break
+                    'Unknown error while fetching NWM data.')
+
+        for d in data:
+
+            base_date_str = f'{d.split("/")[0].split(".")[-1]}'
+            timedelta_str = d.split(
+                'channel_rt_1.')[-1].split('.')[0].strip('f')
+            file_datetime = datetime.strptime(base_date_str, '%Y%m%d') \
+                + timedelta(hours=int(d.split('.')[2].strip('tz'))) \
+                + timedelta(hours=float(timedelta_str))
+
+            if file_datetime in self._files:
+                file = self._files[file_datetime]
+                if file is None:
+                    filename = pathlib.Path(self.tmpdir.name) / d
+                    filename.parent.mkdir(parents=True, exist_ok=True)
+                    with open(filename, 'wb') as f:
+                        logger.info(f'Downloading file {d}.')
+                        self.s3.download_fileobj(self.bucket, d, f)
+                    self._files[file_datetime] = filename
+
+        for dt, data in self._files.items():
+            if data is None:
+                raise IOError(f'No NWM data for time {str(dt)}.')
 
     def __call__(self, pairings: NWMElementPairings, h0=1e-1, nprocs=-1):
-        logger.info('Will pair NWM data to elements...')
-        start = _time()
+        logger.info('Launching streamflow lookup...')
+        start = time()
         with multiprocessing.Pool(
                 processes=cpu_count() if nprocs == -1 else nprocs
         ) as pool:
             res = pool.starmap(
                 streamflow_lookup, [(file, pairings) for file in self.files])
         pool.join()
+        logger.info(f'streamflow lookup took {time()-start}...')
 
+        logger.info('Adding streamflow data as sources and sinks...')
+        start = time()
         sources = Sources()
         sinks = Sinks()
         for i, file in enumerate(self.files):
             nc = Dataset(file)
-            time = pytz.timezone('UTC').localize(
+            _time = pytz.timezone('UTC').localize(
                 datetime.strptime(
                     nc.model_output_valid_time,
                     "%Y-%m-%d_%H:%M:%S"))
             # TODO: This is slow, it might change if add_data is vectorized.
             for j, element_id in enumerate(pairings.sources.keys()):
-                sources.add_data(time, element_id, res[i][0][j], -9999, 0.)
+                sources.add_data(_time, element_id, res[i][0][j], -9999, 0.)
             for k, element_id in enumerate(pairings.sinks.keys()):
-                sinks.add_data(time, element_id, res[i][1][k])
-        logger.info(f'Done pairing, took {_time()-start} seconds...')
+                sinks.add_data(_time, element_id, res[i][1][k])
+        logger.info(f'Adding source/sink data took {time()-start}.')
         return sources, sinks
 
     @property
     def files(self):
-        return sorted(list(pathlib.Path(self.tmpdir.name).glob('*')))
+        return sorted(list(pathlib.Path(self.tmpdir.name).glob('**/*.nc')))
+
+    @property
+    def requested_product(self):
+        return {
+            'medium_range_mem1': 'medium_range.channel_rt_1'
+        }[self.product]
 
 
 class AWSDataGetter(NWMDataGetter):
@@ -389,14 +476,16 @@ class NationalWaterModel(Hydrology):
         pairings = NWMElementPairings(model_driver.model_domain.hgrid)
         start_date = model_driver.param.opt.start_date
         rnday = model_driver.param.core.rnday
-        if start_date >= pivot_time() - timedelta(days=30):
+
+        # forecast
+        if start_date >= pivot_time() - timedelta(days=30): 
             logger.info('Fetching NWM data.')
             AWSData = AWSDataGetter(pairings, start_date, rnday)
             sources, sinks = AWSData(h0=h0, nprocs=nprocs)
 
+        # hindcast
         else:
-            raise NotImplementedError(
-                'start_date is less than pivot_time - 30 days ')
+            raise NotImplementedError('Hindcast is not implemented 30 days.')
 
         # turn 'on' the source/sink system in SCHISM.
         model_driver.param.opt.if_source = 1
@@ -407,8 +496,8 @@ class NationalWaterModel(Hydrology):
             # source/sinks
             model_driver.param.opt.nramp_ss = nramp_ss
             # dramp_ss = 2 # needed if if_source=1; ramp-up period in days
-        if int(nramp_ss) != 0 and dramp_ss is not None:
-            model_driver.param.opt.dramp_ss = dramp_ss
+            if dramp_ss is not None:
+                model_driver.param.opt.dramp_ss = dramp_ss
 
     @staticmethod
     def from_files(msource, vsource, vsink):

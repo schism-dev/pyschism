@@ -18,10 +18,10 @@ from pyschism.forcing.atmosphere.nws.nws2.sflux import (
     PrcComponent,
     RadComponent,
 )
+from pyschism.dates import pivot_time, localize_datetime, nearest_cycle_date
 
 BASE_URL = 'https://nomads.ncep.noaa.gov/dods'
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
 
 
 class BaseURL(Enum):
@@ -35,93 +35,200 @@ class BaseURL(Enum):
         raise ValueError(f'{name} is not a valid GFS product.')
 
 
-class Tmpdir:
+# class Inventory:
 
-    def __get__(self, obj, val):
-        tmpdir = obj.__dict__.get('tmpdir')
-        if tmpdir is None:
-            tmpdir = tempfile.TemporaryDirectory()
-            obj.__dict__['tmpdir'] = tmpdir
-            obj.resource = tmpdir.name
-        return tmpdir
+#     def __get__(self, obj, val):
+#         utc_now = obj.utc_timezone.localize(datetime.utcnow())
+#         current_cycle = int(6 * np.floor(utc_now.hour/6))
+#         nomads_now = obj.utc_timezone.localize(datetime(
+#             utc_now.year, utc_now.month, utc_now.day, current_cycle))
+#         nomads_start_dates = [nomads_now - i*obj.forecast_interval
+#                               for i in range(40)]
+#         inventory = {}
+#         for reference_date in nomads_start_dates:
+#             if reference_date + timedelta(hours=0.5) > obj.start_date:
+#                 self.add_dataset_to_inventory(obj, inventory, reference_date)
+#             else:
+#                 self.add_dataset_to_inventory(obj, inventory, reference_date)
+#                 break
+#         return inventory
+
+#     def add_dataset_to_inventory(self, obj, inventory, reference_date):
+#         _reference_date = reference_date.strftime('%Y%m%d')
+#         start_data_url = obj.base_url + f'/gfs{_reference_date}'
+#         nearest_cycle = int(6 * np.floor(reference_date.hour/6))
+#         fname = f'{obj.product.value}_{nearest_cycle:02d}z'
+#         file_url = start_data_url + f'/{fname}'
+#         try:
+#             logger.info(f'Add dataset to inventory: {fname}')
+#             inventory[reference_date] = Dataset(file_url)
+#         except OSError as e:
+        # if e.errno == -70:
+        #     logger.info('Add dataset to invetory failed.')
+        #     cdate = reference_date - obj.forecast_interval
+        #     closest_cycle = int(6 * np.floor(cdate.hour/6))
+        #     nomads_closest = obj.utc_timezone.localize(datetime(
+        #         cdate.year, cdate.month, cdate.day, closest_cycle))
+        #     if reference_date not in inventory.keys():
+        #         _reference_date = nomads_closest.strftime('%Y%m%d')
+        #         start_data_url = obj.base_url + f'/gfs{_reference_date}'
+        #         fname = f'{obj.product.value}_' \
+        #                 f'{nomads_closest.hour:02d}z'
+        #         logger.info(f'Adding {fname} instead.')
+        #         file_url = start_data_url + f'/{fname}'
+        #         inventory[cdate] = Dataset(file_url)
+        # else:
+        #     raise e
 
 
-class StartDate:
+class GFSInventory:
 
-    def __set__(self, obj, start_date):
-        if start_date is not None:
-            obj.__dict__['start_date'] = start_date
-
-    def __get__(self, obj, val):
-        start_date = obj.__dict__.get(
-            'start_date', obj.utc_timezone.localize(datetime.utcnow()))
-        return datetime(start_date.year, start_date.month, start_date.day,
-                        int(6 * np.floor(start_date.hour/6)),
-                        tzinfo=start_date.tzinfo).astimezone(obj.utc_timezone)
-
-
-class Inventory:
-
-    def __get__(self, obj, val):
-        utc_now = obj.utc_timezone.localize(datetime.utcnow())
-        current_cycle = int(6 * np.floor(utc_now.hour/6))
-        nomads_now = obj.utc_timezone.localize(datetime(
-            utc_now.year, utc_now.month, utc_now.day, current_cycle))
-        nomads_start_dates = [nomads_now - i*obj.forecast_interval
-                              for i in range(40)]
-        inventory = {}
-        for reference_date in nomads_start_dates:
-            nearest_cycle = int(6 * np.floor(reference_date.hour/6))
-            if nearest_cycle != 0:
-                # TODO: SCHISM is limited to cycle 00z only.
-                continue
-            if reference_date + timedelta(hours=0.5) > obj.start_date:
-                self.add_dataset_to_inventory(obj, inventory, reference_date)
-            else:
-                self.add_dataset_to_inventory(obj, inventory, reference_date)
+    def __init__(self, product, start_date=None, rnday=4, bbox=None):
+        self.product = GFSProduct(product) if not \
+            isinstance(product, GFSProduct) else product
+        self.start_date = nearest_cycle_date() if start_date is None else \
+            localize_datetime(start_date).astimezone(pytz.utc)
+        self.rnday = rnday if isinstance(rnday, timedelta) else \
+            timedelta(days=rnday)
+        if self.start_date != nearest_cycle_date(self.start_date):
+            raise NotImplementedError(
+                'Argment start_date is does not align with any GFS cycle '
+                'times.')
+        self._files = {_: None for _ in np.arange(
+            self.start_date,
+            self.start_date + self.rnday + self.output_interval,
+            self.output_interval
+        ).astype(datetime)}
+        for dt in self.pivot_times:
+            if None not in list(self._files.values()):
                 break
-        return inventory
+            base_url = BASE_URL + f'/{self.product.value}' + \
+                f'/gfs{pivot_time(dt).strftime("%Y%m%d")}'
+            for cycle in reversed(range(0, 24, 6)):
+                test_url = f'{base_url}/' + \
+                           f'{self.product.name.lower()}_{cycle:02d}z'
+                try:
+                    nc = Dataset(test_url)
+                except OSError as e:
+                    if e.errno == -70:
+                        print()
+                        continue
+                    else:
+                        raise e
+                file_dates = self.get_nc_datevector(nc)
+                for _datetime in reversed(self._files.keys()):
+                    if _datetime in file_dates:
+                        if self._files[_datetime] is None:
+                            self._files[_datetime] = nc
+        missing_records = [dt for dt, nc in self._files.items() if nc is None]
+        if len(missing_records) > 0:
+            raise ValueError(f'No GFS data for dates: {missing_records}.')
 
-    def add_dataset_to_inventory(self, obj, inventory, reference_date):
-        _reference_date = reference_date.strftime('%Y%m%d')
-        start_data_url = obj.base_url + f'/gfs{_reference_date}'
-        nearest_cycle = int(6 * np.floor(reference_date.hour/6))
-        fname = f'{obj.product.value}_{nearest_cycle:02d}z'
-        file_url = start_data_url + f'/{fname}'
-        try:
-            inventory[reference_date] = Dataset(file_url)
-        except OSError as e:
-            if e.errno == -70:
-                cdate = reference_date - obj.forecast_interval
-                closest_cycle = int(6 * np.floor(cdate.hour/6))
-                nomads_closest = obj.utc_timezone.localize(datetime(
-                    cdate.year, cdate.month, cdate.day, closest_cycle))
-                if reference_date not in inventory.keys():
-                    _reference_date = nomads_closest.strftime('%Y%m%d')
-                    start_data_url = obj.base_url + f'/gfs{_reference_date}'
-                    fname = f'{obj.product.value}_' \
-                            f'{nomads_closest.hour:02d}z'
-                    file_url = start_data_url + f'/{fname}'
-                    inventory[cdate] = Dataset(file_url)
+        self._bbox = self._modified_bbox(bbox)
+
+    def put_field(self, variable, dst, var):
+        lon_idxs, lat_idxs = self._modified_bbox_indexes(self._bbox)
+        for dt, nc in self._files.items():
+            _f = nc.filepath().replace(BASE_URL, '')
+            logger.info(
+                f'Putting GFS field {variable} for time {dt} as '
+                f'{var} from file {_f}.')
+            time_index = self.get_nc_time_index(nc, dt)
+            dst[var][time_index, :, :] = nc.variables[variable][
+                time_index, lat_idxs, lon_idxs]
+        dst.sync()
+
+    def get_nc_time_index(self, nc, dt):
+        return np.where(np.in1d(self.get_nc_datevector(nc), [dt]))[0][0]
+
+    def get_nc_datevector(self, nc):
+        base_date = localize_datetime(
+            datetime.strptime(
+                nc['time'].minimum.split('z')[-1],
+                '%d%b%Y')) + timedelta(
+            hours=float(nc['time'].minimum.split('z')[0]))
+        return np.arange(
+            base_date + self.output_interval,
+            base_date + len(nc['time'][:])*self.output_interval,
+            self.output_interval
+        ).astype(datetime)
+
+    def get_sflux_timevector(self):
+        timevec = list(self._files.keys())
+        _pivot_time = pivot_time(np.min(timevec))
+        return [(localize_datetime(x) - _pivot_time) / timedelta(days=1)
+                for x in timevec]
+
+    def xy_grid(self):
+        lon_idxs, lat_idxs = self._modified_bbox_indexes(self._bbox)
+        lon = []
+        for x in self.lon[lon_idxs]:
+            if x > 180:
+                lon.append(x-360)
             else:
-                raise e
+                lon.append(x)
+        return np.meshgrid(np.array(lon), self.lat[lat_idxs])
+
+    @property
+    def pivot_time(self):
+        if not hasattr(self, '_pivot_time'):
+            self._pivot_time = pivot_time()
+        return self._pivot_time
+
+    @property
+    def pivot_times(self):
+        return np.arange(
+            self.pivot_time,
+            self.pivot_time - timedelta(days=10),
+            -timedelta(days=1),
+        ).astype(datetime)
+
+    @property
+    def output_interval(self):
+        if self.product == GFSProduct.GFS_0P25_1HR:
+            return timedelta(hours=1)
+        return timedelta(hours=6)
+
+    @property
+    def lon(self):
+        if not hasattr(self, '_lon'):
+            nc = self._files[list(self._files.keys())[0]]
+            self._lon = nc.variables['lon'][:]
+            if not hasattr(self, '_lat'):
+                self._lat = nc.variables['lat'][:]
+        return self._lon
+
+    @property
+    def lat(self):
+        if not hasattr(self, '_lat'):
+            nc = self._files[list(self._files.keys())[0]]
+            self._lat = nc.variables['lat'][:]
+            if not hasattr(self, '_lon'):
+                self._lon = nc.variables['lon'][:]
+        return self._lat
+
+    def _modified_bbox(self, bbox=None):
+        if bbox is None:
+            return Bbox.from_extents(0, -90, 360, 90)
+        else:
+            xmin = bbox.xmin + 360 if bbox.xmin < 0 else bbox.xmin
+            xmax = bbox.xmax + 360 if bbox.xmax < 0 else bbox.xmax
+            return Bbox.from_extents(xmin, bbox.ymin, xmax, bbox.ymax)
+
+    def _modified_bbox_indexes(self, bbox):
+        lat_idxs = np.where((self.lat >= bbox.ymin)
+                            & (self.lat <= bbox.ymax))[0]
+        lon_idxs = np.where((self.lon >= bbox.xmin)
+                            & (self.lon <= bbox.xmax))[0]
+        return lon_idxs, lat_idxs
 
 
 class GlobalForecastSystem(SfluxDataset):
-
-    _tmpdir = Tmpdir()
-    _inventory = Inventory()
-    start_date = StartDate()
 
     def __init__(
         self,
         product: Union[str, GFSProduct] = GFSProduct.GFS_0P25_1HR,
     ):
-
-        if not isinstance(product, GFSProduct):
-            product = GFSProduct(product)
-        self.product = product
-        self.base_url = BaseURL[product.name].value
         self.prmsl_name = 'prmslmsl'
         self.spfh_name = 'spfh2m'
         self.stmp_name = 'tmpsfc'
@@ -130,251 +237,207 @@ class GlobalForecastSystem(SfluxDataset):
         self.prate_name = 'pratesfc'
         self.dlwrf_name = 'dlwrfsfc'
         self.dswrf_name = 'dswrfsfc'
+        self.product = GFSProduct(product) if not \
+            isinstance(product, GFSProduct) else product
 
     def fetch_data(
             self,
             start_date: datetime = None,
-            rnday: Union[float, timedelta] = None,
+            rnday: Union[float, timedelta] = 4,
             air: bool = True,
             prc: bool = True,
             rad: bool = True,
             bbox: Bbox = None,
-            timezone=None,
     ):
         """Fetches GFS data from NOMADS server. """
+        logger.info('Fetching GFS data.')
+        self.start_date = nearest_cycle_date() if start_date is None else \
+            localize_datetime(start_date).astimezone(pytz.utc)
+        self.rnday = rnday if isinstance(rnday, timedelta) else \
+            timedelta(days=rnday)
+        inventory = GFSInventory(
+            self.product,
+            self.start_date,
+            self.rnday + self.output_interval,
+            bbox
+        )
+        nx_grid, ny_grid = inventory.xy_grid()
+        if air is True:
+            with Dataset(
+                self.tmpdir /
+                f"air_{inventory.product.value}_"
+                f"{str(self.start_date)}.nc",
+                'w', format='NETCDF3_CLASSIC'
+                    ) as dst:
 
-        self.start_date = start_date
-        self._rnday = rnday
-        # inventory = self.get_inventory(start_date, rnday)
-        if timezone is None:
-            timezone = self.utc_timezone
-        if len(self._inventory) == 0:
-            raise ValueError("No data. Perhaps the server is down?")
-        for date in sorted(self._inventory.keys()):
-            date = date.astimezone(timezone)
-            nc = self._inventory[date]
-            lons = nc.variables['lon'][:]
-            lats = nc.variables['lat'][:]
-            if bbox is None:
-                bbox = Bbox.from_extents(0, -90, 360, 90)
-            else:
-                xmin = bbox.xmin + 360 if bbox.xmin < 0 else bbox.xmin
-                xmax = bbox.xmax + 360 if bbox.xmax < 0 else bbox.xmax
-                bbox = Bbox.from_extents(xmin, bbox.ymin, xmax, bbox.ymax)
+                # global attributes
+                dst.setncatts({"Conventions": "CF-1.0"})
+                # dimensions
+                dst.createDimension('nx_grid', nx_grid.shape[1])
+                dst.createDimension('ny_grid', ny_grid.shape[0])
+                dst.createDimension('time', None)
+                # variables
+                # lon
+                dst.createVariable('lon', 'f4', ('ny_grid', 'nx_grid'))
+                dst['lon'].long_name = "Longitude"
+                dst['lon'].standard_name = "longitude"
+                dst['lon'].units = "degrees_east"
+                dst['lon'][:] = nx_grid
+                # lat
+                dst.createVariable('lat', 'f4', ('ny_grid', 'nx_grid'))
+                dst['lat'].long_name = "Latitude"
+                dst['lat'].standard_name = "latitude"
+                dst['lat'].units = "degrees_north"
+                dst['lat'][:] = ny_grid
+                # time
+                dst.createVariable('time', 'f4', ('time',))
+                dst['time'].long_name = 'Time'
+                dst['time'].standard_name = 'time'
+                date = pivot_time(self.start_date)
+                dst['time'].units = f'days since {date.year}-{date.month}'\
+                                    f'-{date.day} 00:00'\
+                                    f'{date.tzinfo}'
+                dst['time'].base_date = (date.year, date.month, date.day, 0)
+                dst['time'][:] = inventory.get_sflux_timevector()
 
-            lat_idxs = np.where((lats >= bbox.ymin)
-                                & (lats <= bbox.ymax))[0]
-            lats = lats[lat_idxs]
-            lon_idxs = np.where((lons >= bbox.xmin)
-                                & (lons <= bbox.xmax))[0]
-            _lons = []
-            for x in lons[lon_idxs]:
-                if x > 180:
-                    _lons.append(x-360)
-                else:
-                    _lons.append(x)
-            lons = np.array(_lons)
-            x, y = np.meshgrid(lons, lats)
-            if air is True:
-                with Dataset(pathlib.Path(self._tmpdir.name) /
-                             f"air_{self.product.value}_{date}.nc", 'w',
-                             format='NETCDF3_CLASSIC') as dst:
-                    # global attributes
-                    dst.setncatts({"Conventions": "CF-1.0"})
-                    # dimensions
-                    dst.createDimension('nx_grid', lons.shape[0])
-                    dst.createDimension('ny_grid', lats.shape[0])
-                    dst.createDimension('time', None)
-                    # variables
-                    # lon
-                    dst.createVariable('lon', 'f4', ('ny_grid', 'nx_grid'))
-                    dst['lon'].long_name = "Longitude"
-                    dst['lon'].standard_name = "longitude"
-                    dst['lon'].units = "degrees_east"
-                    dst['lon'][:] = x
-                    # lat
-                    dst.createVariable('lat', 'f4', ('ny_grid', 'nx_grid'))
-                    dst['lat'].long_name = "Latitude"
-                    dst['lat'].standard_name = "latitude"
-                    dst['lat'].units = "degrees_north"
-                    dst['lat'][:] = y
-                    # time
-                    dst.createVariable('time', 'f4', ('time',))
-                    dst['time'].long_name = 'Time'
-                    dst['time'].standard_name = 'time'
-                    dst['time'].units = f'days since {date.year}-{date.month}'\
-                                        f'-{date.day}'
-                    dst['time'].base_date = (date.year, date.month, date.day,
-                                             date.hour)
-                    dst['time'][:] = np.arange(
-                        nc['time'].resolution,
-                        nc['time'].resolution*(nc['time'].shape[0]+1),
-                        step=nc['time'].resolution)
+                for var in AirComponent.var_types:
+                    dst.createVariable(var, float,
+                                       ('time', 'ny_grid', 'nx_grid'))
+                    logger.info(f'Put field {var}')
+                    inventory.put_field(getattr(self, f'{var}_name'), dst, var)
 
-                    # prmsl
-                    dst.createVariable(
-                        'prmsl', nc.variables[self.prmsl_name].datatype,
-                        ('time', 'ny_grid', 'nx_grid'))
-                    dst['prmsl'].long_name = "Pressure reduced to MSL"
-                    dst['prmsl'].standard_name = "air_pressure_at_sea_level"
-                    dst['prmsl'].units = "Pa"
-                    dst['prmsl'][:] = nc.variables[
-                        self.prmsl_name][:, lat_idxs, lon_idxs]
+                # prmsl
+                dst['prmsl'].long_name = "Pressure reduced to MSL"
+                dst['prmsl'].standard_name = "air_pressure_at_sea_level"
+                dst['prmsl'].units = "Pa"
 
-                    # spfh
-                    dst.createVariable(
-                        'spfh', nc.variables[self.spfh_name].datatype,
-                        ('time', 'ny_grid', 'nx_grid'))
-                    dst['spfh'].long_name = "Surface Specific Humidity "\
-                                            "(2m AGL)"
-                    dst['spfh'].standard_name = "specific_humidity"
-                    dst['spfh'].units = "1"
-                    dst['spfh'][:] = nc.variables[
-                        self.spfh_name][:, lat_idxs, lon_idxs]
+                # spfh
+                dst['spfh'].long_name = "Surface Specific Humidity "\
+                                        "(2m AGL)"
+                dst['spfh'].standard_name = "specific_humidity"
+                dst['spfh'].units = "1"
 
-                    # stmp
-                    dst.createVariable(
-                        'stmp', nc.variables[self.stmp_name].datatype,
-                        ('time', 'ny_grid', 'nx_grid'))
-                    dst['stmp'].long_name = "Surface Air Temperature (2m AGL)"
-                    dst['stmp'].standard_name = "air_temperature"
-                    dst['stmp'].units = "K"
-                    dst['stmp'][:] = nc.variables[
-                        self.stmp_name][:, lat_idxs, lon_idxs]
+                # stmp
+                dst['stmp'].long_name = "Surface Air Temperature (2m AGL)"
+                dst['stmp'].standard_name = "air_temperature"
+                dst['stmp'].units = "K"
 
-                    # uwind
-                    dst.createVariable(
-                        'uwind', nc.variables[self.uwind_name].datatype,
-                        ('time', 'ny_grid', 'nx_grid'))
-                    dst['uwind'].long_name = "Surface Eastward Air Velocity "\
-                                             "(10m AGL)"
-                    dst['uwind'].standard_name = "eastward_wind"
-                    dst['uwind'].units = "m/s"
-                    dst['uwind'][:] = nc.variables[
-                        self.uwind_name][:, lat_idxs, lon_idxs]
+                # uwind
+                dst['uwind'].long_name = "Surface Eastward Air Velocity "\
+                    "(10m AGL)"
+                dst['uwind'].standard_name = "eastward_wind"
+                dst['uwind'].units = "m/s"
 
-                    # vwind
-                    dst.createVariable(
-                        'vwind', nc.variables[self.vwind_name].datatype,
-                        ('time', 'ny_grid', 'nx_grid'))
-                    dst['vwind'].long_name = "Surface Northward Air Velocity "\
-                                             "(10m AGL)"
-                    dst['vwind'].standard_name = "northward_wind"
-                    dst['vwind'].units = "m/s"
-                    dst['vwind'][:] = nc.variables[
-                        self.vwind_name][:, lat_idxs, lon_idxs]
+                # vwind
+                dst['vwind'].long_name = "Surface Northward Air Velocity "\
+                    "(10m AGL)"
+                dst['vwind'].standard_name = "northward_wind"
+                dst['vwind'].units = "m/s"
 
-            if prc is True:
-                with Dataset(pathlib.Path(self._tmpdir.name) /
-                             f"prc_{self.product.value}_{date}.nc", 'w',
-                             format='NETCDF3_CLASSIC') as dst:
-                    # global attributes
-                    dst.setncatts({"Conventions": "CF-1.0"})
-                    # dimensions
-                    dst.createDimension('nx_grid', lons.shape[0])
-                    dst.createDimension('ny_grid', lats.shape[0])
-                    dst.createDimension('time', None)
-                    # variables
-                    # lon
-                    dst.createVariable('lon', 'f4', ('ny_grid', 'nx_grid'))
-                    dst['lon'].long_name = "Longitude"
-                    dst['lon'].standard_name = "longitude"
-                    dst['lon'].units = "degrees_east"
-                    dst['lon'][:] = x
-                    # lat
-                    dst.createVariable('lat', 'f4', ('ny_grid', 'nx_grid'))
-                    dst['lat'].long_name = "Latitude"
-                    dst['lat'].standard_name = "latitude"
-                    dst['lat'].units = "degrees_north"
-                    dst['lat'][:] = y
-                    # time
-                    dst.createVariable('time', 'f4', ('time',))
-                    dst['time'].long_name = 'Time'
-                    dst['time'].standard_name = 'time'
-                    dst['time'].units = f'days since {date.year}-{date.month}'\
-                                        f'-{date.day} {date.hour:02d}:'\
-                                        f"{date.minute:02d} " \
-                                        f'{date.tzinfo}'
-                    dst['time'].base_date = (date.year, date.month, date.day,
-                                             date.hour)
-                    dst['time'][:] = np.arange(
-                        nc['time'].resolution,
-                        nc['time'].resolution*(len(nc['time'][:])),
-                        step=nc['time'].resolution)
+        if prc is True:
+            with Dataset(
+                self.tmpdir /
+                f"prc_{inventory.product.value}_"
+                f"{str(self.start_date)}.nc",
+                'w', format='NETCDF3_CLASSIC'
+                    ) as dst:
 
-                    # prate
-                    dst.createVariable(
-                        'prate', nc.variables[self.prate_name].datatype,
-                        ('time', 'ny_grid', 'nx_grid'))
-                    dst['prate'].long_name = "Surface Precipitation Rate"
-                    dst['prate'].standard_name = "air_pressure_at_sea_level"
-                    dst['prate'].units = "kg/m^2/s"
-                    dst['prate'][:] = nc.variables[
-                        self.prate_name][:, lat_idxs, lon_idxs]
+                # global attributes
+                dst.setncatts({"Conventions": "CF-1.0"})
+                # dimensions
+                dst.createDimension('nx_grid', nx_grid.shape[1])
+                dst.createDimension('ny_grid', ny_grid.shape[0])
+                dst.createDimension('time', None)
+                # lon
+                dst.createVariable('lon', 'f4', ('ny_grid', 'nx_grid'))
+                dst['lon'].long_name = "Longitude"
+                dst['lon'].standard_name = "longitude"
+                dst['lon'].units = "degrees_east"
+                dst['lon'][:] = nx_grid
+                # lat
+                dst.createVariable('lat', 'f4', ('ny_grid', 'nx_grid'))
+                dst['lat'].long_name = "Latitude"
+                dst['lat'].standard_name = "latitude"
+                dst['lat'].units = "degrees_north"
+                dst['lat'][:] = ny_grid
+                # time
+                dst.createVariable('time', 'f4', ('time',))
+                dst['time'].long_name = 'Time'
+                dst['time'].standard_name = 'time'
+                date = pivot_time(self.start_date)
+                dst['time'].units = f'days since {date.year}-{date.month}'\
+                                    f'-{date.day} 00:00'\
+                                    f'{date.tzinfo}'
+                dst['time'].base_date = (date.year, date.month, date.day, 0)
+                dst['time'][:] = inventory.get_sflux_timevector()
 
-            if rad is True:
-                with Dataset(pathlib.Path(self._tmpdir.name) /
-                             f"rad_{self.product.value}_{date}.nc", 'w',
-                             format='NETCDF3_CLASSIC') as dst:
-                    # global attributes
-                    dst.setncatts({"Conventions": "CF-1.0"})
-                    # dimensions
-                    dst.createDimension('nx_grid', lons.shape[0])
-                    dst.createDimension('ny_grid', lats.shape[0])
-                    dst.createDimension('time', None)
-                    # variables
-                    # lon
-                    dst.createVariable('lon', 'f4', ('ny_grid', 'nx_grid'))
-                    dst['lon'].long_name = "Longitude"
-                    dst['lon'].standard_name = "longitude"
-                    dst['lon'].units = "degrees_east"
-                    dst['lon'][:] = x
-                    # lat
-                    dst.createVariable('lat', 'f4', ('ny_grid', 'nx_grid'))
-                    dst['lat'].long_name = "Latitude"
-                    dst['lat'].standard_name = "latitude"
-                    dst['lat'].units = "degrees_north"
-                    dst['lat'][:] = y
-                    # time
-                    dst.createVariable('time', 'f4', ('time',))
-                    dst['time'].long_name = 'Time'
-                    dst['time'].standard_name = 'time'
-                    dst['time'].units = f'days since {date.year}-{date.month}'\
-                                        f'-{date.day}T{date.hour:02d}:'\
-                                        f'{date.minute:02d}'\
-                                        f'{date.tzinfo}'
-                    dst['time'].base_date = (date.year, date.month, date.day,
-                                             date.hour)
-                    dst['time'][:] = np.arange(
-                        nc['time'].resolution,
-                        nc['time'].resolution*(len(nc['time'][:])),
-                        step=nc['time'].resolution)
+                for var in PrcComponent.var_types:
+                    dst.createVariable(var, float,
+                                       ('time', 'ny_grid', 'nx_grid'))
+                    logger.info(f'Put field {var}')
+                    inventory.put_field(getattr(self, f'{var}_name'), dst, var)
+                # prate
+                dst['prate'].long_name = "Surface Precipitation Rate"
+                dst['prate'].standard_name = "air_pressure_at_sea_level"
+                dst['prate'].units = "kg/m^2/s"
 
-                    # dlwrf
-                    dst.createVariable(
-                        'dlwrf', nc.variables[self.dlwrf_name].datatype,
-                        ('time', 'ny_grid', 'nx_grid'))
-                    dst['dlwrf'].long_name = "Downward Long Wave Radiation "\
-                                             "Flux"
-                    dst['dlwrf'].standard_name = "surface_downwelling_"\
-                                                 "longwave_flux_in_air"
-                    dst['dlwrf'].units = "W/m^2"
-                    dst['dlwrf'][:] = nc.variables[
-                        self.dlwrf_name][:, lat_idxs, lon_idxs]
+        if rad is True:
+            with Dataset(
+                self.tmpdir /
+                f"rad_{inventory.product.value}_"
+                f"{str(self.start_date)}.nc",
+                'w', format='NETCDF3_CLASSIC'
+                    ) as dst:
+                # global attributes
+                dst.setncatts({"Conventions": "CF-1.0"})
+                # dimensions
+                dst.createDimension('nx_grid', nx_grid.shape[1])
+                dst.createDimension('ny_grid', ny_grid.shape[0])
+                dst.createDimension('time', None)
+                # lon
+                dst.createVariable('lon', 'f4', ('ny_grid', 'nx_grid'))
+                dst['lon'].long_name = "Longitude"
+                dst['lon'].standard_name = "longitude"
+                dst['lon'].units = "degrees_east"
+                dst['lon'][:] = nx_grid
+                # lat
+                dst.createVariable('lat', 'f4', ('ny_grid', 'nx_grid'))
+                dst['lat'].long_name = "Latitude"
+                dst['lat'].standard_name = "latitude"
+                dst['lat'].units = "degrees_north"
+                dst['lat'][:] = ny_grid
+                # time
+                dst.createVariable('time', 'f4', ('time',))
+                dst['time'].long_name = 'Time'
+                dst['time'].standard_name = 'time'
+                date = pivot_time(self.start_date)
+                dst['time'].units = f'days since {date.year}-{date.month}'\
+                                    f'-{date.day} 00:00'\
+                                    f'{date.tzinfo}'
+                dst['time'].base_date = (date.year, date.month, date.day, 0)
+                dst['time'][:] = inventory.get_sflux_timevector()
 
-                    # dswrf
-                    dst.createVariable(
-                        'dswrf', nc.variables[self.dswrf_name].datatype,
-                        ('time', 'ny_grid', 'nx_grid'))
-                    dst['dswrf'].long_name = "Downward Short Wave Radiation "\
-                                             "Flux"
-                    dst['dswrf'].standard_name = "surface_downwelling_"\
-                                                 "shortwave_flux_in_air"
-                    dst['dswrf'].units = "W/m^2"
-                    dst['dswrf'][:] = nc.variables[
-                        self.dswrf_name][:, lat_idxs, lon_idxs]
+                for var in RadComponent.var_types:
+                    dst.createVariable(var, float,
+                                       ('time', 'ny_grid', 'nx_grid'))
+                    logger.info(f'Put field {var}')
+                    inventory.put_field(getattr(self, f'{var}_name'), dst, var)
 
-        self.resource = self._tmpdir.name
+                # dlwrf
+                dst['dlwrf'].long_name = "Downward Long Wave Radiation "\
+                                         "Flux"
+                dst['dlwrf'].standard_name = "surface_downwelling_"\
+                                             "longwave_flux_in_air"
+                dst['dlwrf'].units = "W/m^2"
+
+                # dswrf
+                dst['dswrf'].long_name = "Downward Short Wave Radiation "\
+                                         "Flux"
+                dst['dswrf'].standard_name = "surface_downwelling_"\
+                                             "shortwave_flux_in_air"
+                dst['dswrf'].units = "W/m^2"
+
+        self.resource = self.tmpdir
         if air:
             self.air = AirComponent(self.fields)
         if prc:
@@ -383,13 +446,13 @@ class GlobalForecastSystem(SfluxDataset):
             self.rad = RadComponent(self.fields)
 
     @property
-    def forecast_interval(self):
+    def tmpdir(self):
+        if not hasattr(self, '_tmpdir'):
+            self._tmpdir = tempfile.TemporaryDirectory()
+        return pathlib.Path(self._tmpdir.name)
+
+    @property
+    def output_interval(self):
+        if self.product == GFSProduct.GFS_0P25_1HR:
+            return timedelta(hours=1)
         return timedelta(hours=6)
-
-    @property
-    def utc_timezone(self):
-        return pytz.timezone('UTC')
-
-    @property
-    def nomads_server_ttl(self):
-        return timedelta(days=10)

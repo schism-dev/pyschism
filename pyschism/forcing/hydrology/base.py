@@ -1,235 +1,234 @@
+from datetime import datetime
 import logging
 import os
 import pathlib
 from typing import Union
 
-import pandas as pd
+import numpy as np
+import pytz
 
 
 _logger = logging.getLogger(__name__)
 
 
-class TimeHistoryFile:
-
-    def __init__(self, df, start_date, rnday, filename):
-        self.df = df
-        self.filename = filename
-        self.start_date = start_date
-        self.rnday = rnday
-
-    def write(self, path: Union[str, os.PathLike], overwrite: bool = False):
-        elements = self.df['element_id'].unique()
-        times = self.df['time'].unique()
-        with open(pathlib.Path(path) / self.filename, 'w') as f:
-            for time in times:
-                relative_time = (time - self.start_date).total_seconds()
-                if relative_time < 0:
-                    continue
-                line = [f"{relative_time:G}"]
-                for element_id in elements:
-                    pd_series = self.df["flow"][
-                        (self.df["time"] == time) &
-                        (self.df["element_id"] == element_id)]
-                    line.append(f'{pd_series.values[0]:.4e}')
-                f.write(' '.join(line))
-                f.write('\n')
-
-
-class Vsource(TimeHistoryFile):
-
-    def __init__(self, df, start_date, rnday, filename='vsource.th'):
-        super().__init__(df, start_date, rnday, filename)
-
-
-class Vsink(TimeHistoryFile):
-
-    def __init__(self, df, start_date, rnday, filename='vsink.th'):
-        super().__init__(df, start_date, rnday, filename)
-
-
-class Msource(TimeHistoryFile):
-
-    def __init__(self, df, start_date, rnday, filename='msource.th'):
-        super().__init__(df, start_date, rnday, filename)
-
-    def write(self, path: Union[str, os.PathLike], overwrite: bool = False):
-        elements = self.df['element_id'].unique()
-        times = self.df['time'].unique()
-        with open(pathlib.Path(path) / self.filename, 'w') as f:
-            for time in times:
-                relative_time = (time - self.start_date).total_seconds()
-                if relative_time < 0:
-                    continue
-                line = [f"{relative_time:G}"]
-                for element_id in elements:
-                    pd_series = self.df["temperature"][
-                        (self.df["time"] == time) &
-                        (self.df["element_id"] == element_id)]
-                    line.append(f'{pd_series.values[0]:.4e}')
-                for element_id in elements:
-                    pd_series = self.df["salinity"][
-                        (self.df["time"] == time) &
-                        (self.df["element_id"] == element_id)]
-                    line.append(f'{pd_series.values[0]:.4e}')
-                f.write(' '.join(line))
-                f.write('\n')
-
-
-class SourcesDataFrame:
-    '''This descriptor holds the shared dataframe for the API components.'''
-
-    def __get__(self, obj, val):
-        if not hasattr(self, '_df'):
-            self._df = pd.DataFrame(
-                columns=[
-                    'element_id',
-                    'time',
-                    'flow',
-                    'temperature',
-                    'salinity'
-                ])
-        return self._df
-
-    def __set__(self, obj, df: pd.DataFrame):
-        self._df = df
+def localize_datetime(d):
+    # datetime is naïve iff:
+    if d.tzinfo is None or d.tzinfo.utcoffset(d) is None:
+        return pytz.timezone('UTC').localize(d)
+    return d
 
 
 class Sources:
     '''Public interface used for adding sources to the model.'''
 
-    _df = SourcesDataFrame()
+    _data = {}
 
     def __len__(self):
-        return len(self.df)
+        return len(self._data)
 
-    def add_data(self, time, element_id, flow, temperature, salinity):
+    def add_data(
+            self,
+            time: datetime,
+            element_id: str,
+            flow: float,
+            temperature: float = np.nan,
+            salinity: float = np.nan,
+    ):
 
-        # TODO: sources/sinks.add_data is slow, it should be vectorized
-        # main reason is because it's tallying multiple datapoints that
-        # corresponds to the same element, so it has to check the dataframe
-        # for each datapoint added.
+        time = localize_datetime(time).astimezone(pytz.utc)
+        data_for_element = self._data.get(time, {}).get('element_id', {})
 
-        # TODO: Consider additional inputs besides TS?
-        # Check if datapoint already exists (auto-tally)
-        tally = ((self.df['time'] == time) &
-                 (self.df['element_id'] == element_id))
-        if tally.any():
-            # previous_flow = self.df.loc[tally, 'flow']
-            self.df.loc[tally, 'flow'] += flow
-            # TODO: What happens if we have two different flows that both are
-            # assigned to the same element? Example: 100 m^3/s @ 1 psu then
-            # another flow on the same element of 1 m^3/s @ 100 psu. How do we
-            # combine these on a single element? Flow is just simple summation,
-            # but TS is different.
-            if (self.df.loc[tally, 'salinity'] != salinity).any():
-                raise NotImplementedError('Two different values of salinity '
-                                          'for same time/element')
+        # TODO: What happens if we have two different flows that both are
+        # assigned to the same element? Example: 100 m^3/s @ 1 psu then
+        # another flow on the same element of 1 m^3/s @ 100 psu. How do we
+        # combine these on a single element? Flow is just simple summation,
 
-            if (self.df.loc[tally, 'temperature'] != temperature).any():
-                raise NotImplementedError('Two different values of temperature'
-                                          ' for same time/element')
+        _tmp = data_for_element.get('temperature', np.nan)
+        if not np.isnan(_tmp):
+            if _tmp != temperature:
+                raise NotImplementedError(
+                    'Two different values of temperature for same '
+                    'time/element.')
 
-        else:
-            self._df = self.df.append(
-                pd.Series(
-                    [element_id, time, flow, temperature, salinity],
-                    index=self.df.columns,
-                ),
-                ignore_index=True,
-                # TODO: in_place=True, ?
-            )
+        _sal = data_for_element.get('salinity', np.nan)
+        if not np.isnan(_sal):
+            if _sal != salinity:
+                raise NotImplementedError(
+                    'Two different values of salinity for same time/element.')
+        self._data.setdefault(time, {}).setdefault(element_id, {}).update(
+            {
+                'flow': np.nansum(
+                    [data_for_element.get('flow', np.nan), flow]),
+                'temperature': temperature,
+                'salinity': salinity
+            })
 
     @property
-    def df(self):
-        return self._df
+    def elements(self):
+        unique_elements = set()
+        for elements in self._data.values():
+            for element_id in elements.keys():
+                unique_elements.add(element_id)
+        return list(map(str, sorted(list(map(int, unique_elements)))))
 
-
-class SinksDataFrame:
-    '''This descriptor holds the shared dataframe for the API components.'''
-
-    def __get__(self, obj, val):
-        if not hasattr(self, '_df'):
-            self._df = pd.DataFrame(
-                columns=[
-                    'element_id',
-                    'time',
-                    'flow'
-                ])
-        return self._df
-
-    def __set__(self, obj, df: pd.DataFrame):
-        self._df = df
+    @property
+    def timevector(self):
+        return list(sorted(self._data.keys()))
 
 
 class Sinks:
 
-    _df = SinksDataFrame()
+    _data = {}
 
     def __len__(self):
-        return len(self.df)
+        return len(self._data)
 
-    def add_data(self, time, element_id, flow):
-        tally = ((self.df['time'] == time) &
-                 (self.df['element_id'] == element_id))
-        if tally.any():
-            self.df.loc[tally, 'flow'] += flow
-        else:
-            self._df = self.df.append(
-                pd.Series(
-                    [element_id, time, flow],
-                    index=self.df.columns,
-                ),
-                ignore_index=True,
-            )
+    def add_data(
+            self,
+            time: datetime,
+            element_id: str,
+            flow: float,
+    ):
+
+        time = localize_datetime(time).astimezone(pytz.utc)
+        data_for_element = self._data.get(time, {}).get('element_id', {})
+        if flow > 0:
+            raise ValueError('Argument flow for must be smaller than 0.')
+        self._data.setdefault(time, {}).setdefault(element_id, {}).update(
+            {
+                'flow': np.nansum(
+                    [data_for_element.get('flow', np.nan), flow]),
+            })
 
     @property
-    def df(self):
-        return self._df
+    def elements(self):
+        unique_elements = set()
+        for elements in self._data.values():
+            for element_id in elements.keys():
+                unique_elements.add(element_id)
+        return list(map(str, sorted(list(map(int, unique_elements)))))
+
+    @property
+    def timevector(self):
+        return list(sorted(self._data.keys()))
+
+
+class TimeHistoryFile:
+
+    def __init__(self, start_date, rnday, filename):
+
+        self.filename = filename
+        self.start_date = start_date
+        self.rnday = rnday
+
+    def __str__(self):
+        data = []
+        for time in self._source_sink.timevector:
+            relative_time = (time - self.start_date).total_seconds()
+            if relative_time < 0:
+                continue
+            line = [f"{relative_time:G}"]
+            for element_id in self._source_sink.elements:
+                line.append(
+                    f'{self._source_sink._data[time][element_id]["flow"]:.4e}')
+            data.append(' '.join(line))
+        return '\n'.join(data)
+
+    def write(self, path: Union[str, os.PathLike], overwrite: bool = False):
+        path = pathlib.Path(path)
+        if path.exists() and overwrite is not True:
+            raise IOError('File exists and overwrite is not True.')
+        open(path / self.filename, 'w').write(str(self))
+
+
+class Vsource(TimeHistoryFile):
+
+    _sources = Sources()
+
+    def __init__(self, start_date, rnday, filename='vsource.th'):
+        super().__init__(start_date, rnday, filename)
+        self._source_sink = self._sources
+
+
+class Vsink(TimeHistoryFile):
+
+    _sinks = Sinks()
+
+    def __init__(self, start_date, rnday, filename='vsink.th'):
+        super().__init__(start_date, rnday, filename)
+        self._source_sink = self._sinks
+
+
+class Msource(TimeHistoryFile):
+
+    _sources = Sources()
+
+    def __init__(self, start_date, rnday, filename='msource.th'):
+        super().__init__(start_date, rnday, filename)
+        self._source_sink = self._sources
+
+    def __str__(self):
+        data = []
+        for time in self._source_sink.timevector:
+            relative_time = (time - self.start_date).total_seconds()
+            if relative_time < 0:
+                continue
+            line = [f"{relative_time:G}"]
+            for element_id in self._source_sink.elements:
+                line.append(
+                    f'{self._source_sink._data[time][element_id]["temperature"]: .4e}')
+            for element_id in self._source_sink.elements:
+                line.append(
+                    f'{self._source_sink._data[time][element_id]["salinity"]: .4e}')
+            data.append(' '.join(line))
+        return '\n'.join(data)
 
 
 class SourceSink:
 
+    _sources = Sources()
+    _sinks = Sinks()
+
     def __init__(
             self,
-            sources: Sources,
-            sinks: Sinks,
             filename='source_sink.in'
     ):
-        self._sources = sources
-        self._sinks = sinks
         self.filename = filename
 
-    def write(self, path: Union[str, os.PathLike], overwrite: bool = False):
-        sources = self.sources.df['element_id'].unique()
-        sinks = self.sinks.df['element_id'].unique()
+    def __str__(self):
+        source_id = self._sources.elements
         data = []
-        with open(pathlib.Path(path) / self.filename, 'w') as f:
-            data.append(f'{len(sources)}')
-            for element_id in sources:
-                data.append(f'{element_id}')
-            data.append('\n')
-            data.append(f'{len(sinks)}')
-            for element_id in sinks:
-                data.append(f'{element_id}')
-            f.write('\n'.join(data))
+        data.append(f'{len(source_id)}')
+        for element_id in source_id:
+            data.append(f'{element_id}')
+        data.append('')
+        sink_id = self._sinks.elements
+        data.append(f'{len(sink_id)}')
+        for element_id in sink_id:
+            data.append(f'{element_id}')
+        return '\n'.join(data)
 
-    @property
-    def sources(self):
-        return self._sources
-
-    @property
-    def sinks(self):
-        return self._sinks
+    def write(self, path: Union[str, os.PathLike], overwrite: bool = False):
+        path = pathlib.Path(path)
+        if path.exists() and overwrite is not True:
+            raise IOError('File exists and overwrite is not True.')
+        open(path / self.filename, 'w').write(str(self))
 
 
 class Hydrology:
 
-    def __init__(self):
-        self._sources = Sources()
-        self._sinks = Sinks()
+    _sources = Sources()
+    _sinks = Sinks()
 
     def __call__(self, model_driver):
-        self._model_driver = model_driver
+        self.set_start_date(model_driver.param.opt.start_date)
+        self.set_rnday(model_driver.param.opt.start_date)
+
+    def set_start_date(self, start_date):
+        self._start_date = start_date
+
+    def set_rnday(self, rnday):
+        self._rnday = rnday
 
     def write(
             self,
@@ -241,16 +240,15 @@ class Hydrology:
             source_sink: Union[str, bool] = True,
     ):
 
-        start_date = self.model_driver.param.opt.start_date
-        rnday = self.model_driver.param.core.rnday
-
         # write source sink
         if source_sink is True:
             fname = 'source_sink.in'
         elif isinstance(source_sink, str):
             fname = source_sink
         if source_sink is not False:
-            SourceSink(self.sources, self.sinks, fname).write(path, overwrite)
+            SourceSink(
+                fname
+            ).write(path, overwrite)
 
         if vsource is True:
             fname = 'vsource.th'
@@ -258,8 +256,10 @@ class Hydrology:
             fname = vsource
         if vsource is not False:
             Vsource(
-                self.sources.df, start_date, rnday, fname).write(
-                path, overwrite)
+                self._start_date,
+                self._rnday,
+                fname
+            ).write(path, overwrite)
 
         if msource is True:
             fname = 'msource.th'
@@ -267,8 +267,10 @@ class Hydrology:
             fname = msource
         if msource is not False:
             Msource(
-                self.sources.df, start_date, rnday, fname).write(
-                path, overwrite)
+                self._start_date,
+                self._rnday,
+                fname
+            ).write(path, overwrite)
 
         if vsink is True:
             fname = 'vsink.th'
@@ -276,17 +278,7 @@ class Hydrology:
             fname = vsink
         if vsink is not False:
             Vsink(
-                self.sinks.df, start_date, rnday, fname).write(
-                path, overwrite)
-
-    @property
-    def sources(self):
-        return self._sources
-
-    @property
-    def sinks(self):
-        return self._sinks
-
-    @property
-    def model_driver(self):
-        return self._model_driver
+                self._start_date,
+                self._rnday,
+                fname
+            ).write(path, overwrite)

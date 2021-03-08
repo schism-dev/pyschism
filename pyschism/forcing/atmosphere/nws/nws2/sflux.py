@@ -258,6 +258,7 @@ class BaseComponent(ABC):
 class AirComponent(BaseComponent):
 
     name = 'air'
+    var_types = ['prmsl', 'spfh', 'stmp', 'uwind', 'vwind']
 
     def __init__(self, fields: cf.FieldList, prmsl_name='prmsl',
                  spfh_name='spfh', stmp_name='stmp', uwind_name='uwind',
@@ -278,28 +279,22 @@ class AirComponent(BaseComponent):
                               "Surface Northward Air Velocity (10m AGL)",
                               "northward_wind", "m/s")
 
-    @property
-    def var_types(self):
-        return ['prmsl', 'spfh', 'stmp', 'uwind', 'vwind']
-
 
 class PrcComponent(BaseComponent):
 
     name = 'prc'
+    var_types = ['prate']
 
     def __init__(self, fields: cf.FieldList, prate_name='prate'):
         self.prate = Variable(fields, 'prate', prate_name,
                               "Surface Precipitation Rate",
                               "air_pressure_at_sea_level", "kg/m^2/s")
 
-    @property
-    def var_types(self):
-        return ['prate']
-
 
 class RadComponent(BaseComponent):
 
     name = 'rad'
+    var_types = ['dlwrf', 'dswrf']
 
     def __init__(self, fields: cf.FieldList, dlwrf_name='dlwrf',
                  dswrf_name='dswrf'):
@@ -311,10 +306,6 @@ class RadComponent(BaseComponent):
                               "Downward Short Wave Radiation Flux",
                               "surface_downwelling_shortwave_flux_in_air",
                               "W/m^2")
-
-    @property
-    def var_types(self):
-        return ['dlwrf', 'dswrf']
 
 
 class Resource:
