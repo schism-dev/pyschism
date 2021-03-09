@@ -71,7 +71,7 @@ class GFSInventory:
                     else:
                         raise e
                 file_dates = self.get_nc_datevector(nc)
-                for _datetime in reversed(self._files.keys()):
+                for _datetime in reversed(list(self._files.keys())):
                     if _datetime in file_dates:
                         if self._files[_datetime] is None:
                             self._files[_datetime] = nc
