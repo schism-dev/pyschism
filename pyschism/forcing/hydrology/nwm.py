@@ -5,8 +5,11 @@ import multiprocessing
 import pathlib
 import tempfile
 import warnings
+import tarfile
+import tempfile
 from time import time
 from typing import Union
+import urllib
 
 from appdirs import user_data_dir
 import boto3
@@ -29,32 +32,12 @@ from pyschism.forcing.hydrology.base import Hydrology, Sources, Sinks
 
 DATADIR = pathlib.Path(user_data_dir('nwm'))
 DATADIR.mkdir(exist_ok=True, parents=True)
-NWM_FILE = DATADIR / 'nwm_v12.gdb.zip'
+NWM_FILE = DATADIR / 'NWM_channel_hydrofabric.tar.gz'
 
 logger = logging.getLogger(__name__)
 
 
-class NWMGeoDataFrame:
-
-    def __get__(self, obj, val):
-        gdf = obj.__dict__.get('gdf')
-        if gdf is None:
-            bbox = obj._hgrid.bbox
-            gdf = gpd.read_file(
-                NWM_FILE,
-                bbox=(bbox.xmin, bbox.ymin, bbox.xmax, bbox.ymax),
-                # bbox=(-75.889435, 38.895308, -74.604034, 39.477546),  # Delaware Bay, debug  # noqa: E501
-                )
-            obj.__dict__['gdf'] = gdf
-        return gdf
-
-    def __delete__(self, obj):
-        del obj.__dict__['gdf']
-
-
 class NWMElementPairings:
-
-    _gdf = NWMGeoDataFrame()
 
     def __init__(self, hgrid):
 
@@ -67,7 +50,7 @@ class NWMElementPairings:
         # data.
         logger.info('Computing r_index.')
         start = time()
-        nwm_r_index = self._gdf.sindex
+        nwm_r_index = self.gdf.sindex
         logger.info(f'Computing r_index took {time() - start}.')
 
         # The r-index is used to find intersections between mesh boundary edges
@@ -78,7 +61,7 @@ class NWMElementPairings:
         for edge in hgrid.hull.edges().itertuples():
             for index in list(nwm_r_index.intersection(edge.geometry.bounds)):
                 possible_indexes.add(index)
-        possible_matches = self._gdf.iloc[list(possible_indexes)]
+        possible_matches = self.gdf.iloc[list(possible_indexes)]
         logger.info(f'Filtering features took {time()-start}.')
         del possible_indexes
         del nwm_r_index
@@ -91,7 +74,7 @@ class NWMElementPairings:
         for pm in possible_matches.itertuples():
             if hgrid.hull.rings().geometry.intersects(pm.geometry).any():
                 exact_indexes.add(pm.Index)
-        reaches = self._gdf.iloc[list(exact_indexes)]
+        reaches = self.gdf.iloc[list(exact_indexes)]
         logger.info(f'Finding exact features took {time()-start}.')
 
         # release some memory
@@ -169,9 +152,9 @@ class NWMElementPairings:
                                 np.finfo(np.float32).eps)):
                         downstream = segment.coords[-1]
                         if element.geometry.contains(Point(downstream)):
-                            sources[element.id].add(reach.featureID)
+                            sources[element.id].add(reach.feature_id)
                         else:
-                            sinks[element.id].add(reach.featureID)
+                            sinks[element.id].add(reach.feature_id)
                         break
         logger.info(
             'Sorting features into sources and sinks took: '
@@ -194,12 +177,36 @@ class NWMElementPairings:
     @_hgrid.setter
     def _hgrid(self, hgrid: Gr3):
         hgrid = Hgrid(**hgrid.to_dict())
-        hgrid.transform_to(gpd.read_file(NWM_FILE, rows=1).crs)
+        hgrid.transform_to(gpd.read_file(self.nwm_file, rows=1, layer=0).crs)
         self.__hgrid = hgrid
 
     @_hgrid.deleter
     def _hgrid(self):
         del self.__hgrid
+
+    @property
+    def nwm_file(self):
+        if not hasattr(self, '_nwm_file'):
+            self._tmpdir = tempfile.TemporaryDirectory()
+            with tarfile.open(NWM_FILE, "r:gz") as src:
+                src.extractall(self._tmpdir.name)
+            self._nwm_file = (
+                pathlib.Path(self._tmpdir.name) /
+                'NWM_v2.0_channel_hydrofabric/nwm_v2_0_hydrofabric.gdb'
+            )
+        return self._nwm_file
+
+    @property
+    def gdf(self):
+        if not hasattr(self, '_gdf'):
+            bbox = self._hgrid.bbox
+            self._gdf = gpd.read_file(
+                self.nwm_file,
+                bbox=(bbox.xmin, bbox.ymin, bbox.xmax, bbox.ymax),
+                # bbox=(-75.889435, 38.895308, -74.604034, 39.477546),  # Delaware Bay, debug  # noqa: E501
+                layer=0,
+                )
+        return self._gdf
 
 
 class NWMDataGetter:
@@ -212,10 +219,7 @@ class NWMDataGetter:
     ):
         self._pairings = pairings
         # naïve-datetime
-        if start_date.tzinfo is None or \
-                start_date.tzinfo.utcoffset(start_date) is None:
-            start_date = pytz.timezone('utm').localize(start_date)
-        self._start_date = start_date
+        self._start_date = localize_datetime(start_date).astimezone(pytz.utc)
         self._rnday = rnday
 
 
@@ -457,9 +461,16 @@ class NationalWaterModel(Hydrology):
             logger.warning(
                 "Downloading National Water Model stream network file to "
                 "the pyschism cache...")
-            wget.download(
-                "https://www.dropbox.com/s/3w8i46uumbcs49v/nwm_v12.gdb.zip"
-                "?dl=1", out=str(self._nwm_file))
+            try:
+                wget.download(
+                    'http://www.nohrsc.noaa.gov/pub/staff/keicher/NWM_live/'
+                    'web/data_tools/NWM_channel_hydrofabric.tar.gz',
+                    out=str(self._nwm_file))
+            except urllib.error.HTTPError as e:
+                logger.fatal(
+                    'Could not download NWM_channel_hydrofabric.tar.gz')
+                raise e
+
         super().__init__()
 
     def __call__(self, model_driver, nramp_ss: bool = False, dramp_ss=None,
