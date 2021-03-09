@@ -7,15 +7,10 @@ from typing import Union
 import numpy as np
 import pytz
 
+from pyschism.dates import localize_datetime
+
 
 _logger = logging.getLogger(__name__)
-
-
-def localize_datetime(d):
-    # datetime is naïve iff:
-    if d.tzinfo is None or d.tzinfo.utcoffset(d) is None:
-        return pytz.timezone('UTC').localize(d)
-    return d
 
 
 class Sources:
@@ -55,6 +50,7 @@ class Sources:
             if _sal != salinity:
                 raise NotImplementedError(
                     'Two different values of salinity for same time/element.')
+
         self._data.setdefault(time, {}).setdefault(element_id, {}).update(
             {
                 'flow': np.nansum(

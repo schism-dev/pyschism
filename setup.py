@@ -23,13 +23,6 @@ except RuntimeError:
     version = '0.0.0'
 
 
-# INSTALL_PATH='$HOME/.local'
-# export PATH=$INSTALL_PATH/bin:$PATH
-# export LD_LIBRARY_PATH=$INSTALL_PATH/lib:$LD_LIBRARY_PATH
-# export CFLAGS=-I$INSTALL_PATH/include
-# export CPPFLAGS="-I$INSTALL_PATH/include" LDFLAGS="-L$INSTALL_PATH/lib"
-
-
 parent = pathlib.Path(__file__).parent.absolute()
 conf = setuptools.config.read_configuration(parent / 'setup.cfg')
 meta = conf['metadata']

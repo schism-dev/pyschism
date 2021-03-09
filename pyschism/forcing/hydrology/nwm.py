@@ -92,7 +92,7 @@ class NWMElementPairings:
             if hgrid.hull.rings().geometry.intersects(pm.geometry).any():
                 exact_indexes.add(pm.Index)
         reaches = self._gdf.iloc[list(exact_indexes)]
-        logger.info(f'Finding exact features took {start-time()}.')
+        logger.info(f'Finding exact features took {time()-start}.')
 
         # release some memory
         del possible_matches
@@ -135,18 +135,18 @@ class NWMElementPairings:
                 geom = MultiPoint(geom.coords)
             element_index[inters.reachIndex] = []
             for point in geom:
-                _, idx = tree.query(point)
+                _, idx = tree.query(point, workers=-1)
                 element_index[inters.reachIndex].append(idx)
         del tree
         logger.info(
             'Pairing features to corresponding element took '
-            f'{start-time()}.')
+            f'{time()-start}.')
 
         start = time()
         elements = hgrid.elements.geodataframe()
         logger.info(
             'Generating mesh-element geodataframe took: '
-            f'{start-time()}.')
+            f'{time()-start}.')
         del self._hgrid  # release
 
         start = time()
@@ -175,7 +175,7 @@ class NWMElementPairings:
                         break
         logger.info(
             'Sorting features into sources and sinks took: '
-            f'{start-time()}.')
+            f'{time()-start}.')
         self._sources = sources
         self._sinks = sinks
 

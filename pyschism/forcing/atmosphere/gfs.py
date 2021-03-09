@@ -4,12 +4,12 @@ import pathlib
 import tempfile
 from typing import Union
 import logging
-# import warnings
+
 
 import pytz
-from matplotlib.transforms import Bbox  # type: ignore[import]
-from netCDF4 import Dataset  # type: ignore[import]
-import numpy as np  # type: ignore[import]
+from matplotlib.transforms import Bbox
+from netCDF4 import Dataset
+import numpy as np
 
 from pyschism.enums import GFSProduct
 from pyschism.forcing.atmosphere.nws.nws2.sflux import (
@@ -35,55 +35,10 @@ class BaseURL(Enum):
         raise ValueError(f'{name} is not a valid GFS product.')
 
 
-# class Inventory:
-
-#     def __get__(self, obj, val):
-#         utc_now = obj.utc_timezone.localize(datetime.utcnow())
-#         current_cycle = int(6 * np.floor(utc_now.hour/6))
-#         nomads_now = obj.utc_timezone.localize(datetime(
-#             utc_now.year, utc_now.month, utc_now.day, current_cycle))
-#         nomads_start_dates = [nomads_now - i*obj.forecast_interval
-#                               for i in range(40)]
-#         inventory = {}
-#         for reference_date in nomads_start_dates:
-#             if reference_date + timedelta(hours=0.5) > obj.start_date:
-#                 self.add_dataset_to_inventory(obj, inventory, reference_date)
-#             else:
-#                 self.add_dataset_to_inventory(obj, inventory, reference_date)
-#                 break
-#         return inventory
-
-#     def add_dataset_to_inventory(self, obj, inventory, reference_date):
-#         _reference_date = reference_date.strftime('%Y%m%d')
-#         start_data_url = obj.base_url + f'/gfs{_reference_date}'
-#         nearest_cycle = int(6 * np.floor(reference_date.hour/6))
-#         fname = f'{obj.product.value}_{nearest_cycle:02d}z'
-#         file_url = start_data_url + f'/{fname}'
-#         try:
-#             logger.info(f'Add dataset to inventory: {fname}')
-#             inventory[reference_date] = Dataset(file_url)
-#         except OSError as e:
-        # if e.errno == -70:
-        #     logger.info('Add dataset to invetory failed.')
-        #     cdate = reference_date - obj.forecast_interval
-        #     closest_cycle = int(6 * np.floor(cdate.hour/6))
-        #     nomads_closest = obj.utc_timezone.localize(datetime(
-        #         cdate.year, cdate.month, cdate.day, closest_cycle))
-        #     if reference_date not in inventory.keys():
-        #         _reference_date = nomads_closest.strftime('%Y%m%d')
-        #         start_data_url = obj.base_url + f'/gfs{_reference_date}'
-        #         fname = f'{obj.product.value}_' \
-        #                 f'{nomads_closest.hour:02d}z'
-        #         logger.info(f'Adding {fname} instead.')
-        #         file_url = start_data_url + f'/{fname}'
-        #         inventory[cdate] = Dataset(file_url)
-        # else:
-        #     raise e
-
-
 class GFSInventory:
 
-    def __init__(self, product, start_date=None, rnday=4, bbox=None):
+    def __init__(self, product='gfs_0p25_1hr', start_date=None, rnday=4,
+                 bbox=None):
         self.product = GFSProduct(product) if not \
             isinstance(product, GFSProduct) else product
         self.start_date = nearest_cycle_date() if start_date is None else \
@@ -126,7 +81,7 @@ class GFSInventory:
 
         self._bbox = self._modified_bbox(bbox)
 
-    def put_field(self, variable, dst, var):
+    def put_field(self, variable: str, dst: Dataset, var: str):
         lon_idxs, lat_idxs = self._modified_bbox_indexes(self._bbox)
         for dt, nc in self._files.items():
             _f = nc.filepath().replace(BASE_URL, '')
@@ -226,8 +181,8 @@ class GFSInventory:
 class GlobalForecastSystem(SfluxDataset):
 
     def __init__(
-        self,
-        product: Union[str, GFSProduct] = GFSProduct.GFS_0P25_1HR,
+            self,
+            product: Union[str, GFSProduct] = GFSProduct.GFS_0P25_1HR,
     ):
         self.prmsl_name = 'prmslmsl'
         self.spfh_name = 'spfh2m'
