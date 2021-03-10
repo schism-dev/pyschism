@@ -12,6 +12,8 @@ from netCDF4 import Dataset
 import numpy as np
 import pytz
 
+from pyschism.dates import localize_datetime
+
 
 _logger = logging.getLogger(__name__)
 
@@ -93,7 +95,8 @@ class ReferenceDatetimes:
         for field in obj.fields:
             dt = field.construct('time').reference_datetime
             yield pytz.timezone('UTC').localize(
-                datetime(dt.year, dt.month, dt.day, dt.hour, dt.minute))
+                datetime(dt.year, dt.month, dt.day, dt.hour, dt.minute)
+                )
 
 
 class Variable:
@@ -178,8 +181,12 @@ class BaseComponent(ABC):
             timezone = start_date.tzinfo
 
         stacks = []
-        for i, field in enumerate(getattr(
-                self, self.var_types[0]).get_fields(start_date, rnday)):
+        for i, field in enumerate(
+            getattr(
+                self,
+                self.var_types[0]
+                ).get_fields(start_date, rnday)
+                ):
             stacks.append(f"sflux_{self.name}_{level}.{i+1:04d}.nc")
         for i, filename in enumerate(stacks):
             with Dataset(outdir / filename, 'w',
@@ -206,28 +213,23 @@ class BaseComponent(ABC):
                 dst['lat'].units = "degrees_north"
                 dst['lat'][:] = variable.ny_grids[0]
                 nc_start_date = list(variable.reference_datetimes)[0]
-                resolution = (
-                    list(variable.datetime_arrays)[0][0]
-                    - nc_start_date).total_seconds() / (60*60*24)
                 nc_start_date = nc_start_date.astimezone(timezone)
                 dst.createVariable('time', 'f4', ('time',))
                 dst['time'].long_name = 'Time'
                 dst['time'].standard_name = 'time'
                 dst['time'].units = f'days since {nc_start_date.year}-' \
                                     f'{nc_start_date.month}-'\
-                                    f'{nc_start_date.day} ' \
-                                    f'{nc_start_date.hour:02d}:'\
-                                    f'{nc_start_date.minute:02d} ' \
+                                    f'{nc_start_date.day} '\
+                                    '00:00:00+' \
                                     f'{nc_start_date.tzinfo}'
                 dst['time'].base_date = (
                     nc_start_date.year,
                     nc_start_date.month,
                     nc_start_date.day,
-                    nc_start_date.hour)
-                dst['time'][:] = np.arange(
-                    resolution,
-                    resolution*(variable.fields[0].shape[0]+1),
-                    step=resolution)
+                    0)
+                dst['time'][:] = [
+                    (localize_datetime(x) - nc_start_date) / timedelta(days=1)
+                    for x in variable.datetime_array]
                 for vartype in self.var_types:
                     variable = getattr(self, vartype)
                     dst.createVariable(

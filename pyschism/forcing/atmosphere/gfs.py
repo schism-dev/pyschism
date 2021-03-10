@@ -81,17 +81,16 @@ class GFSInventory:
 
         self._bbox = self._modified_bbox(bbox)
 
-    def put_field(self, variable: str, dst: Dataset, var: str):
+    def put_field(self, gfs_varname: str, dst: Dataset, sflux_varname: str):
         lon_idxs, lat_idxs = self._modified_bbox_indexes(self._bbox)
-        for dt, nc in self._files.items():
-            _f = nc.filepath().replace(BASE_URL, '')
+        for i, (dt, nc) in enumerate(self._files.items()):
             logger.info(
-                f'Putting GFS field {variable} for time {dt} as '
-                f'{var} from file {_f}.')
-            time_index = self.get_nc_time_index(nc, dt)
-            dst[var][time_index, :, :] = nc.variables[variable][
-                time_index, lat_idxs, lon_idxs]
-        dst.sync()
+                f'Putting GFS field {gfs_varname} for time {dt} as '
+                f'{sflux_varname} from file '
+                f'{nc.filepath().replace(f"{BASE_URL}/", "")}.')
+            dst[sflux_varname][i, :, :] = nc.variables[gfs_varname][
+                self.get_nc_time_index(nc, dt), lat_idxs, lon_idxs]
+            dst.sync()
 
     def get_nc_time_index(self, nc, dt):
         return np.where(np.in1d(self.get_nc_datevector(nc), [dt]))[0][0]
@@ -256,8 +255,11 @@ class GlobalForecastSystem(SfluxDataset):
                 dst['time'][:] = inventory.get_sflux_timevector()
 
                 for var in AirComponent.var_types:
-                    dst.createVariable(var, float,
-                                       ('time', 'ny_grid', 'nx_grid'))
+                    dst.createVariable(
+                        var,
+                        'f4',
+                        ('time', 'ny_grid', 'nx_grid')
+                    )
                     logger.info(f'Put field {var}')
                     inventory.put_field(getattr(self, f'{var}_name'), dst, var)
 
@@ -393,12 +395,9 @@ class GlobalForecastSystem(SfluxDataset):
                 dst['dswrf'].units = "W/m^2"
 
         self.resource = self.tmpdir
-        if air:
-            self.air = AirComponent(self.fields)
-        if prc:
-            self.prc = PrcComponent(self.fields)
-        if rad:
-            self.rad = RadComponent(self.fields)
+        self.air = AirComponent(self.fields)
+        self.prc = PrcComponent(self.fields)
+        self.rad = RadComponent(self.fields)
 
     @property
     def tmpdir(self):
