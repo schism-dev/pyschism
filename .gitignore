@@ -5,3 +5,10 @@ dist/
 __pycache__
 *_env
 .ipynb_checkpoints
+forecast
+.vscode
+*.swp
+*.nc
+hgrid.*
+fgrid.*
+vgrid.*

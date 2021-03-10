@@ -1,21 +1,22 @@
 from abc import ABC, abstractmethod
-from collections import defaultdict
-# from enum import Enum
 from datetime import datetime, timedelta
 import logging
 import os
 import pathlib
-from typing import Union, List
+from typing import Union
 import warnings
 
-import cf  # type: ignore[import]
+import cf
 import cftime
-from netCDF4 import Dataset  # type: ignore[import]
-import numpy as np  # type: ignore[import]
+from netCDF4 import Dataset
+import numpy as np
 import pytz
+
+from pyschism.dates import localize_datetime
 
 
 _logger = logging.getLogger(__name__)
+
 
 class FieldsDescriptor:
 
@@ -94,7 +95,8 @@ class ReferenceDatetimes:
         for field in obj.fields:
             dt = field.construct('time').reference_datetime
             yield pytz.timezone('UTC').localize(
-                datetime(dt.year, dt.month, dt.day, dt.hour, dt.minute))
+                datetime(dt.year, dt.month, dt.day, dt.hour, dt.minute)
+                )
 
 
 class Variable:
@@ -179,8 +181,12 @@ class BaseComponent(ABC):
             timezone = start_date.tzinfo
 
         stacks = []
-        for i, field in enumerate(getattr(
-                self, self.var_types[0]).get_fields(start_date, rnday)):
+        for i, field in enumerate(
+            getattr(
+                self,
+                self.var_types[0]
+                ).get_fields(start_date, rnday)
+                ):
             stacks.append(f"sflux_{self.name}_{level}.{i+1:04d}.nc")
         for i, filename in enumerate(stacks):
             with Dataset(outdir / filename, 'w',
@@ -207,28 +213,23 @@ class BaseComponent(ABC):
                 dst['lat'].units = "degrees_north"
                 dst['lat'][:] = variable.ny_grids[0]
                 nc_start_date = list(variable.reference_datetimes)[0]
-                resolution = (
-                    list(variable.datetime_arrays)[0][0]
-                    - nc_start_date).total_seconds() / (60*60*24)
                 nc_start_date = nc_start_date.astimezone(timezone)
                 dst.createVariable('time', 'f4', ('time',))
                 dst['time'].long_name = 'Time'
                 dst['time'].standard_name = 'time'
                 dst['time'].units = f'days since {nc_start_date.year}-' \
                                     f'{nc_start_date.month}-'\
-                                    f'{nc_start_date.day} ' \
-                                    f'{nc_start_date.hour:02d}:'\
-                                    f'{nc_start_date.minute:02d} ' \
+                                    f'{nc_start_date.day} '\
+                                    '00:00:00+' \
                                     f'{nc_start_date.tzinfo}'
                 dst['time'].base_date = (
                     nc_start_date.year,
                     nc_start_date.month,
                     nc_start_date.day,
-                    nc_start_date.hour)
-                dst['time'][:] = np.arange(
-                    resolution,
-                    resolution*(variable.fields[0].shape[0]+1),
-                    step=resolution)
+                    0)
+                dst['time'][:] = [
+                    (localize_datetime(x) - nc_start_date) / timedelta(days=1)
+                    for x in variable.datetime_array]
                 for vartype in self.var_types:
                     variable = getattr(self, vartype)
                     dst.createVariable(
@@ -258,6 +259,7 @@ class BaseComponent(ABC):
 class AirComponent(BaseComponent):
 
     name = 'air'
+    var_types = ['prmsl', 'spfh', 'stmp', 'uwind', 'vwind']
 
     def __init__(self, fields: cf.FieldList, prmsl_name='prmsl',
                  spfh_name='spfh', stmp_name='stmp', uwind_name='uwind',
@@ -278,28 +280,22 @@ class AirComponent(BaseComponent):
                               "Surface Northward Air Velocity (10m AGL)",
                               "northward_wind", "m/s")
 
-    @property
-    def var_types(self):
-        return ['prmsl', 'spfh', 'stmp', 'uwind', 'vwind']
-
 
 class PrcComponent(BaseComponent):
 
     name = 'prc'
+    var_types = ['prate']
 
     def __init__(self, fields: cf.FieldList, prate_name='prate'):
         self.prate = Variable(fields, 'prate', prate_name,
                               "Surface Precipitation Rate",
                               "air_pressure_at_sea_level", "kg/m^2/s")
 
-    @property
-    def var_types(self):
-        return ['prate']
-
 
 class RadComponent(BaseComponent):
 
     name = 'rad'
+    var_types = ['dlwrf', 'dswrf']
 
     def __init__(self, fields: cf.FieldList, dlwrf_name='dlwrf',
                  dswrf_name='dswrf'):
@@ -311,10 +307,6 @@ class RadComponent(BaseComponent):
                               "Downward Short Wave Radiation Flux",
                               "surface_downwelling_shortwave_flux_in_air",
                               "W/m^2")
-
-    @property
-    def var_types(self):
-        return ['dlwrf', 'dswrf']
 
 
 class Resource:
@@ -401,133 +393,3 @@ class SfluxDataset:
         self.air.write(outdir, level, overwrite, start_date, rnday)
         self.prc.write(outdir, level, overwrite, start_date, rnday)
         self.rad.write(outdir, level, overwrite, start_date, rnday)
-
-
-
-
-
-
-
-
-
-
-# class ComponentDescriptor:
-
-#     # file_names = ComponentFileNames()
-
-#     def __init__(self, var_name: str, default_vars: List[str]):
-#         self.default_name = default_name
-#         setattr(self, f'{default_name}_name', default_name)
-
-#     def __get__(self, obj, val):
-#         component = obj.__dict__.get(self.default_name)
-#         if component is None:
-#             varname = getattr(self, f"{self.default_name}_name")
-#             component = obj.fields.select_by_ncvar(varname)
-#             if len(component) == 0:
-#                 warnings.warn(f"No data with name {varname} exists "
-#                               'on the input dataset.')
-#             obj.__dict__[f"{self.default_name}"] = component
-#         return component
-
-
-
-
-
-
-    # def __init__(self):
-    #     start_date = set()
-    #     for vartype in self.var_types:
-    #         start_date.add(getattr(self, vartype).start_date)
-    #     if len(start_date) > 1:
-    #         raise ValueError("dimension mistmatch between variables of the "
-    #                          "same type.")
-
-
-            # datetime_array = variable
-            # start_date.add(np.min(
-            # setattr(f"start_date = np.min(variable.datetime_array)
-
-
-
-    # def __init__
-
-    # def __init__(self, fields: cf.FieldList, **kwargs):
-    #     self.fields = fields
-    #     self.nc_date_ranges = []
-
-    #     for var_name, value in kwargs.items():
-    #         var = var_name.split('_name')[0]
-    #         setattr(self, f'{var}.name', value)
-    #     date_ranges = defaultdict(list)
-    #     for var in self.variables:  # type: ignore[attr-defined]
-    #         for field in getattr(self, var):
-    #             time = field.construct('time')
-    #             date_ranges[f"{var}"].append(time.datetime_array)
-    #     self.nc_date_ranges = date_ranges[f"{var}"]
-    #     # self.nc_reference_datetime = time.reference_datetime
-    #     self.nc_start_date = self.nc_date_ranges[0][0]
-    #     self.nc_end_date = self.nc_date_ranges[-1][-2]
-    #     self.nc_time_resolution = self.nc_start_date - time.reference_datetime
-    #     # self.nc_rnday = self.nc_date_ranges[-1][-2] - self.nc_start_date
-    #     self.nx_grids = self.fields.select_by_ncvar('lon')
-    #     self.ny_grids = self.fields.select_by_ncvar('lat')
-
-
-        # if start_date is None:
-        #     start_date = self.nc_start_date
-
-        # if not isinstance(rnday, timedelta):
-        #     if rnday is None:
-        #         rnday = self.nc_rnday
-        #     else:
-        #         rnday = timedelta(days=rnday)
-
-        # cfdata = getattr(self, f"{self.variables[0]}")  # type: ignore[attr-defined]  # noqa: E501
-        # ordered_indexes = np.argsort(
-        #     [field.construct('time').reference_datetime for field
-        #      in cfdata])
-        # start_index = None
-        # for i, current_idx in enumerate(ordered_indexes):
-        #     next_idx = ordered_indexes[(i+1) % len(ordered_indexes)]
-        #     current_start_date = self.nc_date_ranges[current_idx][0]
-        #     next_start_date = self.nc_date_ranges[next_idx][0]
-        #     if next_start_date < current_start_date:
-        #         break
-        #     if start_date >= current_start_date \
-        #             and next_start_date > start_date:
-        #         start_index = current_idx
-        #         break
-        # if start_index is None:
-        #     if len(ordered_indexes) == 1:
-        #         if start_date < self.nc_start_date \
-        #                 or start_date > self.nc_end_date:
-        #             raise ValueError("Date out of range")
-        #         start_index = 0
-        #     else:
-        #         raise ValueError(
-        #             f'No data found for the specified start_date = {start_date}. '
-        #             f'Earliest start_date must be > {self.nc_start_date}.')
-
-        # end_date = start_date + rnday  # type: ignore[operator]
-        # end_index = None
-        # for i, current_idx in enumerate(reversed(ordered_indexes)):
-        #     next_idx = ordered_indexes[(i+1) % len(ordered_indexes)]
-        #     current_end_date = self.nc_date_ranges[current_idx][-2]
-        #     next_end_date = self.nc_date_ranges[next_idx][-2]
-        #     if end_date <= current_end_date \
-        #             and next_end_date > end_date:
-        #         end_index = current_idx
-        #         break
-        #     if next_end_date < current_end_date:
-        #         end_index = current_idx
-        # if end_index is None:
-        #     end_index = np.max(ordered_indexes)
-
-        # start_index = np.min(ordered_indexes)
-        # end_index = np.max(ordered_indexes)
-
-        # tzinfo = pytz.timezone('utc') if not hasattr(start_date, 'tzinfo') \
-        #     else start_date.tzinfo
-
-        # for i in range(start_index, end_index+1):

@@ -1,7 +1,7 @@
 from argparse import Namespace
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import json
-# import logging
+import logging
 import os
 import pathlib
 import shutil
@@ -54,22 +54,6 @@ class ColdstartDirectory:
         return coldstart_directory
 
 
-class TargetDatetime:
-
-    def __get__(self, obj, val):
-        target_datetime = obj.__dict__.get('target_datetime')
-        if target_datetime is None:
-            utcnow = pytz.timezone('UTC').localize(datetime.utcnow())
-            # localnow = utcnow.astimezone(pytz.timezone(obj.args.timezone))
-            nowcast_cycle = int(obj.forecast_interval * np.floor(
-                utcnow.hour/obj.forecast_interval))  # % 24
-            target_datetime = datetime(
-                utcnow.year, utcnow.month, utcnow.day, nowcast_cycle,
-                tzinfo=pytz.timezone(obj.args.timezone))
-            obj.__dict__['target_datetime'] = target_datetime
-        return target_datetime
-
-
 class ColdstartDomain:
 
     def __get__(self, obj, val):
@@ -109,18 +93,6 @@ class ColdstartDriver:
                     )
             obj.__dict__['coldstart_driver'] = coldstart
         return coldstart
-
-
-class ForecastInterval:
-
-    def __get__(self, obj, val):
-        forecast_interval = obj.__dict__.get('forecast_interval')
-        if forecast_interval is None:
-            if obj.args.forecast_interval != 24:
-                raise NotImplementedError(
-                    'Forecast interval only at 24 hours for now.')
-            obj.__dict__['forecast_interval'] = obj.args.forecast_interval
-        return obj.__dict__['forecast_interval']
 
 
 class HgridPath:
@@ -197,7 +169,10 @@ class TidesDescriptor:
                     and not obj.args.constituents:
                 return
             else:
-                tides = Tides(velocity=obj.args.bnd_vel)
+                tides = Tides(
+                    database=obj.args.tidal_database,
+                    velocity=obj.args.bnd_vel
+                )
                 if obj.args.all_constituents:
                     tides.use_all()
                 if obj.args.major_constituents:
@@ -245,10 +220,8 @@ class ForecastInit:
     project_directory = ProjectDirectory()
     config_file = ConfigFile()
     coldstart_directory = ColdstartDirectory()
-    target_datetime = TargetDatetime()
     coldstart_domain = ColdstartDomain()
     coldstart_driver = ColdstartDriver()
-    forecast_interval = ForecastInterval()
     static_files_directory = StaticFilesDirectory()
     hgrid_path = HgridPath()
     vgrid_path = VgridPath()
@@ -267,7 +240,7 @@ class ForecastInit:
         self._write_config_file()
         self._symlink_files(self.coldstart_directory,
                             self.coldstart_domain.ics)
-        # self.logger.info('Writting coldstart files to disk...')
+        self.logger.info('Writting coldstart files to disk...')
         self.coldstart_driver.write(
             self.coldstart_directory,
             hgrid=False,
@@ -279,11 +252,11 @@ class ForecastInit:
 
         if self.args.skip_run is False:
             # release memory before launching SCHISM.
-            # self.logger.info('Releasing memory before calling SCHISM...')
+            self.logger.info('Releasing memory before calling SCHISM...')
             for item in list(self.__dict__.keys()):
                 if not item.startswith('_'):
                     del self.__dict__[item]
-            # self.logger.info('Calling SCHISM using make.')
+            self.logger.info('Calling SCHISM using make.')
             subprocess.check_call(
                 ["make", "run"],
                 cwd=self.coldstart_directory
@@ -304,14 +277,14 @@ class ForecastInit:
                 'been initialized previously. Please use\npyschism '
                 'forecast --overwrite init [...]\nto allow overwrite of '
                 'previous initialization options.')
-        # self.logger.info(
-            # f"Writting configuration file to path {self.config_file}")
+        self.logger.info(
+            f"Writting configuration file to path {self.config_file}")
         with open(self.config_file, 'w') as fp:
             json.dump(self.args.__dict__, fp, indent=4)
 
     def _symlink_files(self, target_directory, ics):
-        # self.logger.info(
-            # f"Establishing symlinks to target_directory: {target_directory}")
+        self.logger.info(
+            f"Establishing symlinks to target_directory: {target_directory}")
         hgrid_lnk = target_directory / 'hgrid.gr3'
         vgrid_lnk = target_directory / 'vgrid.in'
         fgrid_lnk = target_directory / f'{self.fgrid_path.name}'
@@ -345,13 +318,20 @@ class ForecastInit:
         os.symlink(os.path.relpath(
             self.hgrid_path, target_directory), hgridll_lnk)
 
-    # @property
-    # def logger(self):
-    #     try:
-    #         return self._logger
-    #     except AttributeError:
-    #         self._logger = get_logger(
-    #             console_level=logging._nameToLevel[self.args.log_level.upper()]
-    #             )
-    #         self._logger.propagate = 0
-    #         return self._logger
+    @property
+    def target_datetime(self):
+        if not hasattr(self, '_target_datetime'):
+            now_utc = datetime.now(timezone.utc)
+            nearest_cycle = int(6 * np.floor(now_utc.hour/6))
+            self._target_datetime = datetime(
+                now_utc.year, now_utc.month, now_utc.day, nearest_cycle,
+                tzinfo=timezone.utc)
+            self.logger.info(
+                f'Target datetime is: {str(self._target_datetime)}.')
+        return self._target_datetime
+
+    @property
+    def logger(self):
+        if not hasattr(self, '_logger'):
+            self._logger = logging.getLogger(f"{self.__class__.__name__}")
+        return self._logger

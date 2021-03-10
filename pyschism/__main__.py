@@ -1,8 +1,15 @@
 #! /usr/bin/env python
 import argparse
+from datetime import datetime
+import logging
+
+from pytz import timezone
 
 from pyschism.cmd.forecast.forecast import ForecastCli, add_forecast
 from pyschism.cmd.bctides import BctidesCli, add_bctides
+
+
+# logging.getLogger().setLevel(logging.NOTSET)
 
 
 def parse_args():
@@ -19,6 +26,19 @@ def parse_args():
 
 def main():
     args = parse_args()
+
+    logging.basicConfig(
+        level={
+            'warning': logging.WARNING,
+            'info': logging.INFO,
+            'debug': logging.DEBUG,
+        }[args.log_level],
+        format='[%(asctime)s] %(name)s %(levelname)s: %(message)s',
+        force=True,
+    )
+
+    logging.Formatter.converter = lambda *args: datetime.now(
+        tz=timezone('UTC')).timetuple()
 
     if args.mode == 'forecast':
         ForecastCli(args)

@@ -1,3 +1,4 @@
+import logging
 import pathlib
 
 from netCDF4 import Dataset
@@ -8,6 +9,8 @@ from pyschism.forcing.tides.base import TidalDataProvider
 
 # https://icdc.cen.uni-hamburg.de/en/hamtide.html
 base_url = 'https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/hamtide/'
+
+logger = logging.getLogger(__name__)
 
 
 class HamtideResource:
@@ -48,6 +51,8 @@ class HAMTIDE(TidalDataProvider):
         self._resource = resource
 
     def get_elevation(self, constituent, vertices):
+        logger.info('Querying HAMTIDE for elevation constituent '
+                    f'{constituent}.')
         amp = 0.01 * self._get_interpolation(
             'elevation', 'AMPL', constituent, vertices)
         phase = self._get_interpolation(
@@ -55,6 +60,8 @@ class HAMTIDE(TidalDataProvider):
         return amp, phase
 
     def get_velocity(self, constituent, vertices):
+        logger.info('Querying HAMTIDE for velocity constituent '
+                    f'{constituent}.')
         uamp = 0.01 * self._get_interpolation(
             'velocity', 'UAMP', constituent, vertices)
         uphase = self._get_interpolation(
