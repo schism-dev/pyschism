@@ -138,4 +138,6 @@ class Param:
         assert isinstance(stations, (Stations, type(None))), \
             f"Argument stations must be of type {Stations} or None, " \
             f"not type {type(stations)}."
+        raise NotImplementedError('Must #1 subset stations and #2 enable param'
+                                  ' flag')
         self.__stations = stations

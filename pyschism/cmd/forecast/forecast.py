@@ -98,11 +98,6 @@ def add_forecast(subparsers):
     forecast.add_argument(
         "--overwrite", action="store_true",
         help="Allow overwrite of output directory.")
-    forecast.add_argument(
-        "--log-level",
-        choices=['info', 'warning', 'debug'],
-        default='info'
-    )
     actions = forecast.add_subparsers(dest="action")
     add_forecast_init(actions)
     add_forecast_update(actions)

@@ -7,20 +7,20 @@ from pytz import timezone
 
 from pyschism.cmd.forecast.forecast import ForecastCli, add_forecast
 from pyschism.cmd.bctides import BctidesCli, add_bctides
-
-
-# logging.getLogger().setLevel(logging.NOTSET)
+from pyschism.cmd.stations import StationsCli, add_stations
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--log-level",
+        choices=['info', 'warning', 'debug'],
+        default='info'
+    )
     subparsers = parser.add_subparsers(dest='mode')
-    # add_forecastd(subparsers)
     add_forecast(subparsers)
-    # add_plot(subparsers)
     add_bctides(subparsers)
-    # add_viewerd(subparsers)
-    # add_autodocd(subparsers)
+    add_stations(subparsers)
     return parser.parse_args()
 
 
@@ -45,6 +45,9 @@ def main():
 
     elif args.mode == 'bctides':
         BctidesCli(args)
+
+    elif args.mode == 'stations':
+        StationsCli(args)
 
     else:
         raise NotImplementedError(f'Unhandled CLI mode: {args.mode}')
