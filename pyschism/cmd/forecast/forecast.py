@@ -62,9 +62,9 @@ def add_forecast_init(actions):
     # TODO: Additional forcings.
     # _add_wave_forcing(forecast)
     model_outputs = init.add_argument_group('model_outputs')
-    _add_surface_outputs(model_outputs)
     # TODO: Stations outputs.
-    # _add_stations_outputs(model_outputs)
+    _add_stations_outputs(model_outputs)
+    _add_surface_outputs(model_outputs)
     server_config = init.add_subparsers(dest="server_config")
     slurm = server_config.add_parser(
         'slurm', help="Add options for slurm run configuration.")
@@ -618,3 +618,18 @@ def _add_surface_outputs(parser):
                 help=help_msg,
                 action='store_true'
             )
+
+
+def _add_stations_outputs(parser):
+    parser.add_argument('--stations-file')
+    parser.add_argument('--stations-file-crs')
+    parser.add_argument('--nspool-sta')
+    parser.add_argument('--stations-elev', action='store_true')
+    parser.add_argument('--stations-prmsl', action='store_true')
+    parser.add_argument('--stations-uwind', action='store_true')
+    parser.add_argument('--stations-vwind', action='store_true')
+    parser.add_argument('--stations-temp', action='store_true')
+    parser.add_argument('--stations-sal', action='store_true')
+    parser.add_argument('--stations-uvel', action='store_true')
+    parser.add_argument('--stations-vvel', action='store_true')
+    parser.add_argument('--stations-wvel', action='store_true')

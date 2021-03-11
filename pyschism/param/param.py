@@ -12,6 +12,7 @@ from pyschism.stations import Stations
 
 _logger = logging.getLogger(__name__)
 
+
 class Param:
 
     def __init__(
@@ -137,6 +138,4 @@ class Param:
         assert isinstance(stations, (Stations, type(None))), \
             f"Argument stations must be of type {Stations} or None, " \
             f"not type {type(stations)}."
-        if isinstance(stations, Stations):
-            raise NotImplementedError("Do something!")
         self.__stations = stations
