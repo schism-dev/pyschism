@@ -58,7 +58,7 @@ class TPXO(TidalDataProvider):
     def get_elevation(self, constituent, vertices):
         logger.info('Querying TPXO for elevation constituent '
                     f'{constituent}.')
-        amp = 0.01 * self._get_interpolation(
+        amp = self._get_interpolation(
             'elevation', 'ha', constituent, vertices)
         phase = self._get_interpolation(
             'elevation', 'hp', constituent, vertices)
