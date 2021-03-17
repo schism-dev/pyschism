@@ -65,7 +65,6 @@ class TPXO(TidalDataProvider):
         return amp, phase
 
     def get_velocity(self, constituent, vertices):
-        raise NotImplementedError('Velocity not implemented for TPXO.')
         logger.info('Querying TPXO for velocity constituent '
                     f'{constituent}.')
         uamp = self._get_interpolation(
@@ -99,7 +98,7 @@ class TPXO(TidalDataProvider):
         if phys_var == 'elevation':
             ncarray = self._h
         elif phys_var == 'velocity':
-            raise NotImplementedError('What\'s the variable for velocity?')
+            ncarray = self._uv
         array = ncarray[ncvar][
                 lower_c.index(constituent.lower()), :, :].flatten()
         _x = np.asarray([x + 360. for x in vertices[:, 0] if x < 0]).flatten()
