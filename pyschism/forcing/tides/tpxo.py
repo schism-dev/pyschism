@@ -53,7 +53,7 @@ class TPXO(TidalDataProvider):
                 f'1) copy or symlink the file to "{velocity_file}"',
                 f'2) set the environment variable `{TPXO_VELOCITY}` to point to the file',
             ]))
-        self._uv = pathlib.Path(velocity_file)
+        self._uv = Dataset(velocity_file)
 
     def get_elevation(self, constituent, vertices):
         logger.info('Querying TPXO for elevation constituent '
