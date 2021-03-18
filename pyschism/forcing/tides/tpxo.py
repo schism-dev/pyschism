@@ -13,7 +13,7 @@ from pyschism.forcing.tides.base import TidalDataProvider
 logger = logging.getLogger(__name__)
 
 TPXO_ELEVATION = 'h_tpxo9.v1.nc'
-TPXO_VELOCITY = 'uv_tpxo9.v1.nc'
+TPXO_VELOCITY = 'u_tpxo9.v1.nc'
 
 
 class TPXO(TidalDataProvider):
@@ -38,22 +38,22 @@ class TPXO(TidalDataProvider):
             ]))
         self._h = Dataset(elevation_file)
 
-        # if velocity_file is None:
-        #     velocity_file = os.getenv('TPXO_VELOCITY')
-        #     if velocity_file is None:
-        #         velocity_file = pathlib.Path(
-        #             appdirs.user_data_dir('tpxo')) / TPXO_VELOCITY
-        # if not velocity_file.exists():
-        #     raise FileNotFoundError('\n'.join([
-        #         f'No TPXO file found at "{velocity_file}".',
-        #         'New users will need to register and request a copy of '
-        #         f'the TPXO9 NetCDF file (specifically `{TPXO_VELOCITY}`) '
-        #         'from the authors at https://www.tpxo.net.',
-        #         'Once you obtain `h_tpxo9.v1.nc`, you can follow one of the following options: ',
-        #         f'1) copy or symlink the file to "{velocity_file}"',
-        #         f'2) set the environment variable `{TPXO_VELOCITY}` to point to the file',
-        #     ]))
-        # self._uv = pathlib.Path(velocity_file)
+        if velocity_file is None:
+            velocity_file = os.getenv('TPXO_VELOCITY')
+            if velocity_file is None:
+                velocity_file = pathlib.Path(
+                    appdirs.user_data_dir('tpxo')) / TPXO_VELOCITY
+        if not velocity_file.exists():
+            raise FileNotFoundError('\n'.join([
+                f'No TPXO file found at "{velocity_file}".',
+                'New users will need to register and request a copy of '
+                f'the TPXO9 NetCDF file (specifically `{TPXO_VELOCITY}`) '
+                'from the authors at https://www.tpxo.net.',
+                'Once you obtain `h_tpxo9.v1.nc`, you can follow one of the following options: ',
+                f'1) copy or symlink the file to "{velocity_file}"',
+                f'2) set the environment variable `{TPXO_VELOCITY}` to point to the file',
+            ]))
+        self._uv = Dataset(velocity_file)
 
     def get_elevation(self, constituent, vertices):
         logger.info('Querying TPXO for elevation constituent '
@@ -65,18 +65,17 @@ class TPXO(TidalDataProvider):
         return amp, phase
 
     def get_velocity(self, constituent, vertices):
-        raise NotImplementedError('Velocity not implemented for TPXO.')
-    #     logger.info('Querying TPXO for velocity constituent '
-    #                 f'{constituent}.')
-    #     uamp = 0.01 * self._get_interpolation(
-    #         'velocity', 'UAMP', constituent, vertices)
-    #     uphase = self._get_interpolation(
-    #         'velocity', 'UPHA', constituent, vertices)
-    #     vamp = 0.01 * self._get_interpolation(
-    #         'velocity', 'VAMP', constituent, vertices)
-    #     vphase = self._get_interpolation(
-    #         'velocity', 'VPHA', constituent, vertices)
-    #     return uamp, uphase, vamp, vphase
+        logger.info('Querying TPXO for velocity constituent '
+                    f'{constituent}.')
+        uamp = self._get_interpolation(
+            'velocity', 'ua', constituent, vertices)
+        uphase = self._get_interpolation(
+            'velocity', 'up', constituent, vertices)
+        vamp = self._get_interpolation(
+            'velocity', 'va', constituent, vertices)
+        vphase = self._get_interpolation(
+            'velocity', 'vp', constituent, vertices)
+        return uamp, uphase, vamp, vphase
 
     @property
     def constituents(self):
@@ -99,7 +98,7 @@ class TPXO(TidalDataProvider):
         if phys_var == 'elevation':
             ncarray = self._h
         elif phys_var == 'velocity':
-            raise NotImplementedError('What\'s the variable for velocity?')
+            ncarray = self._uv
         array = ncarray[ncvar][
                 lower_c.index(constituent.lower()), :, :].flatten()
         _x = np.asarray([x + 360. for x in vertices[:, 0] if x < 0]).flatten()
