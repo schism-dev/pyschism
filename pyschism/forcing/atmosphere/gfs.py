@@ -54,6 +54,7 @@ class GFSInventory:
             self.start_date + self.rnday + self.output_interval,
             self.output_interval
         ).astype(datetime)}
+
         for dt in self.pivot_times:
             if None not in list(self._files.values()):
                 break
@@ -63,11 +64,24 @@ class GFSInventory:
                 test_url = f'{base_url}/' + \
                            f'{self.product.name.lower()}_{cycle:02d}z'
                 try:
+                    logger.info(f'Checking url: {test_url}')
                     nc = Dataset(test_url)
+                    logger.info('Success!')
                 except OSError as e:
                     if e.errno == -70:
                         print()
                         continue
+                    elif e.errno == -73:
+                        nc = False
+
+                        def retry():
+                            try:
+                                return Dataset(test_url)
+                            except Exception:
+                                return False
+
+                        while not isinstance(nc, Dataset):
+                            nc = retry()
                     else:
                         raise e
                 file_dates = self.get_nc_datevector(nc)
@@ -75,37 +89,56 @@ class GFSInventory:
                     if _datetime in file_dates:
                         if self._files[_datetime] is None:
                             self._files[_datetime] = nc
+                if not any(nc is None for nc in self._files.values()):
+                    break
+
         missing_records = [dt for dt, nc in self._files.items() if nc is None]
         if len(missing_records) > 0:
             raise ValueError(f'No GFS data for dates: {missing_records}.')
 
         self._bbox = self._modified_bbox(bbox)
 
-    def put_field(self, gfs_varname: str, dst: Dataset, sflux_varname: str):
+    def put_sflux_field(self, gfs_varname: str, dst: Dataset,
+                        sflux_varname: str):
+
         lon_idxs, lat_idxs = self._modified_bbox_indexes(self._bbox)
         for i, (dt, nc) in enumerate(self._files.items()):
             logger.info(
                 f'Putting GFS field {gfs_varname} for time {dt} as '
                 f'{sflux_varname} from file '
                 f'{nc.filepath().replace(f"{BASE_URL}/", "")}.')
-            dst[sflux_varname][i, :, :] = nc.variables[gfs_varname][
-                self.get_nc_time_index(nc, dt), lat_idxs, lon_idxs]
+
+            def put_nc_field():
+                try:
+                    dst[sflux_varname][i, :, :] = nc.variables[gfs_varname][
+                            self.get_nc_time_index(nc, dt), lat_idxs, lon_idxs]
+                    return True
+                except RuntimeError:
+                    logger.info('Failed! retrying...')
+                    return False
+
+            success = False
+            while success is False:
+                success = put_nc_field()
             dst.sync()
 
     def get_nc_time_index(self, nc, dt):
         return np.where(np.in1d(self.get_nc_datevector(nc), [dt]))[0][0]
 
     def get_nc_datevector(self, nc):
-        base_date = localize_datetime(
-            datetime.strptime(
-                nc['time'].minimum.split('z')[-1],
-                '%d%b%Y')) + timedelta(
-            hours=float(nc['time'].minimum.split('z')[0]))
-        return np.arange(
-            base_date + self.output_interval,
-            base_date + len(nc['time'][:])*self.output_interval,
-            self.output_interval
-        ).astype(datetime)
+        try:
+            base_date = localize_datetime(
+                datetime.strptime(
+                    nc['time'].minimum.split('z')[-1],
+                    '%d%b%Y')) + timedelta(
+                hours=float(nc['time'].minimum.split('z')[0]))
+            return np.arange(
+                base_date + self.output_interval,
+                base_date + len(nc['time'][:])*self.output_interval,
+                self.output_interval
+            ).astype(datetime)
+        except RuntimeError:
+            return self.get_nc_datevector(nc)
 
     def get_sflux_timevector(self):
         timevec = list(self._files.keys())
@@ -261,7 +294,7 @@ class GlobalForecastSystem(SfluxDataset):
                         ('time', 'ny_grid', 'nx_grid')
                     )
                     logger.info(f'Put field {var}')
-                    inventory.put_field(getattr(self, f'{var}_name'), dst, var)
+                    inventory.put_sflux_field(getattr(self, f'{var}_name'), dst, var)
 
                 # prmsl
                 dst['prmsl'].long_name = "Pressure reduced to MSL"
@@ -332,7 +365,7 @@ class GlobalForecastSystem(SfluxDataset):
                     dst.createVariable(var, float,
                                        ('time', 'ny_grid', 'nx_grid'))
                     logger.info(f'Put field {var}')
-                    inventory.put_field(getattr(self, f'{var}_name'), dst, var)
+                    inventory.put_sflux_field(getattr(self, f'{var}_name'), dst, var)
                 # prate
                 dst['prate'].long_name = "Surface Precipitation Rate"
                 dst['prate'].standard_name = "air_pressure_at_sea_level"
@@ -378,7 +411,7 @@ class GlobalForecastSystem(SfluxDataset):
                     dst.createVariable(var, float,
                                        ('time', 'ny_grid', 'nx_grid'))
                     logger.info(f'Put field {var}')
-                    inventory.put_field(getattr(self, f'{var}_name'), dst, var)
+                    inventory.put_sflux_field(getattr(self, f'{var}_name'), dst, var)
 
                 # dlwrf
                 dst['dlwrf'].long_name = "Downward Long Wave Radiation "\

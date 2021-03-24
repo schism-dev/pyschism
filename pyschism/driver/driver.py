@@ -4,6 +4,7 @@ import pathlib
 import subprocess
 from typing import Union
 
+from netCDF4 import Dataset
 import numpy as np
 
 from pyschism.domain import ModelDomain
@@ -29,6 +30,16 @@ class CombineHotstartBinary:
             ["combine_hotstart7", '-i', f'{iteration}'], cwd=path)
         self.path = path / f"hotstart_it={iteration}.nc"
 
+    def add_elev_ic(self, hgrid):
+        nc = Dataset(self.path, 'r+')
+        mask = np.logical_and(
+                hgrid.values > 0.,
+                nc['eta2'][:] < hgrid.values
+            )
+        idxs = np.where(mask)
+        nc['eta2'][idxs] = hgrid.values[idxs] - 0.01
+        nc.close()
+
 
 class ModelDriver:
 
@@ -48,7 +59,8 @@ class ModelDriver:
             server_config: ServerConfig = None,
             combine_hotstart: Union[str, os.PathLike] = None,
             cutoff_depth: float = 50.,
-            **surface_outputs):
+            **surface_outputs
+    ):
         """Main driver class used to generate SCHISM input files
 
         This __init__ calls initialization routines for all SCHISM data inputs

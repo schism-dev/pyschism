@@ -19,7 +19,7 @@ class StationsOutput:
         outputs = pathlib.Path(outputs)
         if not outputs.is_dir():
             raise Exception(f'{str(outputs)} is not a directory.')
-        self.__station_id: List = []
+        self._station_id: List = []
         if stations_file is None:
             stations_file = outputs.resolve() / '../station.in'
             if not stations_file.is_file():
@@ -30,9 +30,9 @@ class StationsOutput:
                     for station in range(int(f.readline())):
                         line = f.readline()
                         if '!' in line:
-                            self.__station_id.append(line.split('!')[-1])
+                            self._station_id.append(line.split('!')[-1])
                         else:
-                            self.__station_id.append(None)
+                            self._station_id.append(None)
         self._manifest = list(outputs.glob('staout_*'))
 
         # find the start_date. Let's first check if it's on the param.nml file
@@ -47,13 +47,13 @@ class StationsOutput:
             if None in [start_year, start_month, start_day, start_hour,
                         utc_start]:
                 warnings.warn('Could not determine start date automatically.')
-                self.__start_date = None
+                self._start_date = None
             else:
-                self.__start_date = datetime(start_year, start_month,
-                                             start_day, int(start_hour), 0,
-                                             tzinfo=timezone(timedelta(
-                                                hours=-utc_start)))
-        self.__rndays = None
+                self._start_date = datetime(start_year, start_month,
+                                            start_day, int(start_hour), 0,
+                                            tzinfo=timezone(
+                                                timedelta(hours=-utc_start)))
+        self._rndays = None
         for file in self._manifest:
             with warnings.catch_warnings(record=True) as w:
                 warnings.simplefilter("always")
@@ -61,7 +61,7 @@ class StationsOutput:
                 if len(w) != 0:
                     pass
                 else:
-                    self.__rndays = timedelta(seconds=data[-1, 0])
+                    self._rndays = timedelta(seconds=data[-1, 0])
                     break
 
         if self.rndays is None:
@@ -69,18 +69,10 @@ class StationsOutput:
                             "output data.")
 
     def set_start_date(self, start_date: datetime):
-        self.__start_date = start_date
+        self._start_date = start_date
 
     def get_station_id(self, index):
-        return self.__station_id[index].strip()
-
-    @property
-    def start_date(self):
-        return self.__start_date
-
-    @property
-    def rndays(self):
-        return self.__rndays
+        return self._station_id[index].strip()
 
     def plot(self, variable, station_index=None, show=False):
         filenames = [path.name for path in self._manifest]
@@ -90,8 +82,7 @@ class StationsOutput:
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             data = np.loadtxt(
-                self._manifest[filenames.index(
-                    f'staout_{var_index}')])
+                self._manifest[filenames.index(f'staout_{var_index}')])
             if len(w) != 0:
                 raise AttributeError(f'Empty record for variable {variable}.')
 
@@ -137,3 +128,11 @@ class StationsOutput:
         #     for line in f:
         #         print(len(line.split()))
         #         exit()
+
+    @property
+    def start_date(self):
+        return self._start_date
+
+    @property
+    def rndays(self):
+        return self._rndays

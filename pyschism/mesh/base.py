@@ -7,42 +7,31 @@ import os
 import pathlib
 from typing import Union, Sequence, Hashable, List, Dict
 
-import geopandas as gpd  # type: ignore[import]
-from matplotlib.collections import PolyCollection  # type: ignore[import]
-from matplotlib.path import Path  # type: ignore[import]
-from matplotlib.tri import Triangulation  # type: ignore[import]
-from matplotlib.transforms import Bbox  # type: ignore[import]
-import numpy as np  # type: ignore[import]
-from pyproj import Transformer, CRS  # type: ignore[import]
-from shapely.geometry import (  # type: ignore[import]
+import geopandas as gpd
+from matplotlib.collections import PolyCollection
+from matplotlib.path import Path
+from matplotlib.tri import Triangulation
+from matplotlib.transforms import Bbox
+import numpy as np
+from pyproj import Transformer, CRS
+from shapely.geometry import (
+    box,
+    LinearRing,
+    LineString,
     MultiPolygon,
     Polygon,
-    LineString,
-    LinearRing,
+    Point,
 )
 
-from pyschism.mesh.parsers import grd
+from pyschism.mesh.parsers import grd, sms2dm
 from pyschism.figures import figure
 
 _logger = logging.getLogger(__name__)
 
-class Description:
-
-    def __set__(self, obj, description):
-        if description is None:
-            description = ''
-        if not isinstance(description, str):
-            raise TypeError('Argument description must be a string, not '
-                            f'type {type(description)}.')
-        obj.__dict__['description'] = description.replace('\n', ' ')
-
-    def __get__(self, obj, val):
-        return obj.__dict__['description']
-
 
 class Nodes:
 
-    def __set__(self, obj: "Gr3", nodes: Dict[Hashable, List[List]]):
+    def __init__(self, nodes: Dict[Hashable, List[List]], crs=None):
         """Setter for the nodes attribute.
 
         Argument nodes must be of the form:
@@ -59,73 +48,97 @@ class Nodes:
                 raise ValueError(
                     'Coordinate vertices for a gr3 type must be 2D, but got '
                     f'coordinates {coords}.')
-        obj.__dict__['nodes'] = nodes
-        self.gr3 = obj
-        # self.ball = NodeBall(self.gr3)
+        self.nodes = nodes
+        self.crs = CRS.from_user_input(crs) if crs is not None else crs
 
-        obj.__dict__['id_to_index'] = {
-            self.id()[i]: i for i in range(len(self.id()))}
+    def transform_to(self, dst_crs):
+        dst_crs = CRS.from_user_input(dst_crs)
+        if not self.crs.equals(dst_crs):
+            xy = self.get_xy(dst_crs)
+            nodes = {
+                self.id[i]: (coord.tolist(), self.values[i])
+                for i, coord in enumerate(xy)
+                }
+            self.nodes = nodes
+            self.crs = dst_crs
 
-        obj.__dict__['index_to_id'] = {
-            i: self.id()[i] for i in range(len(self.id()))}
+        if hasattr(self, '_gdf'):
+            del self._gdf
 
-    def __call__(self):
-        return self.gr3.__dict__['nodes']
+    def get_xy(self, crs: Union[CRS, str] = None):
+        if crs is not None:
+            crs = CRS.from_user_input(crs)
+            if not crs.equals(self.crs):
+                transformer = Transformer.from_crs(
+                    self.crs, crs, always_xy=True)
+                x, y = transformer.transform(
+                    self.coord[:, 0], self.coord[:, 1])
+                return np.vstack([x, y]).T
+        return self.coord
 
+    @property
+    def gdf(self):
+        if not hasattr(self, '_gdf'):
+            data = []
+            for id, (coord, values) in self.nodes.items():
+                data.append({
+                    'geometry': Point(coord),
+                    'id': id,
+                    'values': values
+                    })
+            self._gdf = gpd.GeoDataFrame(data, crs=self.crs)
+        return self._gdf
+
+    @property
     def id(self):
-        node_id = self.gr3.__dict__.get('node_id')
-        if node_id is None:
-            node_id = list(self().keys())
-            self.gr3.__dict__['node_id'] = node_id
-        return node_id
+        if not hasattr(self, '_id'):
+            self._id = list(self.nodes.keys())
+        return self._id
 
+    @property
     def index(self):
-        node_index = self.gr3.__dict__.get('node_index')
-        if node_index is None:
-            node_index = np.arange(len(self()))
-            self.gr3.__dict__['node_index'] = node_index
-        return node_index
+        if not hasattr(self, '_index'):
+            self._index = np.arange(len(self.nodes))
+        return self._index
 
+    @property
+    def coords(self):
+        if not hasattr(self, '_coords'):
+            self._coords = np.array(
+                [coords for coords, value in self.nodes.values()])
+        return self._coords
+
+    @property
     def coord(self):
-        coord = self.gr3.__dict__.get('coord')
-        if coord is None:
-            coord = np.array([coords for coords, _ in self().values()])
-            self.gr3.__dict__['coord'] = coord
-        return coord
+        return self.coords
 
+    @property
     def values(self):
-        values = self.gr3.__dict__.get('values')
-        if values is None:
-            values = np.array([val for _, val in self().values()])
-            self.gr3.__dict__['values'] = values
-        return values
+        if not hasattr(self, '_values'):
+            self._values = np.array(
+                [value for coords, value in self.nodes.values()])
+        return self._values
 
     def get_index_by_id(self, id: Hashable):
-        return self.gr3.__dict__['id_to_index'][id]
+        if not hasattr(self, 'node_id_to_index'):
+            self.node_id_to_index = {
+                self.id[i]: i for i in range(len(self.id))}
+        return self.node_id_to_index[id]
 
     def get_id_by_index(self, index: int):
-        return self.gr3.__dict__['index_to_id'][index]
-
-    def get_indexes_around_index(self, index):
-        indexes_around_index = self.__dict__.get('indexes_around_index')
-        if indexes_around_index is None:
-            def append(geom):
-                for simplex in geom:
-                    for i, j in permutations(simplex, 2):
-                        indexes_around_index[i].add(j)
-            indexes_around_index = defaultdict(set)
-            append(self.gr3.elements.triangles())
-            append(self.gr3.elements.quads())
-            self.__dict__['indexes_around_index'] = indexes_around_index
-        return list(indexes_around_index[index])
+        if not hasattr(self, 'node_index_to_id'):
+            self.node_index_to_id = {
+                i: self.id[i] for i in range(len(self.id))}
+        return self.node_index_to_id[index]
 
 
 class Elements:
 
-    def __set__(self, obj: "Gr3", elements: Dict[Hashable, Sequence]):
+    def __init__(self, nodes: Nodes, elements: Dict[Hashable, Sequence]):
         if not isinstance(elements, dict):
             raise TypeError('Argument elements must be a dict.')
-        vertex_id_set = set(obj.nodes.id())
+
+        vertex_id_set = set(nodes.id)
         for i, element in enumerate(elements):
             if not isinstance(element, Sequence):
                 raise TypeError(f'Element with index {i} of the elements '
@@ -134,87 +147,141 @@ class Elements:
             if not set(element).issubset(vertex_id_set):
                 ValueError(f'Element with index {i} is not a subset of the '
                            "coordinate id's.")
-        obj.__dict__['elements'] = elements
-        self.gr3 = obj
+        self.nodes = nodes
+        self.elements = elements
 
-    def __call__(self):
-        return self.gr3.__dict__["elements"]
-
+    @property
     def id(self):
-        element_id = self.gr3.__dict__.get('element_id')
-        if element_id is None:
-            element_id = list(self().keys())
-            self.gr3.__dict__['element_id'] = element_id
-        return element_id
+        if not hasattr(self, '_id'):
+            self._id = list(self.elements.keys())
+        return self._id
 
+    @property
     def index(self):
-        element_index = self.gr3.__dict__.get('element_index')
-        if element_index is None:
-            element_index = np.arange(len(self()))
-            self.gr3.__dict__['element_index'] = element_index
-        return element_index
+        if not hasattr(self, '_index'):
+            self._index = np.arange(len(self.elements))
+        return self._index
 
+    def get_index_by_id(self, id: Hashable):
+        if not hasattr(self, 'element_id_to_index'):
+            self.element_id_to_index = {
+                self.id[i]: i for i in range(len(self.id))}
+        return self.element_id_to_index[id]
+
+    def get_id_by_index(self, index: int):
+        if not hasattr(self, 'element_index_to_id'):
+            self.element_index_to_id = {
+                i: self.id[i] for i in range(len(self.id))}
+        return self.element_index_to_id[index]
+
+    def get_indexes_around_index(self, index):
+        if not hasattr(self, 'indexes_around_index'):
+            def append_geom(geom):
+                for simplex in geom:
+                    for i, j in permutations(simplex, 2):
+                        indexes_around_index[i].add(j)
+            indexes_around_index = defaultdict(set)
+            append_geom(self.triangles)
+            append_geom(self.quads)
+            self.indexes_around_index = indexes_around_index
+        return list(self.indexes_around_index[index])
+
+    def get_ball(self, order: int, id=None, index=None):
+
+        if not isinstance(order, int):
+            raise TypeError('Argument \'order\' must be of type int.')
+
+        if not order >= 0:
+            raise TypeError('Argument \'order\' must be of greater '
+                            'than zero.')
+
+        if id is None and index is None:
+            raise ValueError(
+                'Must specify one keyword argument of index or id.')
+
+        if id is not None and index is not None:
+            raise ValueError('Must specify only one keyword argument of '
+                             'index or id.')
+
+        if id is not None:
+            index = self.get_index_by_id(id)
+
+        eidxs = set([index])
+        for i in range(order):
+            elements = self.array[list(sorted(eidxs)), :]
+            new_neighbors = list(
+                    map(self.get_indexes_around_index,
+                        list(set(elements.data.flatten()))))
+            new_neighbors = set([item for sublist in new_neighbors
+                                 for item in sublist])
+            eidxs = eidxs.union(set(np.where(
+                np.logical_and(
+                    np.any(
+                        np.isin(self.array, list(set(new_neighbors))), axis=1),
+                    np.any(np.isin(self.array, elements), axis=1),
+                ))[0]))
+        return self.gdf.loc[eidxs].geometry.unary_union.exterior
+
+    @property
     def array(self):
-        element_array = self.gr3.__dict__.get('element_array')
-        if element_array is None:
-            rank = int(max(map(len, self().values())))
-            element_array = np.full((len(self()), rank), -1)
-            for i, element in enumerate(self().values()):
-                row = np.array(list(map(self.gr3.nodes.get_index_by_id, element)))
-                element_array[i, :len(row)] = row
-                element_array = np.ma.masked_equal(element_array, -1)
-                self.gr3.__dict__['element_array'] = element_array
-        return element_array
+        if not hasattr(self, '_array'):
+            rank = int(max(map(len, self.elements.values())))
+            array = np.full((len(self.elements), rank), -1)
+            for i, element in enumerate(self.elements.values()):
+                row = np.array(
+                    list(map(self.nodes.get_index_by_id, element)))
+                array[i, :len(row)] = row
+            array = np.ma.masked_equal(array, -1)
+            self._array = array
+        return self._array
 
+    @property
     def triangles(self):
-        triangles = self.gr3.__dict__.get('triangles')
-        if triangles is None:
-            triangles = np.array(
-                [list(map(self.gr3.nodes.get_index_by_id, element))
-                for element in self().values()
-                if len(element) == 3])
-            self.gr3.__dict__['triangles'] = triangles
-        return triangles
+        if not hasattr(self, '_triangles'):
+            self._triangles = np.array(
+                [list(map(self.nodes.get_index_by_id, element))
+                 for element in self.elements.values()
+                 if len(element) == 3])
+        return self._triangles
 
+    @property
+    def quadrilaterals(self):
+        return self.quads
+
+    @property
     def quads(self):
-        quads = self.gr3.__dict__.get('quads')
-        if quads is None:
-            quads = np.array(
-                [list(map(self.gr3.nodes.get_index_by_id, element))
-                for element in self().values()
-                if len(element) == 4])
-            self.gr3.__dict__['quads'] = quads
-        return quads
+        if not hasattr(self, '_quads'):
+            self._quads = np.array(
+                [list(map(self.nodes.get_index_by_id, element))
+                 for element in self.elements.values()
+                 if len(element) == 4])
+        return self._quads
 
+    @property
     def triangulation(self):
-        triangles = self.triangles().tolist()
-        for quad in self.quads():
-            triangles.append([quad[0], quad[1], quad[3]])
-            triangles.append([quad[1], quad[2], quad[3]])
-        return Triangulation(
-            self.gr3.nodes.coord()[:, 0],
-            self.gr3.nodes.coord()[:, 1],
-            triangles)
+        if not hasattr(self, '_triangulation'):
+            triangles = self.triangles.tolist()
+            for quad in self.quads:
+                triangles.append([quad[0], quad[1], quad[3]])
+                triangles.append([quad[1], quad[2], quad[3]])
+            self._triangulation = Triangulation(
+                self.nodes.coord[:, 0],
+                self.nodes.coord[:, 1],
+                triangles)
+        return self._triangulation
 
-    def geodataframe(self):
-        data = []
-        for id, element in self().items():
-            data.append({
-                'geometry': Polygon(
-                    self.gr3.nodes.coord()[list(
-                        map(self.gr3.nodes.get_index_by_id, element))]),
-                'id': id})
-        return gpd.GeoDataFrame(data, crs=self.gr3.crs)
-
-
-class Crs:
-
-    def __set__(self, obj, val):
-        if val is not None:
-            obj.__dict__['crs'] = CRS.from_user_input(val)
-
-    def __get__(self, obj, val):
-        return obj.__dict__.get('crs')
+    @property
+    def gdf(self):
+        if not hasattr(self, '_gdf'):
+            data = []
+            for id, element in self.elements.items():
+                data.append({
+                    'geometry': Polygon(
+                        self.nodes.coord[list(
+                            map(self.get_index_by_id, element))]),
+                    'id': id})
+            self._gdf = gpd.GeoDataFrame(data, crs=self.nodes.crs)
+        return self._gdf
 
 
 class Edges:
@@ -248,17 +315,17 @@ class Rings:
 
     @lru_cache(maxsize=1)
     def __call__(self) -> gpd.GeoDataFrame:
-        tri = self.gr3.elements.triangulation()
+        tri = self.gr3.elements.triangulation
         idxs = np.vstack(list(np.where(tri.neighbors == -1))).T
         boundary_edges = []
         for i, j in idxs:
             boundary_edges.append(
                 (tri.triangles[i, j], tri.triangles[i, (j+1) % 3]))
         sorted_rings = sort_rings(edges_to_rings(boundary_edges),
-                                  self.gr3.nodes.coord())
+                                  self.gr3.nodes.coord)
         data = []
         for bnd_id, rings in sorted_rings.items():
-            coords = self.gr3.nodes.coord()[rings['exterior'][:, 0], :]
+            coords = self.gr3.nodes.coord[rings['exterior'][:, 0], :]
             geometry = LinearRing(coords)
             data.append({
                     "geometry": geometry,
@@ -266,7 +333,7 @@ class Rings:
                     "type": 'exterior'
                 })
             for interior in rings['interiors']:
-                coords = self.gr3.nodes.coord()[interior[:, 0], :]
+                coords = self.gr3.nodes.coord[interior[:, 0], :]
                 geometry = LinearRing(coords)
                 data.append({
                     "geometry": geometry,
@@ -332,80 +399,88 @@ class Hull:
             crs=self.gr3.crs)
 
     def multipolygon(self) -> MultiPolygon:
-        return self.implode().iloc[0].geometry
+        geometry = self.implode().iloc[0].geometry
+        if not isinstance(geometry, MultiPolygon):
+            geometry = MultiPolygon([geometry])
+        return geometry
 
 
 class Gr3(ABC):
 
-    _description = Description()
-    _nodes = Nodes()
-    _elements = Elements()
-    _crs = Crs()
-
     def __init__(self, nodes, elements=None, description=None, crs=None):
-        self._nodes = nodes
-        self._elements = elements
-        self._description = description
-        self._crs = crs
-        self._hull = Hull(self)
+
+        self.nodes = Nodes(nodes, crs)
+        self.elements = Elements(self.nodes, elements)
+        self.description = '' if description is None else str(description)
 
     def __str__(self):
         return grd.to_string(**self.to_dict())
 
-    def __repr__(self):
-        return ", ".join([
-            f"{self.nodes()}",
-            f"elements={self.elements()}",
-            f"description={self.description}",
-            f"crs={self.crs}"])
-
     def to_dict(self):
         return {
             "description": self.description,
-            "nodes": self.nodes(),
-            "elements": self.elements(),
+            "nodes": self.nodes.nodes,
+            "elements": self.elements.elements,
             "crs": self.crs}
 
-    def write(self, path, overwrite=False):
-        grd.write(self.to_dict(), path, overwrite)
-
-    def get_x(self, crs: Union[CRS, str] = None):
-        return self.get_xy(crs)[:, 0]
-
-    def get_y(self, crs: Union[CRS, str] = None):
-        return self.get_xy(crs)[:, 1]
+    def write(self, path, overwrite=False, format='gr3'):
+        if format in ['gr3', 'grd']:
+            grd.write(self.to_dict(), path, overwrite)
+        elif format in ['sms', '2dm', 'sms2dm']:
+            sms2dm.writer({
+                'ND': {i+1: (coord, -self.values[i] if not
+                             np.isnan(self.values[i]) else -99999)
+                       for i, coord in enumerate(self.coords)},
+                'E3T': {i+1: index+1 for i, index
+                        in enumerate(self.triangles)},
+                'E4Q': {i+1: index+1 for i, index
+                        in enumerate(self.quads)}
+            }, path, overwrite)
+        else:
+            raise ValueError(f'Unknown format {format} for hgrid output.')
 
     def get_xy(self, crs: Union[CRS, str] = None):
+        return self.nodes.get_xy(crs)
+
+    def get_bbox(
+            self,
+            crs: Union[str, CRS] = None,
+            output_type: str = None
+    ) -> Union[Polygon, Bbox]:
+        output_type = 'polygon' if output_type is None else output_type
+        xmin, xmax = np.min(self.coord[:, 0]), np.max(self.coord[:, 0])
+        ymin, ymax = np.min(self.coord[:, 1]), np.max(self.coord[:, 1])
+        crs = self.crs if crs is None else crs
         if crs is not None:
-            crs = CRS.from_user_input(crs)
-            if not crs.equals(self.crs):
+            if not self.crs.equals(crs):
                 transformer = Transformer.from_crs(
                     self.crs, crs, always_xy=True)
-                x, y = transformer.transform(self.x, self.y)
-                return np.vstack([x, y]).T
-        return np.vstack([self.x, self.y]).T
+                (xmin, xmax), (ymin, ymax) = transformer.transform(
+                    (xmin, xmax), (ymin, ymax))
+        if output_type == 'polygon':
+            return box(xmin, ymin, xmax, ymax)
+        elif output_type == 'bbox':
+            return Bbox([[xmin, ymin], [xmax, ymax]])
+        else:
+            raise TypeError(
+                'Argument output_type must a string literal \'polygon\' or '
+                '\'bbox\'')
 
-    def get_bbox(self, crs: Union[CRS, str] = None) -> Bbox:
-        vertices = self.get_xy(crs)
-        x0 = np.min(vertices[:, 0])
-        x1 = np.max(vertices[:, 0])
-        y0 = np.min(vertices[:, 1])
-        y1 = np.max(vertices[:, 1])
-        return Bbox([[x0, y0], [x1, y1]])
+    def invert_sign(self):
+        self.nodes.nodes = {
+            id: (coords, -val) for id, (coords, val)
+            in self.nodes.nodes.items()}
 
     def transform_to(self, dst_crs):
         """Transforms coordinate system of mesh in-place.
         """
-        dst_crs = CRS.from_user_input(dst_crs)
-        if not self.crs.equals(dst_crs):
-            xy = self.get_xy(dst_crs)
-            self._nodes = {self.nodes.id()[i]:
-                           (coord.tolist(), self.nodes.values()[i])
-                           for i, coord in enumerate(xy)}
-            self._crs = dst_crs
+        self.nodes.transform_to(dst_crs)
 
     def vertices_around_vertex(self, index):
         return self.nodes.vertices_around_vertex(index)
+
+    def copy(self):
+        return self.__class__(**self.to_dict())
 
     @classmethod
     def open(cls, file: Union[str, os.PathLike],
@@ -415,13 +490,15 @@ class Gr3(ABC):
     @figure
     def tricontourf(self, axes=None, show=True, figsize=None, **kwargs):
         if len(self.triangles) > 0:
-            axes.tricontourf(self.triangulation, self.values, **kwargs)
+            axes.tricontourf(self.x, self.y, self.triangles, self.values,
+                             **kwargs)
         return axes
 
     @figure
     def tripcolor(self, axes=None, show=True, figsize=None, **kwargs):
         if len(self.triangles) > 0:
-            axes.tripcolor(self.triangulation, self.values, **kwargs)
+            axes.tripcolor(self.x, self.y, self.triangles, self.values,
+                           **kwargs)
         return axes
 
     @figure
@@ -437,7 +514,7 @@ class Gr3(ABC):
         if len(self.triangles) > 0:
             kwargs.update({'linewidth': linewidth})
             kwargs.update({'color': color})
-            axes.triplot(self.triangulation, **kwargs)
+            axes.triplot(self.x, self.y, self.triangles, **kwargs)
         return axes
 
     @figure
@@ -480,70 +557,64 @@ class Gr3(ABC):
         return axes
 
     @figure
-    def plot_wireframe(self, axes=None, show=False, **kwargs):
+    def wireframe(self, axes=None, show=False, **kwargs):
         axes = self.triplot(axes=axes, **kwargs)
         axes = self.quadplot(axes=axes, **kwargs)
         return axes
 
     @property
-    def nodes(self):
-        return self._nodes
+    def coords(self):
+        return self.nodes.coord
 
     @property
-    def coords(self):
-        return self._nodes.coord()
+    def coord(self):
+        return self.nodes.coord
 
     @property
     def vertices(self):
-        return self._nodes.coord()
+        return self.nodes.coord
 
     @property
     def vertex_id(self):
-        return self._nodes.id()
-
-    @property
-    def elements(self):
-        return self._elements
+        return self.nodes.id
 
     @property
     def element_id(self):
-        return self._elements.id()
+        return self.elements.id
 
     @property
     def values(self):
-        return self._nodes.values()
-
-    @property
-    def description(self):
-        return self._description
+        return self.nodes.values
 
     @property
     def crs(self):
-        return self._crs
+        return self.nodes.crs
 
     @property
     def x(self):
-        return self._nodes.coord()[:, 0]
+        return self.nodes.coord[:, 0]
 
     @property
     def y(self):
-        return self._nodes.coord()[:, 1]
+        return self.nodes.coord[:, 1]
 
     @property
     def hull(self):
+        if not hasattr(self, '_hull'):
+            self._hull = Hull(self)
         return self._hull
 
     @property
     def triangles(self):
-        return self._elements.triangles()
+        return self.elements.triangles
 
     @property
     def quads(self):
-        return self._elements.quads()
+        return self.elements.quads
 
     @property
     def triangulation(self):
-        return self._elements.triangulation()
+        return self.elements.triangulation
 
     @property
     def bbox(self):

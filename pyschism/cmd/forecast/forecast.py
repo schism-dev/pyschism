@@ -168,8 +168,6 @@ def _add_tidal_constituents(parser):
     tides = parser.add_argument_group('tides')
     options = tides.add_mutually_exclusive_group()
     options.required = True
-    options.add_argument("--tidal-database", choices=['tpxo', 'hamtide'],
-                         default='hamtide')
     options.add_argument("--all-constituents", action="store_true")
     options.add_argument("--major-constituents", action="store_true")
     options.add_argument(
@@ -180,6 +178,8 @@ def _add_tidal_constituents(parser):
         dest='constituents',
         default=False,
         help="Tidal constituent to be forced in the model (case-insensitive).")
+    tides.add_argument("--tidal-database", choices=['tpxo', 'hamtide'],
+                       default='tpxo')
     tides.add_argument("--include-tidal-velocity",
                        "--bnd-vel", action="store_true", dest='bnd_vel')
 

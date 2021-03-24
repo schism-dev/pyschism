@@ -16,44 +16,25 @@ TPXO_ELEVATION = 'h_tpxo9.v1.nc'
 TPXO_VELOCITY = 'u_tpxo9.v1.nc'
 
 
-class TPXO(TidalDataProvider):
-
-    def __init__(self, elevation_file=None, velocity_file=None):
-        if elevation_file is None:
-            elevation_file = os.getenv('TPXO_ELEVATION')
-            if elevation_file is None:
-                elevation_file = pathlib.Path(
-                    appdirs.user_data_dir('tpxo')) / TPXO_ELEVATION
-        if not elevation_file.exists():
-            raise FileNotFoundError('\n'.join([
-                f'No TPXO file found at "{elevation_file}".',
+def raise_missing_file(fpath, fname):
+    raise FileNotFoundError('\n'.join([
+                f'No TPXO file found at "{fpath}".',
                 'New users will need to register and request a copy of '
-                f'the TPXO9 NetCDF file (specifically `{TPXO_ELEVATION}`) '
+                f'the TPXO9 NetCDF file (specifically `{fname}`) '
                 'from the authors at https://www.tpxo.net.',
                 'Once you obtain `h_tpxo9.v1.nc`, you can follow one of the '
                 'following options: ',
-                f'1) copy or symlink the file to "{elevation_file}"',
-                f'2) set the environment variable `{TPXO_ELEVATION}` to point'
+                f'1) copy or symlink the file to "{fpath}"',
+                f'2) set the environment variable `{fname}` to point'
                 ' to the file',
             ]))
-        self._h = Dataset(elevation_file)
 
-        if velocity_file is None:
-            velocity_file = os.getenv('TPXO_VELOCITY')
-            if velocity_file is None:
-                velocity_file = pathlib.Path(
-                    appdirs.user_data_dir('tpxo')) / TPXO_VELOCITY
-        if not velocity_file.exists():
-            raise FileNotFoundError('\n'.join([
-                f'No TPXO file found at "{velocity_file}".',
-                'New users will need to register and request a copy of '
-                f'the TPXO9 NetCDF file (specifically `{TPXO_VELOCITY}`) '
-                'from the authors at https://www.tpxo.net.',
-                'Once you obtain `h_tpxo9.v1.nc`, you can follow one of the following options: ',
-                f'1) copy or symlink the file to "{velocity_file}"',
-                f'2) set the environment variable `{TPXO_VELOCITY}` to point to the file',
-            ]))
-        self._uv = Dataset(velocity_file)
+
+class TPXO(TidalDataProvider):
+
+    def __init__(self, h_file=None, u_file=None):
+        self._h_file = h_file
+        self._u_file = u_file
 
     def get_elevation(self, constituent, vertices):
         logger.info('Querying TPXO for elevation constituent '
@@ -65,6 +46,8 @@ class TPXO(TidalDataProvider):
         return amp, phase
 
     def get_velocity(self, constituent, vertices):
+        if self._uv is None:
+            raise_missing_file()
         logger.info('Querying TPXO for velocity constituent '
                     f'{constituent}.')
         uamp = self._get_interpolation(
@@ -81,27 +64,54 @@ class TPXO(TidalDataProvider):
     def constituents(self):
         if not hasattr(self, '_constituents'):
             self._constituents = [
-                c.capitalize() for c in self._h['con'][:].astype(
+                c.capitalize() for c in self.h['con'][:].astype(
                     '|S1').tostring().decode('utf-8').split()]
         return self._constituents
 
     @property
     def x(self) -> np.ndarray:
-        return self._h['lon_z'][:, 0].data
+        return self.h['lon_z'][:, 0].data
 
     @property
     def y(self) -> np.ndarray:
-        return self._h['lat_z'][0, :].data
+        return self.h['lat_z'][0, :].data
+
+    @property
+    def h(self):
+        if not hasattr(self, '_h'):
+            if self._h_file is None:
+                self._h_file = os.getenv('TPXO_ELEVATION')
+                if self._h_file is None:
+                    self._h_file = pathlib.Path(
+                        appdirs.user_data_dir('tpxo')) / TPXO_ELEVATION
+            if not self._h_file.exists():
+                raise_missing_file(self._h_file, TPXO_ELEVATION)
+            self._h = Dataset(self._h_file)
+        return self._h
+
+    @property
+    def uv(self):
+        if not hasattr(self, '_uv'):
+            if self._u_file is None:
+                self._u_file = os.getenv('TPXO_VELOCITY')
+                if self._u_file is None:
+                    self._u_file = pathlib.Path(
+                        appdirs.user_data_dir('tpxo')) / TPXO_VELOCITY
+            if not self._u_file.exists():
+                raise_missing_file(self._u_file, TPXO_VELOCITY)
+            self._uv = Dataset(self._u_file)
+        return self._uv
 
     def _get_interpolation(self, phys_var, ncvar, constituent, vertices):
         lower_c = [c.lower() for c in self.constituents]
         if phys_var == 'elevation':
-            ncarray = self._h
+            ncarray = self.h
         elif phys_var == 'velocity':
-            ncarray = self._uv
+            ncarray = self.uv
         array = ncarray[ncvar][
                 lower_c.index(constituent.lower()), :, :].flatten()
-        _x = np.asarray([x + 360. for x in vertices[:, 0] if x < 0]).flatten()
+        _x = np.asarray(
+            [x + 360. if x < 0. else x for x in vertices[:, 0]]).flatten()
         _y = vertices[:, 1].flatten()
         x, y = np.meshgrid(self.x, self.y, indexing='ij')
         x = x.flatten()

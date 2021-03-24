@@ -81,6 +81,13 @@ class HotstartDriver:
                 **self.surface_outputs(obj)
                 )
             obj.__dict__['hotstart_driver'] = hotstart_driver
+
+            # Initialize hydrology elevations on hotstart file.
+            if obj.args.action == 'init':
+                if len(obj.hotstart_domain.hydrology) > 0:
+                    hotstart_driver._combine_hotstart.add_elev_ic(
+                        obj.hotstart_domain.hgrid)
+
         return hotstart_driver
 
     def surface_outputs(self, obj):
@@ -298,7 +305,9 @@ class ForecastUpdate(ForecastInit):
                     pathlib.Path(self.args.stations_file),
                     timedelta(minutes=6) if self.args.nspool_sta is None else
                     nspool_sta,
-                    self.args.stations_file_crs,
+                    self.hotstart_domain.hgrid.crs if
+                    self.args.stations_file_crs is None
+                    else self.args.stations_file_crs,
                     elev=self.args.stations_elev,
                     air_pressure=self.args.stations_prmsl,
                     windx=self.args.stations_uwind,

@@ -13,26 +13,6 @@ base_url = 'https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/hamtide/'
 logger = logging.getLogger(__name__)
 
 
-class HamtideResource:
-
-    def __set__(self, obj, resource):
-        if resource is None:
-            resource = {'elevation': {}, 'velocity': {}}
-            for constituent in obj.constituents:
-                for key in resource.keys():
-                    resource[key].update({constituent: None})
-        else:
-            raise NotImplementedError('Check that static files exist.')
-            _resource = pathlib.Path(resource)
-            for file in _resource.glob('*.nc'):
-                print(file)
-
-        obj.__dict__['resource'] = resource
-
-    def __get__(self, obj, val):
-        return obj.__dict__['resource']
-
-
 class HAMTIDE(TidalDataProvider):
     ''' Wrapper for querying HAMTIDE model harmonic constituents.
 
@@ -45,10 +25,8 @@ class HAMTIDE(TidalDataProvider):
         HAMTIDE model (to be submitted to J. Geophys. Res.).
     '''
 
-    _resource = HamtideResource()
-
     def __init__(self, resource=None):
-        self._resource = resource
+        self.resource = resource
 
     def get_elevation(self, constituent, vertices):
         logger.info('Querying HAMTIDE for elevation constituent '
@@ -102,8 +80,16 @@ class HAMTIDE(TidalDataProvider):
         xq = np.asarray(
             [x + 360. if x < 0. else x for x in vertices[:, 0]]).flatten()
         yq = vertices[:, 1].flatten()
-        xidx = np.logical_and(self.x >= np.min(xq), self.x <= np.max(xq))
-        yidx = np.logical_and(self.y >= np.min(yq), self.y <= np.max(yq))
+        dx = (self.x[-1] - self.x[0]) / len(self.x)
+        xidx = np.logical_and(
+            self.x >= np.min(xq) - 2.*dx,
+            self.x <= np.max(xq) + 2.*dx
+        )
+        dy = (self.y[-1] - self.y[0]) / len(self.y)
+        yidx = np.logical_and(
+            self.y >= np.min(yq) - 2.*dy,
+            self.y <= np.max(yq) + 2.*dy
+        )
         xi, yi = np.meshgrid(self.x[xidx], self.y[yidx])
         xi = xi.flatten()
         yi = yi.flatten()
@@ -115,3 +101,20 @@ class HAMTIDE(TidalDataProvider):
             (xq, yq),
             method='nearest'
         )
+
+    @property
+    def resource(self):
+        return self._resource
+
+    @resource.setter
+    def resource(self, resource):
+        if resource is None:
+            resource = {'elevation': {}, 'velocity': {}}
+            for constituent in self.constituents:
+                for key in resource.keys():
+                    resource[key].update({constituent: None})
+        else:
+            raise NotImplementedError('Check that static files exist.')
+            for file in pathlib.Path(resource).glob('*.nc'):
+                print(file)
+        self._resource = resource

@@ -24,9 +24,9 @@ def stations_subparser(subparsers):
     # plotting action
     plot = actions.add_parser('plot')
     plot.add_argument('variable')
+    plot.add_argument('station_index', type=int)
     plot.add_argument('outputs_directory')
     plot.add_argument('--stations-file')
-    plot.add_argument('--stations-index', type=int)
 
 
 add_stations = stations_subparser

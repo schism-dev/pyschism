@@ -189,13 +189,9 @@ class Stations:
             geometry: Polygon or MultiPolygon used for clipping the
                 stations. Normally this comes from Hgrid.get_multipolygon()
         """
-
-        eliminate: List[int] = []
-        for id, x, y, _, _ in self:
-            if not geometry.contains(Point(x, y)):
-                eliminate.insert(id-1, 0)
-        for id in eliminate:
-            del(self._stations[id])
+        for i, s in reversed(list(enumerate(self._stations))):
+            if not geometry.contains(Point(s['x'], s['y'])):
+                self._stations.pop(i)
 
     def write(self, path: Union[str, pathlib.Path], overwrite: bool = False):
         """Writes the SCHISM station.in file to disk.
