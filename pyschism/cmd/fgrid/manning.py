@@ -25,7 +25,7 @@ class ManningsNCli:
                 # we need to use defaults
                 keys = ["min_value", "max_value", "min_depth", "max_depth"]
                 linear_args = {
-                    key[i]: val for i, val in enumerate(args.linear)}
+                    keys[i]: val for i, val in enumerate(args.linear)}
 
                 mann_obj = ManningsN.linear_with_depth(
                     hgrid, **linear_args)
