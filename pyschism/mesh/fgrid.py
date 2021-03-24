@@ -119,12 +119,12 @@ class Fgrid(Gr3):
         if isinstance(region, Polygon):
             region = [region]
         gdf1 = gpd.GeoDataFrame(
-                {'geometry': region}, crs='EPSG:4326')
+                {'geometry': region}, crs=self.crs)
 
         points = [Point(*coord) for coord in self.coords]
         gdf2 = gpd.GeoDataFrame(
                 {'geometry': points, 'index': list(range(len(points)))},
-                crs='EPSG:4326')
+                crs=self.crs)
         gdf_in = gpd.sjoin(gdf2, gdf1, op="within")
         picks = ([i.index for i in gdf_in.itertuples()])
         values = self.values.copy()
