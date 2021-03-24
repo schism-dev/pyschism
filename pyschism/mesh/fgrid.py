@@ -86,20 +86,24 @@ class Fgrid(Gr3):
     def linear_with_depth(
             cls,
             hgrid: Union[str, os.PathLike, Gr3],
-            values: Tuple[float, float],
-            depths: Union[Tuple[float, float], None] = None):
+            min_value: float = 0.02,
+            max_value: float = 0.05,
+            min_depth: float = None,
+            max_depth: float = None):
 
         # Inspired by https://github.com/schism-dev/schism/blob/master/src/Utility/Pre-Processing/NWM/Manning/write_manning.py
         obj = cls.from_hgrid(hgrid)
         hgrid_depths = obj.values.copy()
-        if not depths:
-            depths = (np.min(hgrid_depths.ravel()),
-                      np.max(hgrid_depths.ravel()))
+        if min_depth == None:
+            min_depth = np.min(hgrid_depths.ravel())
+        if max_depth == None:
+            max_depth = np.max(hgrid_depths.ravel())
+
         obj.nodes.values[:] = (
-                values[0] + (hgrid_depths - depths[0])
-                * (values[1] - values[0]) / (depths[1] - depths[0]))
-        obj.nodes.values[obj.nodes.values < values[0]] = values[0]
-        obj.nodes.values[obj.nodes.values > values[1]] = values[1]
+                min_value + (hgrid_depths - min_depth)
+                * (max_value - min_value) / (max_depth - min_depth))
+        obj.nodes.values[obj.nodes.values < min_value] = min_value
+        obj.nodes.values[obj.nodes.values > max_value] = max_value
 
         return obj
 
@@ -143,10 +147,12 @@ class ManningsN(Fgrid):
     def linear_with_depth(
             cls,
             hgrid: Union[str, os.PathLike, Gr3],
-            values: Tuple[float, float],
-            depths: Union[Tuple[float, float], None] = None):
+            min_value: float = 0.02,
+            max_value: float = 0.05,
+            min_depth: float = None,
+            max_depth: float = None):
         return super(ManningsN, cls).linear_with_depth(
-                hgrid, values, depths)
+                hgrid, min_value, max_value, min_depth, max_depth)
 
 class RoughnessLength(Fgrid):
 
