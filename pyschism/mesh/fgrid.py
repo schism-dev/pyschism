@@ -79,7 +79,9 @@ class Fgrid(Gr3):
     @classmethod
     def constant(cls, hgrid, value):
         obj = cls.from_hgrid(hgrid)
-        obj.nodes.values[:] = value
+        values = obj.values.copy()
+        values[:] = value
+        cls._update_node_values(obj, values)
         return obj
 
     @classmethod
@@ -99,14 +101,15 @@ class Fgrid(Gr3):
         if max_depth == None:
             max_depth = np.max(hgrid_depths.ravel())
 
-        obj.nodes.values[:] = (
+        values = (
                 min_value + (hgrid_depths - min_depth)
                 * (max_value - min_value) / (max_depth - min_depth))
-        obj.nodes.values[obj.nodes.values < min_value] = min_value
-        obj.nodes.values[obj.nodes.values > max_value] = max_value
+        values[values < min_value] = min_value
+        values[values > max_value] = max_value
+
+        cls._update_node_values(obj, values)
 
         return obj
-
 
     def add_region(
             self,
@@ -124,7 +127,18 @@ class Fgrid(Gr3):
                 crs='EPSG:4326')
         gdf_in = gpd.sjoin(gdf2, gdf1, op="within")
         picks = ([i.index for i in gdf_in.itertuples()])
-        self.nodes.values[picks] = value
+        values = self.values.copy()
+        values[picks] = value
+        self._update_node_values(self, values)
+
+
+    @staticmethod
+    def _update_node_values(gr3, values):
+        gr3.nodes.nodes = {
+            id: (coords, values[idx]) for idx, (id, (coords, _))
+            in enumerate(gr3.nodes.nodes.items())}
+        if hasattr(gr3.nodes, '_values'):
+            del gr3.nodes._values
 
 
 class ManningsN(Fgrid):
