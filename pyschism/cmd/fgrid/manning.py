@@ -17,8 +17,8 @@ class ManningsNCli:
                 outdir = Path(hgrid).parent
             outdir = Path(outdir)
 
-            if args.constant:
-                mann_obj = ManningsN.constant(hgrid, value)
+            if args.constant != None:
+                mann_obj = ManningsN.constant(hgrid, args.constant)
 
             elif args.linear != None:
                 # NOTE: args.linear can be empty list in which case
@@ -56,7 +56,7 @@ class ManningsNCli:
 
                 mann_obj.add_region(multipolygon, value)
 
-            mann_obj.write(outdir/'manning.gr3')
+            mann_obj.write(outdir/'manning.gr3', overwrite=args.overwrite)
             
             return
 
@@ -74,13 +74,15 @@ def manning_subparser(subparsers):
 
     gen_mann.add_argument('--hgrid', required=True)
     gen_mann.add_argument('--out-dir', required=False)
+    gen_mann.add_argument('--overwrite', action='store_true')
 
     gen_mode_grp = gen_mann.add_mutually_exclusive_group(required=True)
     gen_mode_grp.add_argument('--constant', type=float)
     gen_mode_grp.add_argument('--linear', nargs='*', type=float)
 
     gen_mann.add_argument(
-        '--region-specific', nargs=2, action='append')
+        '--region-specific', nargs=2, action='append',
+        default=list())
 
 
 add_manning = manning_subparser
