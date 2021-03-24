@@ -463,7 +463,7 @@ class AWSDataInventory:
 
 class NationalWaterModel(Hydrology):
 
-    def __init__(self):
+    def __init__(self, aggregation_radius=None):
         self._nwm_file = NWM_FILE
         if not self._nwm_file.exists():
             logger.warning(
@@ -478,6 +478,7 @@ class NationalWaterModel(Hydrology):
                 logger.fatal(
                     'Could not download NWM_channel_hydrofabric.tar.gz')
                 raise e
+        self.aggregation_radius = aggregation_radius
 
     def __call__(self, model_driver, nramp_ss: bool = False, dramp_ss=None,
                  nprocs=-1):
@@ -526,7 +527,10 @@ class NationalWaterModel(Hydrology):
             # Pass NWM data to Hydrology class.
             logging.info('Generating per-element hydrologic timeseries...')
             start = time()
-            hydro = Hydrology(pivot_time(), inventory.rnday)
+            hydro = Hydrology(
+                self.start_date,
+                self.rnday
+            )
             for i, file in enumerate(inventory.files):
                 nc = Dataset(file)
                 _time = localize_datetime(datetime.strptime(
@@ -540,19 +544,21 @@ class NationalWaterModel(Hydrology):
                 'Generating per-element hydrologic timeseries took '
                 f'{time() - start}.')
 
-            # aggregate timeseries
-            aggregation_radius = 4000.
+        # hindcast
+        else:
+            raise NotImplementedError('Hindcast is not implemented 30 days.')
+
+        # aggregate timeseries
+        if self.aggregation_radius is not None:
+            aggregation_radius = float(self.aggregation_radius)
             logging.info(
                 'Aggregating hydrology timeseries/elements using a '
                 f'radius of {aggregation_radius} meters.')
             start = time()
             hydro.aggregate_by_radius(model_driver.model_domain.hgrid,
                                       aggregation_radius)
-            logging.info(f'Aggregating NWM elements took {time() - start}.')
-
-        # hindcast
-        else:
-            raise NotImplementedError('Hindcast is not implemented 30 days.')
+            logging.info(
+                f'Aggregating NWM elements took {time() - start}.')
 
         # turn 'on' the source/sink system in SCHISM.
         model_driver.param.opt.if_source = 1

@@ -21,4 +21,4 @@ if __name__ == '__main__':
 
     stations = Stations.from_file('/home/jreniel/schism-dev/pyschism-forecast-useast/static/station.in', timedelta(minutes=6.0))
     stations.clip(hgrid.hull.multipolygon())
-    breakpoint()
+    # breakpoint()
