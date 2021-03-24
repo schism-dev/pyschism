@@ -50,7 +50,7 @@ setuptools.setup(
         'fiona',
         'f90nml',
         'psutil',
-        'scipy>=1.8.0',
+        'scipy',
         'wget',
         'appdirs',
         'cf-python',
