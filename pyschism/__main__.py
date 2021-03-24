@@ -22,7 +22,7 @@ def parse_args():
     add_forecast(subparsers)
     add_bctides(subparsers)
     add_stations(subparsers)
-    add_hgrid(subparsers)
+    # add_hgrid(subparsers)
     return parser.parse_args()
 
 
