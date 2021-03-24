@@ -1,9 +1,8 @@
 from collections import defaultdict
 from datetime import datetime, timedelta
 import logging
-import multiprocessing
+from multiprocessing import Pool
 import pathlib
-import tempfile
 import warnings
 import tarfile
 import tempfile
@@ -22,12 +21,12 @@ from psutil import cpu_count
 import pytz
 from scipy.spatial import cKDTree
 from shapely import ops
-from shapely.geometry import LinearRing, Point, MultiPoint, LineString
+from shapely.geometry import LinearRing, Point, MultiPoint, LineString, box
 import wget
 
 from pyschism.dates import localize_datetime, nearest_cycle_date, pivot_time
 from pyschism.mesh import Hgrid, Gr3
-from pyschism.forcing.hydrology.base import Hydrology, Sources, Sinks
+from pyschism.forcing.hydrology.base import Hydrology
 
 
 DATADIR = pathlib.Path(user_data_dir('nwm'))
@@ -88,22 +87,31 @@ class NWMElementPairings:
         # 1) Find reach-hull intersections.
         start = time()
         data = []
-        intersections: gpd.GeoDataFrame
+        intersection: gpd.GeoDataFrame
         for i, reach in enumerate(reaches.itertuples()):
             for ring in hgrid.hull.rings().itertuples():
                 if ring.geometry.intersects(reach.geometry):
+                    _intersections = ring.geometry.intersection(reach.geometry)
+                    if isinstance(_intersections, MultiPoint):
+                        # features with even number of intersections are
+                        # discarded.
+                        if len(_intersections.geoms) % 2 == 0:
+                            continue
+                        # if a feature has an odd number of intersections > 1,
+                        # we only take the last point.
+                        _intersections = _intersections.geoms[-1]
                     data.append({
-                        "geometry": ring.geometry.intersection(reach.geometry),
+                        "geometry": _intersections,
                         "reachIndex": i})
                     break
 
-        intersections = gpd.GeoDataFrame(data, crs=hgrid.crs)
+        intersection = gpd.GeoDataFrame(data, crs=hgrid.crs)
         del data
 
         # 2) Generate element centroid KDTree
         centroids = []
-        for element in hgrid.elements().values():
-            cent = LinearRing(hgrid.nodes.coord()[list(
+        for element in hgrid.elements.elements.values():
+            cent = LinearRing(hgrid.nodes.coord[list(
                 map(hgrid.nodes.get_index_by_id, element))]
             ).centroid
             centroids.append((cent.x, cent.y))
@@ -111,36 +119,31 @@ class NWMElementPairings:
         del centroids
 
         # 3) Match reach/boundary intersection to nearest element centroid
-        element_index = {}
-        for inters in intersections.itertuples():
-            geom = inters.geometry
-            if isinstance(geom, Point):
-                geom = MultiPoint(geom.coords)
-            element_index[inters.reachIndex] = []
-            for point in geom:
-                _, idx = tree.query(point, workers=-1)
-                element_index[inters.reachIndex].append(idx)
+
+        coords = [np.array(inters.geometry.coords)
+                  for inters in intersection.itertuples()]
+        _, idxs = tree.query(np.vstack(coords), workers=-1)
+
+        element_index = defaultdict(list)
+        for i, idx in enumerate(idxs):
+            element_index[intersection.iloc[i].reachIndex].append(idx)
         del tree
         logger.info(
             'Pairing features to corresponding element took '
             f'{time()-start}.')
 
-        start = time()
-        elements = hgrid.elements.geodataframe()
-        logger.info(
-            'Generating mesh-element geodataframe took: '
-            f'{time()-start}.')
-        del self._hgrid  # release
+        hull = hgrid.hull.multipolygon()
+        # del self._hgrid  # release
 
         start = time()
         sources = defaultdict(set)
         sinks = defaultdict(set)
         for reach_index, paired_elements_idxs in element_index.items():
             reach = reaches.iloc[reach_index]
-            point_of_intersection = intersections.loc[
-                intersections["reachIndex"] == reach_index]
+            point_of_intersection = intersection.loc[
+                intersection["reachIndex"] == reach_index]
             for element_idx in paired_elements_idxs:
-                element = elements.iloc[element_idx]
+                element = hgrid.elements.gdf.iloc[element_idx]
                 if not isinstance(reach.geometry, LineString):
                     geom = ops.linemerge(reach.geometry)
                 else:
@@ -151,24 +154,78 @@ class NWMElementPairings:
                             point_of_intersection.iloc[0].geometry.buffer(
                                 np.finfo(np.float32).eps)):
                         downstream = segment.coords[-1]
-                        if element.geometry.contains(Point(downstream)):
+                        if box(*segment.bounds).intersection(hull).intersects(
+                                Point(downstream)):
                             sources[element.id].add(reach.feature_id)
                         else:
                             sinks[element.id].add(reach.feature_id)
-                        break
+
         logger.info(
             'Sorting features into sources and sinks took: '
             f'{time()-start}.')
-        self._sources = sources
-        self._sinks = sinks
+
+        # verification plot
+        # data = []
+        # for eid, features in sources.items():
+        #     # for feat in features:
+        #     eidx = self._hgrid.elements.get_index_by_id(eid)
+        #     data.append({
+        #             'geometry': elements.iloc[eidx].geometry
+        #         })
+        # src_gdf = gpd.GeoDataFrame(data)
+        # data = []
+        # for eid, features in sinks.items():
+        #     # for feat in features:
+        #     eidx = self._hgrid.elements.get_index_by_id(eid)
+        #     data.append({
+        #             'geometry': elements.iloc[eidx].geometry
+        #         })
+        # snk_gdf = gpd.GeoDataFrame(data)
+        # import matplotlib.pyplot as plt
+        # ax = elements.plot(facecolor="none",  edgecolor='black', lw=0.7)
+        # src_gdf.plot(color='red', ax=ax, alpha=0.5)
+        # snk_gdf.plot(color='blue', ax=ax, alpha=0.5)
+        # plt.show()
+
+        self.sources = sources
+        self.sinks = sinks
 
     @property
-    def sources(self):
-        return self._sources
+    def sources_gdf(self):
+        if not hasattr(self, '_sources_gdf'):
+            data = []
+            for eid, features in self.sources.items():
+                eidx = self.hgrid.elements.get_index_by_id(eid)
+                data.append(
+                    {
+                        'element_id': eid,
+                        'geometry':
+                            self.hgrid.elements.gdf.loc[eidx].geometry,
+                        'features': list(features),
+                    })
+            self._sources_gdf = gpd.GeoDataFrame(data)
+        return self._sources_gdf
 
     @property
-    def sinks(self):
-        return self._sinks
+    def sinks_gdf(self):
+        if not hasattr(self, '_sinks_gdf'):
+            data = []
+            for eid, features in self.sinks.items():
+                eidx = self.hgrid.elements.get_index_by_id(eid)
+                data.append(
+                    {
+                        'element_id': eid,
+                        'geometry':
+                            self.hgrid.elements.gdf.loc[eidx].geometry,
+                        'features': list(features),
+
+                    })
+            self._sinks_gdf = gpd.GeoDataFrame(data)
+        return self._sinks_gdf
+
+    @property
+    def hgrid(self):
+        return self._hgrid
 
     @property
     def _hgrid(self):
@@ -199,7 +256,7 @@ class NWMElementPairings:
     @property
     def gdf(self):
         if not hasattr(self, '_gdf'):
-            bbox = self._hgrid.bbox
+            bbox = self._hgrid.get_bbox(crs='EPSG:4326', output_type='bbox')
             self._gdf = gpd.read_file(
                 self.nwm_file,
                 bbox=(bbox.xmin, bbox.ymin, bbox.xmax, bbox.ymax),
@@ -209,34 +266,14 @@ class NWMElementPairings:
         return self._gdf
 
 
-class NWMDataGetter:
-
-    def __init__(
-            self,
-            pairings: NWMElementPairings,
-            start_date: datetime,
-            rnday: timedelta
-    ):
-        self._pairings = pairings
-        # naïve-datetime
-        self._start_date = localize_datetime(start_date).astimezone(pytz.utc)
-        self._rnday = rnday
-
-
-def streamflow_lookup(file, pairings):
+def streamflow_lookup(file, indexes):
     nc = Dataset(file)
     streamflow = nc['streamflow'][:]
-    feature_id = nc['feature_id'][:]
-    sources = []
+    data = []
     # TODO: read scaling factor directly from netcdf file?
-    for features in pairings.sources.values():
-        in_file = np.in1d(feature_id, list(features), assume_unique=True)
-        sources.append(0.01*np.sum(streamflow[np.where(in_file)]))
-    sinks = []
-    for features in pairings.sinks.values():
-        in_file = np.in1d(feature_id, list(features), assume_unique=True)
-        sinks.append(-0.01*np.sum(streamflow[np.where(in_file)]))
-    return sources, sinks
+    for indxs in indexes:
+        data.append(0.01*np.sum(streamflow[indxs]))
+    return data
 
 
 class AWSDataInventory:
@@ -277,6 +314,28 @@ class AWSDataInventory:
                 f'Model start_date={str(self.start_date)} is not a "pivot" '
                 'time.')
 
+    def get_nc_pairing_indexes(self, pairings: NWMElementPairings):
+        nc_feature_id = Dataset(self.files[0])['feature_id'][:]
+
+        def get_aggregated_features(features):
+            aggregated_features = []
+            for source_feats in features:
+                aggregated_features.extend(list(source_feats))
+            in_file = np.where(
+                np.in1d(nc_feature_id, aggregated_features,
+                        assume_unique=True))[0]
+            in_file_2 = []
+            sidx = 0
+            for source_feats in features:
+                eidx = sidx + len(source_feats)
+                in_file_2.append(in_file[sidx:eidx].tolist())
+                sidx = eidx
+            return in_file_2
+
+        sources = get_aggregated_features(pairings.sources.values())
+        sinks = get_aggregated_features(pairings.sinks.values())
+        return sources, sinks
+
     @property
     def bucket(self):
         return 'noaa-nwm-pds'
@@ -311,10 +370,10 @@ class AWSDataInventory:
     @property
     def timevector(self):
         return np.arange(
-                    self.start_date,
-                    self.start_date + self.rnday + self.output_interval,
-                    self.output_interval
-                ).astype(datetime)
+            self.start_date,
+            self.start_date + self.rnday + self.output_interval,
+            self.output_interval
+        ).astype(datetime)
 
     def _fetch_data(self):
 
@@ -332,13 +391,13 @@ class AWSDataInventory:
             Bucket=self.bucket,
             Delimiter='/',
             Prefix=f'nwm.{nwm_time}/{self.product}/'
-                   )
+        )
 
         if 'Contents' in res:
             # contents will be empty when t00z is called.
             data = list(reversed(sorted([
-                data['Key'] for data in res['Contents'] if 'channel' in data['Key']
-                ])))
+                data['Key'] for data in res['Contents'] if 'channel'
+                in data['Key']])))
         else:
             data = []
 
@@ -349,11 +408,11 @@ class AWSDataInventory:
             Bucket=self.bucket,
             Delimiter='/',
             Prefix=f'nwm.{nwm_time}/{self.product}/'
-                   )
+        )
 
         data.extend(list(reversed(sorted([
             data['Key'] for data in res['Contents'] if 'channel' in data['Key']
-            ]))))
+        ]))))
 
         nearest_cycle = int(6 * np.floor(requested_time.hour/6))
         previous_cycle = (nearest_cycle - 6) % 24
@@ -362,8 +421,8 @@ class AWSDataInventory:
                 and f't{previous_cycle:02d}z' in data[0]:
             if self.fallback is True:
                 warnings.warn(
-                        f'NWM data for cycle t{nearest_cycle:02d}z is not yet '
-                        'on the server, defaulting to previous cycle.')
+                    f'NWM data for cycle t{nearest_cycle:02d}z is not yet '
+                    'on the server, defaulting to previous cycle.')
             else:
                 raise IOError(
                     'Unknown error while fetching NWM data.')
@@ -391,35 +450,6 @@ class AWSDataInventory:
             if data is None:
                 raise IOError(f'No NWM data for time {str(dt)}.')
 
-    def __call__(self, pairings: NWMElementPairings, h0=1e-1, nprocs=-1):
-        logger.info('Launching streamflow lookup...')
-        start = time()
-        with multiprocessing.Pool(
-                processes=cpu_count() if nprocs == -1 else nprocs
-        ) as pool:
-            res = pool.starmap(
-                streamflow_lookup, [(file, pairings) for file in self.files])
-        pool.join()
-        logger.info(f'streamflow lookup took {time()-start}...')
-
-        logger.info('Adding streamflow data as sources and sinks...')
-        start = time()
-        sources = Sources()
-        sinks = Sinks()
-        for i, file in enumerate(self.files):
-            nc = Dataset(file)
-            _time = pytz.timezone('UTC').localize(
-                datetime.strptime(
-                    nc.model_output_valid_time,
-                    "%Y-%m-%d_%H:%M:%S"))
-            # TODO: This is slow, it might change if add_data is vectorized.
-            for j, element_id in enumerate(pairings.sources.keys()):
-                sources.add_data(_time, element_id, res[i][0][j], -9999, 0.)
-            for k, element_id in enumerate(pairings.sinks.keys()):
-                sinks.add_data(_time, element_id, res[i][1][k])
-        logger.info(f'Adding source/sink data took {time()-start}.')
-        return sources, sinks
-
     @property
     def files(self):
         return sorted(list(pathlib.Path(self.tmpdir.name).glob('**/*.nc')))
@@ -429,28 +459,6 @@ class AWSDataInventory:
         return {
             'medium_range_mem1': 'medium_range.channel_rt_1'
         }[self.product]
-
-
-class AWSDataGetter(NWMDataGetter):
-
-    def __call__(self, product: str = 'medium_range_mem1',
-                 verbose: bool = False, h0=1e-1, nprocs=-1):
-        """
-        We just picked up a server_config. This part must be slurm-aware and
-        potentially
-        """
-        return AWSDataInventory(
-            start_date=self._start_date,
-            rnday=self._rnday,
-            product=product,
-            verbose=False
-        )(self._pairings, h0, nprocs)
-
-
-class FTPDataGetter(NWMDataGetter):
-
-    def __call__(self):
-        raise NotImplementedError('FTPDataGetter')
 
 
 class NationalWaterModel(Hydrology):
@@ -471,10 +479,8 @@ class NationalWaterModel(Hydrology):
                     'Could not download NWM_channel_hydrofabric.tar.gz')
                 raise e
 
-        super().__init__()
-
     def __call__(self, model_driver, nramp_ss: bool = False, dramp_ss=None,
-                 h0=1e-1, nprocs=-1):
+                 nprocs=-1):
         """Initializes the NWM data.
         Used by :class:`pyschism.driver.ModelDriver`
 
@@ -482,17 +488,67 @@ class NationalWaterModel(Hydrology):
         The are fringe cases not yet covered, for example when the data spans
         more than 1 data source.
         """
-        super().__call__(model_driver)
-        logger.info('NationalWaterModel.__call__')
+        super().__init__(
+            model_driver.param.opt.start_date,
+            model_driver.param.core.rnday
+        )
+        logger.info('Initializing NationalWaterModel data.')
         pairings = NWMElementPairings(model_driver.model_domain.hgrid)
-        start_date = model_driver.param.opt.start_date
-        rnday = model_driver.param.core.rnday
+
+        # start_date = model_driver.param.opt.start_date
+        # rnday = model_driver.param.core.rnday
 
         # forecast
-        if start_date >= pivot_time() - timedelta(days=30): 
+        if self.start_date >= pivot_time() - timedelta(days=30):
             logger.info('Fetching NWM data.')
-            AWSData = AWSDataGetter(pairings, start_date, rnday)
-            sources, sinks = AWSData(h0=h0, nprocs=nprocs)
+            # (self._pairings, h0, nprocs)
+            inventory = AWSDataInventory(
+                start_date=self.start_date,
+                rnday=self.rnday,
+                product='medium_range_mem1',
+                verbose=False
+            )
+
+            logger.info('Launching streamflow lookup...')
+            source_indexes, sinks_indexes = inventory.get_nc_pairing_indexes(
+                pairings)
+            start = time()
+            with Pool(processes=cpu_count()) as pool:
+                sources = pool.starmap(
+                    streamflow_lookup,
+                    [(file, source_indexes) for file in inventory.files])
+                sinks = pool.starmap(
+                    streamflow_lookup,
+                    [(file, sinks_indexes) for file in inventory.files])
+            pool.join()
+            logger.info(f'streamflow lookup took {time()-start}...')
+
+            # Pass NWM data to Hydrology class.
+            logging.info('Generating per-element hydrologic timeseries...')
+            start = time()
+            hydro = Hydrology(pivot_time(), inventory.rnday)
+            for i, file in enumerate(inventory.files):
+                nc = Dataset(file)
+                _time = localize_datetime(datetime.strptime(
+                    nc.model_output_valid_time,
+                    "%Y-%m-%d_%H:%M:%S"))
+                for j, element_id in enumerate(pairings.sources.keys()):
+                    hydro.add_data(_time, element_id, sources[i][j], -9999, 0.)
+                for k, element_id in enumerate(pairings.sinks.keys()):
+                    hydro.add_data(_time, element_id, -sinks[i][k])
+            logging.info(
+                'Generating per-element hydrologic timeseries took '
+                f'{time() - start}.')
+
+            # aggregate timeseries
+            aggregation_radius = 4000.
+            logging.info(
+                'Aggregating hydrology timeseries/elements using a '
+                f'radius of {aggregation_radius} meters.')
+            start = time()
+            hydro.aggregate_by_radius(model_driver.model_domain.hgrid,
+                                      aggregation_radius)
+            logging.info(f'Aggregating NWM elements took {time() - start}.')
 
         # hindcast
         else:

@@ -153,8 +153,9 @@ class Bctides:
                      f'{forcing[2]:G} ' \
                      f'{forcing[3]:G} ' \
                      f'{forcing[4]:G}\n'
-        f += f'{self.tidal_forcing.nbfr:d}\n'
-        for constituent in self.get_active_forcing_constituents():
+        afc = self._model_domain.get_active_forcing_constituents()
+        f += f'{len(afc):d}\n'
+        for constituent in afc:
             forcing = self.tidal_forcing(
                 self.start_date, self.rnday, constituent)
             f += f'{constituent} \n' \

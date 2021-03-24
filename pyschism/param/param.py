@@ -12,6 +12,7 @@ from pyschism.stations import Stations
 
 _logger = logging.getLogger(__name__)
 
+
 class Param:
 
     def __init__(
@@ -33,7 +34,7 @@ class Param:
         self._model_domain = model_domain
         self._core = CORE(ibc, rnday, dt, nspool, ihfskip)
         self._opt = OPT(dramp, drampbc, start_date)
-        self._schout = SCHOUT(**surface_outputs)
+        self._schout = SCHOUT(dt, rnday, **surface_outputs)
         self._nhot_write = nhot_write
         self._stations = stations
 
@@ -138,5 +139,10 @@ class Param:
             f"Argument stations must be of type {Stations} or None, " \
             f"not type {type(stations)}."
         if isinstance(stations, Stations):
-            raise NotImplementedError("Do something!")
+            stations.transform_to(self.model_domain.hgrid.crs)
+            stations.clip(
+                self.model_domain.hgrid.get_bbox()
+            )
+            self.schout.iout_sta = 1
+            self.schout.nspool_sta = stations.nspool_sta
         self.__stations = stations

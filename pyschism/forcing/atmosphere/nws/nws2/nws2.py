@@ -14,52 +14,7 @@ SFLUX_DEFAULTS = f90nml.read(
     pathlib.Path(__file__).parent / 'sflux_inputs.txt')
 
 
-class Sflux1Descriptor:
-
-    def __set__(self, obj, sflux_1: SfluxDataset):
-        if not isinstance(sflux_1, SfluxDataset):
-            raise TypeError(f'Argument sflux_1 must be of type {SfluxDataset},'
-                            f' not type {type(sflux_1)}')
-        obj.__dict__['sflux_1'] = sflux_1
-
-    def __get__(self, obj, val):
-        return obj.__dict__['sflux_1']
-
-
-class Sflux2Descriptor:
-
-    def __set__(self, obj, sflux_2: Union[SfluxDataset, None]):
-        if sflux_2 is not None:
-            if not isinstance(sflux_2, SfluxDataset):
-                raise TypeError(f'Argument sflux_2 must be of type {SfluxDataset},'
-                                f' not type {type(sflux_2)}.')
-            obj.__dict__['sflux_2'] = sflux_2
-
-    def __get__(self, obj, val):
-        return obj.__dict__.get('sflux_2')
-
-
-class WindRotDescriptor:
-
-    def __set__(self, obj, grd: Gr3):
-        if not isinstance(grd, Gr3):
-            raise TypeError(f'Argument grd must be of type {Gr3}, '
-                            f'not type {type(grd)}.')
-        data = grd.to_dict()
-        data.pop("boundaries", None)
-        data["nodes"] = {id: (coord, 0.) for id, (coord, _)
-                         in data["nodes"].items()}
-        obj.__dict__['windrot'] = Gr3(**data)
-
-    def __get__(self, obj, val):
-        return obj.__dict__.get('windrot')
-
-
 class NWS2(NWS):
-
-    _sflux_1 = Sflux1Descriptor()
-    _sflux_2 = Sflux2Descriptor()
-    _windrot = WindRotDescriptor()
 
     def __init__(self, sflux_1: SfluxDataset,
                  sflux_2: SfluxDataset = None):
@@ -69,20 +24,22 @@ class NWS2(NWS):
         #     print(key, item)
         #     setattr(self, key, item)
 
-        self._sflux_1 = sflux_1
-        self._sflux_2 = sflux_2
+        self.sflux_1 = sflux_1
+        self.sflux_2 = sflux_2
 
     def __call__(self, model_driver):
         super().__call__(model_driver)
         if hasattr(self.sflux_1, 'fetch_data'):
             self.sflux_1.fetch_data(
                 self._start_date, self._rnday,
-                bbox=model_driver.model_domain.hgrid.get_bbox('EPSG:4326'))
+                bbox=model_driver.model_domain.hgrid.get_bbox(
+                    'EPSG:4326', output_type='bbox'))
         if self.sflux_2 is not None:
             if hasattr(self.sflux_2, 'fetch_data'):
                 self.sflux_2.fetch_data(
                     self._start_date, self._rnday,
-                    bbox=model_driver.model_domain.hgrid.get_bbox('EPSG:4326'))
+                    bbox=model_driver.model_domain.hgrid.get_bbox(
+                        'EPSG:4326', output_type='bbox'))
         self._windrot = model_driver.model_domain.hgrid
 
     def __str__(self):
@@ -107,10 +64,10 @@ class NWS2(NWS):
                 path, 2, overwrite, start_date=self._start_date,
                 rnday=self._rnday)
         # # write windrot data
-        if self._windrot is not None:
+        if self.windrot is not None:
             if wind_rot is True:
-                self._windrot.write(path.parent / 'windrot_geo2proj.gr3',
-                                    overwrite)
+                self.windrot.write(path.parent / 'windrot_geo2proj.gr3',
+                                   overwrite)
 
     @property
     def dtype(self) -> NWSType:
@@ -121,6 +78,37 @@ class NWS2(NWS):
     def sflux_1(self) -> SfluxDataset:
         return self._sflux_1
 
+    @sflux_1.setter
+    def sflux_1(self, sflux_1):
+        if not isinstance(sflux_1, SfluxDataset):
+            raise TypeError(f'Argument sflux_1 must be of type {SfluxDataset},'
+                            f' not type {type(sflux_1)}')
+        self._sflux_1 = sflux_1
+
     @property
     def sflux_2(self) -> SfluxDataset:
         return self._sflux_2
+
+    @sflux_2.setter
+    def sflux_2(self, sflux_2):
+        if sflux_2 is not None:
+            if not isinstance(sflux_2, SfluxDataset):
+                raise TypeError(
+                    f'Argument sflux_2 must be of type {SfluxDataset}, not '
+                    f'type {type(sflux_2)}.')
+        self._sflux_2 = sflux_2
+
+    @property
+    def windrot(self):
+        return self._windrot
+
+    @windrot.setter
+    def windrot(self, grd):
+        if not isinstance(grd, Gr3):
+            raise TypeError(f'Argument grd must be of type {Gr3}, '
+                            f'not type {type(grd)}.')
+        data = grd.to_dict()
+        data.pop("boundaries", None)
+        data["nodes"] = {id: (coord, 0.) for id, (coord, _)
+                         in data["nodes"].items()}
+        self._windrot = Gr3(**data)

@@ -147,7 +147,7 @@ class Hgrid(Gr3):
         _grd = super().to_dict()
         _grd.update({
             "nodes": {id: (coord, -val) for id, (coord, val)
-                      in self.nodes().items()},
+                      in self.nodes.nodes.items()},
             "boundaries": self.boundaries.data})
         return _grd
 

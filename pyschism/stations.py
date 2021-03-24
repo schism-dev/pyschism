@@ -46,14 +46,14 @@ class Stations:
 
         if not isinstance(nspool_sta, (int, timedelta)):
             raise TypeError('nspool_sta must be an int or timedelta')
-        self.__nspool_sta = nspool_sta
+        self._nspool_sta = nspool_sta
 
         if isinstance(crs, str):
             crs = CRS.from_user_input(crs)
-        self.__crs = crs
+        self._crs = crs
 
         # contains main station data (coordinates and id)
-        self.__stations: List[Dict[str, Any]] = []
+        self._stations: List[Dict[str, Any]] = []
 
         # init the properties
         self.elev = elev
@@ -67,12 +67,12 @@ class Stations:
         self.w = w
 
     def __iter__(self):
-        for i, s in enumerate(self.__stations):
+        for i, s in enumerate(self._stations):
             yield i+1, s['x'], s['y'], s['z'], s['comment']
 
     def __str__(self):
         f = [f'{self.state}',
-             f'{len(self.__stations)}']
+             f'{len(self._stations)}']
         for i, x, y, z, comment in self:
             if comment is None:
                 comment = ''
@@ -146,7 +146,7 @@ class Stations:
             comment (optional): Can be used to store the COOPS id, useful
                 during post-processing for validation.
         """
-        self.__stations.append({'x': x, 'y': y, 'z': z, 'comment': comment})
+        self._stations.append({'x': x, 'y': y, 'z': z, 'comment': comment})
 
     def get_active_vars(self) -> List[str]:
         """Returns a list of the names of activated output variables.
@@ -171,13 +171,13 @@ class Stations:
         if dst_crs.equals(self.crs):
             return
         transformer = Transformer.from_crs(self.crs, dst_crs, always_xy=True)
-        x = [_['x'] for _ in self.__stations]
-        y = [_['y'] for _ in self.__stations]
+        x = [_['x'] for _ in self._stations]
+        y = [_['y'] for _ in self._stations]
         xy = list(zip(*transformer.transform(x, y)))
         for i, (x, y) in enumerate(xy):
-            self.__stations[i]['x'] = x
-            self.__stations[i]['y'] = y
-        self.__crs = dst_crs
+            self._stations[i]['x'] = x
+            self._stations[i]['y'] = y
+        self._crs = dst_crs
 
     def clip(self, geometry: Union[Polygon, MultiPolygon]):
         """Eliminates any stations not contained within the given geometry.
@@ -189,13 +189,9 @@ class Stations:
             geometry: Polygon or MultiPolygon used for clipping the
                 stations. Normally this comes from Hgrid.get_multipolygon()
         """
-
-        eliminate: List[int] = []
-        for id, x, y, _, _ in self:
-            if not geometry.contains(Point(x, y)):
-                eliminate.insert(id-1, 0)
-        for id in eliminate:
-            del(self.__stations[id])
+        for i, s in reversed(list(enumerate(self._stations))):
+            if not geometry.contains(Point(s['x'], s['y'])):
+                self._stations.pop(i)
 
     def write(self, path: Union[str, pathlib.Path], overwrite: bool = False):
         """Writes the SCHISM station.in file to disk.
@@ -213,17 +209,17 @@ class Stations:
     @property
     def stations(self) -> List[Dict]:
         """Returns list of currently loaded stations."""
-        return self.__stations
+        return self._stations
 
     @property
     def nspool_sta(self) -> Union[int, timedelta]:
         """Returns output frequency."""
-        return self.__nspool_sta
+        return self._nspool_sta
 
     @property
     def crs(self) -> Union[CRS, None]:
         """Returns coordinate reference system of the current instance."""
-        return self.__crs
+        return self._crs
 
     @property
     def state(self) -> str:
@@ -234,90 +230,90 @@ class Stations:
     @property
     def elev(self) -> bool:
         """Returns state (ON/OFF) of variable elev request."""
-        return self.__elev
+        return self._elev
 
     @elev.setter
     def elev(self, elev: bool):
         assert isinstance(elev, bool), 'Argument to "elev" must be boolean'
-        self.__elev = elev
+        self._elev = elev
 
     @property
     def air_pressure(self) -> bool:
         """Returns state (ON/OFF) of variable air_pressure request."""
-        return self.__air_pressure
+        return self._air_pressure
 
     @air_pressure.setter
     def air_pressure(self, air_pressure: bool):
         assert isinstance(air_pressure, bool), \
             'Argument to "air_pressure" must be boolean'
-        self.__air_pressure = air_pressure
+        self._air_pressure = air_pressure
 
     @property
     def windx(self) -> bool:
         """Returns state (ON/OFF) of variable windx request."""
-        return self.__windx
+        return self._windx
 
     @windx.setter
     def windx(self, windx: bool):
         assert isinstance(windx, bool), 'Argument to "windx" must be boolean'
-        self.__windx = windx
+        self._windx = windx
 
     @property
     def windy(self) -> bool:
         """Returns state (ON/OFF) of variable windy request."""
-        return self.__windy
+        return self._windy
 
     @windy.setter
     def windy(self, windy: bool):
         assert isinstance(windy, bool), 'Argument to "windy" must be boolean'
-        self.__windy = windy
+        self._windy = windy
 
     @property
     def T(self) -> bool:
         """Returns state (ON/OFF) of variable T request."""
-        return self.__T
+        return self._T
 
     @T.setter
     def T(self, T: bool):
         assert isinstance(T, bool), 'Argument to "T" must be boolean'
-        self.__T = T
+        self._T = T
 
     @property
     def S(self) -> bool:
         """Returns state (ON/OFF) of variable S request."""
-        return self.__S
+        return self._S
 
     @S.setter
     def S(self, S: bool):
         assert isinstance(S, bool), 'Argument to "S" must be boolean'
-        self.__S = S
+        self._S = S
 
     @property
     def u(self) -> bool:
         """Returns state (ON/OFF) of variable u request."""
-        return self.__u
+        return self._u
 
     @u.setter
     def u(self, u: bool):
         assert isinstance(u, bool), 'Argument to "u" must be boolean'
-        self.__u = u
+        self._u = u
 
     @property
     def v(self) -> bool:
         """Returns state (ON/OFF) of variable v request."""
-        return self.__v
+        return self._v
 
     @v.setter
     def v(self, v: bool):
         assert isinstance(v, bool), 'Argument to "v" must be boolean'
-        self.__v = v
+        self._v = v
 
     @property
     def w(self) -> bool:
         """Returns state (ON/OFF) of variable w request."""
-        return self.__w
+        return self._w
 
     @w.setter
     def w(self, w: bool):
         assert isinstance(w, bool), 'Argument to "w" must be boolean'
-        self.__w = w
+        self._w = w

@@ -144,10 +144,14 @@ class SCHOUT(metaclass=SchoutMeta):
     nhot_write = NhotWrite()
     nspool_sta = NspoolSta()
 
-    def __init__(self, **outputs):
+    def __init__(self, dt, rnday, **outputs):
         _logger.info('Initializing SCHOUT.')
         for key, val in outputs.items():
             setattr(self, key, val)
+        self._dt = dt.total_seconds() if isinstance(dt, timedelta) \
+            else float(dt)
+        self._rnday = rnday.total_seconds() / 3600. if isinstance(
+                rnday, timedelta) else float(rnday)
 
     def __iter__(self):
         for outvar in self._surface_output_vars:
@@ -159,8 +163,17 @@ class SCHOUT(metaclass=SchoutMeta):
             schout.append(f"  nhot={self._nhot}")
             schout.append(f"  nhot_write={self.nhot_write}")
         if self.nspool_sta is not None:
+            nspool_sta = self.nspool_sta
+            if isinstance(nspool_sta, timedelta):
+                nspool_sta = int(round(nspool_sta.total_seconds() / self._dt))
+            if isinstance(nspool_sta, float):
+                nspool_sta = int(
+                    round(timedelta(hours=nspool_sta) / self._dt))
+            if isinstance(nspool_sta, (int, float)):
+                if nspool_sta <= 0:
+                    raise ValueError("nspool_sta must be positive.")
             schout.append(f"  iout_sta={self._iout_sta}")
-            schout.append(f"  nspool_sta={self.nspool_sta}")
+            schout.append(f"  nspool_sta={nspool_sta}")
         for var in dir(self):
             if var.startswith('_iof'):
                 for i, state in enumerate(getattr(self, var)):

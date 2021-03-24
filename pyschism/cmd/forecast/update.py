@@ -3,7 +3,7 @@ from collections import namedtuple
 from datetime import timedelta
 import json
 import os
-# import logging
+import pathlib
 import subprocess
 
 from pyschism.cmd.forecast.init import ForecastInit
@@ -13,8 +13,7 @@ from pyschism.forcing.atmosphere.nws.nws2 import NWS2
 from pyschism.forcing.atmosphere import GlobalForecastSystem as GFS
 from pyschism.forcing.hydrology import NationalWaterModel as NWM
 from pyschism.param.schout import SurfaceOutputVars
-
-# logger = logging.getLogger()
+from pyschism.stations import Stations
 
 
 class HotstartDirectory:
@@ -75,13 +74,20 @@ class HotstartDriver:
                 # ihfskip=obj.args.ihfskip,
                 start_date=obj.target_datetime,
                 # ibc=obj.ibc,
-                # stations=obj.stations,
+                stations=obj.stations,
                 nspool=obj.nspool,
                 combine_hotstart=obj.previous_run_directory / 'outputs',
                 server_config=obj.server_config,
                 **self.surface_outputs(obj)
                 )
             obj.__dict__['hotstart_driver'] = hotstart_driver
+
+            # Initialize hydrology elevations on hotstart file.
+            if obj.args.action == 'init':
+                if len(obj.hotstart_domain.hydrology) > 0:
+                    hotstart_driver._combine_hotstart.add_elev_ic(
+                        obj.hotstart_domain.hgrid)
+
         return hotstart_driver
 
     def surface_outputs(self, obj):
@@ -284,3 +290,34 @@ class ForecastUpdate(ForecastInit):
             raise NotImplementedError(
                 'Must find previous_run_directory from the hotstarts or '
                 'regenerate init')
+
+    @property
+    def stations(self):
+        if not hasattr(self, '_stations'):
+            if self.args.nspool_sta is None:
+                nspool_sta = timedelta(minutes=6)
+            elif '.' in self.args.nspool_sta:
+                nspool_sta = timedelta(minutes=float(self.args.nspool_sta))
+            else:
+                nspool_sta = int(self.args.nspool_sta)
+            if self.args.stations_file is not None:
+                self._stations = Stations.from_file(
+                    pathlib.Path(self.args.stations_file),
+                    timedelta(minutes=6) if self.args.nspool_sta is None else
+                    nspool_sta,
+                    self.hotstart_domain.hgrid.crs if
+                    self.args.stations_file_crs is None
+                    else self.args.stations_file_crs,
+                    elev=self.args.stations_elev,
+                    air_pressure=self.args.stations_prmsl,
+                    windx=self.args.stations_uwind,
+                    windy=self.args.stations_vwind,
+                    T=self.args.stations_temp,
+                    S=self.args.stations_sal,
+                    u=self.args.stations_uvel,
+                    v=self.args.stations_vvel,
+                    w=self.args.stations_wvel,
+                    )
+            else:
+                self._stations = None
+        return self._stations
