@@ -3,6 +3,7 @@ import os
 import pathlib
 from typing import Union, Tuple
 from copy import deepcopy
+import numpy as np
 
 from pyproj import CRS  # type: ignore[import]
 from shapely.geometry import Polygon, MultiPolygon, Point
