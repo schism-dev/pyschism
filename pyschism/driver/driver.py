@@ -30,14 +30,14 @@ class CombineHotstartBinary:
             ["combine_hotstart7", '-i', f'{iteration}'], cwd=path)
         self.path = path / f"hotstart_it={iteration}.nc"
 
-    def add_elev_ic(self, hgrid):
+    def add_elev_ic(self, hgrid, offset=-0.1):
         nc = Dataset(self.path, 'r+')
         mask = np.logical_and(
                 hgrid.values > 0.,
                 nc['eta2'][:] < hgrid.values
             )
         idxs = np.where(mask)
-        nc['eta2'][idxs] = hgrid.values[idxs] - 0.01
+        nc['eta2'][idxs] = hgrid.values[idxs] + offset
         nc.close()
 
 
