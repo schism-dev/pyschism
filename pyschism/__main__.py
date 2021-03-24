@@ -8,7 +8,7 @@ from pytz import timezone
 from pyschism.cmd.forecast.forecast import ForecastCli, add_forecast
 from pyschism.cmd.bctides import BctidesCli, add_bctides
 from pyschism.cmd.stations import StationsCli, add_stations
-from pyschism.cmd.hgrid import HgridCli, add_hgrid
+# from pyschism.cmd.hgrid import HgridCli, add_hgrid
 
 
 def parse_args():
@@ -51,8 +51,8 @@ def main():
     elif args.mode == 'stations':
         StationsCli(args)
 
-    elif args.mode == 'hgrid':
-        HgridCli(args)
+    # elif args.mode == 'hgrid':
+    #     HgridCli(args)
 
     else:
         raise NotImplementedError(f'Unhandled CLI mode: {args.mode}')
