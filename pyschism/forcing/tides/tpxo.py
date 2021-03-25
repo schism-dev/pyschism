@@ -46,8 +46,6 @@ class TPXO(TidalDataProvider):
         return amp, phase
 
     def get_velocity(self, constituent, vertices):
-        if self._uv is None:
-            raise_missing_file()
         logger.info('Querying TPXO for velocity constituent '
                     f'{constituent}.')
         uamp = self._get_interpolation(

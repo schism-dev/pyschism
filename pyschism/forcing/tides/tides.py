@@ -72,9 +72,6 @@ class Tides(bctypes.BoundaryCondition):
                 boundary initial conditions, defaults to TidalDatabase.TPXO
         """
         _logger.info('Initializing tidal boundary conditions.')
-        if velocity is True and database == 'tpxo':
-            raise NotImplementedError(
-                'Boundary velocities are temporarily disabled for TPXO.')
         super().__init__(
             iettype=bctypes.InitialElevationType.TIDAL
             if elevation is True else bctypes.InitialElevationType.NONE,
