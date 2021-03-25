@@ -143,12 +143,14 @@ class Hgrid(Gr3):
                          in _grd['nodes'].items()}
         return Hgrid(**_grd)
 
-    def to_dict(self):
+    def to_dict(self, boundaries=True):
         _grd = super().to_dict()
-        _grd.update({
-            "nodes": {id: (coord, -val) for id, (coord, val)
-                      in self.nodes.to_dict().items()},
-            "boundaries": self.boundaries.data})
+        if boundaries is True:
+            _grd.update({
+                "nodes": {id: (coord, -val) for id, (coord, val)
+                          in self.nodes.to_dict().items()},
+                "boundaries": self.boundaries.data})
+            return _grd
         return _grd
 
     @figure

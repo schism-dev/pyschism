@@ -52,16 +52,15 @@ class Nodes:
         self._id = list(nodes.keys())
         self._coords = np.array(
             [coords for coords, _ in nodes.values()])
+        self._crs = CRS.from_user_input(crs) if crs is not None else crs
         self.values = np.array(
             [value for _, value in nodes.values()])
-
-        self.crs = CRS.from_user_input(crs) if crs is not None else crs
 
     def transform_to(self, dst_crs):
         dst_crs = CRS.from_user_input(dst_crs)
         if not self.crs.equals(dst_crs):
             self._coords = self.get_xy(dst_crs)
-            self.crs = dst_crs
+            self._crs = dst_crs
 
         if hasattr(self, '_gdf'):
             del self._gdf
@@ -99,6 +98,10 @@ class Nodes:
         if not hasattr(self, '_index'):
             self._index = np.arange(len(self._id))
         return self._index
+
+    @property
+    def crs(self):
+        return self._crs
 
     @property
     def coords(self):

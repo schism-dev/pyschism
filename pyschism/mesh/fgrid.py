@@ -56,29 +56,30 @@ class Fgrid(Gr3):
             FrictionFilename(filename).name].value(
                 **grd.read(pathlib.Path(file), boundaries=False, crs=crs))
 
-    @classmethod
-    def from_hgrid(cls, hgrid):
-        # NOTE: nchi is set by subclass calling this method
-        if isinstance(hgrid, (str, os.PathLike)):
-            obj = cls.open(hgrid)
-        elif isinstance(hgrid, Gr3):
-            hgrid_dict = hgrid.to_dict()
-            create_dict = deepcopy({
-                k: hgrid_dict[k] for k in [
-                    "description", "nodes", "elements", "crs"]})
-            create_dict["nodes"] = create_dict["nodes"].copy()
-            create_dict["elements"] = create_dict["elements"].copy()
-            obj = cls(**create_dict)
-        else:
-            raise TypeError(
-                f"Invalid hgrid type passed to create constant value"
-                f" Fgrid: {type(hgrid)}")
+    # @classmethod
+    # def from_hgrid(cls, hgrid):
+    #     # NOTE: nchi is set by subclass calling this method
+    #     if isinstance(hgrid, (str, os.PathLike)):
+    #         obj = cls.open(hgrid)
+    #     elif isinstance(hgrid, Gr3):
+    #         hgrid_dict = hgrid.to_dict()
+    #         create_dict = deepcopy({
+    #             k: hgrid_dict[k] for k in [
+    #                 "description", "nodes", "elements", "crs"]})
+    #         create_dict["nodes"] = create_dict["nodes"].copy()
+    #         create_dict["elements"] = create_dict["elements"].copy()
+    #         obj = cls(**create_dict)
+    #     else:
+    #         raise TypeError(
+    #             f"Invalid hgrid type passed to create constant value"
+    #             f" Fgrid: {type(hgrid)}")
 
-        return obj
+    #     return obj
 
     @classmethod
     def constant(cls, hgrid, value):
-        obj = cls.from_hgrid(hgrid)
+        obj = cls(**{k: v for k, v in hgrid.to_dict().items() if k
+                     in ['nodes', 'elements', 'description', 'crs']})
         obj.values[:] = value
         return obj
 
@@ -92,8 +93,8 @@ class Fgrid(Gr3):
             max_depth: float = None):
 
         # Inspired by https://github.com/schism-dev/schism/blob/master/src/Utility/Pre-Processing/NWM/Manning/write_manning.py
-        obj = cls.from_hgrid(hgrid)
-        hgrid_depths = obj.values.copy()
+        obj = cls.constant(hgrid, np.nan)
+        hgrid_depths = hgrid.values.copy()
         if min_depth is None:
             min_depth = np.min(hgrid_depths.ravel())
         if max_depth is None:
