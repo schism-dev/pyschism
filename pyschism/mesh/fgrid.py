@@ -134,11 +134,7 @@ class Fgrid(Gr3):
 
     @staticmethod
     def _update_node_values(gr3, values):
-        gr3.nodes.nodes = {
-            id: (coords, values[idx]) for idx, (id, (coords, _))
-            in enumerate(gr3.nodes.nodes.items())}
-        if hasattr(gr3.nodes, '_values'):
-            del gr3.nodes._values
+        gr3.values[:] = values
 
 
 class ManningsN(Fgrid):

@@ -43,23 +43,23 @@ class Nodes:
         triangles or quads.
 
         """
-        for coords, _ in nodes.values():
-            if len(coords) != 2:
-                raise ValueError(
-                    'Coordinate vertices for a gr3 type must be 2D, but got '
-                    f'coordinates {coords}.')
-        self.nodes = nodes
+        if any(len(coord) != 2 for coord, _ in nodes.values()):
+            raise ValueError(
+                'Coordinate vertices for a gr3 type must be 2D, but got '
+                f'coordinates {coords}.')
+
+        self._id = list(nodes.keys())
+        self._coords = np.array(
+            [coords for coords, _ in nodes.values()])
+        self.values = np.array(
+            [value for _, value in nodes.values()])
+
         self.crs = CRS.from_user_input(crs) if crs is not None else crs
 
     def transform_to(self, dst_crs):
         dst_crs = CRS.from_user_input(dst_crs)
         if not self.crs.equals(dst_crs):
-            xy = self.get_xy(dst_crs)
-            nodes = {
-                self.id[i]: (coord.tolist(), self.values[i])
-                for i, coord in enumerate(xy)
-                }
-            self.nodes = nodes
+            self._coords = self.get_xy(dst_crs)
             self.crs = dst_crs
 
         if hasattr(self, '_gdf'):
@@ -80,7 +80,7 @@ class Nodes:
     def gdf(self):
         if not hasattr(self, '_gdf'):
             data = []
-            for id, (coord, values) in self.nodes.items():
+            for id, coord, values in zip(self._id, self._coords, self.values):
                 data.append({
                     'geometry': Point(coord),
                     'id': id,
@@ -91,33 +91,21 @@ class Nodes:
 
     @property
     def id(self):
-        if not hasattr(self, '_id'):
-            self._id = list(self.nodes.keys())
         return self._id
 
     @property
     def index(self):
         if not hasattr(self, '_index'):
-            self._index = np.arange(len(self.nodes))
+            self._index = np.arange(len(self._id))
         return self._index
 
     @property
     def coords(self):
-        if not hasattr(self, '_coords'):
-            self._coords = np.array(
-                [coords for coords, value in self.nodes.values()])
         return self._coords
 
     @property
     def coord(self):
         return self.coords
-
-    @property
-    def values(self):
-        if not hasattr(self, '_values'):
-            self._values = np.array(
-                [value for coords, value in self.nodes.values()])
-        return self._values
 
     def get_index_by_id(self, id: Hashable):
         if not hasattr(self, 'node_id_to_index'):
@@ -131,6 +119,11 @@ class Nodes:
                 i: self.id[i] for i in range(len(self.id))}
         return self.node_index_to_id[index]
 
+    def to_dict(self):
+        nodes = {
+            nid: (coo, val)
+            for nid, coo, val in zip(self._id, self._coords, self.values)}
+        return nodes
 
 class Elements:
 
@@ -419,7 +412,7 @@ class Gr3(ABC):
     def to_dict(self):
         return {
             "description": self.description,
-            "nodes": self.nodes.nodes,
+            "nodes": self.nodes.to_dict(),
             "elements": self.elements.elements,
             "crs": self.crs}
 
@@ -467,9 +460,7 @@ class Gr3(ABC):
                 '\'bbox\'')
 
     def invert_sign(self):
-        self.nodes.nodes = {
-            id: (coords, -val) for id, (coords, val)
-            in self.nodes.nodes.items()}
+        self.nodes.values[:] = -self.nodes.values
 
     def transform_to(self, dst_crs):
         """Transforms coordinate system of mesh in-place.
