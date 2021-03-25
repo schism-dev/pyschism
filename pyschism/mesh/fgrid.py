@@ -56,26 +56,6 @@ class Fgrid(Gr3):
             FrictionFilename(filename).name].value(
                 **grd.read(pathlib.Path(file), boundaries=False, crs=crs))
 
-    # @classmethod
-    # def from_hgrid(cls, hgrid):
-    #     # NOTE: nchi is set by subclass calling this method
-    #     if isinstance(hgrid, (str, os.PathLike)):
-    #         obj = cls.open(hgrid)
-    #     elif isinstance(hgrid, Gr3):
-    #         hgrid_dict = hgrid.to_dict()
-    #         create_dict = deepcopy({
-    #             k: hgrid_dict[k] for k in [
-    #                 "description", "nodes", "elements", "crs"]})
-    #         create_dict["nodes"] = create_dict["nodes"].copy()
-    #         create_dict["elements"] = create_dict["elements"].copy()
-    #         obj = cls(**create_dict)
-    #     else:
-    #         raise TypeError(
-    #             f"Invalid hgrid type passed to create constant value"
-    #             f" Fgrid: {type(hgrid)}")
-
-    #     return obj
-
     @classmethod
     def constant(cls, hgrid, value):
         obj = cls(**{k: v for k, v in hgrid.to_dict().items() if k
@@ -140,21 +120,6 @@ class ManningsN(Fgrid):
     def open(cls, file: Union[str, os.PathLike],
              crs: Union[str, CRS] = None):
         return super(Fgrid, cls).open(file, crs)
-
-    @classmethod
-    def constant(cls, hgrid, value):
-        return super(ManningsN, cls).constant(hgrid, value)
-
-    @classmethod
-    def linear_with_depth(
-            cls,
-            hgrid: Union[str, os.PathLike, Gr3],
-            min_value: float = 0.02,
-            max_value: float = 0.05,
-            min_depth: float = None,
-            max_depth: float = None):
-        return super(ManningsN, cls).linear_with_depth(
-                hgrid, min_value, max_value, min_depth, max_depth)
 
 
 class RoughnessLength(Fgrid):
