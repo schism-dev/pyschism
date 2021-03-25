@@ -63,37 +63,6 @@ class Fgrid(Gr3):
         obj.values[:] = value
         return obj
 
-    @classmethod
-    def linear_with_depth(
-            cls,
-            hgrid: Union[str, os.PathLike, Gr3],
-            min_value: float = None,
-            max_value: float = None,
-            min_depth: float = None,
-            max_depth: float = None):
-
-        # Inspired by https://github.com/schism-dev/schism/blob/master/src/Utility/Pre-Processing/NWM/Manning/write_manning.py
-        obj = cls.constant(hgrid, np.nan)
-        hgrid_depths = hgrid.values.copy()
-        if min_depth is None:
-            min_depth = np.min(hgrid_depths)
-        if max_depth is None:
-            max_depth = np.max(hgrid_depths)
-
-        values = (
-                min_value + (hgrid_depths - min_depth)
-                * (max_value - min_value) / (max_depth - min_depth))
-
-        if min_value is not None:
-            values[values < min_value] = min_value
-
-        if max_value is not None:
-            values[values > max_value] = max_value
-
-        obj.values[:] = values
-
-        return obj
-
     def add_region(
             self,
             region: Union[Polygon, MultiPolygon],
@@ -133,8 +102,28 @@ class ManningsN(Fgrid):
             max_value: float = 0.05,
             min_depth: float = None,
             max_depth: float = None):
-        return super().linear_with_depth(hgrid, min_value, max_value,
-                                         min_depth, max_depth)
+
+        # Inspired by https://github.com/schism-dev/schism/blob/master/src/Utility/Pre-Processing/NWM/Manning/write_manning.py
+        obj = cls.constant(hgrid, np.nan)
+        hgrid_depths = hgrid.values.copy()
+        if min_depth is None:
+            min_depth = np.min(hgrid_depths)
+        if max_depth is None:
+            max_depth = np.max(hgrid_depths)
+
+        values = (
+                min_value + (hgrid_depths - min_depth)
+                * (max_value - min_value) / (max_depth - min_depth))
+
+        if min_value is not None:
+            values[values < min_value] = min_value
+
+        if max_value is not None:
+            values[values > max_value] = max_value
+
+        obj.values[:] = values
+
+        return obj
 
 
 class RoughnessLength(Fgrid):
