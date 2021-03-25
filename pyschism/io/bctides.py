@@ -87,7 +87,8 @@ class Bctides:
         self._temperature = temperature
         self._salinity = salinity
         self._tracers = [] if tracers is None or tracers is False else tracers
-        self._tides = Tides(database=tidal_database)
+        self._tides = Tides(database=tidal_database, elevation=elevation,
+                            velocity=velocity)
         self.tides.use_all()
 
     def __str__(self):
