@@ -43,10 +43,11 @@ class Nodes:
         triangles or quads.
 
         """
-        if any(len(coord) != 2 for coord, _ in nodes.values()):
-            raise ValueError(
-                'Coordinate vertices for a gr3 type must be 2D, but got '
-                f'coordinates {coord}.')
+        for coords, _ in nodes.values():
+            if len(coords) != 2:
+                raise ValueError(
+                    'Coordinate vertices for a gr3 type must be 2D, but got '
+                    f'coordinates {coords}.')
 
         self._id = list(nodes.keys())
         self._coords = np.array(
