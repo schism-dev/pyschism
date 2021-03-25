@@ -79,9 +79,7 @@ class Fgrid(Gr3):
     @classmethod
     def constant(cls, hgrid, value):
         obj = cls.from_hgrid(hgrid)
-        values = obj.values.copy()
-        values[:] = value
-        cls._update_node_values(obj, values)
+        obj.values[:] = value
         return obj
 
     @classmethod
@@ -107,7 +105,7 @@ class Fgrid(Gr3):
         values[values < min_value] = min_value
         values[values > max_value] = max_value
 
-        cls._update_node_values(obj, values)
+        obj.values[:] = values
 
         return obj
 
@@ -127,14 +125,8 @@ class Fgrid(Gr3):
                 crs=self.crs)
         gdf_in = gpd.sjoin(gdf2, gdf1, op="within")
         picks = ([i.index for i in gdf_in.itertuples()])
-        values = self.values.copy()
-        values[picks] = value
-        self._update_node_values(self, values)
+        self.values[picks] = value
 
-
-    @staticmethod
-    def _update_node_values(gr3, values):
-        gr3.values[:] = values
 
 
 class ManningsN(Fgrid):
