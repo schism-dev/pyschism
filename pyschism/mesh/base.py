@@ -46,7 +46,7 @@ class Nodes:
         if any(len(coord) != 2 for coord, _ in nodes.values()):
             raise ValueError(
                 'Coordinate vertices for a gr3 type must be 2D, but got '
-                f'coordinates {coords}.')
+                f'coordinates {coord}.')
 
         self._id = list(nodes.keys())
         self._coords = np.array(
