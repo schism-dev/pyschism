@@ -11,7 +11,7 @@ from pyproj.exceptions import CRSError  # type: ignore[import]
 
 
 def buffer_to_dict(buf: TextIO):
-    description = buf.readline()
+    description = buf.readline().strip()
     NE, NP = map(int, buf.readline().split())
     nodes = {}
     for _ in range(NP):
