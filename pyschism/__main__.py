@@ -8,7 +8,7 @@ from pytz import timezone
 from pyschism.cmd.forecast.forecast import ForecastCli, add_forecast
 from pyschism.cmd.bctides import BctidesCli, add_bctides
 from pyschism.cmd.stations import StationsCli, add_stations
-# from pyschism.cmd.hgrid import HgridCli, add_hgrid
+from pyschism.cmd.hgrid import HgridCli, add_hgrid
 from pyschism.cmd.fgrid.entry import FgridCli, add_fgrid
 
 
@@ -23,7 +23,7 @@ def parse_args():
     add_forecast(subparsers)
     add_bctides(subparsers)
     add_stations(subparsers)
-    # add_hgrid(subparsers)
+    add_hgrid(subparsers)
     add_fgrid(subparsers)
     return parser.parse_args()
 
@@ -53,8 +53,8 @@ def main():
     elif args.mode == 'stations':
         StationsCli(args)
 
-    # elif args.mode == 'hgrid':
-    #     HgridCli(args)
+    elif args.mode == 'hgrid':
+        HgridCli(args)
 
     elif args.mode == 'fgrid':
         FgridCli(args)

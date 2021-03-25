@@ -1,7 +1,7 @@
 from argparse import Namespace
 
-from pyschism.mesh.fgrid import ManningsN
 from pyschism.cmd.fgrid import manning
+
 
 class FgridCli:
 
@@ -9,9 +9,9 @@ class FgridCli:
 
         if args.action == 'manning':
             manning.ManningsNCli(args)
-            return
 
-        raise NotImplementedError(f'Unhandled CLI action: {args.action}.')
+        else:
+            raise NotImplementedError(f'Unhandled CLI action: {args.action}.')
 
 
 def fgrid_subparser(subparsers):

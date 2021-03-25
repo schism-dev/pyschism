@@ -367,6 +367,7 @@ class Hydrology:
                 flow_data = element_data['flow']
                 if np.all(flow_data > 0.):
                     # TODO:  Are irregular timeseries allowed?
+                    # if not, we need an interpolator here.
                     for row in element_data.sort_values(
                             by=['time']).itertuples():
                         sources.setdefault(row.time, {}).setdefault(
@@ -397,6 +398,7 @@ class Hydrology:
                 flow_data = element_data['flow']
                 if np.all(flow_data < 0.):
                     # TODO:  Are irregular timeseries allowed?
+                    # if not, we need an ingerpolator here.
                     for row in element_data.sort_values(
                             by=['time']).itertuples():
                         sinks.setdefault(row.time, {}).setdefault(

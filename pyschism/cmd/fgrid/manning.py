@@ -6,6 +6,7 @@ import geopandas as gpd
 
 from pyschism.mesh.fgrid import ManningsN
 
+
 class ManningsNCli:
 
     def __init__(self, args: Namespace):
@@ -17,10 +18,10 @@ class ManningsNCli:
                 outdir = Path(hgrid).parent
             outdir = Path(outdir)
 
-            if args.constant != None:
+            if args.constant is not None:
                 mann_obj = ManningsN.constant(hgrid, args.constant)
 
-            elif args.linear != None:
+            elif args.linear is not None:
                 # NOTE: args.linear can be empty list in which case
                 # we need to use defaults
                 keys = ["min_value", "max_value", "min_depth", "max_depth"]
@@ -57,7 +58,7 @@ class ManningsNCli:
                 mann_obj.add_region(multipolygon, value)
 
             mann_obj.write(outdir/'manning.gr3', overwrite=args.overwrite)
-            
+
             return
 
         raise NotImplementedError(f'Unhandled CLI action: {args.action}.')

@@ -1,7 +1,7 @@
 import pathlib
 
 
-def reader(path):
+def read(path):
     sms2dm = dict()
     with open(pathlib.Path(path), 'r') as f:
         f.readline()
@@ -26,7 +26,7 @@ def reader(path):
     return sms2dm
 
 
-def writer(sms2dm, path, overwrite=False):
+def write(sms2dm, path, overwrite=False):
     path = pathlib.Path(path)
     if path.is_file() and not overwrite:
         msg = 'File exists, pass overwrite=True to allow overwrite.'
@@ -54,7 +54,7 @@ def graph(sms2dm):
 def nodes(sms2dm):
     assert all(int(id) > 0 for id in sms2dm['ND'])
     f = ''
-    for id, (coords, value)in sms2dm['ND'].items():
+    for id, (coords, value) in sms2dm['ND'].items():
         f += f"ND {int(id):d} "
         f += f"{coords[0]:<.16E} "
         f += f"{coords[1]:<.16E} "

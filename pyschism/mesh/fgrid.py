@@ -1,7 +1,7 @@
 from enum import Enum
 import os
 import pathlib
-from typing import Union, Tuple
+from typing import Union
 from copy import deepcopy
 import numpy as np
 
@@ -94,9 +94,9 @@ class Fgrid(Gr3):
         # Inspired by https://github.com/schism-dev/schism/blob/master/src/Utility/Pre-Processing/NWM/Manning/write_manning.py
         obj = cls.from_hgrid(hgrid)
         hgrid_depths = obj.values.copy()
-        if min_depth == None:
+        if min_depth is None:
             min_depth = np.min(hgrid_depths.ravel())
-        if max_depth == None:
+        if max_depth is None:
             max_depth = np.max(hgrid_depths.ravel())
 
         values = (
@@ -128,7 +128,6 @@ class Fgrid(Gr3):
         self.values[picks] = value
 
 
-
 class ManningsN(Fgrid):
     """  Class for representing Manning's n values.  """
 
@@ -155,6 +154,7 @@ class ManningsN(Fgrid):
             max_depth: float = None):
         return super(ManningsN, cls).linear_with_depth(
                 hgrid, min_value, max_value, min_depth, max_depth)
+
 
 class RoughnessLength(Fgrid):
 

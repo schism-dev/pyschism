@@ -126,6 +126,7 @@ class Nodes:
             for nid, coo, val in zip(self._id, self._coords, self.values)}
         return nodes
 
+
 class Elements:
 
     def __init__(self, nodes: Nodes, elements: Dict[Hashable, Sequence]):
@@ -133,13 +134,13 @@ class Elements:
             raise TypeError('Argument elements must be a dict.')
 
         vertex_id_set = set(nodes.id)
-        for i, element in enumerate(elements):
-            if not isinstance(element, Sequence):
-                raise TypeError(f'Element with index {i} of the elements '
+        for id, geom in elements.items():
+            if not isinstance(geom, Sequence):
+                raise TypeError(f'Element with id {id} of the elements '
                                 f'argument must be of type {Sequence}, not '
-                                f'type {type(element)}.')
-            if not set(element).issubset(vertex_id_set):
-                ValueError(f'Element with index {i} is not a subset of the '
+                                f'type {type(geom)}.')
+            if not set(geom).issubset(vertex_id_set):
+                ValueError(f'Element with id {id} is not a subset of the '
                            "coordinate id's.")
         self.nodes = nodes
         self.elements = elements
