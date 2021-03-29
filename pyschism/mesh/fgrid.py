@@ -48,13 +48,16 @@ class Fgrid(Gr3):
     def fname(self):
         return self._fname.value
 
-    @staticmethod
-    def open(file: Union[str, os.PathLike],
+    @classmethod
+    def open(cls, file: Union[str, os.PathLike],
              crs: Union[str, CRS] = None):
         filename = pathlib.Path(file).name
-        return FrictionDispatch[
-            FrictionFilename(filename).name].value(
-                **grd.read(pathlib.Path(file), boundaries=False, crs=crs))
+        if cls.__name__ == "Fgrid":
+            return FrictionDispatch[
+                FrictionFilename(filename).name].value(
+                    **grd.read(pathlib.Path(file), boundaries=False, crs=crs))
+        else:
+            return super().open(file, crs)
 
     @classmethod
     def constant(cls, hgrid, value):
@@ -66,7 +69,8 @@ class Fgrid(Gr3):
     def add_region(
             self,
             region: Union[Polygon, MultiPolygon],
-            value: float = 0.02):
+            value
+    ):
         # Assuming input polygons are in EPSG:4326
         if isinstance(region, Polygon):
             region = [region]
@@ -88,11 +92,6 @@ class ManningsN(Fgrid):
     def __init__(self, *argv, **kwargs):
         self.hmin_man = 1.
         super().__init__(NchiType.MANNINGS_N, *argv, **kwargs)
-
-    @classmethod
-    def open(cls, file: Union[str, os.PathLike],
-             crs: Union[str, CRS] = None):
-        return super(Fgrid, cls).open(file, crs)
 
     @classmethod
     def linear_with_depth(
@@ -131,11 +130,6 @@ class RoughnessLength(Fgrid):
     def __init__(self, *argv, **kwargs):
         super().__init__(NchiType.ROUGHNESS_LENGTH, *argv, **kwargs)
 
-    @classmethod
-    def open(cls, file: Union[str, os.PathLike],
-             crs: Union[str, CRS] = None):
-        return super(Fgrid, cls).open(file, crs)
-
 
 class DragCoefficient(Fgrid):
 
@@ -143,11 +137,6 @@ class DragCoefficient(Fgrid):
         self.dzb_min = 0.5
         self.dzb_decay = 0.
         super().__init__(NchiType.DRAG_COEFFICIENT, *argv, **kwargs)
-
-    @classmethod
-    def open(cls, file: Union[str, os.PathLike],
-             crs: Union[str, CRS] = None):
-        return super(Fgrid, cls).open(file, crs)
 
 
 class FrictionDispatch(Enum):

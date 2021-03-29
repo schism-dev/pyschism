@@ -95,12 +95,22 @@ class HAMTIDE(TidalDataProvider):
         yi = yi.flatten()
         zi = self._get_resource(
                 phys_var, constituent)[ncvar][yidx, xidx].flatten()
-        return griddata(
-            (xi[~zi.mask], yi[~zi.mask]),
-            zi[~zi.mask],
-            (xq, yq),
-            method='nearest'
+        values = griddata(
+                (xi[~zi.mask], yi[~zi.mask]),
+                zi[~zi.mask],
+                (xq, yq),
+                method='linear',
+                fill_value=np.nan
+            )
+        nan_idxs = np.where(np.isnan(values))
+        values[nan_idxs] = griddata(
+                (xi[~zi.mask], yi[~zi.mask]),
+                zi[~zi.mask],
+                (xq[nan_idxs], yq[nan_idxs]),
+                method='nearest',
         )
+        return values
+
 
     @property
     def resource(self):

@@ -43,6 +43,7 @@ class Nodes:
         triangles or quads.
 
         """
+
         for coords, _ in nodes.values():
             if len(coords) != 2:
                 raise ValueError(
@@ -53,7 +54,7 @@ class Nodes:
         self._coords = np.array(
             [coords for coords, _ in nodes.values()])
         self._crs = CRS.from_user_input(crs) if crs is not None else crs
-        self.values = np.array(
+        self._values = np.array(
             [value for _, value in nodes.values()])
 
     def transform_to(self, dst_crs):
@@ -102,6 +103,10 @@ class Nodes:
     @property
     def crs(self):
         return self._crs
+
+    @property
+    def values(self):
+        return self._values
 
     @property
     def coords(self):
@@ -410,6 +415,7 @@ class Gr3(ABC):
         self.nodes = Nodes(nodes, crs)
         self.elements = Elements(self.nodes, elements)
         self.description = '' if description is None else str(description)
+        self.hull = Hull(self)
 
     def __str__(self):
         return grd.to_string(**self.to_dict())
@@ -593,12 +599,6 @@ class Gr3(ABC):
     @property
     def y(self):
         return self.nodes.coord[:, 1]
-
-    @property
-    def hull(self):
-        if not hasattr(self, '_hull'):
-            self._hull = Hull(self)
-        return self._hull
 
     @property
     def triangles(self):

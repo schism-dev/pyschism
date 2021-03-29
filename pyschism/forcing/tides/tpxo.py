@@ -49,11 +49,11 @@ class TPXO(TidalDataProvider):
         logger.info('Querying TPXO for velocity constituent '
                     f'{constituent}.')
         uamp = self._get_interpolation(
-            'velocity', 'ua', constituent, vertices)
+            'velocity', 'ua', constituent, vertices) / 100.
         uphase = self._get_interpolation(
             'velocity', 'up', constituent, vertices)
         vamp = self._get_interpolation(
-            'velocity', 'va', constituent, vertices)
+            'velocity', 'va', constituent, vertices) / 100.
         vphase = self._get_interpolation(
             'velocity', 'vp', constituent, vertices)
         return uamp, uphase, vamp, vphase
@@ -132,9 +132,18 @@ class TPXO(TidalDataProvider):
         )
 
         # "method" can be 'spline' or any string accepted by griddata()'s method kwarg.
-        return griddata(
+        values = griddata(
                 (x[_idx], y[_idx]),
                 array[_idx],
                 (_x, _y),
-                method='nearest'
+                method='linear',
+                fill_value=np.nan,
         )
+        nan_idxs = np.where(np.isnan(values))
+        values[nan_idxs] = griddata(
+                (x[_idx], y[_idx]),
+                array[_idx],
+                (_x[nan_idxs], _y[nan_idxs]),
+                method='nearest',
+        )
+        return values
