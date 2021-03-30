@@ -248,3 +248,12 @@ class Bctides:
     @property
     def salinity(self):
         return self._salinity
+
+    @property
+    def Z0(self):
+        if hasattr(self.tides, '_Z0'):
+            return self.tides._Z0
+
+    @Z0.setter
+    def Z0(self, Z0):
+        self.tides.add_Z0(Z0)

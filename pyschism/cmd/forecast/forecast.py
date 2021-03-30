@@ -182,6 +182,7 @@ def _add_tidal_constituents(parser):
                        default='tpxo')
     tides.add_argument("--include-tidal-velocity",
                        "--bnd-vel", action="store_true", dest='bnd_vel')
+    tides.add_argument("--Z0", type=float)
 
 
 def _add_atmospheric_forcing(parser):

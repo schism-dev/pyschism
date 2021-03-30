@@ -111,7 +111,6 @@ class HAMTIDE(TidalDataProvider):
         )
         return values
 
-
     @property
     def resource(self):
         return self._resource

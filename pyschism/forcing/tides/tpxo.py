@@ -116,7 +116,6 @@ class TPXO(TidalDataProvider):
         y = y.flatten()
         dx = np.mean(np.diff(self.x))
         dy = np.mean(np.diff(self.y))
-
         # buffer the bbox by 2 difference units
         _idx = np.where(
                 np.logical_and(
@@ -130,8 +129,6 @@ class TPXO(TidalDataProvider):
                         )
                 )
         )
-
-        # "method" can be 'spline' or any string accepted by griddata()'s method kwarg.
         values = griddata(
                 (x[_idx], y[_idx]),
                 array[_idx],

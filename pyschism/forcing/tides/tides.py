@@ -101,9 +101,14 @@ class Tides(bctypes.BoundaryCondition):
                 self.get_greenwich_factor(start_date, rnday, constituent))  # FACE* # noqa:E501
 
     def get_elevation(self, constituent, vertices):
+        if constituent.lower() == 'z0':
+            return np.full((vertices.shape[0],), float(self._Z0)), \
+                    np.full((vertices.shape[0],), 0.)
         return self.forcing_database.get_elevation(constituent, vertices)
 
     def get_velocity(self, constituent, vertices):
+        if constituent.lower() == 'z0':
+            return tuple(4*[np.full((vertices.shape[0],), 0.)])
         return self.forcing_database.get_velocity(constituent, vertices)
 
     def use_all(self, potential=True, forcing=True):
@@ -135,6 +140,13 @@ class Tides(bctypes.BoundaryCondition):
                              f"{self.active_constituents}")
         self._active_constituents.pop(constituent)
 
+    def add_Z0(self, value):
+        self._active_constituents['Z0'] = {
+            "potential": False,
+            "forcing": True,
+        }
+        self._Z0 = float(value)
+
     def get_active_constituents(self):
         return list(self.active_constituents.keys())
 
@@ -160,12 +172,12 @@ class Tides(bctypes.BoundaryCondition):
     def get_initial_conditions(self, constituent, vertices):
         return self.initial_conditions(constituent, vertices)
 
-    def set_Z0(self, Z0, **kwargs):
+    def set_Z0(self, Z0):
         self._active_constituents['Z0'] = {
             'potential': False,
             'forcing': True
         }
-        self.Z0 = Z0
+        self._Z0 = Z0
 
     def _manage_dates(f: Callable):
         def decorator(self, start_date, rnday, constituent):
@@ -264,7 +276,7 @@ class Tides(bctypes.BoundaryCondition):
         elif constituent == "MS4":
             return self.EQ78
         if constituent == "Z0":
-            return self.Z0
+            return 1.
         else:
             msg = f'Unrecognized constituent {constituent}'
             raise TypeError(msg)

@@ -4,11 +4,14 @@ from enum import Enum
 from functools import lru_cache
 import logging
 
+import numpy as np
+
 from pyschism.domain import ModelDomain
 from pyschism.forcing.tides.tides import Tides
 from pyschism.param.param import Param
 
 _logger = logging.getLogger(__name__)
+
 
 class NullWritter:
 

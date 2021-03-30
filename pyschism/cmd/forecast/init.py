@@ -180,6 +180,8 @@ class TidesDescriptor:
                 if obj.args.constituents:
                     for constituent in obj.args.constituents:
                         tides.use_constituent(constituent)
+                if obj.args.Z0 is not None:
+                    tides.add_Z0(obj.args.Z0)
             obj.__dict__['tides'] = tides
         return tides
 
