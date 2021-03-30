@@ -671,38 +671,37 @@
 ! Global output options
 ! The variable names that appear in nc output are shown in {}
 !-----------------------------------------------------------------------
+!  iof_hydro(1) = 0 !0: off; 1: on - elev. [m]  {elev}
+!  iof_hydro(2) = 0 !air pressure [Pa]  {air_pressure}
+!  iof_hydro(3) = 0 !air temperature [C] {air_temperature}
+!  iof_hydro(4) = 0 !Specific humidity [-] {specific_humidity}
+!  iof_hydro(5) = 0 !Net downward solar (shortwave) radiation after albedo [W/m/m] {solar_radiation}
+!  iof_hydro(6) = 0 !sensible flux (positive upward) [W/m/m]  {sensible_flux}
+!  iof_hydro(7) = 0 !latent heat flux (positive upward) [W/m/m] {latent_heat}
+!  iof_hydro(8) = 0 !upward longwave radiation (positive upward) [W/m/m] {upward_longwave}
+!  iof_hydro(9) = 0 !downward longwave radiation (positive downward) [W/m/m] {downward_longwave}
+!  iof_hydro(10) = 0 !total flux=-flsu-fllu-(radu-radd) [W/m/m] {total_heat_flux}
+!  iof_hydro(11) = 0 !evaporation rate [kg/m/m/s] {evaporation}
+!  iof_hydro(12) = 0 !precipitation rate [kg/m/m/s] {precipitation}
+!  iof_hydro(13) = 0 !Bottom stress vector [kg/m/s^2(Pa)] {bottom_stress}
+!  iof_hydro(14) = 0 !wind velocity vector [m/s] {wind_speed}
+!  iof_hydro(15) = 0 !wind stress vector [m^2/s/s] {wind_stress}
+!  iof_hydro(16) = 0 !depth-averaged vel vector [m/s] {dahv}
+!  iof_hydro(17) = 0 !vertical velocity [m/s] {vertical_velocity}
+!  iof_hydro(18) = 0 !water temperature [C] {temp}
+!  iof_hydro(19) = 0 !water salinity [PSU] {salt}
+!  iof_hydro(20) = 0 !water density [kg/m^3] {water_density}
+!  iof_hydro(21) = 0 !eddy diffusivity [m^2/s] {diffusivity}
+!  iof_hydro(22) = 0 !eddy viscosity [m^2/s] {viscosity}
+!  iof_hydro(23) = 0 !turbulent kinetic energy {TKE}
+!  iof_hydro(24) = 0 !turbulent mixing length [m] {mixing_length}
+!  iof_hydro(25) = 0 !horizontal vel vector [m/s] {hvel}
+!  iof_hydro(26) = 0 !horizontal vel vector defined @side [m/s] {hvel_side}
+!  iof_hydro(27) = 0 !vertical vel. @elem [m/s] {wvel_elem}
+!  iof_hydro(28) = 0 !T @prism centers [C] {temp_elem}
+!  iof_hydro(29) = 0 !S @prism centers [PSU] {salt_elem}
+!  iof_hydro(30) = 0 !Barotropic pressure gradient force vector (m.s-2) @side centers  {pressure_gradient}
   iof_hydro(1:30) =  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-  ! iof_hydro(1) = 0 !0: off; 1: on - elev. [m]  {elev}
-  ! iof_hydro(2) = 0 !air pressure [Pa]  {air_pressure}
-  ! iof_hydro(3) = 0 !air temperature [C] {air_temperature}
-  ! iof_hydro(4) = 0 !Specific humidity [-] {specific_humidity}
-  ! iof_hydro(5) = 0 !Net downward solar (shortwave) radiation after albedo [W/m/m] {solar_radiation}
-  ! iof_hydro(6) = 0 !sensible flux (positive upward) [W/m/m]  {sensible_flux}
-  ! iof_hydro(7) = 0 !latent heat flux (positive upward) [W/m/m] {latent_heat}
-  ! iof_hydro(8) = 0 !upward longwave radiation (positive upward) [W/m/m] {upward_longwave}
-  ! iof_hydro(9) = 0 !downward longwave radiation (positive downward) [W/m/m] {downward_longwave}
-  ! iof_hydro(10) = 0 !total flux=-flsu-fllu-(radu-radd) [W/m/m] {total_heat_flux}
-  ! iof_hydro(11) = 0 !evaporation rate [kg/m/m/s] {evaporation}
-  ! iof_hydro(12) = 0 !precipitation rate [kg/m/m/s] {precipitation}
-  ! iof_hydro(13) = 0 !Bottom stress vector [kg/m/s^2(Pa)] {bottom_stress}
-  ! iof_hydro(14) = 0 !wind velocity vector [m/s] {wind_speed}
-  ! iof_hydro(15) = 0 !wind stress vector [m^2/s/s] {wind_stress}
-  ! iof_hydro(16) = 0 !depth-averaged vel vector [m/s] {dahv}
-  ! iof_hydro(17) = 0 !vertical velocity [m/s] {vertical_velocity}
-  ! iof_hydro(18) = 0 !water temperature [C] {temp}
-  ! iof_hydro(19) = 0 !water salinity [PSU] {salt}
-  ! iof_hydro(20) = 0 !water density [kg/m^3] {water_density}
-  ! iof_hydro(21) = 0 !eddy diffusivity [m^2/s] {diffusivity}
-  ! iof_hydro(22) = 0 !eddy viscosity [m^2/s] {viscosity}
-  ! iof_hydro(23) = 0 !turbulent kinetic energy {TKE}
-  ! iof_hydro(24) = 0 !turbulent mixing length [m] {mixing_length}
-  ! iof_hydro(25) = 0 !horizontal vel vector [m/s] {hvel}
-  ! iof_hydro(26) = 0 !horizontal vel vector defined @side [m/s] {hvel_side}
-  ! iof_hydro(27) = 0 !vertical vel. @elem [m/s] {wvel_elem}
-  ! iof_hydro(28) = 0 !T @prism centers [C] {temp_elem}
-  ! iof_hydro(29) = 0 !S @prism centers [PSU] {salt_elem}
-  ! iof_hydro(30) = 0 !Barotropic pressure gradient force vector (m.s-2) @side centers  {pressure_gradient}
-
 !-----------------------------------------------------------------------
 ! Outputs from optional modules. Only uncomment these if the USE_* is on
 !-----------------------------------------------------------------------
