@@ -3,12 +3,16 @@ import logging
 import pathlib
 from typing import Union
 
+import f90nml
+
 from pyschism.domain import ModelDomain
 from pyschism.enums import Stratification
 from pyschism.param.core import CORE
 from pyschism.param.opt import OPT
 from pyschism.param.schout import SCHOUT
 from pyschism.stations import Stations
+
+PARAM_TEMPLATE = pathlib.Path(__file__).parent / 'param.nml.template'
 
 _logger = logging.getLogger(__name__)
 
@@ -45,8 +49,18 @@ class Param:
         path = pathlib.Path(path)
         if path.is_file() and not overwrite:
             raise IOError(f"File {path} exists and overwrite=False")
-        with open(path, 'w') as f:
-            f.write(str(self))
+        if use_template:
+            f90nml.patch(PARAM_TEMPLATE, self.to_dict(), path)
+        else:
+            with open(path, 'w') as f:
+                f.write(str(self))
+
+    def to_dict(self):
+        return {
+            'CORE': self.core.__dict__,
+            'OPT': self.opt.__dict__,
+            'SCHOUT': self.schout.__dict__
+        }
 
     @property
     def core(self):
