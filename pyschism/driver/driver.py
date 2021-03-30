@@ -103,6 +103,7 @@ class ModelDriver:
             nws=True,
             wind_rot=True,
             stations=True,
+            use_param_template=False,
     ):
         """Writes to disk the full set of input files necessary to run SCHISM.
         """
@@ -132,7 +133,8 @@ class ModelDriver:
             self.model_domain.fgrid.write(outdir / fgrid, overwrite)
         if param:
             param = 'param.nml' if param is True else param
-            self.param.write(outdir / param, overwrite)
+            self.param.write(outdir / param, overwrite,
+                             use_template=use_param_template)
         if bctides:
             bctides = 'bctides.in' if bctides is True else bctides
             self.bctides.write(outdir / bctides, overwrite)

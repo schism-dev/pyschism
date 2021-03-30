@@ -590,7 +590,7 @@
 ! If USE_MARSH is on and isav=1, all .gr3 must have constant depths!
 !----------------------------------------------------------------------
   isav = 0 !on/off flag
-  sav_cd = 1.13 !only needed if isav=1. Drag coefficient
+! sav_cd = 1.13 !only needed if isav=1. Drag coefficient
 
 !----------------------------------------------------------------------
 ! Coupling step with ICE module.

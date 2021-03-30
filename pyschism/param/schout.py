@@ -181,3 +181,29 @@ class SCHOUT(metaclass=SchoutMeta):
                         schout.append(f'  {var[1:]}({i+1})={state}')
         schout.append('/')
         return '\n'.join(schout)
+
+    def to_dict(self):
+        data = {}
+        if self.nhot_write is not None:
+            data['nhot'] = self._nhot
+            data['nhot_write'] = self.nhot_write
+        if self.nspool_sta is not None:
+            nspool_sta = self.nspool_sta
+            if isinstance(nspool_sta, timedelta):
+                nspool_sta = int(round(nspool_sta.total_seconds() / self._dt))
+            if isinstance(nspool_sta, float):
+                nspool_sta = int(
+                    round(timedelta(hours=nspool_sta) / self._dt))
+            if isinstance(nspool_sta, (int, float)):
+                if nspool_sta <= 0:
+                    raise ValueError("nspool_sta must be positive.")
+            data['iout_sta'] = self._iout_sta
+            data['nspool_sta'] = nspool_sta
+        for var in dir(self):
+            if var.startswith('_iof'):
+                _var = var[1:]
+                data[_var] = len(getattr(self, var)) * [0]
+                for i, state in enumerate(getattr(self, var)):
+                    if state == 1:
+                        data[_var][i] = state
+        return data

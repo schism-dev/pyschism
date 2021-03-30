@@ -249,7 +249,8 @@ class ForecastInit:
             vgrid=False,
             fgrid=False,
             wind_rot=False,
-            overwrite=self.args.overwrite
+            overwrite=self.args.overwrite,
+            use_param_template=self.args.use_param_template
         )
 
         if self.args.skip_run is False:

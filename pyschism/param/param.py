@@ -57,9 +57,9 @@ class Param:
 
     def to_dict(self):
         return {
-            'CORE': self.core.__dict__,
-            'OPT': self.opt.__dict__,
-            'SCHOUT': self.schout.__dict__
+            'CORE': self.core.to_dict(),
+            'OPT': self.opt.to_dict(),
+            'SCHOUT': self.schout.to_dict()
         }
 
     @property

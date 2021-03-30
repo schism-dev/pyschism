@@ -56,6 +56,7 @@ def add_forecast_init(actions):
         "--skip-run", action="store_true",
         help="Skips running the model.")
     init.add_argument('--nproc', type=int, default=cpu_count(logical=False))
+    init.add_argument('--use-param-template', action='store_true')
     _add_tidal_constituents(init)
     _add_atmospheric_forcing(init)
     _add_hydrologic_forcing(init)
