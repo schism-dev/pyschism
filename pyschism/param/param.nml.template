@@ -271,9 +271,9 @@
 ! If ihot=0 && flag_ic(1:2)=2 || ibcc_mean=1, ts.ic is used for removing mean density profile.
 ! flag_ic(1) must =flag_ic(2)
 !-----------------------------------------------------------------------
+!  flag_ic(1) = 1 !T
+!  flag_ic(2) = 1 !S
   flag_ic(1:12) = 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-  ! flag_ic(1) = 1 !T
-  ! flag_ic(2) = 1 !S
 
 ! initial conditions for other tracers.
 ! 1: needs inputs [MOD]_hvar_[1,2,...].ic ('1...' is tracer id); format of each file is similar to salt.ic;
@@ -924,7 +924,6 @@
   !iof_icm(114) = 0 !DO reaeration [g/m^3/day] {ICM_reaDOO}
   !iof_icm(115) = 0 !DO consumption for SAV metabolism [g/m^3/day] {ICM_savmtDOO}
   !iof_icm(116) = 0 !DO production from SAV growth [g/m^3/day] {ICM_savgrDOO}
-
   !iof_icm(117) = 0 !Zoo. #1 {ICM_1}
   !iof_icm(118) = 0 !Zoo. #2 {ICM_2}
   !iof_icm(119) = 0 !phyto #1 {ICM_3}
@@ -1008,7 +1007,6 @@
 !  iof_ice(3)= 0 !net heat flux to ocean (>0 warm up SST) [W/m/m] {ICE_net_heat_flux}
 !  iof_ice(4)= 0 !net fresh water flux to ocean (>0 freshens up SSS) [kg/s/m/m] {ICE_fresh_water_flux}
 !  iof_ice(5)= 0 !ice temperature [C] at air-ice interface {ICE_top_T}
-
 !  iof_ice(6)= 0 !ice volume [m] {ICE_tracer_1}
 !  iof_ice(7)= 0 !ice concentration [-] {ICE_tracer_2}
 !  iof_ice(8)= 0 !snow volume [m] {ICE_tracer_3}
