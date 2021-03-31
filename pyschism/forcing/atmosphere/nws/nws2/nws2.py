@@ -40,7 +40,7 @@ class NWS2(NWS):
                     self._start_date, self._rnday,
                     bbox=model_driver.model_domain.hgrid.get_bbox(
                         'EPSG:4326', output_type='bbox'))
-        self._windrot = model_driver.model_domain.hgrid
+        self.windrot = model_driver.model_domain.hgrid
 
     def __str__(self):
         data = []
@@ -112,3 +112,4 @@ class NWS2(NWS):
         data["nodes"] = {id: (coord, 0.) for id, (coord, _)
                          in data["nodes"].items()}
         self._windrot = Gr3(**data)
+        self._windrot.description = 'windrot'

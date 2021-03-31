@@ -202,8 +202,8 @@ class WindrotPath:
             if obj.args.overwrite is True and windrot_path.exists():
                 windrot_path.unlink()
             if not windrot_path.exists():
-                obj.hotstart_domain.nws._windrot = obj.hotstart_domain.hgrid
-                obj.hotstart_domain.nws._windrot.write(
+                obj.hotstart_domain.nws.windrot = obj.hotstart_domain.hgrid
+                obj.hotstart_domain.nws.windrot.write(
                     windrot_path, overwrite=obj.args.overwrite)
             obj.__dict__['windrot_path'] = windrot_path
         return windrot_path
