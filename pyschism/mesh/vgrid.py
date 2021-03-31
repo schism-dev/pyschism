@@ -1,8 +1,24 @@
 import os
 import pathlib
-
 from typing import Union
+import subprocess
+import shutil
+import tempfile
 
+class BinaryVgridHandler:
+
+    def __init__(self, hgrid, *args, **kwargs):
+ 
+        self._tmpdir = tempfile.TemporaryDirectory()
+        hgrid.write(self.tmpdir / 'hgrid.gr3')
+        cmd = ['gen_vqs']
+        subprocess.check_call(cmd, cwd=self.tmpdir)
+        #static_files_directory = StaticFilesDirectory()
+        shutil.copy2(self.tmpdir / 'vgrid.in', './')
+
+    @property
+    def tmpdir(self):
+        return pathlib.Path(self._tmpdir.name)
 
 class Vgrid:
 
@@ -20,7 +36,12 @@ class Vgrid:
         any inputs. This is so it can be used as a placeholder that outputs at
         least a 2D grid for minimalistic model configuration.
         """
-        pass
+        #pass
+        self.vgrid = vgrid
+
+    @classmethod
+    def from_binary(cls, hgrid, *args, **kwargs):
+        return cls(BinaryVgridHandler(hgrid, *args, **kwargs))
 
     @staticmethod
     def open(path):

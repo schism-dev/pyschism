@@ -173,8 +173,9 @@ def _add_tidal_constituents(parser):
     options.add_argument(
         "-c", "--constituents",
         action='append',
-        choices=["K1", "O1", "P1", "Q1", "MM", "Mf", "M4", "MN4", "MS4",
-                 "2N2", "S1"],
+        #choices=["K1", "O1", "P1", "Q1", "MM", "Mf", "M4", "MN4", "MS4",
+        #         "2N2", "S1"],
+        choices=["Z0","K2","S2","M2","N2","K1","P1","O1","Q1"],
         dest='constituents',
         default=False,
         help="Tidal constituent to be forced in the model (case-insensitive).")
