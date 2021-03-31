@@ -274,12 +274,15 @@ class Hydrology:
         for row in aggregate_gdf.itertuples():
             if row.element_id in aggregation_mapping:
                 continue
-            other_sources = aggregate_gdf.loc[
-                aggregate_gdf.index.difference([row.Index])]
+            aggregation_mapping[row.element_id] = row.element_id
+            possible_sources = aggregate_gdf.loc[
+                aggregate_gdf.index.difference(
+                    np.where(aggregate_gdf['element_id'].isin(
+                        list(aggregation_mapping))))]
             point = np.array(row.geometry.centroid)
             circle = get_circle_of_radius(point[0], point[1], radius)
-            sources_in_circle = other_sources.loc[other_sources.within(circle)]
-            aggregation_mapping[row.element_id] = row.element_id
+            sources_in_circle = possible_sources.loc[
+                possible_sources.within(circle)]
             for row_in_circle in sources_in_circle.itertuples():
                 aggregation_mapping[row_in_circle.element_id] = row.element_id
 
@@ -287,6 +290,7 @@ class Hydrology:
         for current, target in aggregation_mapping.items():
             for time, data in self.get_element_timeseries(current).items():
                 self.add_data(time, target, **data)
+
         for current, target in aggregation_mapping.items():
             if current != target:
                 self.remove_element_timeseries(current)
