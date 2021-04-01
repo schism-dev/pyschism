@@ -5,6 +5,7 @@ from shapely.geometry import Polygon, MultiPolygon
 import geopandas as gpd
 
 from pyschism.mesh.fgrid import ManningsN
+from pyschism.mesh import Hgrid
 
 
 class ManningsNCli:
@@ -12,11 +13,13 @@ class ManningsNCli:
     def __init__(self, args: Namespace):
 
         if args.sub_action == 'generate':
-            hgrid = args.hgrid
+
             outdir = args.out_dir
             if not outdir:
-                outdir = Path(hgrid).parent
+                outdir = Path(args.hgrid).parent
             outdir = Path(outdir)
+
+            hgrid = Hgrid.open(args.hgrid, crs=args.hgrid_crs)
 
             if args.constant is not None:
                 mann_obj = ManningsN.constant(hgrid, args.constant)
@@ -74,6 +77,7 @@ def manning_subparser(subparsers):
     gen_mann = sub_actions.add_parser('generate')
 
     gen_mann.add_argument('--hgrid', required=True)
+    gen_mann.add_argument('--hgrid-crs')
     gen_mann.add_argument('--out-dir', required=False)
     gen_mann.add_argument('--overwrite', action='store_true')
 
