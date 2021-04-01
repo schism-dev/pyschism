@@ -221,3 +221,20 @@ class OPT(metaclass=OptMeta):
                             current.append(f'  {current}({i+1}) = 1')
         data = '\n'.join(data)
         return f"&OPT\n{data}\n/"
+
+    def to_dict(self):
+        data = {}
+        for key, default in PARAM_DEFAULTS.items():
+            current = getattr(self, key)
+            if key in ['dramp', 'drampbc']:
+                if current is not None:
+                    current = current.total_seconds() / (60*60*24)
+            if current is not None:
+                if not isinstance(current, list):
+                    data[key] = current
+                else:
+                    data[key] = len(current) * [0]
+                    for i, state in enumerate(current):
+                        if state:
+                            data[key][i] = 1
+        return data

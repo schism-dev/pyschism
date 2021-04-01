@@ -30,7 +30,7 @@ class BctidesCli:
             tidal_database=args.tidal_database,
             velocity=args.include_velocity,
         )
-
+        bctides.Z0 = args.Z0
         if args.output_file is not None:
             bctides.write(args.output_file, overwrite=args.overwrite)
         else:
@@ -48,6 +48,7 @@ def add_bctides(subparsers):
     bctides.add_argument('--tidal-database', '--tidal-db',
                          choices=['hamtide', 'tpxo'],
                          default='hamtide')
+    bctides.add_argument('--Z0', type=float)
     bctides.add_argument('--hgrid-crs')
     bctides.add_argument(
         "--overwrite", action="store_true",

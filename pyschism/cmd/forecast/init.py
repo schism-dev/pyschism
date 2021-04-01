@@ -180,6 +180,8 @@ class TidesDescriptor:
                 if obj.args.constituents:
                     for constituent in obj.args.constituents:
                         tides.use_constituent(constituent)
+                if obj.args.Z0 is not None:
+                    tides.add_Z0(obj.args.Z0)
             obj.__dict__['tides'] = tides
         return tides
 
@@ -247,7 +249,8 @@ class ForecastInit:
             vgrid=False,
             fgrid=False,
             wind_rot=False,
-            overwrite=self.args.overwrite
+            overwrite=self.args.overwrite,
+            use_param_template=self.args.use_param_template
         )
 
         if self.args.skip_run is False:

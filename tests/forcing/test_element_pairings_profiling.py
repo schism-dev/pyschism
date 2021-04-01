@@ -16,7 +16,7 @@ from pyschism.forcing.hydrology.nwm import (
     AWSDataInventory,
     streamflow_lookup,
     localize_datetime,
-    pivot_time
+    nearest_cycle_date
 )
 
 
@@ -28,7 +28,6 @@ if __name__ == '__main__':
     start = time()
     hgrid = Hgrid.open(
         os.getenv('NWM_TEST_MESH'),
-        # '/ddnas/jreniel/ADCIRC/NetCDF_shinnecock_inlet/fort.14',
         crs='EPSG:4326'
     )
     logging.info(f'Read hgrid took {time() - start}.')
@@ -66,7 +65,7 @@ if __name__ == '__main__':
     # Pass NWM data to Hydrology class.
     logging.info('Generating per-element hydrologic timeseries...')
     start = time()
-    hydro = Hydrology(pivot_time(), inventory.rnday)
+    hydro = Hydrology(nearest_cycle_date(), inventory.rnday)
     for i, file in enumerate(inventory.files):
         nc = Dataset(file)
         _time = localize_datetime(datetime.strptime(

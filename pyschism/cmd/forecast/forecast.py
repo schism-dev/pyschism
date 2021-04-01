@@ -56,6 +56,7 @@ def add_forecast_init(actions):
         "--skip-run", action="store_true",
         help="Skips running the model.")
     init.add_argument('--nproc', type=int, default=cpu_count(logical=False))
+    init.add_argument('--use-param-template', action='store_true')
     _add_tidal_constituents(init)
     _add_atmospheric_forcing(init)
     _add_hydrologic_forcing(init)
@@ -183,6 +184,7 @@ def _add_tidal_constituents(parser):
                        default='tpxo')
     tides.add_argument("--include-tidal-velocity",
                        "--bnd-vel", action="store_true", dest='bnd_vel')
+    tides.add_argument("--Z0", type=float)
 
 
 def _add_atmospheric_forcing(parser):

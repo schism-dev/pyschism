@@ -207,3 +207,17 @@ class CORE(metaclass=CoreMeta):
                 data.append(f"  {key}={str(current)}")
         data = '\n'.join(data)
         return f"&CORE\n{data}\n/"
+
+    def to_dict(self):
+        output = {}
+        for key, default in PARAM_DEFAULTS.items():
+            current = getattr(self, key)
+            if key == 'rnday':
+                current = current.total_seconds() / (60.*60.*24)
+            if key == 'dt':
+                current = current.total_seconds()
+            if key in self._mandatory:
+                output[key] = current
+            elif default != current:
+                output[key] = current
+        return output
