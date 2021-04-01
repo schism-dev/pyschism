@@ -38,8 +38,9 @@ class NWS2(NWS):
             if hasattr(self.sflux_2, 'fetch_data'):
                 self.sflux_2.fetch_data(
                     self._start_date, self._rnday,
-                    bbox=model_driver.model_domain.hgrid.get_bbox(
-                        'EPSG:4326', output_type='bbox'))
+                    # bbox=model_driver.model_domain.hgrid.get_bbox(
+                    #     'EPSG:4326', output_type='bbox')
+                    )
         self.windrot = model_driver.model_domain.hgrid
 
     def __str__(self):

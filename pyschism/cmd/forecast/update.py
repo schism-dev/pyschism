@@ -11,6 +11,7 @@ from pyschism.driver import ModelDriver
 from pyschism.domain import ModelDomain
 from pyschism.forcing.atmosphere.nws.nws2 import NWS2
 from pyschism.forcing.atmosphere import GlobalForecastSystem as GFS
+from pyschism.forcing.atmosphere.hrrr import HRRR
 from pyschism.forcing.hydrology import NationalWaterModel as NWM
 from pyschism.param.schout import SurfaceOutputVars
 from pyschism.stations import Stations
@@ -157,27 +158,10 @@ class NWS2Descriptor:
                         return GFS(product=arg)
 
     def sflux_2(self, obj):
-        return
-
-
-class Sflux2:
-
-    def __get__(self, obj, val):
-        sflux_1 = obj.__dict__.get('sflux_1')
-        if sflux_1 is None:
-            for arg, value in obj.args.__dict__.items():
-                if 'gdas' in arg:
-                    if value is True:
-                        raise NotImplementedError(
-                            'GDAS product not implemented.')
-                elif 'gfs' in arg:
-                    if value is True:
-                        if arg == 'gfs':
-                            sflux_1 = GFS()
-                        else:
-                            sflux_1 = GFS(product=arg)
-            obj.__dict__['sflux_1'] = sflux_1
-        return sflux_1
+        for arg, value in obj.args.__dict__.items():
+            if 'hrrr' in arg:
+                if value is True:
+                    return HRRR()
 
 
 class HydrologyDescriptor:
