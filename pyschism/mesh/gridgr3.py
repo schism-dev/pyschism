@@ -1,30 +1,15 @@
-import os
 import pathlib
+import subprocess
+import tempfile
 from typing import Union
 
-from pyproj import CRS
-from shapely.geometry import Polygon, MultiPolygon, Point
 import geopandas as gpd
+from shapely.geometry import Polygon, MultiPolygon, Point
 
 from pyschism.mesh.base import Gr3
-from pyschism.mesh.parsers import grd
 
-class Gr3Filename(Enum):
-    ALBEDO = 'albedo.gr3'
-    DIFFMAX = 'diffmax.gr3'
-    DIFFMIN = 'diffmin.gr3'
-    WATERTYPE = 'watertype.gr3'
-    SHAPIRO = 'shapiro.gr3'
 
-class NchiType(Enum):
-    AB = 
-    
-
-class Gr3ALL(Gr3):
-
-    def __init__(self, *argv, **kwargs):
-     
-        pass
+class Gr3Field(Gr3):
 
     @classmethod
     def constant(cls, hgrid, value):
@@ -52,12 +37,37 @@ class Gr3ALL(Gr3):
         picks = ([i.index for i in gdf_in.itertuples()])
         self.values[picks] = value
 
-    def write(self, path: Union[str, os.PathLike], overwrite: bool = False):
-        path = pathlib.Path(path)
-        self.write(path.path.parent / , overwrite)
 
-class Albedo(Gr3ALL):
+class Albedo(Gr3Field):
     """ Class for writing albedo.gr3 file with constant value"""
 
-    def __init__(self, *argv, **kwargs):
-     
+
+class Diffmax(Gr3Field):
+    pass
+
+
+class Diffmin(Gr3Field):
+    pass
+
+
+class Watertype(Gr3Field):
+    pass
+
+
+class Shapiro(Gr3Field):
+
+    @classmethod
+    def from_binary(cls, hgrid, dst_crs, ref_slope):
+        _tmpdir = tempfile.TemporaryDirectory()
+        tmpdir = pathlib.Path(_tmpdir.name)
+        hgrid = hgrid.copy()
+        hgrid.transform_to(dst_crs)
+        hgrid.write(tmpdir / 'hgrid.gr3')
+        subprocess.check_call(['gen_slope_filter', ref_slope], cwd=tmpdir)
+        obj = cls.open(tmpdir / 'slope_filter.gr3')
+        obj.description = 'shapiro'
+        return obj
+
+
+class Windrot(Gr3Field):
+    pass
