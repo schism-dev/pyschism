@@ -242,6 +242,12 @@ class ForecastUpdate(ForecastInit):
                 cwd=self.hotstart_directory
             )
 
+    # def _symlink_files(self, hotstart_directory, ics):
+    #     super()._symlink_files(hotstart_directory, ics)
+    #     if self.vgrid.is_3D is True:
+    #         # do stuff
+    #         pass
+
     def _load_config(self):
         config = self.project_directory / 'config.json'
         with open(config) as json_file:
