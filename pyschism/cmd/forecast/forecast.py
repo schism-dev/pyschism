@@ -215,10 +215,13 @@ def _add_atmospheric_forcing(parser):
 
     atmospheric_forcing_2 = parser.add_argument_group(
         'atmospheric forcing level 2')
-    # data_source_2 = atmospheric_forcing_2.add_mutually_exclusive_group()
-    # for product in ["HWRF", "HRRR", "ETC"]:
-    #     data_source_2.add_argument(f"--{product}", help=f'Use {product} as '
-    #                                'data source.')
+    data_source_2 = atmospheric_forcing_2.add_mutually_exclusive_group()
+    for product in ["hrrr"]:
+        data_source_2.add_argument(
+            f"--{product}",
+            help=f'Use {product.upper()} as data source.',
+            action='store_true'
+        )
     atmospheric_forcing_2.add_argument(
         "--no-air-2", action="store_true",
         help="Disables air mass forcing option.")
