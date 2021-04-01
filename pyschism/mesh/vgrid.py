@@ -14,7 +14,7 @@ class BinaryVgridHandler:
         cmd = ['gen_vqs']
         subprocess.check_call(cmd, cwd=self.tmpdir)
         #static_files_directory = StaticFilesDirectory()
-        shutil.copy2(self.tmpdir / 'vgrid.in', './')
+        #shutil.copy2(self.tmpdir / 'vgrid.in', './')
 
     @property
     def tmpdir(self):
@@ -59,6 +59,10 @@ S levels
 
     def write(self, path, overwrite=False):
         path = pathlib.Path(path)
+        if isinstance(self.vgrid, BinaryVgridHandler):
+            shutil.copy2(self.vgrid.tmpdir / 'vgrid.in', path / 'vgrid.in')
+            return
+
         if path.is_file() and not overwrite:
             msg = 'File exists, pass overwrite=True to allow overwrite.'
             raise Exception(msg)
