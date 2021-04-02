@@ -46,8 +46,8 @@ class HYCOM:
  
             t0 = time()
             r = requests.get(url)
-            with open(fn_out,'wb') as f:
-                f.write(r.content) 
+         #   with open(fn_out,'wb') as f:
+         #       f.write(r.content) 
         
-            logger.info('\nrequests.get took %0.1f seconds' %(time()-t0)) 
+         #   logger.info('\nrequests.get took %0.1f seconds' %(time()-t0)) 
  
