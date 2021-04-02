@@ -11,7 +11,6 @@ import pandas as pd
 import pyproj
 from pyproj import CRS
 import pytz
-from scipy.spatial import cKDTree
 from shapely import ops
 from shapely.geometry import Point
 
@@ -402,7 +401,7 @@ class Hydrology:
                 flow_data = element_data['flow']
                 if np.all(flow_data < 0.):
                     # TODO:  Are irregular timeseries allowed?
-                    # if not, we need an ingerpolator here.
+                    # if not, we need an interpolator here.
                     for row in element_data.sort_values(
                             by=['time']).itertuples():
                         sinks.setdefault(row.time, {}).setdefault(
