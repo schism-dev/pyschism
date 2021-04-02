@@ -11,7 +11,7 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, force=True)
     hrrr = HRRR()
     hrrr.fetch_data(
-        bbox=Bbox([[17.623082, -67.730713], [18.786717, -65.055542]]),
+        # bbox=Bbox([[17.623082, -67.730713], [18.786717, -65.055542]]),
         rnday=0.25,
         prc=False,
         rad=False

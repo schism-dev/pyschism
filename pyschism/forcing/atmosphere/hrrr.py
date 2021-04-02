@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 class HRRRInventory:
 
-    def __init__(self, start_date=None, rnday=4, bbox=None):
+    def __init__(self, start_date=None, rnday=2, bbox=None):
         self.start_date = nearest_cycle_date() if start_date is None else \
             localize_datetime(start_date).astimezone(pytz.utc)
         self.rnday = rnday if isinstance(rnday, timedelta) else \
@@ -45,7 +45,8 @@ class HRRRInventory:
                 break
             base_url = BASE_URL + f'/{self.product}' + \
                 f'/hrrr{pivot_time(dt).strftime("%Y%m%d")}'
-            for cycle in reversed(range(0, 24, 6)):
+            # cycle
+            for cycle in reversed(range(0, 24, int(self.output_interval.total_seconds() / 3600))):
                 test_url = f'{base_url}/' + \
                            f'hrrr_sfc.t{cycle:02d}z'
                 try:
@@ -145,7 +146,7 @@ class HRRRInventory:
     def pivot_times(self):
         return np.arange(
             self.pivot_time,
-            self.pivot_time - timedelta(days=10),
+            self.pivot_time - timedelta(days=2),
             -timedelta(days=1),
         ).astype(datetime)
 
