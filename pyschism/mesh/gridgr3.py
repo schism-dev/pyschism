@@ -40,7 +40,7 @@ class Gr3Field(Gr3):
 
 class Albedo(Gr3Field):
     """ Class for writing albedo.gr3 file with constant value"""
-
+    pass
 
 class Diffmax(Gr3Field):
     pass

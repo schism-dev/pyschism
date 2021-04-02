@@ -14,7 +14,7 @@ class Vgrid:
         _tmpdir = tempfile.TemporaryDirectory()
         tmpdir = pathlib.Path(_tmpdir.name)
         hgrid.write(tmpdir / 'hgrid.gr3')
-        subprocess.check_call(['gen_vqs_1'], cwd=tmpdir)
+        subprocess.check_call(['gen_vqs'], cwd=tmpdir)
         obj = cls()
         obj._vgrid = open(tmpdir / 'vgrid.in').read()
         return obj
