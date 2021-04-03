@@ -30,7 +30,8 @@ class BctidesCli:
             tidal_database=args.tidal_database,
             velocity=args.include_velocity,
         )
-        bctides.Z0 = args.Z0
+        if args.Z0 is not None:
+            bctides.Z0 = args.Z0
         if args.output_file is not None:
             bctides.write(args.output_file, overwrite=args.overwrite)
         else:
