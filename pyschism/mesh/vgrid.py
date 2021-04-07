@@ -1,6 +1,7 @@
 import pathlib
 import subprocess
 import tempfile
+import shutil
 
 
 class Vgrid:
@@ -15,8 +16,12 @@ class Vgrid:
         tmpdir = pathlib.Path(_tmpdir.name)
         hgrid.write(tmpdir / 'hgrid.gr3')
         subprocess.check_call(['gen_vqs'], cwd=tmpdir)
+        outdir = pathlib.Path(output_directory)
+        #outdir = pathlib.Path('./')
+        shutil.copy2(tmpdir / 'vgrid.in', outdir / 'vgrid.in')
+        
         obj = cls()
-        obj._vgrid = open(tmpdir / 'vgrid.in').read()
+        #obj._vgrid = open(tmpdir / 'vgrid.in').read()
         return obj
 
     @staticmethod

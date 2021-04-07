@@ -16,6 +16,7 @@ from pyschism.param import Param
 from pyschism.server import ServerConfig
 from pyschism.stations import Stations
 from pyschism.mesh.gridgr3 import Albedo,Diffmax,Diffmin,Watertype
+from pyschism.mesh.vgrid import Vgrid
 
 
 class CombineHotstartBinary:
@@ -104,7 +105,7 @@ class ModelDriver:
             nws=True,
             wind_rot=True,
             stations=True,
-            use_param_template=False,
+            use_param_template=True,
             albedo = True,
             diffmax = True,
             diffmin = True,
@@ -135,20 +136,23 @@ class ModelDriver:
             self.albedo.write(outdir / 'albedo.gr3',overwrite)
 
         if diffmax:
-            self.diffmax = Diffmax.constant(self.model_domain.hgrid, 1.0e-6)
+            self.diffmax = Diffmax.constant(self.model_domain.hgrid, 1.0)
             self.diffmax.write(outdir / 'diffmax.gr3',overwrite)
 
         if diffmin:
-            self.diffmin = Diffmax.constant(self.model_domain.hgrid, 1.0)
+            self.diffmin = Diffmax.constant(self.model_domain.hgrid, 1.0e-6)
             self.diffmin.write(outdir / 'diffmin.gr3',overwrite)
 
         if watertype:
             self.watertype = Diffmax.constant(self.model_domain.hgrid, 1.0)
             self.watertype.write(outdir / 'watertype.gr3',overwrite)
-#lcui
+
         if vgrid:
             vgrid = 'vgrid.in' if vgrid is True else vgrid
-            self.model_domain.vgrid.write(outdir / vgrid, overwrite)
+            self.model_domain.vgrid = Vgrid.from_binary(self.model_domain.hgrid)
+             
+            #self.model_domain.vgrid.write(outdir / vgrid, overwrite)
+#lcui
         if fgrid:
             fgrid = f'{self.model_domain.fgrid.fname}' if fgrid is True \
                     else fgrid
