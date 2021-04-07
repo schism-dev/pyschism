@@ -60,6 +60,7 @@ def add_forecast_init(actions):
     _add_tidal_constituents(init)
     _add_atmospheric_forcing(init)
     _add_hydrologic_forcing(init)
+    init.add_argument('--use-shapiro', action='store_true')
     # TODO: Additional forcings.
     # _add_wave_forcing(forecast)
     model_outputs = init.add_argument_group('model_outputs')

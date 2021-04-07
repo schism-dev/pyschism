@@ -10,7 +10,7 @@ from pyschism.cmd.bctides import BctidesCli, add_bctides
 from pyschism.cmd.stations import StationsCli, add_stations
 from pyschism.cmd.hgrid import HgridCli, add_hgrid
 from pyschism.cmd.sms2grd import Sms2grdCli, add_sms2grd
-# from pyschism.cmd.grd2sms import Grd2smsCli, add_grd2sms
+from pyschism.cmd.grd2sms import Grd2SmsCli, add_grd2sms
 from pyschism.cmd.fgrid.entry import FgridCli, add_fgrid
 
 
@@ -28,7 +28,8 @@ def parse_args():
     add_hgrid(subparsers)
     add_fgrid(subparsers)
     add_sms2grd(subparsers)
-    # add_grd2sms(subparsers)
+    # add_vgrid(subparsers)
+    add_grd2sms(subparsers)
     return parser.parse_args()
 
 
@@ -48,6 +49,8 @@ def main():
     logging.Formatter.converter = lambda *args: datetime.now(
         tz=timezone('UTC')).timetuple()
 
+    logging.captureWarnings(True)
+
     if args.mode == 'forecast':
         ForecastCli(args)
 
@@ -63,8 +66,8 @@ def main():
     elif args.mode == 'stations':
         StationsCli(args)
 
-    # elif args.mode == 'grd2sms':
-    #     Grd2smsCli(args)
+    elif args.mode == 'grd2sms':
+        Grd2SmsCli(args)
 
     elif args.mode == 'sms2grd':
         Sms2grdCli(args)

@@ -88,6 +88,11 @@ class ModelDriver:
         # init hotstart file
         self._combine_hotstart = combine_hotstart
 
+        if model_domain.albedo is not None:
+            self.param.opt.albedo = 1
+
+        # do same here
+
         # init Makefile drivers
         self._makefile = MakefileDriver(server_config=server_config)
 
@@ -124,6 +129,24 @@ class ModelDriver:
                     pass
                 os.symlink(hgrid, 'hgrid.ll')
                 os.chdir(original_dir)  # popd
+        # lcui
+        if self.model_domain.albedo is not None:
+            # self.model_domain.albedo = Albedo.constant(self.model_domain.hgrid, 0.15)
+            self.model_domain.albedo.write(outdir / 'albedo.gr3', overwrite)
+
+        if diffmax:
+            self.diffmax = Diffmax.constant(self.model_domain.hgrid, 1.0e-6)
+            self.diffmax.write(outdir / 'diffmax.gr3', overwrite)
+
+        if diffmin:
+            self.diffmin = Diffmax.constant(self.model_domain.hgrid, 1.0)
+            self.diffmin.write(outdir / 'diffmin.gr3', overwrite)
+
+        if watertype:
+            self.watertype = Diffmax.constant(self.model_domain.hgrid, 1.0)
+            self.watertype.write(outdir / 'watertype.gr3', overwrite)
+
+        # lcui
         if vgrid:
             vgrid = 'vgrid.in' if vgrid is True else vgrid
             self.model_domain.vgrid.write(outdir / vgrid, overwrite)

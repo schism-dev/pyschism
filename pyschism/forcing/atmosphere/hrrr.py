@@ -75,6 +75,9 @@ class HRRRInventory:
                     if _datetime in file_dates:
                         if self._files[_datetime] is None:
                             self._files[_datetime] = nc
+                    else:
+                        logger.debug(f'No data for time {str(_datetime)} in '
+                                     f'{test_url}.')
                 if not any(nc is None for nc in self._files.values()):
                     break
 
