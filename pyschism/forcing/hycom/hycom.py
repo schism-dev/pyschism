@@ -10,7 +10,7 @@ from pyschism.dates import localize_datetime, nearest_cycle_date, pivot_time
 
 logger = logging.getLogger(__name__)
 
-class RTOFS(self, start_date, hgrid):
+class HotStart_RTOFS(self, start_date, hgrid):
 
     logger.info('Fetching RTOFS data')
     self._hgrid = hgrid
@@ -165,5 +165,5 @@ class RTOFS(self, start_date, hgrid):
 
         for it in np.arange(2):
             for k in np.arange(len(lev)):
-                dst['u'][it,k,:,:] = nc_salt['u'][it,k,lat_idxs,lon_idxs]
-                dst['v'][it,k,:,:] = nc_temp['v'][it,k,lat_idxs,lon_idxs]
+                dst['u'][it,k,:,:] = nc_uvel['u'][it,k,lat_idxs,lon_idxs]
+                dst['v'][it,k,:,:] = nc_vvel['v'][it,k,lat_idxs,lon_idxs]
