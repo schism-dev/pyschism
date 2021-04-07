@@ -16,6 +16,7 @@ from pyschism.param import Param
 from pyschism.server import ServerConfig
 from pyschism.stations import Stations
 from pyschism.mesh.gridgr3 import Albedo,Diffmax,Diffmin,Watertype
+from pyschism.mesh.prop import Fluxflag, Tvdflag
 from pyschism.mesh.vgrid import Vgrid
 
 
@@ -110,6 +111,8 @@ class ModelDriver:
             diffmax = True,
             diffmin = True,
             watertype = True,
+            fluxflag = True,
+            tvdflag = True,
     ):
         """Writes to disk the full set of input files necessary to run SCHISM.
         """
@@ -146,6 +149,16 @@ class ModelDriver:
         if watertype:
             self.watertype = Diffmax.constant(self.model_domain.hgrid, 1.0)
             self.watertype.write(outdir / 'watertype.gr3',overwrite)
+
+        if fluxflag:
+            self.fluxflag = Fluxflag.constant(self.model_domain.hgrid, -1)
+            with open(outdir / 'fluxflag.prop', 'w+') as fid:
+                fid.writelines(self.fluxflag)
+
+        if tvdflag:
+            self.tvdflag = Fluxflag.constant(self.model_domain.hgrid, 1)
+            with open(outdir / 'tvd.prop', 'w+') as fid:
+                fid.writelines(self.tvdflag)
 
         if vgrid:
             vgrid = 'vgrid.in' if vgrid is True else vgrid
