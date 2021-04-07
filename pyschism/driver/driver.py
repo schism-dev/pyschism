@@ -15,6 +15,7 @@ from pyschism.forcing.atmosphere import NWS2
 from pyschism.param import Param
 from pyschism.server import ServerConfig
 from pyschism.stations import Stations
+from pyschism.mesh.gridgr3 import Albedo, Diffmax, Diffmin, Watertype
 
 
 class CombineHotstartBinary:
@@ -109,6 +110,10 @@ class ModelDriver:
             wind_rot=True,
             stations=True,
             use_param_template=False,
+            albedo = True,
+            diffmax = True,
+            diffmin = True,
+            watertype = True,
     ):
         """Writes to disk the full set of input files necessary to run SCHISM.
         """
@@ -129,7 +134,7 @@ class ModelDriver:
                     pass
                 os.symlink(hgrid, 'hgrid.ll')
                 os.chdir(original_dir)  # popd
-        # lcui
+
         if self.model_domain.albedo is not None:
             # self.model_domain.albedo = Albedo.constant(self.model_domain.hgrid, 0.15)
             self.model_domain.albedo.write(outdir / 'albedo.gr3', overwrite)
@@ -146,7 +151,6 @@ class ModelDriver:
             self.watertype = Diffmax.constant(self.model_domain.hgrid, 1.0)
             self.watertype.write(outdir / 'watertype.gr3', overwrite)
 
-        # lcui
         if vgrid:
             vgrid = 'vgrid.in' if vgrid is True else vgrid
             self.model_domain.vgrid.write(outdir / vgrid, overwrite)

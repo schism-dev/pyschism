@@ -107,8 +107,8 @@ def to_string(description, nodes, elements, boundaries=None, crs=None):
         if isinstance(values, numbers.Number):
             values = [values]
         line = [f"{id}"]
-        line.extend([f"{x:<.16E}" for x in coords])
-        line.extend([f"{x:<.16E}" for x in values])
+        line.extend([f"{x:<.8f}" for x in coords])
+        line.extend([f"{x:<.8f}" for x in values])
         out.append(" ".join(line))
 
     for id, element in elements.items():

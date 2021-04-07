@@ -15,6 +15,7 @@ from pyschism.forcing.atmosphere.hrrr import HRRR
 from pyschism.forcing.hydrology import NationalWaterModel as NWM
 from pyschism.param.schout import SurfaceOutputVars
 from pyschism.stations import Stations
+#from pyschism.mesh.gridgr3 import Albedo
 
 
 class HotstartDirectory:
@@ -192,6 +193,20 @@ class WindrotPath:
             obj.__dict__['windrot_path'] = windrot_path
         return windrot_path
 
+#class AlbedoPath:
+#    def __get__(self, obj, val):
+#        albedo_path = obj.__dict__.get('albedo_path')
+#        if albedo_path is None:
+#            albedo_path = obj.static_files_direcotry /'albedo.gr3'
+#            if obj.args.overrite is True and albedo_path.exists():
+#                albedo_path.unlink()
+#            if not albedo_path.exists():
+#                albedo = Albedo.constant(obj.hotstart_domain.hgrid,0.15)
+#                obj.hotstart_domian.albedo.write(
+#                    albedo_path, overwrite=obj.args.overwrite)            
+#            obj.__dict__['albedo_path']=albedo_path
+#        return albedo_path       
+
 
 class ForecastUpdate(ForecastInit):
 
@@ -203,6 +218,7 @@ class ForecastUpdate(ForecastInit):
     nws2 = NWS2Descriptor()
     hydrology = HydrologyDescriptor()
     windrot_path = WindrotPath()
+    #albedo_path = AlbedoPath()
 
     def __init__(self, args: Namespace):
         self._args = args
@@ -241,6 +257,12 @@ class ForecastUpdate(ForecastInit):
                 ["make", "run"],
                 cwd=self.hotstart_directory
             )
+
+    # def _symlink_files(self, hotstart_directory, ics):
+    #     super()._symlink_files(hotstart_directory, ics)
+    #     if self.vgrid.is_3D is True:
+    #         # do stuff
+    #         pass
 
     def _load_config(self):
         config = self.project_directory / 'config.json'

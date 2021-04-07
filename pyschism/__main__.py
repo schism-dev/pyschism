@@ -12,6 +12,7 @@ from pyschism.cmd.hgrid import HgridCli, add_hgrid
 from pyschism.cmd.sms2grd import Sms2grdCli, add_sms2grd
 from pyschism.cmd.grd2sms import Grd2SmsCli, add_grd2sms
 from pyschism.cmd.fgrid.entry import FgridCli, add_fgrid
+from pyschism.cmd.vgrid import VgridCli, add_vgrid
 
 
 def parse_args():
@@ -28,8 +29,8 @@ def parse_args():
     add_hgrid(subparsers)
     add_fgrid(subparsers)
     add_sms2grd(subparsers)
-    # add_vgrid(subparsers)
     add_grd2sms(subparsers)
+    add_vgrid(subparsers)
     return parser.parse_args()
 
 
@@ -71,6 +72,9 @@ def main():
 
     elif args.mode == 'sms2grd':
         Sms2grdCli(args)
+
+    elif args.mode == 'vgrid':
+        VgridCli(args)
 
     else:
         raise NotImplementedError(f'Unhandled CLI mode: {args.mode}')

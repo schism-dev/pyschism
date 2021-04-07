@@ -187,7 +187,7 @@ class ModelDomain:
         self._hgrid = hgrid
         self._vgrid = vgrid
         self._fgrid = fgrid
-        self._open_boundaries = OpenBoundaries(hgrid)
+        # self._open_boundaries = OpenBoundaries(hgrid)
         self._ncor = Coriolis.AUTO
         self._nws: Union[NWS, None] = None
         self._hydrology: List[Hydrology] = []
@@ -223,7 +223,20 @@ class ModelDomain:
         assert isinstance(hydrology, Hydrology), \
             f"Argument hydrology must be of type {Hydrology}, " \
             f"not type {type(hydrology)}."
+        # if self.vgrid.is_2D:
+        #     self.elev_ic = ElevIc()
         self._hydrology.append(hydrology)
+
+# class ElecIc(Gr3Field):
+
+#     def __init__(self, offset=-0.1):
+
+#         mask = np.logical_and(
+#                 self.values > 0.,
+#                 nc['eta2'][:] < hgrid.values
+#             )
+#         idxs = np.where(mask)
+#         nc['eta2'][idxs] = hgrid.values[idxs] + offset
 
     @lru_cache(maxsize=1)
     def get_active_potential_constituents(self):
