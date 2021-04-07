@@ -1,5 +1,5 @@
 import numpy as np
-from datetime import datetime
+from datetime import datetime,timedelta
 from netCDF4 import Dataset
 from matplotlib.transforms import Bbox
 import logging
@@ -18,17 +18,18 @@ class RTOFS(self, start_date, hgrid):
     bbox = self._hgrid.get_bbox(crs='epsg:4326', output_type='bbox')
     #Bbox(x0=-98.0058874, y0=8.5344214, x1=-60.0400016, y1=45.83143077) 
     
-    self.start_date = start_date
+    #Go to yesterday's directory to get today and tomorrow's data
+    dt = start_date - timedelta(days=1)
     nc_ssh = Dataset(f'http://nomads.ncep.noaa.gov:80/dods/rtofs/rtofs_global' \
-        + start_date.strftime(%Y%m%d)+f'/rtofs_glo_2ds_forecast_3hrly_diag')
+        + dt.strftime(%Y%m%d)+f'/rtofs_glo_2ds_forecast_3hrly_diag')
     nc_salt = Dataset(f'http://nomads.ncep.noaa.gov:80/dods/rtofs/rtofs_global' \
-        + start_date.strftime(%Y%m%d)+f'/rtofs_glo_3dz_forecast_daily_salt')
+        + dt.strftime(%Y%m%d)+f'/rtofs_glo_3dz_forecast_daily_salt')
     nc_temp = Dataset(f'http://nomads.ncep.noaa.gov:80/dods/rtofs/rtofs_global' \
-        + start_date.strftime(%Y%m%d)+f'/rtofs_glo_3dz_forecast_daily_temp')
+        + dt.strftime(%Y%m%d)+f'/rtofs_glo_3dz_forecast_daily_temp')
     nc_uvel = Dataset('http://nomads.ncep.noaa.gov:80/dods/rtofs/rtofs_global' \
-        + start_date.strftime(%Y%m%d)+f'/rtofs_glo_3dz_forecast_daily_uvel')
+        + dt.strftime(%Y%m%d)+f'/rtofs_glo_3dz_forecast_daily_uvel')
     nc_vvel = Dataset('http://nomads.ncep.noaa.gov:80/dods/rtofs/rtofs_global' \
-        + start_date.strftime(%Y%m%d)+f'/rtofs_glo_3dz_forecast_daily_vvel')
+        + dt.strftime(%Y%m%d)+f'/rtofs_glo_3dz_forecast_daily_vvel')
 
     lon = nc_ssh['lon'][:]
     lat = nc_ssh['lat'][:]
