@@ -76,11 +76,11 @@ class HotStart_RTOFS(self, start_date, hgrid):
         dst.createVariable('time', 'f4', ('time',))
         dst['time'].long_name = 'Time'
         dst['time'].standard_name = 'time'
-        dst['time'][:] = nc_salt['time'][8:17:8]
+        dst['time'][:] = nc_salt['time'][1:2]
         #ssh
         dst.createVariable('ssh', 'f4', ('time', 'lat', 'lon',), fill_value=True)
         dst['ssh'].long_name = "sea_surface_elevation (m)"
-        dst['ssh'][:,:,:] = nc_ssh['ssh'][8:17:8,0,lat_idxs,lon_idxs]
+        dst['ssh'][:,:,:] = nc_ssh['ssh'][8:9,0,lat_idxs,lon_idxs]
     
     with Dataset('./TS_1.nc', 'w', format='NETCDF3_CLASSIC') as dst: 
         dst.setncatts({"Conventions": "cf-1.0"})
@@ -112,7 +112,7 @@ class HotStart_RTOFS(self, start_date, hgrid):
         dst.createVariable('time', 'f4', ('time',))
         dst['time'].long_name = 'Time'
         dst['time'].standard_name = 'time'
-        dst['time'][:] = nc_salt['time'][1:3]
+        dst['time'][:] = nc_salt['time'][1:2]
         #salt 
         dst.createVariable('salinity', 'f4', ('time', 'lev', 'lat', 'lon',), fill_value=True)
         dst['salinity'].long_name = "sea_water_salinity (psu)" 
@@ -120,10 +120,9 @@ class HotStart_RTOFS(self, start_date, hgrid):
         dst.createVariable('temperature', 'f4', ('time', 'lev', 'lat', 'lon',), fill_value=True)
         dst['temperature'].long_name = "sea_water_potential_temperature (degc)"
         
-        for it in np.arange(2):
-            for k in np.arange(len(lev)):
-                dst['salinity'][it,k,:,:] = nc_salt['salinity'][it,k,lat_idxs,lon_idxs]
-                dst['temperature'][it,k,:,:] = nc_temp['temperature'][it,k,lat_idxs,lon_idxs]
+        for k in np.arange(len(lev)):
+            dst['salinity'][:,k,:,:] = nc_salt['salinity'][1:2,k,lat_idxs,lon_idxs]
+            dst['temperature'][:,k,:,:] = nc_temp['temperature'][1:2,k,lat_idxs,lon_idxs]
 
     with Dataset('./UV_1.nc', 'w', format='NETCDF3_CLASSIC') as dst:
         dst.setncatts({"Conventions": "cf-1.0"})
@@ -155,7 +154,7 @@ class HotStart_RTOFS(self, start_date, hgrid):
         dst.createVariable('time', 'f4', ('time',))
         dst['time'].long_name = 'Time'
         dst['time'].standard_name = 'time'
-        dst['time'][:] = nc_salt['time'][1:3]
+        dst['time'][:] = nc_salt['time'][1:2]
         #uvel
         dst.createVariable('u', 'f4', ('time', 'lev', 'lat', 'lon',), fill_value=True)
         dst['u'].long_name = "eastward_sea_water_velocity (m/s)"
@@ -163,7 +162,6 @@ class HotStart_RTOFS(self, start_date, hgrid):
         dst.createVariable('v', 'f4', ('time', 'lev', 'lat', 'lon',), fill_value=True)
         dst['v'].long_name = "northward_sea_water_velocity (m/s)"
 
-        for it in np.arange(2):
-            for k in np.arange(len(lev)):
-                dst['u'][it,k,:,:] = nc_uvel['u'][it,k,lat_idxs,lon_idxs]
-                dst['v'][it,k,:,:] = nc_vvel['v'][it,k,lat_idxs,lon_idxs]
+        for k in np.arange(len(lev)):
+            dst['u'][:,k,:,:] = nc_uvel['u'][1:2,k,lat_idxs,lon_idxs]
+            dst['v'][:,k,:,:] = nc_vvel['v'][1:2,k,lat_idxs,lon_idxs]
