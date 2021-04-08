@@ -6,6 +6,7 @@ from typing import Union
 
 from netCDF4 import Dataset
 import numpy as np
+from shapely.geometry import Polygon, MultiPolygon, Point, MultiPoint
 
 from pyschism.domain import ModelDomain
 from pyschism.driver.makefile import MakefileDriver
@@ -156,7 +157,14 @@ class ModelDriver:
                 fid.writelines(self.fluxflag)
 
         if tvdflag:
-            self.tvdflag = Fluxflag.constant(self.model_domain.hgrid, 1)
+            #Hard-wire the polygon at this point. 
+            coords = [(-75.340506, 40.843483), (-75.533474, 40.436019), (-75.796036, 39.535807), \
+                (-75.672664, 39.339972), (-75.305709, 39.460000), (-75.103251, 39.636884), \
+                (-74.692008, 39.744277), (-74.391485, 40.009603), (-74.359851, 40.252818), \
+                (-74.514858, 40.745565), (-74.834362, 40.957194), (-75.210807, 40.935083),
+                (-75.283565, 40.925607) ]
+            poly = Polygon(coords)
+            self.tvdflag = Tvdflag.define_by_region(hgrid=self.model_domain.hgrid, region=poly, value=1)
             with open(outdir / 'tvd.prop', 'w+') as fid:
                 fid.writelines(self.tvdflag)
 

@@ -63,7 +63,7 @@ class PropField:
                     lat[v4-1])/4
             p = Point((xtmp, ytmp))
             if p.within(region):
-               value = -1
+               value = 0 
             line = [f'{id}'] 
             line.extend([f'{value}'])
             line.extend([f'\n'])
