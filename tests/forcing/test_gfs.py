@@ -11,7 +11,8 @@ class GFSTestCase(unittest.TestCase):
     def test_nowcast(self):
         gfs = GlobalForecastSystem()
         gfs.fetch_data(
-            bbox=Bbox([[17.623082, -67.730713], [18.786717, -65.055542]])
+            bbox=Bbox([[17.623082, -67.730713], [18.786717, -65.055542]]),
+            rnday=0.25
         )
 
 
