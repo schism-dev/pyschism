@@ -1,9 +1,12 @@
+import os
 import numpy as np
 from datetime import datetime,timedelta
-from netCDF4 import Dataset
-from matplotlib.transforms import Bbox
 import logging
 import pathlib
+from typing import Union
+
+from netCDF4 import Dataset
+from matplotlib.transforms import Bbox
 
 from pyschism.mesh import Hgrid
 from pyschism.dates import localize_datetime, nearest_cycle_date, pivot_time
@@ -18,13 +21,18 @@ class HotStartInventory():
 
     logger.info('Fetching RTOFS data')
 
-    def fetch_data(self, hgrid, start_date):
+    def fetch_data(self, outdir: Union[str, os.PathLike], hgrid, start_date):
 
         self.hgrid = hgrid
         self.start_date = start_date
 
+        outdir = pathlib.Path(outdir)
+        if outdir.name != '':
+            outdir /= 'hotstart'
+        outdir.mkdir(exist_ok=True)
+
         bbox = self.hgrid.get_bbox(crs='epsg:4326', output_type='bbox')
-    
+ 
         #Go to yesterday's directory to get tomorrow's data
         dt = self.start_date - timedelta(days=1)
         nc_ssh = Dataset(f'http://nomads.ncep.noaa.gov:80/dods/rtofs/rtofs_global' \
@@ -55,7 +63,7 @@ class HotStartInventory():
                 xlon[ilon] = xlon[ilon] - 360.
         ylat = lat[lat_idxs]
 
-        with Dataset('./SSH_1.nc', 'w', format='NETCDF3_CLASSIC') as dst:
+        with Dataset(outdir / 'SSH_1.nc', 'w', format='NETCDF3_CLASSIC') as dst:
             dst.setncatts({"Conventions": "cf-1.0"})
             #dimensions
             dst.createDimension('lon', xlon.shape[0])
@@ -85,7 +93,7 @@ class HotStartInventory():
             dst['ssh'].long_name = "sea_surface_elevation (m)"
             dst['ssh'][:,:,:] = nc_ssh['ssh'][8:9,0,lat_idxs,lon_idxs]
 
-        with Dataset('./TS_1.nc', 'w', format='NETCDF3_CLASSIC') as dst: 
+        with Dataset(outdir / 'TS_1.nc', 'w', format='NETCDF3_CLASSIC') as dst: 
             dst.setncatts({"Conventions": "cf-1.0"})
             #dimensions
             dst.createDimension('lon', xlon.shape[0])
@@ -127,7 +135,7 @@ class HotStartInventory():
                 dst['salinity'][:,k,:,:] = nc_salt['salinity'][1:2,k,lat_idxs,lon_idxs]
                 dst['temperature'][:,k,:,:] = nc_temp['temperature'][1:2,k,lat_idxs,lon_idxs]
 
-        with Dataset('./UV_1.nc', 'w', format='NETCDF3_CLASSIC') as dst:
+        with Dataset(outdir / 'UV_1.nc', 'w', format='NETCDF3_CLASSIC') as dst:
             dst.setncatts({"Conventions": "cf-1.0"})
             #dimensions
             dst.createDimension('lon', xlon.shape[0])
@@ -175,10 +183,15 @@ class OpenBoundaryInventory():
 
         pass
 
-    def fetch_data(self, start_date, rnday, idx_min, idx_max, jdx_min, jdx_max):
+    def fetch_data(self, outdir: Union[str, os.PathLike], start_date, rnday, idx_min, idx_max, jdx_min, jdx_max):
 
         self.start_date = start_date
         self.rnday = rnday
+
+        outdir = pathlib.Path(outdir)
+        if outdir.name != '':
+            outdir /= '3Dth'
+        outdir.mkdir(exist_ok=True)
 
         #Go to yesterday's directory to get tomorrow's data
         dt = self.start_date - timedelta(days=1)
@@ -203,7 +216,7 @@ class OpenBoundaryInventory():
                 xlon[ilon] = xlon[ilon] - 360.
         ylat = lat[jdx_min:jdx_max+1]
 
-        with Dataset('./SSH_2.nc', 'w', format='NETCDF3_CLASSIC') as dst:
+        with Dataset(outdir / 'SSH_1.nc', 'w', format='NETCDF3_CLASSIC') as dst:
             dst.setncatts({"Conventions": "cf-1.0"})
             #dimensions
             dst.createDimension('lon', xlon.shape[0])
@@ -233,7 +246,7 @@ class OpenBoundaryInventory():
             dst['ssh'].long_name = "sea_surface_elevation (m)"
             dst['ssh'][:,:,:] = nc_ssh['ssh'][8:8*(rnday+1)+1:8,0,jdx_min:jdx_max+1,idx_min:idx_max+1]
 
-        with Dataset('./TS_2.nc', 'w', format='NETCDF3_CLASSIC') as dst:
+        with Dataset(outdir / 'TS_1.nc', 'w', format='NETCDF3_CLASSIC') as dst:
             dst.setncatts({"Conventions": "cf-1.0"})
             #dimensions
             dst.createDimension('lon', xlon.shape[0])
@@ -273,7 +286,7 @@ class OpenBoundaryInventory():
             dst['temperature'].long_name = "sea_water_potential_temperature (degc)"
             dst['temperature'][:,:,:,:] = nc_temp['temperature'][1:rnday+2,:,jdx_min:jdx_max+1,idx_min:idx_max+1]
 
-        with Dataset('./UV_2.nc', 'w', format='NETCDF3_CLASSIC') as dst:
+        with Dataset(outdir / 'UV_1.nc', 'w', format='NETCDF3_CLASSIC') as dst:
             dst.setncatts({"Conventions": "cf-1.0"})
             #dimensions
             dst.createDimension('lon', xlon.shape[0])

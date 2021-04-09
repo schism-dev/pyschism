@@ -13,13 +13,14 @@ from pyschism.driver.makefile import MakefileDriver
 from pyschism.enums import Stratification
 from pyschism.forcing.tides.bctides import Bctides
 from pyschism.forcing.atmosphere import NWS2
+from pyschism.forcing.hycom.hycom import HotStartInventory, OpenBoundaryInventory
 from pyschism.param import Param
 from pyschism.server import ServerConfig
 from pyschism.stations import Stations
 from pyschism.mesh.gridgr3 import Albedo,Diffmax,Diffmin,Watertype
 from pyschism.mesh.prop import Fluxflag, Tvdflag
 from pyschism.mesh.vgrid import Vgrid
-
+from pyschism.dates import pivot_time, localize_datetime, nearest_cycle_date
 
 class CombineHotstartBinary:
 
@@ -114,6 +115,7 @@ class ModelDriver:
             watertype = True,
             fluxflag = True,
             tvdflag = True,
+            rtofs = True,
     ):
         """Writes to disk the full set of input files necessary to run SCHISM.
         """
@@ -167,6 +169,14 @@ class ModelDriver:
             self.tvdflag = Tvdflag.define_by_region(hgrid=self.model_domain.hgrid, region=poly, value=1)
             with open(outdir / 'tvd.prop', 'w+') as fid:
                 fid.writelines(self.tvdflag)
+
+        if rtofs:
+            self.start_date = nearest_cycle_date()
+            self.hotstart = HotStartInventory()
+            self.hotstart.fetch_data(outdir, self.model_domain.hgrid, self.start_date)
+            self.obnd = OpenBoundaryInventory()
+            self.obnd.fetch_data(outdir, self.start_date, rnday=3, \
+                idx_min=2687, idx_max=2714, jdx_min=1181, jdx_max=1634)
 
         if vgrid:
             vgrid = 'vgrid.in' if vgrid is True else vgrid
