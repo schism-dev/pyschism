@@ -17,15 +17,11 @@ from pyschism.forcing.hycom.hycom import HotStartInventory, OpenBoundaryInventor
 from pyschism.param import Param
 from pyschism.server import ServerConfig
 from pyschism.stations import Stations
-<<<<<<< HEAD
 from pyschism.mesh.gridgr3 import Albedo, Diffmax, Diffmin, Watertype
-
-=======
-from pyschism.mesh.gridgr3 import Albedo,Diffmax,Diffmin,Watertype
 from pyschism.mesh.prop import Fluxflag, Tvdflag
 from pyschism.mesh.vgrid import Vgrid
 from pyschism.dates import pivot_time, localize_datetime, nearest_cycle_date
->>>>>>> origin/ICOGS3D
+
 
 class CombineHotstartBinary:
 
@@ -43,9 +39,9 @@ class CombineHotstartBinary:
     def add_elev_ic(self, hgrid, offset=-0.1):
         nc = Dataset(self.path, 'r+')
         mask = np.logical_and(
-                hgrid.values > 0.,
-                nc['eta2'][:] < hgrid.values
-            )
+            hgrid.values > 0.,
+            nc['eta2'][:] < hgrid.values
+        )
         idxs = np.where(mask)
         nc['eta2'][idxs] = hgrid.values[idxs] + offset
         nc.close()
@@ -118,22 +114,14 @@ class ModelDriver:
             nws=True,
             wind_rot=True,
             stations=True,
-<<<<<<< Updated upstream
             use_param_template=True,
-            albedo = True,
-            diffmax = True,
-            diffmin = True,
-            watertype = True,
-            fluxflag = True,
-            tvdflag = True,
-            rtofs = True,
-=======
-            use_param_template=False,
             albedo=True,
             diffmax=True,
             diffmin=True,
             watertype=True,
->>>>>>> Stashed changes
+            fluxflag=True,
+            tvdflag=True,
+            rtofs=True,
     ):
         """Writes to disk the full set of input files necessary to run SCHISM.
         """
@@ -155,34 +143,21 @@ class ModelDriver:
                 os.symlink(hgrid, 'hgrid.ll')
                 os.chdir(original_dir)  # popd
 
-<<<<<<< Updated upstream
         if self.model_domain.albedo is not None:
             # self.model_domain.albedo = Albedo.constant(self.model_domain.hgrid, 0.15)
             self.model_domain.albedo.write(outdir / 'albedo.gr3', overwrite)
 
         if diffmax:
-<<<<<<< HEAD
-            self.diffmax = Diffmax.constant(self.model_domain.hgrid, 1.0e-6)
+            self.diffmax = Diffmax.constant(self.model_domain.hgrid, 1.0)
             self.diffmax.write(outdir / 'diffmax.gr3', overwrite)
 
         if diffmin:
-            self.diffmin = Diffmax.constant(self.model_domain.hgrid, 1.0)
+            self.diffmin = Diffmax.constant(self.model_domain.hgrid, 1.0e-6)
             self.diffmin.write(outdir / 'diffmin.gr3', overwrite)
 
         if watertype:
             self.watertype = Diffmax.constant(self.model_domain.hgrid, 1.0)
             self.watertype.write(outdir / 'watertype.gr3', overwrite)
-=======
-            self.diffmax = Diffmax.constant(self.model_domain.hgrid, 1.0)
-            self.diffmax.write(outdir / 'diffmax.gr3',overwrite)
-
-        if diffmin:
-            self.diffmin = Diffmax.constant(self.model_domain.hgrid, 1.0e-6)
-            self.diffmin.write(outdir / 'diffmin.gr3',overwrite)
-
-        if watertype:
-            self.watertype = Diffmax.constant(self.model_domain.hgrid, 1.0)
-            self.watertype.write(outdir / 'watertype.gr3',overwrite)
 
         if fluxflag:
             self.fluxflag = Fluxflag.constant(self.model_domain.hgrid, -1)
@@ -190,43 +165,41 @@ class ModelDriver:
                 fid.writelines(self.fluxflag)
 
         if tvdflag:
-            #Hard-wire the polygon at this point. 
-            coords = [(-75.340506, 40.843483), (-75.533474, 40.436019), (-75.796036, 39.535807), \
-                (-75.672664, 39.339972), (-75.305709, 39.460000), (-75.103251, 39.636884), \
-                (-74.692008, 39.744277), (-74.391485, 40.009603), (-74.359851, 40.252818), \
-                (-74.514858, 40.745565), (-74.834362, 40.957194), (-75.210807, 40.935083),
-                (-75.283565, 40.925607) ]
+            # Hard-wire the polygon at this point.
+            coords = [(-75.340506, 40.843483), (-75.533474, 40.436019), (-75.796036, 39.535807),
+                      (-75.672664, 39.339972), (-75.305709,
+                                                39.460000), (-75.103251, 39.636884),
+                      (-74.692008, 39.744277), (-74.391485,
+                                                40.009603), (-74.359851, 40.252818),
+                      (-74.514858, 40.745565), (-74.834362,
+                                                40.957194), (-75.210807, 40.935083),
+                      (-75.283565, 40.925607)]
             poly = Polygon(coords)
-            self.tvdflag = Tvdflag.define_by_region(hgrid=self.model_domain.hgrid, region=poly, value=1)
+            self.tvdflag = Tvdflag.define_by_region(
+                hgrid=self.model_domain.hgrid, region=poly, value=1)
             with open(outdir / 'tvd.prop', 'w+') as fid:
                 fid.writelines(self.tvdflag)
 
         if rtofs:
             self.start_date = nearest_cycle_date()
             self.hotstart = HotStartInventory()
-            self.hotstart.fetch_data(outdir, self.model_domain.hgrid, self.start_date)
+            self.hotstart.fetch_data(
+                outdir, self.model_domain.hgrid, self.start_date)
             self.obnd = OpenBoundaryInventory()
-            self.obnd.fetch_data(outdir, self.start_date, rnday=3, \
-                idx_min=2687, idx_max=2714, jdx_min=1181, jdx_max=1634)
->>>>>>> origin/ICOGS3D
+            self.obnd.fetch_data(outdir, self.start_date, rnday=3,
+                                 idx_min=2687, idx_max=2714, jdx_min=1181, jdx_max=1634)
 
         if vgrid:
             vgrid = 'vgrid.in' if vgrid is True else vgrid
-            self.model_domain.vgrid = Vgrid.from_binary(self.model_domain.hgrid)
-             
+            self.model_domain.vgrid = Vgrid.from_binary(
+                self.model_domain.hgrid)
+
             #self.model_domain.vgrid.write(outdir / vgrid, overwrite)
-#lcui
-=======
-        if vgrid:
-            vgrid = 'vgrid.in' if vgrid is True else vgrid
-            self.model_domain.vgrid.write(outdir / vgrid, overwrite)
-
->>>>>>> Stashed changes
+# lcui
         if fgrid:
             fgrid = f'{self.model_domain.fgrid.fname}' if fgrid is True \
                     else fgrid
             self.model_domain.fgrid.write(outdir / fgrid, overwrite)
-
         if param:
             param = 'param.nml' if param is True else param
             self.param.write(outdir / param, overwrite,
@@ -234,7 +207,6 @@ class ModelDriver:
         if bctides:
             bctides = 'bctides.in' if bctides is True else bctides
             self.bctides.write(outdir / bctides, overwrite)
-
         if nws:
             if self.nws is not None:
                 if isinstance(self.nws, NWS2):
@@ -257,23 +229,6 @@ class ModelDriver:
                     hotstart_lnk.unlink()
             os.symlink(os.path.relpath(
                 self.hotstart_file, outdir), hotstart_lnk)
-
-        # TODO: Fix.
-        if self.model_domain.albedo is not None:
-            # self.model_domain.albedo = Albedo.constant(self.model_domain.hgrid, 0.15)
-            self.model_domain.albedo.write(outdir / 'albedo.gr3', overwrite)
-
-        if diffmax:
-            self.diffmax = Diffmax.constant(self.model_domain.hgrid, 1.0e-6)
-            self.diffmax.write(outdir / 'diffmax.gr3', overwrite)
-
-        if diffmin:
-            self.diffmin = Diffmax.constant(self.model_domain.hgrid, 1.0)
-            self.diffmin.write(outdir / 'diffmin.gr3', overwrite)
-
-        if watertype:
-            self.watertype = Diffmax.constant(self.model_domain.hgrid, 1.0)
-            self.watertype.write(outdir / 'watertype.gr3', overwrite)
 
         self.makefile.write(outdir / 'Makefile', overwrite)
 
