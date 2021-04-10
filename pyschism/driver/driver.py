@@ -118,6 +118,7 @@ class ModelDriver:
             nws=True,
             wind_rot=True,
             stations=True,
+<<<<<<< Updated upstream
             use_param_template=True,
             albedo = True,
             diffmax = True,
@@ -126,6 +127,13 @@ class ModelDriver:
             fluxflag = True,
             tvdflag = True,
             rtofs = True,
+=======
+            use_param_template=False,
+            albedo=True,
+            diffmax=True,
+            diffmin=True,
+            watertype=True,
+>>>>>>> Stashed changes
     ):
         """Writes to disk the full set of input files necessary to run SCHISM.
         """
@@ -147,6 +155,7 @@ class ModelDriver:
                 os.symlink(hgrid, 'hgrid.ll')
                 os.chdir(original_dir)  # popd
 
+<<<<<<< Updated upstream
         if self.model_domain.albedo is not None:
             # self.model_domain.albedo = Albedo.constant(self.model_domain.hgrid, 0.15)
             self.model_domain.albedo.write(outdir / 'albedo.gr3', overwrite)
@@ -207,10 +216,17 @@ class ModelDriver:
              
             #self.model_domain.vgrid.write(outdir / vgrid, overwrite)
 #lcui
+=======
+        if vgrid:
+            vgrid = 'vgrid.in' if vgrid is True else vgrid
+            self.model_domain.vgrid.write(outdir / vgrid, overwrite)
+
+>>>>>>> Stashed changes
         if fgrid:
             fgrid = f'{self.model_domain.fgrid.fname}' if fgrid is True \
                     else fgrid
             self.model_domain.fgrid.write(outdir / fgrid, overwrite)
+
         if param:
             param = 'param.nml' if param is True else param
             self.param.write(outdir / param, overwrite,
@@ -218,6 +234,7 @@ class ModelDriver:
         if bctides:
             bctides = 'bctides.in' if bctides is True else bctides
             self.bctides.write(outdir / bctides, overwrite)
+
         if nws:
             if self.nws is not None:
                 if isinstance(self.nws, NWS2):
@@ -240,6 +257,23 @@ class ModelDriver:
                     hotstart_lnk.unlink()
             os.symlink(os.path.relpath(
                 self.hotstart_file, outdir), hotstart_lnk)
+
+        # TODO: Fix.
+        if self.model_domain.albedo is not None:
+            # self.model_domain.albedo = Albedo.constant(self.model_domain.hgrid, 0.15)
+            self.model_domain.albedo.write(outdir / 'albedo.gr3', overwrite)
+
+        if diffmax:
+            self.diffmax = Diffmax.constant(self.model_domain.hgrid, 1.0e-6)
+            self.diffmax.write(outdir / 'diffmax.gr3', overwrite)
+
+        if diffmin:
+            self.diffmin = Diffmax.constant(self.model_domain.hgrid, 1.0)
+            self.diffmin.write(outdir / 'diffmin.gr3', overwrite)
+
+        if watertype:
+            self.watertype = Diffmax.constant(self.model_domain.hgrid, 1.0)
+            self.watertype.write(outdir / 'watertype.gr3', overwrite)
 
         self.makefile.write(outdir / 'Makefile', overwrite)
 

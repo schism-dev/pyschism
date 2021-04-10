@@ -140,7 +140,7 @@ class NWS2Descriptor:
             if sflux_1 is not None:
                 nws2 = NWS2(
                     sflux_1,
-                    self.sflux_2(obj)
+                    self.sflux_2(obj, pad=sflux_1)
                     )
                 obj.__dict__['nws2'] = nws2
         return nws2
@@ -217,8 +217,8 @@ class ForecastUpdate(ForecastInit):
     forcings = Forcings()
     nws2 = NWS2Descriptor()
     hydrology = HydrologyDescriptor()
-    windrot_path = WindrotPath()
-    #albedo_path = AlbedoPath()
+    # windrot_path = WindrotPath()
+    # albedo_path = AlbedoPath()
 
     def __init__(self, args: Namespace):
         self._args = args

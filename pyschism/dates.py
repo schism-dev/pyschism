@@ -1,7 +1,78 @@
-from datetime import datetime
+from datetime import datetime, timedelta
+from typing import Union
 
 import numpy as np
 import pytz
+
+
+def singleton(class_):
+    instances = {}
+
+    def getinstance(*args, **kwargs):
+        if class_ not in instances:
+            instances[class_] = class_(*args, **kwargs)
+        return instances[class_]
+    return getinstance
+
+
+@singleton
+class StartDate:
+
+    def __init__(self):
+        self.start_date = None
+
+    def __set__(self, obj, val: datetime):
+        self.start_date = localize_datetime(val).astimezone(pytz.utc)
+
+    def __get__(self, obj, val) -> datetime:
+        return self.start_date
+
+    def __delete__(self, obj):
+        self.start_date = None
+
+
+@singleton
+class EndDate:
+
+    def __init__(self):
+        self.end_date = None
+
+    def __set__(self, obj, val: Union[float, timedelta, datetime]):
+
+        if isinstance(val, datetime):
+            val = localize_datetime(val).astimezone(pytz.utc)
+
+        elif not isinstance(val, timedelta):
+            val = obj.start_date + timedelta(days=float(val))
+
+        elif isinstance(val, timedelta):
+            val = obj.start_date + val
+
+        self.end_date = val
+
+    def __get__(self, obj, val) -> datetime:
+        return self.end_date
+
+    def __delete__(self, obj):
+        self.end_date = None
+
+
+@singleton
+class SpinupTime:
+
+    def __init__(self):
+        self.spinup_time = None
+
+    def __set__(self, obj, val: Union[int, float, timedelta]):
+        if not isinstance(val, timedelta):
+            val = timedelta(days=float(val))
+        self.spinup_time = val
+
+    def __get__(self, obj, val) -> timedelta:
+        return self.spinup_time
+
+    def __delete__(self, obj):
+        self.spinup_time = None
 
 
 def pivot_time(input_datetime=None):

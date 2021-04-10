@@ -1,6 +1,5 @@
 from argparse import Namespace
 from enum import Enum
-import logging
 import pathlib
 
 from psutil import cpu_count
