@@ -13,10 +13,10 @@
   ipre = 0 !Pre-processor flag (1: on; 0: off)
 
 ! Baroclinic/barotropic option. If ibc=0 (baroclinic model), ibtp is not used.
-  ibc = 0 !Baroclinic option
+  ibc = 1 !Baroclinic option
   ibtp = 0 
 
-  rnday = 40 !total run time in days
+  rnday = 120 !total run time in days
   dt = 150. !Time step in sec
 
 ! Grid for WWM (USE_WWM)
@@ -61,7 +61,7 @@
 ! Hotstart option. 0: cold start; 1: hotstart with time reset to 0; 2: 
 ! continue from the step in hotstart.nc
 !-----------------------------------------------------------------------
-  ihot = 1
+  ihot = 0
 
 !-----------------------------------------------------------------------
 ! Equation of State type used
@@ -76,7 +76,7 @@
 !-----------------------------------------------------------------------
 ! Main ramp option
 !-----------------------------------------------------------------------
-  nramp = 0 !ramp-up option (1: on; 0: off)
+  nramp = 1 !ramp-up option (1: on; 0: off)
   dramp = 1. !needed if nramp=1; ramp-up period in days
 
   nrampbc = 0 !ramp-up flag for baroclinic force
@@ -109,7 +109,7 @@
 ! (2) indvel=0, ishapiro=1 (shapiro0=0.5), ihorcon=inter_mom=0.
 ! For applications that include eddying regime, refer to the manual.
 !-----------------------------------------------------------------------
-  ihorcon = 2
+  ihorcon = 0 
   hvis_coef0 = 0.025 !const. diffusion # if ihorcon/=0; <=0.025 for ihorcon=2, <=0.125 for ihorcon=1
 !  cdh = 0.01 !needed only if ihorcon/=0; land friction coefficient - not active yet
 
@@ -118,7 +118,7 @@
 ! if indvel=ihorcon=0. To transition between eddying/non-eddying regimes, use
 ! indvel=0, ihorcon/=0, and ishapiro=-1 (shapiro.gr3).
 !-----------------------------------------------------------------------
-  ishapiro = -1 !on/off flag. Default: 0
+  ishapiro = 1 !on/off flag. Default: 0
   shapiro0 = 0.5 !Shapiro filter strength, needed only if ishapiro=1; max is 0.5 
   niter_shap = 1 !needed of ishapiro/=0 - # of iterations with Shapiro filter. Suggested: 1
 
@@ -204,7 +204,7 @@
 ! than once, and the code will accumulate the volumes, but for mass conc, one of
 ! the specified values will be taken (no summation).
 !-----------------------------------------------------------------------
-  if_source = 1
+  if_source = 0 
   nramp_ss = 1 !needed if if_source=1; ramp-up flag for source/sinks
   dramp_ss = 3 !needed if if_source=1; ramp-up period in days
 
@@ -225,9 +225,9 @@
 !           and may remove this constant in the future.
 !           If iwbl/=0, nchi must =1.
 !-----------------------------------------------------------------------
-  nchi = 0
+  nchi = -1 
   dzb_min = 0.5 !needed if nchi=1; min. bottom boundary layer thickness [m].
-  dzb_decay = 0. !needed if nchi=1; a decay const. [-]. should =0
+  !dzb_decay = 0. !needed if nchi=1; a decay const. [-]. should =0
   hmin_man = 1. !needed if nchi=-1: min. depth in Manning's formulation [m]
 
 !-----------------------------------------------------------------------
@@ -270,8 +270,8 @@
 ! If ihot=0 && flag_ic(1:2)=2 || ibcc_mean=1, ts.ic is used for removing mean density profile.
 ! flag_ic(1) must =flag_ic(2)
 !-----------------------------------------------------------------------
-  flag_ic(1) = 0 !T
-  flag_ic(2) = 0 !S
+!  flag_ic(1) = 0 !T
+!  flag_ic(2) = 0 !S
 
 ! initial conditions for other tracers.
 ! 1: needs inputs [MOD]_hvar_[1,2,...].ic ('1...' is tracer id); format of each file is similar to salt.ic;
@@ -279,15 +279,16 @@
 ! 2: needs [MOD]_vvar_[1,2,...].ic. Format of each file (for each tracer in tis MOD) is similar to ts.ic
 !    (i.e. level #, z-coord., tracer value). Verically varying i.c. is used for each tracer.
 ! 0: model sets own i.c. (EcoSim; TIMOR)
-  flag_ic(3) = 1 !GEN (user defined module)
-  flag_ic(4) = 1 !Age
-  flag_ic(5) = 1 !SED3D
-  flag_ic(6) = 1 !EcoSim
-  flag_ic(7) = 1 !ICM
-  flag_ic(8) = 1 !CoSINE
-  flag_ic(9) = 1 !FIB
-  flag_ic(10) = 1 !TIMOR
-  flag_ic(11) = 1 !FABM
+!  flag_ic(3) = 1 !GEN (user defined module)
+!  flag_ic(4) = 1 !Age
+!  flag_ic(5) = 1 !SED3D
+!  flag_ic(6) = 1 !EcoSim
+!  flag_ic(7) = 1 !ICM
+!  flag_ic(8) = 1 !CoSINE
+!  flag_ic(9) = 1 !FIB
+!  flag_ic(10) = 1 !TIMOR
+!  flag_ic(11) = 1 !FABM
+   flag_ic(1:11) = 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 
 !  ic_GEN = 1 !user defined module
 !  ic_AGE = 1 !Age
@@ -333,7 +334,7 @@
 ! Behavior when trajectory hits open bnd. If ibtrack_openbnd=0, slide with
 ! tangential vel; otherwise, stop and exit btrack (recommended?)
 !-----------------------------------------------------------------------
-  ibtrack_openbnd = 0 !Default: 0
+!  ibtrack_openbnd = 0 !Default: 0
 
 !-----------------------------------------------------------------------
 ! Wetting and drying. 
@@ -393,7 +394,7 @@
 ! Also if itr_met==3 and h_tvd>=1.e5, some parts of the code are bypassed for efficiency
 ! Controls for WENO are not yet in place
 !-----------------------------------------------------------------------
-  itr_met = 4 !Default: 1
+  itr_met = 1 !Default: 1
   h_tvd = 5. !used only if itr_met>=2; cut-off depth (m) 
   !If itr_met=3 or 4, need the following 2 tolerances of convergence. The convergence
   !is achieved when sqrt[\sum_i(T_i^s+1-T_i^s)^2]<=eps1_tvd_imp*sqrt[\sum_i(T_i^s)^2]+eps2_tvd_imp
@@ -413,7 +414,7 @@
   nquad = 2  !number of quad points on each side, nquad= 1 or 2
   ntd_weno = 1 !order of temporal discretization: (1) Euler (default); (3): 3rd-order Runge-Kutta (only for benchmarking)
   epsilon1 = 1.e-3   !coefficient for 2nd order weno smoother
-  epsilon2 = 1.e-7  !1st coefficient for 3rd order weno smoother (larger values are more prone to numerical dispersion
+  epsilon2 = 1.e-5  !1st coefficient for 3rd order weno smoother (larger values are more prone to numerical dispersion
                      !, 1.e-10 should be fairly safe, recommended values: 1.e-8 ~ 1.e-6 (from the real applications so far)
   i_prtnftl_weno = 0 !option for writing nonfatal errors on invalid temp. or salinity for density: (0) off; (1) on.
 
@@ -439,11 +440,11 @@
 ! If WWM is enabled and icou_elfe_wwm>0 and iwind_form=-2, stress is overwritten by WWM.
 ! In all cases, if USE_ICE the stress in ice-covered portion is calculated by ICE routine.
 !-----------------------------------------------------------------------
-  nws = 2
+  nws = 0 
   wtiminc = 150. !time step for atmos. forcing. Default: same as dt
   nrampwind = 1 !ramp-up option for atmos. forcing
-  drampwind = 2. !needed if nrampwind/=0; ramp-up period in days
-  iwindoff = 0 !needed only if nws/=0; '1': needs windfactor.gr3
+  drampwind = 1. !needed if nrampwind/=0; ramp-up period in days
+!  iwindoff = 0 !needed only if nws/=0; '1': needs windfactor.gr3
   iwind_form = -1 !needed if nws/=0
   !If impose_net_flux/=0 and nws=2, read in net _surface_ heat flux as var 'dlwrf' 
   !(Downward Long Wave) in sflux_rad (solar radiation is still used separately),
@@ -454,8 +455,8 @@
 ! Heat and salt exchange. isconsv=1 needs ihconsv=1; ihconsv=1 needs nws=2.
 ! If isconsv=1, need to compile with precip/evap module turned on.
 !-----------------------------------------------------------------------
-  ihconsv = 1 !heat exchange option
-  isconsv = 1 !evaporation/precipitation model
+  ihconsv = 0 !heat exchange option
+  isconsv = 0 !evaporation/precipitation model
 
 ! Min total water depth for applying heat/salt exchange (i.e. off if the local water depth <hmin_airsea_ex)
   hmin_airsea_ex = 0.001 ![m]
@@ -463,7 +464,7 @@
 !-----------------------------------------------------------------------
 ! Turbulence closure.
 !-----------------------------------------------------------------------
-  itur = 3 !Default: 0
+  itur = 0 !Default: 0
   dfv0 = 1.e-2 !needed if itur=0
   dfh0 = 1.e-4 !needed if itur=0
   mid = 'KL' !needed if itur=3,5. Use KE if itur=5 
@@ -490,17 +491,18 @@
 ! Code will ignore junk values (<=-99) inside [MOD]_nu.nc, so 1 way to avoid 
 ! nudging for a tracer is to set its nudged values to -9999
 !-----------------------------------------------------------------------
-  inu_tr(1) = 2 !T
-  inu_tr(2) = 2 !S
-  inu_tr(3) = 0 !GEN
-  inu_tr(4) = 0 !Age
-  inu_tr(5) = 0 !SED3D
-  inu_tr(6) = 0 !EcoSim 
-  inu_tr(7) = 0 !ICM 
-  inu_tr(8) = 0 !CoSINE 
-  inu_tr(9) = 0 !FIB
-  inu_tr(10) = 0 !TIMOR 
-  inu_tr(11) = 0 !FABM 
+!  inu_tr(1) = 0 !T
+!  inu_tr(2) = 0 !S
+!  inu_tr(3) = 0 !GEN
+!  inu_tr(4) = 0 !Age
+!  inu_tr(5) = 0 !SED3D
+!  inu_tr(6) = 0 !EcoSim 
+!  inu_tr(7) = 0 !ICM 
+!  inu_tr(8) = 0 !CoSINE 
+!  inu_tr(9) = 0 !FIB
+!  inu_tr(10) = 0 !TIMOR 
+!  inu_tr(11) = 0 !FABM 
+  inu_tr(1:11) = 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 
   vnh1 = 400 !vertical nudging depth 1
   vnf1 = 0. !vertical relax \in [0,1]
@@ -539,7 +541,7 @@
 ! in output flux.dat, positive means flux from region n to region n-1 (n>=1)
 ! output file flux.dat need to be saved before continuing hotstart
 !-----------------------------------------------------------------------
-  iflux = 1
+  iflux = 0
 
 !-----------------------------------------------------------------------
 ! Test flags for debugging. These flags should be turned off normally.
@@ -628,17 +630,18 @@
 ! At moment the scheme has not accounted for bottom 'leaking' (e.g. in SED), 
 ! so iadjust_mass_consv0(5) must =0
 !-----------------------------------------------------------------------
-  iadjust_mass_consv0(1)=0 !T
-  iadjust_mass_consv0(2)=0 !S
-  iadjust_mass_consv0(3)=0 !GEN
-  iadjust_mass_consv0(4)=0 !AGE
-  iadjust_mass_consv0(5)=0 !SED3D (code won't allow non-0 for this module)
-  iadjust_mass_consv0(6)=0 !EcoSim
-  iadjust_mass_consv0(7)=0 !ICM
-  iadjust_mass_consv0(8)=0 !CoSiNE
-  iadjust_mass_consv0(9)=0 !Feco
-  iadjust_mass_consv0(10)=0 !TIMOR
-  iadjust_mass_consv0(11)=0 !FABM
+!  iadjust_mass_consv0(1)=0 !T
+!  iadjust_mass_consv0(2)=0 !S
+!  iadjust_mass_consv0(3)=0 !GEN
+!  iadjust_mass_consv0(4)=0 !AGE
+!  iadjust_mass_consv0(5)=0 !SED3D (code won't allow non-0 for this module)
+!  iadjust_mass_consv0(6)=0 !EcoSim
+!  iadjust_mass_consv0(7)=0 !ICM
+!  iadjust_mass_consv0(8)=0 !CoSiNE
+!  iadjust_mass_consv0(9)=0 !Feco
+!  iadjust_mass_consv0(10)=0 !TIMOR
+!  iadjust_mass_consv0(11)=0 !FABM
+  iadjust_mass_consv0(1:11) = 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 /
 
 &SCHOUT
@@ -648,52 +651,52 @@
 ! Option for hotstart outputs
 !-----------------------------------------------------------------------
   nhot = 1 !1: output *_hotstart every 'hotout_write' steps
-  nhot_write = 2880 !must be a multiple of ihfskip if nhot=1
+  nhot_write = 576 !must be a multiple of ihfskip if nhot=1
 
 !-----------------------------------------------------------------------
 ! Station output option. If iout_sta/=0, need output skip (nspool_sta) and
 ! a station.in. If ics=2, the cordinates in station.in must be in lon., lat,
 ! and z (positive upward; not used for 2D variables). 
 !-----------------------------------------------------------------------
-  iout_sta = 1
+  iout_sta = 0
   nspool_sta = 12 !needed if iout_sta/=0; mod(nhot_write,nspool_sta) must=0
 
 !-----------------------------------------------------------------------
 ! Global output options
 ! The variable names that appear in nc output are shown in {}
 !-----------------------------------------------------------------------
-  iof_hydro(1) = 1 !0: off; 1: on - elev. [m]  {elev}
-  iof_hydro(2) = 0 !air pressure [Pa]  {air_pressure}
-  iof_hydro(3) = 0 !air temperature [C] {air_temperature}
-  iof_hydro(4) = 0 !Specific humidity [-] {specific_humidity}
-  iof_hydro(5) = 0 !solar (shortwave) radiation [W/m/m] {solar_radiation}
-  iof_hydro(6) = 0 !sensible flux (positive upward) [W/m/m]  {sensible_flux}
-  iof_hydro(7) = 0 !latent heat flux (positive upward) [W/m/m] {latent_heat}
-  iof_hydro(8) = 0 !upward longwave radiation (positive upward) [W/m/m] {upward_longwave}
-  iof_hydro(9) = 0 !downward longwave radiation (positive downward) [W/m/m] {downward_longwave}
-  iof_hydro(10) = 0 !total flux=-flsu-fllu-(radu-radd) [W/m/m] {total_heat_flux}
-  iof_hydro(11) = 0 !evaporation rate [kg/m/m/s] {evaporation}
-  iof_hydro(12) = 0 !precipitation rate [kg/m/m/s] {precipitation}
-  iof_hydro(13) = 0 !Bottom stress vector [kg/m/s^2(Pa)] {bottom_stress}
-  iof_hydro(14) = 0 !wind velocity vector [m/s] {wind_speed}
-  iof_hydro(15) = 0 !wind stress vector [m^2/s/s] {wind_stress}
-  iof_hydro(16) = 0 !depth-averaged vel vector [m/s] {dahv}
-  iof_hydro(17) = 0 !vertical velocity [m/s] {vertical_velocity}
-  iof_hydro(18) = 1 !water temperature [C] {temp}
-  iof_hydro(19) = 1 !water salinity [PSU] {salt}
-  iof_hydro(20) = 0 !water density [kg/m^3] {water_density}
-  iof_hydro(21) = 0 !eddy diffusivity [m^2/s] {diffusivity}
-  iof_hydro(22) = 0 !eddy viscosity [m^2/s] {viscosity}
-  iof_hydro(23) = 0 !turbulent kinetic energy {TKE}
-  iof_hydro(24) = 0 !turbulent mixing length [m] {mixing_length}
-  iof_hydro(25) = 1 !horizontal vel vector [m/s] {hvel}
+!  iof_hydro(1) = 1 !0: off; 1: on - elev. [m]  {elev}
+!  iof_hydro(2) = 0 !air pressure [Pa]  {air_pressure}
+!  iof_hydro(3) = 0 !air temperature [C] {air_temperature}
+!  iof_hydro(4) = 0 !Specific humidity [-] {specific_humidity}
+!  iof_hydro(5) = 0 !solar (shortwave) radiation [W/m/m] {solar_radiation}
+!  iof_hydro(6) = 0 !sensible flux (positive upward) [W/m/m]  {sensible_flux}
+!  iof_hydro(7) = 0 !latent heat flux (positive upward) [W/m/m] {latent_heat}
+!  iof_hydro(8) = 0 !upward longwave radiation (positive upward) [W/m/m] {upward_longwave}
+!  iof_hydro(9) = 0 !downward longwave radiation (positive downward) [W/m/m] {downward_longwave}
+!  iof_hydro(10) = 0 !total flux=-flsu-fllu-(radu-radd) [W/m/m] {total_heat_flux}
+!  iof_hydro(11) = 0 !evaporation rate [kg/m/m/s] {evaporation}
+!  iof_hydro(12) = 0 !precipitation rate [kg/m/m/s] {precipitation}
+!  iof_hydro(13) = 0 !Bottom stress vector [kg/m/s^2(Pa)] {bottom_stress}
+!  iof_hydro(14) = 0 !wind velocity vector [m/s] {wind_speed}
+!  iof_hydro(15) = 0 !wind stress vector [m^2/s/s] {wind_stress}
+!  iof_hydro(16) = 0 !depth-averaged vel vector [m/s] {dahv}
+!  iof_hydro(17) = 0 !vertical velocity [m/s] {vertical_velocity}
+!  iof_hydro(18) = 0 !water temperature [C] {temp}
+!  iof_hydro(19) = 0 !water salinity [PSU] {salt}
+!  iof_hydro(20) = 0 !water density [kg/m^3] {water_density}
+!  iof_hydro(21) = 0 !eddy diffusivity [m^2/s] {diffusivity}
+!  iof_hydro(22) = 0 !eddy viscosity [m^2/s] {viscosity}
+!  iof_hydro(23) = 0 !turbulent kinetic energy {TKE}
+!  iof_hydro(24) = 0 !turbulent mixing length [m] {mixing_length}
+!  iof_hydro(25) = 1 !horizontal vel vector [m/s] {hvel}
 
-  iof_hydro(26) = 0 !horizontal vel vector defined @side [m/s] {hvel_side}
-  iof_hydro(27) = 0 !vertical vel. @elem [m/s] {wvel_elem}
-  iof_hydro(28) = 0 !T @prism centers [C] {temp_elem}
-  iof_hydro(29) = 0 !S @prism centers [PSU] {salt_elem}
-  iof_hydro(30) = 0 !Barotropic pressure gradient force vector (m.s-2) @side centers  {pressure_gradient}
-
+!  iof_hydro(26) = 0 !horizontal vel vector defined @side [m/s] {hvel_side}
+!  iof_hydro(27) = 0 !vertical vel. @elem [m/s] {wvel_elem}
+!  iof_hydro(28) = 0 !T @prism centers [C] {temp_elem}
+!  iof_hydro(29) = 0 !S @prism centers [PSU] {salt_elem}
+!  iof_hydro(30) = 0 !Barotropic pressure gradient force vector (m.s-2) @side centers  {pressure_gradient}
+  iof_hydro(1:30) =  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 !-----------------------------------------------------------------------
 ! Outputs from optional modules. Only uncomment these if the USE_* is on
 !-----------------------------------------------------------------------
@@ -909,19 +912,19 @@
 !-----------------------------------------------------------------------
 ! Analysis module outputs (USE_ANALYSIS)
 !-----------------------------------------------------------------------
-  iof_ana(1) = 0 !x-component of \nabla air_pres /\rho_0 [m/s/s] {ANA_air_pres_grad_x}
-  iof_ana(2) = 0 !y-component of \nabla air_pres /\rho_0 [m/s/s] {ANA_air_pres_grad_y}
-  iof_ana(3) = 0  !\alpha*g*\nabla \Psi [m/s/s] (gradient of tidal potential) {ANA_tide_pot_grad_x}
-  iof_ana(4) = 0  !\alpha*g*\nabla \Psi [m/s/s] {ANA_tide_pot_grad_y}
-  iof_ana(5) = 0 !\nabla \cdot (\mu \nabla u) [m/s/s] (horizontal viscosity) {ANA_hor_viscosity_x}
-  iof_ana(6) = 0 !\nabla \cdot (\mu \nabla u) [m/s/s] {ANA_hor_viscosity_y}
-  iof_ana(7) = 0 !-g/rho0* \int_z^\eta dr_dx dz  [m/s/s] (b-clinic gradient) {ANA_bclinic_force_x}
-  iof_ana(8) = 0 !-g/rho0* \int_z^\eta dr_dy dz  [m/s/s] {ANA_bclinic_force_y}
-  iof_ana(9) = 0 !d (\nu du/dz)/dz [m/s/s] - no vegetation effects (vertical viscosity) {ANA_vert_viscosity_x}
-  iof_ana(10) = 0 !d (\nu dv/dz)/dz [m/s/s] - no vegetation effects {ANA_vert_viscosity_y}
-  iof_ana(11) = 0 !(u \cdot \nabla) u [m/s/s] (momentum advection) {ANA_mom_advection_x}
-  iof_ana(12) = 0 !(u \cdot \nabla) u [m/s/s] {ANA_mom_advection_y}
-  iof_ana(13) = 0 !gradient Richardson number [-] {ANA_Richardson}
-  iof_ana(14) = 1 !min time step at each element over all 
+!  iof_ana(1) = 0 !x-component of \nabla air_pres /\rho_0 [m/s/s] {ANA_air_pres_grad_x}
+!  iof_ana(2) = 0 !y-component of \nabla air_pres /\rho_0 [m/s/s] {ANA_air_pres_grad_y}
+!  iof_ana(3) = 0  !\alpha*g*\nabla \Psi [m/s/s] (gradient of tidal potential) {ANA_tide_pot_grad_x}
+!  iof_ana(4) = 0  !\alpha*g*\nabla \Psi [m/s/s] {ANA_tide_pot_grad_y}
+!  iof_ana(5) = 0 !\nabla \cdot (\mu \nabla u) [m/s/s] (horizontal viscosity) {ANA_hor_viscosity_x}
+!  iof_ana(6) = 0 !\nabla \cdot (\mu \nabla u) [m/s/s] {ANA_hor_viscosity_y}
+!  iof_ana(7) = 0 !-g/rho0* \int_z^\eta dr_dx dz  [m/s/s] (b-clinic gradient) {ANA_bclinic_force_x}
+!  iof_ana(8) = 0 !-g/rho0* \int_z^\eta dr_dy dz  [m/s/s] {ANA_bclinic_force_y}
+!  iof_ana(9) = 0 !d (\nu du/dz)/dz [m/s/s] - no vegetation effects (vertical viscosity) {ANA_vert_viscosity_x}
+!  iof_ana(10) = 0 !d (\nu dv/dz)/dz [m/s/s] - no vegetation effects {ANA_vert_viscosity_y}
+!  iof_ana(11) = 0 !(u \cdot \nabla) u [m/s/s] (momentum advection) {ANA_mom_advection_x}
+!  iof_ana(12) = 0 !(u \cdot \nabla) u [m/s/s] {ANA_mom_advection_y}
+!  iof_ana(13) = 0 !gradient Richardson number [-] {ANA_Richardson}
+!  iof_ana(14) = 1 !min time step at each element over all 
                    !subcycles in horizontal transport solver [s]   {ANA_transport_min_dt_elem}
 /
