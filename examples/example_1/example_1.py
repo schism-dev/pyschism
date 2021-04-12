@@ -6,33 +6,9 @@ import logging
 from pyschism.mesh import Hgrid, Vgrid, Fgrid
 from pyschism import ModelDomain, ModelDriver, Stations
 from pyschism.forcing import Tides
-
-
-
-SIMPLE_SLURM_DRIVER = """#!/bin/bash --login
-#SBATCH -D .
-#SBATCH -J schism-test
-#SBATCH -A nosofs
-#SBATCH --mail-type=all
-#SBATCH --mail-user=jaime.calzada@noaa.gov
-#SBATCH --output=slurm.log
-#SBATCH -n 500
-#SBATCH --time=02:00:00
-#SBATCH --partition=orion
-
-set -e
-
-module load intel/2020 impi/2020 netcdf/4.7.2-parallel
-
-PATH=$HOME/SCHISM/schism/build/bin:$PATH
-
-main() {
-  mkdir -p outputs
-  time srun pschism_TVD-VL
-}
-
-main
-"""
+from pyschism.forcing.atmosphere.nws.nws2 import NWS2
+from pyschism.forcing.atmosphere.gfs import GlobalForecastSystem as GFS
+from pyschism.forcing.atmosphere.hrrr import HRRR
 
 # https://eev.ee/blog/2012/05/23/python-faq-descriptors/
 
@@ -43,15 +19,10 @@ logging.basicConfig(level=logging.INFO)
 _logger = logging.getLogger(__name__)
 
 if __name__ == '__main__':
-    from time import time
-    # open gr3 file
-    _logger.info('Reading hgrid file...')
-    _tic = time()
-    hgrid = Hgrid.open(PARENT / 'hgrid.gr3',crs='EPSG:4326')
-    _logger.info(f'Reading hgrind file took {time()-_tic}.')
 
+    hgrid = Hgrid.open(PARENT / 'hgrid.gr3', crs='EPSG:4326')
     vgrid = Vgrid()
-    fgrid = Fgrid.open(PARENT / 'manning.gr3',crs='EPSG:4326')
+    fgrid = Fgrid.open(PARENT / 'manning.gr3', crs='EPSG:4326')
 
     # setup model domain
     domain = ModelDomain(hgrid, vgrid, fgrid)
@@ -63,21 +34,7 @@ if __name__ == '__main__':
     # connect the boundary condition to the domain
     domain.add_boundary_condition(elevbc)
 
-    # from pyschism.forcing.atmosphere.nws.nws2 import NWS2
-    # from pyschism.forcing.atmosphere.gfs import GlobalForecastSystem as GFS
-
-    # sflux_1 = GFS()
-    # sflux_2 = HWRF()
-
-    # atmos = NWS2(
-    #         sflux_1,
-    #         sflux_2
-    #     )
-
-    # domain.set_atmospheric_forcing(atmos)
-
-    #  ------ Param options
-    # dt and rnday are required arguments
+    domain.set_atmospheric_forcing(NWS2(GFS(), HRRR()))
 
     # Use int or float for seconds, or timedelta objects for pythonic
     # specifications
@@ -100,13 +57,25 @@ if __name__ == '__main__':
                           ) - dramp
 
     # Now we add station outputs
-#    stations = Stations.from_file(PARENT / 'station.in', timedelta(minutes=6.),
-#                                  elev=True, u=True, v=True)
+    stations = Stations.from_file(
+        PARENT / 'station.in',
+        timedelta(minutes=6.),
+        elev=True,
+        u=True,
+        v=True
+    )
 
     # init the model driver
-    driver = ModelDriver(domain, dt, rnday, dramp=dramp, start_date=start_date,
-                         #stations=stations, nspool=nspool, elev=True)
-                         nspool=nspool, elev=True)
+    driver = ModelDriver(
+        domain,
+        dt,
+        rnday,
+        dramp=dramp,
+        start_date=start_date,
+        # stations=stations,
+        nspool=nspool,
+        elev=True,
+    )
 
     # Output requests, as well as most other namelist variables, can be
     # modified post instantiation through their corresponding properties.
@@ -117,7 +86,3 @@ if __name__ == '__main__':
     # write files to disk
     outdir = pathlib.Path('staging')
     driver.write(outdir, overwrite=True)
-
-    # This will go as part of the writter
-    with open(outdir / 'slurm.job', 'w') as f:
-        f.write(SIMPLE_SLURM_DRIVER)

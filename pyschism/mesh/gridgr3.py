@@ -1,9 +1,11 @@
+import os
 import pathlib
 import subprocess
 import tempfile
 from typing import Union
 
 import geopandas as gpd
+import numpy as np
 from shapely.geometry import Polygon, MultiPolygon, Point
 
 from pyschism.mesh.base import Gr3
@@ -42,6 +44,7 @@ class Albedo(Gr3Field):
     """ Class for writing albedo.gr3 file with constant value"""
     pass
 
+
 class Diffmax(Gr3Field):
     pass
 
@@ -51,6 +54,14 @@ class Diffmin(Gr3Field):
 
 
 class Watertype(Gr3Field):
+    pass
+
+
+class Fluxflag(Gr3Field):
+    pass
+
+
+class Tvdflag(Gr3Field):
     pass
 
 
@@ -71,3 +82,73 @@ class Shapiro(Gr3Field):
 
 class Windrot(Gr3Field):
     pass
+
+
+class Nudge(Gr3Field):
+
+    """
+    This class is to generate nudge.gr3 file. The time complexity is O(n^2), which
+    is bad for large mesh. 
+    """
+
+    def __init__(self):
+
+        pass
+
+    def gen_nudge(self, outdir: Union[str, os.PathLike], hgrid):
+
+        #self.hgrid = hgrid
+
+        outdir = pathlib.Path(outdir)
+
+        hgrid = hgrid.to_dict()
+        nodes = hgrid['nodes']
+        elements = hgrid['elements']
+        NE, NP = len(elements), len(nodes)
+        lon = []
+        lat = []
+        for id, (coords, values) in nodes.items():
+            lon.append(coords[0])
+            lat.append(coords[1])
+
+        bnd = hgrid['boundaries']
+        opbd = bnd[None][0]['indexes']
+
+        # Max relax distance in degr
+        rlmax = 1.5
+        # Max relax strength in days
+        rnu_day = 0.25
+
+        rnu = 0
+        rnu_max = 1./rnu_day/86400.
+        out = [f"{rlmax}, {rnu_day}"]
+        out.extend("\n")
+        out.append(f"{NE} {NP}")
+        out.extend("\n")
+        print(f'Max relax distnce is {rlmax}')
+        for idn, (coords, values) in nodes.items():
+            if idn in opbd:
+                rnu = rnu_max
+                distmin = 0.
+            else:
+                distmin = np.finfo(np.float64).max
+                for j in opbd:
+                    tmp = np.square(lon[int(idn)-1]-lon[int(j)-1]) +  \
+                        np.square(lat[int(idn)-1]-lat[int(j)-1])
+                    # print(tmp)
+                    # exit()
+                    rl2 = np.sqrt(tmp)
+                    if rl2 < distmin:
+                        distmin = rl2
+            rnu = 0.
+            if distmin <= rlmax:
+                rnu = (1-distmin/rlmax)*rnu_max
+            line = [f"{idn}"]
+            line.extend([f"{x:<.7e}" for x in coords])
+            line.extend([f"{rnu:<.7e}"])
+            line.extend("\n")
+            out.append(" ".join(line))
+            print(out)
+            exit()
+            with open(outdir / 'TEM_nudge.gr3', 'w+') as fid:
+                fid.writelines(out)

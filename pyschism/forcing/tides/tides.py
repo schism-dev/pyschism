@@ -17,23 +17,8 @@ class TidalDatabase(Enum):
     TPXO = TPXO
     HAMTIDE = HAMTIDE
 
-
-class StrTidalDatabase(Enum):
-    TPXO = 'TPXO'
-    HAMTIDE = 'HAMTIDE'
-
-    @classmethod
     def _missing_(self, name):
         raise ValueError(f"{name} is not a valid tidal database.")
-
-
-class TidalConstituents(Enum):
-    M2 = "M2"
-    # etc...
-
-    @classmethod
-    def _missing_(self, name):
-        raise ValueError(f"{name} is not a valid tidal constituent.")
 
 
 class ActiveConstituents:
@@ -88,7 +73,7 @@ class Tides(bctypes.BoundaryCondition):
         return len(self.active_constituents)
 
     def __call__(self, start_date: datetime, rnday: Union[int, datetime],
-                 constituent: Union[str, TidalConstituents]):
+                 constituent: str):
         """Returns the tidal characteristic values for a given time period.
         """
         _logger.debug(
@@ -99,6 +84,9 @@ class Tides(bctypes.BoundaryCondition):
                 self.get_orbital_frequency(constituent),  # FF*
                 self.get_nodal_factor(start_date, rnday, constituent),  # Amig*
                 self.get_greenwich_factor(start_date, rnday, constituent))  # FACE* # noqa:E501
+
+    def fetch_data(self, hgrid, start_date, rnday):
+        pass
 
     def get_elevation(self, constituent, vertices):
         if constituent.lower() == 'z0':
@@ -697,11 +685,9 @@ class Tides(bctypes.BoundaryCondition):
         return self._forcing_database
 
     @forcing_database.setter
-    def forcing_database(self, database: Union[str, TidalDatabase]):
-        database = 'hamtide' if database is None else database
+    def forcing_database(self, database: str):
         if isinstance(database, str):
-            database = TidalDatabase[
-                StrTidalDatabase(database.upper()).name].value()
+            database = TidalDatabase[database.upper()].value()
         if isinstance(database, TidalDatabase):
             database = database.value()
         self._forcing_database = database

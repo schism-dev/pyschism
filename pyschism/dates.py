@@ -5,17 +5,17 @@ import numpy as np
 import pytz
 
 
-def singleton(class_):
-    instances = {}
+# def singleton(class_):
+#     instances = {}
 
-    def getinstance(*args, **kwargs):
-        if class_ not in instances:
-            instances[class_] = class_(*args, **kwargs)
-        return instances[class_]
-    return getinstance
+#     def getinstance(*args, **kwargs):
+#         if class_ not in instances:
+#             instances[class_] = class_(*args, **kwargs)
+#         return instances[class_]
+#     return getinstance
 
 
-@singleton
+# @singleton
 class StartDate:
 
     def __init__(self):
@@ -31,7 +31,7 @@ class StartDate:
         self.start_date = None
 
 
-@singleton
+# @singleton
 class EndDate:
 
     def __init__(self):
@@ -57,7 +57,6 @@ class EndDate:
         self.end_date = None
 
 
-@singleton
 class SpinupTime:
 
     def __init__(self):
@@ -85,7 +84,7 @@ def pivot_time(input_datetime=None):
         localize_datetime(input_datetime).astimezone(pytz.utc)
     return localize_datetime(
         datetime(input_datetime.year, input_datetime.month, input_datetime.day)
-        )
+    )
 
 
 def nearest_cycle_date(input_datetime=None, period=6):

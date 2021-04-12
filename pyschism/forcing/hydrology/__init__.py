@@ -9,6 +9,8 @@ from pyschism.forcing.hydrology.base import (
 )
 from pyschism.forcing.hydrology.nwm import NationalWaterModel
 
+NWM = NationalWaterModel
+
 __all__ = [
     "Hydrology",
     "NationalWaterModel",
@@ -18,4 +20,5 @@ __all__ = [
     "Vsource",
     "Vsink",
     "SourceSink",
+    'NWM',
 ]
