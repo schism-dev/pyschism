@@ -13,6 +13,72 @@ from pyschism.dates import localize_datetime, nearest_cycle_date, pivot_time
 
 logger = logging.getLogger(__name__)
 
+class Nudge:
+
+    """
+    This class is to generate nudge.gr3 file. The time complexity is O(n^2), which
+    is bad for large mesh. 
+    """
+
+    def __init__(self):
+
+        pass
+
+    def gen_nudge(self, outdir: Union[str, os.PathLike], hgrid):
+        
+        #self.hgrid = hgrid
+
+        outdir = pathlib.Path(outdir)
+
+        hgrid = hgrid.to_dict()
+        nodes = hgrid['nodes']
+        elements = hgrid['elements']
+        NE, NP = len(elements), len(nodes)
+        lon = []
+        lat = []
+        for id, (coords, values) in nodes.items():
+            lon.append(coords[0])
+            lat.append(coords[1])
+
+        bnd = hgrid['boundaries']
+        opbd = bnd[None][0]['indexes']
+
+        #Max relax distance in degr
+        rlmax = 1.5
+        #Max relax strength in days
+        rnu_day = 0.25
+
+        rnu = 0
+        rnu_max = 1./rnu_day/86400.
+        out = [f"{rlmax}, {rnu_day}"]
+        out.extend("\n")
+        out.append(f"{NE} {NP}")
+        out.extend("\n")
+        print(f'Max relax distnce is {rlmax}')
+        for idn, (coords, values) in nodes.items():
+            if idn in opbd:
+                rnu = rnu_max
+                distmin = 0.
+            else:
+                distmin = np.finfo(np.float64).max
+                for j in opbd:
+                    tmp = np.square(lon[int(idn)-1]-lon[int(j)-1]) +  \
+                        np.square(lat[int(idn)-1]-lat[int(j)-1])
+                    rl2 = np.sqrt(tmp)
+                    if rl2 < distmin:
+                        distmin=rl2
+            rnu = 0.
+            if distmin <= rlmax:
+                rnu = (1-distmin/rlmax)*rnu_max
+            line = [f"{idn}"]
+            line.extend([f"{x:<.7e}" for x in coords])
+            line.extend([f"{rnu:<.7e}"])
+            line.extend("\n")
+            out.append(" ".join(line))
+
+            with open(outdir / 'TEM_nudge.gr3','w+') as fid:
+                fid.writelines(out)
+
 class HotStartInventory():
 
     def __init__(self):
@@ -66,54 +132,56 @@ class HotStartInventory():
         with Dataset(outdir / 'SSH_1.nc', 'w', format='NETCDF3_CLASSIC') as dst:
             dst.setncatts({"Conventions": "cf-1.0"})
             #dimensions
-            dst.createDimension('lon', xlon.shape[0])
-            dst.createDimension('lat', ylat.shape[0])
+            dst.createDimension('xlon', xlon.shape[0])
+            dst.createDimension('ylat', ylat.shape[0])
             dst.createDimension('time', None)
 
             # variables
             # lon
-            dst.createVariable('lon', 'f4', ('lon',))
-            dst['lon'].long_name = "Longitude"
-            dst['lon'].standard_name = "longitude"
-            dst['lon'].units = "degrees_east"
-            dst['lon'][:] = xlon
+            dst.createVariable('xlon', 'f4', ('xlon',))
+            dst['xlon'].long_name = "Longitude"
+            dst['xlon'].standard_name = "longitude"
+            dst['xlon'].units = "degrees_east"
+            dst['xlon'][:] = xlon
             # lat 
-            dst.createVariable('lat', 'f4', ('lat',))
-            dst['lat'].long_name = "Latitude"
-            dst['lat'].standard_name = "latitude"
-            dst['lat'].units = "degrees_north"
-            dst['lat'][:] = ylat
+            dst.createVariable('ylat', 'f4', ('ylat',))
+            dst['ylat'].long_name = "Latitude"
+            dst['ylat'].standard_name = "latitude"
+            dst['ylat'].units = "degrees_north"
+            dst['ylat'][:] = ylat
             #time
             dst.createVariable('time', 'f4', ('time',))
-            dst['time'].long_name = 'Time'
-            dst['time'].standard_name = 'time'
+            dst['time'].standard_name = "time"
+            dst['time'].units = "days since 1-1-1 00:00:0.0"
             dst['time'][:] = nc_salt['time'][1:2]
             #ssh
-            dst.createVariable('ssh', 'f4', ('time', 'lat', 'lon',), fill_value=True)
-            dst['ssh'].long_name = "sea_surface_elevation (m)"
-            dst['ssh'][:,:,:] = nc_ssh['ssh'][8:9,0,lat_idxs,lon_idxs]
+            dst.createVariable('surf_el', 'f4', ('time', 'ylat', 'xlon',), fill_value=-30000.0)
+            dst['surf_el'].long_name = "sea_surface_elevation (m)"
+            dst['surf_el'].add_offset = 0.
+            dst['surf_el'].scale_factor = 0.001
+            dst['surf_el'][:,:,:] = nc_ssh['ssh'][8:9,0,lat_idxs,lon_idxs]
 
         with Dataset(outdir / 'TS_1.nc', 'w', format='NETCDF3_CLASSIC') as dst: 
             dst.setncatts({"Conventions": "cf-1.0"})
             #dimensions
-            dst.createDimension('lon', xlon.shape[0])
-            dst.createDimension('lat', ylat.shape[0])
+            dst.createDimension('xlon', xlon.shape[0])
+            dst.createDimension('ylat', ylat.shape[0])
             dst.createDimension('lev', nc_salt['lev'].shape[0])
             dst.createDimension('time', None)
 
             # variables
             # lon
-            dst.createVariable('lon', 'f4', ('lon',))
-            dst['lon'].long_name = "Longitude"
-            dst['lon'].standard_name = "longitude"
-            dst['lon'].units = "degrees_east"
-            dst['lon'][:] = xlon
+            dst.createVariable('xlon', 'f4', ('xlon',))
+            dst['xlon'].long_name = "Longitude"
+            dst['xlon'].standard_name = "longitude"
+            dst['xlon'].units = "degrees_east"
+            dst['xlon'][:] = xlon
             # lat 
-            dst.createVariable('lat', 'f4', ('lat',))
-            dst['lat'].long_name = "Latitude"
-            dst['lat'].standard_name = "latitude"
-            dst['lat'].units = "degrees_north"
-            dst['lat'][:] = ylat
+            dst.createVariable('ylat', 'f4', ('ylat',))
+            dst['ylat'].long_name = "Latitude"
+            dst['ylat'].standard_name = "latitude"
+            dst['ylat'].units = "degrees_north"
+            dst['ylat'][:] = ylat
             #lev
             dst.createVariable('lev', 'f4', ('lev',))
             dst['lev'].long_name = "altitude"
@@ -121,15 +189,19 @@ class HotStartInventory():
             dst['lev'][:] = nc_salt['lev'][:]
             #time
             dst.createVariable('time', 'f4', ('time',))
-            dst['time'].long_name = 'Time'
-            dst['time'].standard_name = 'time'
+            dst['time'].standard_name = "time"
+            dst['time'].units = "days since 1-1-1 00:00:0.0"
             dst['time'][:] = nc_salt['time'][1:2]
             #salt 
-            dst.createVariable('salinity', 'f4', ('time', 'lev', 'lat', 'lon',), fill_value=True)
+            dst.createVariable('salinity', 'f4', ('time', 'lev', 'ylat', 'xlon',), fill_value=-30000.0)
             dst['salinity'].long_name = "sea_water_salinity (psu)" 
+            dst['salinity'].add_offset = 20.
+            dst['salinity'].scale_factor = 0.001
             #temp
-            dst.createVariable('temperature', 'f4', ('time', 'lev', 'lat', 'lon',), fill_value=True)
+            dst.createVariable('temperature', 'f4', ('time', 'lev', 'ylat', 'xlon',), fill_value=-30000.0)
             dst['temperature'].long_name = "sea_water_potential_temperature (degc)"
+            dst['temperature'].add_offset = 20.
+            dst['temperature'].scale_factor = 0.001
         
             for k in np.arange(len(lev)):
                 dst['salinity'][:,k,:,:] = nc_salt['salinity'][1:2,k,lat_idxs,lon_idxs]
@@ -138,24 +210,24 @@ class HotStartInventory():
         with Dataset(outdir / 'UV_1.nc', 'w', format='NETCDF3_CLASSIC') as dst:
             dst.setncatts({"Conventions": "cf-1.0"})
             #dimensions
-            dst.createDimension('lon', xlon.shape[0])
-            dst.createDimension('lat', ylat.shape[0])
+            dst.createDimension('xlon', xlon.shape[0])
+            dst.createDimension('ylat', ylat.shape[0])
             dst.createDimension('lev', nc_salt['lev'].shape[0])
             dst.createDimension('time', None)
 
             # variables
             # lon
-            dst.createVariable('lon', 'f4', ('lon',))
-            dst['lon'].long_name = "Longitude"
-            dst['lon'].standard_name = "longitude"
-            dst['lon'].units = "degrees_east"
-            dst['lon'][:] = xlon
+            dst.createVariable('xlon', 'f4', ('xlon',))
+            dst['xlon'].long_name = "Longitude"
+            dst['xlon'].standard_name = "longitude"
+            dst['xlon'].units = "degrees_east"
+            dst['xlon'][:] = xlon
             # lat 
-            dst.createVariable('lat', 'f4', ('lat',))
-            dst['lat'].long_name = "Latitude"
-            dst['lat'].standard_name = "latitude"
-            dst['lat'].units = "degrees_north"
-            dst['lat'][:] = ylat
+            dst.createVariable('ylat', 'f4', ('ylat',))
+            dst['ylat'].long_name = "Latitude"
+            dst['ylat'].standard_name = "latitude"
+            dst['ylat'].units = "degrees_north"
+            dst['ylat'][:] = ylat
             #lev
             dst.createVariable('lev', 'f4', ('lev',))
             dst['lev'].long_name = "altitude"
@@ -163,19 +235,26 @@ class HotStartInventory():
             dst['lev'][:] = nc_salt['lev'][:]
             #time
             dst.createVariable('time', 'f4', ('time',))
-            dst['time'].long_name = 'Time'
-            dst['time'].standard_name = 'time'
+            dst['time'].standard_name = "time"
+            dst['time'].units = "days since 1-1-1 00:00:0.0"
             dst['time'][:] = nc_salt['time'][1:2]
             #uvel
-            dst.createVariable('u', 'f4', ('time', 'lev', 'lat', 'lon',), fill_value=True)
-            dst['u'].long_name = "eastward_sea_water_velocity (m/s)"
+            dst.createVariable('water_u', 'f4', ('time', 'lev', 'ylat', 'xlon',), fill_value=-30000.0)
+            dst['water_u'].long_name = "eastward_sea_water_velocity (m/s)"
+            dst['water_u'].add_offset = 0.
+            dst['water_u'].scale_factor = 0.001
             #vvel
-            dst.createVariable('v', 'f4', ('time', 'lev', 'lat', 'lon',), fill_value=True)
-            dst['v'].long_name = "northward_sea_water_velocity (m/s)"
+            dst.createVariable('water_v', 'f4', ('time', 'lev', 'ylat', 'xlon',), fill_value=-30000.0)
+            dst['water_v'].long_name = "northward_sea_water_velocity (m/s)"
+            dst['water_v'].add_offset = 0.
+            dst['water_v'].scale_factor = 0.001
 
             for k in np.arange(len(lev)):
-                dst['u'][:,k,:,:] = nc_uvel['u'][1:2,k,lat_idxs,lon_idxs]
-                dst['v'][:,k,:,:] = nc_vvel['v'][1:2,k,lat_idxs,lon_idxs]
+                dst['water_u'][:,k,:,:] = nc_uvel['u'][1:2,k,lat_idxs,lon_idxs]
+                dst['water_v'][:,k,:,:] = nc_vvel['v'][1:2,k,lat_idxs,lon_idxs]
+
+       #symlink estaury.gr3 and *.in file 
+       # os.symlink(estaury.gr3, './start/estuary.gr3')
 
 class OpenBoundaryInventory():
 
@@ -219,54 +298,57 @@ class OpenBoundaryInventory():
         with Dataset(outdir / 'SSH_1.nc', 'w', format='NETCDF3_CLASSIC') as dst:
             dst.setncatts({"Conventions": "cf-1.0"})
             #dimensions
-            dst.createDimension('lon', xlon.shape[0])
-            dst.createDimension('lat', ylat.shape[0])
+            dst.createDimension('xlon', xlon.shape[0])
+            dst.createDimension('ylat', ylat.shape[0])
             dst.createDimension('time', None)
 
             # variables
             # lon
-            dst.createVariable('lon', 'f4', ('lon',))
-            dst['lon'].long_name = "Longitude"
-            dst['lon'].standard_name = "longitude"
-            dst['lon'].units = "degrees_east"
-            dst['lon'][:] = xlon
+            dst.createVariable('xlon', 'f4', ('xlon',))
+            dst['xlon'].long_name = "Longitude"
+            dst['xlon'].standard_name = "longitude"
+            dst['xlon'].units = "degrees_east"
+            dst['xlon'][:] = xlon
             # lat 
-            dst.createVariable('lat', 'f4', ('lat',))
-            dst['lat'].long_name = "Latitude"
-            dst['lat'].standard_name = "latitude"
-            dst['lat'].units = "degrees_north"
-            dst['lat'][:] = ylat
+            dst.createVariable('ylat', 'f4', ('ylat',))
+            dst['ylat'].long_name = "Latitude"
+            dst['ylat'].standard_name = "latitude"
+            dst['ylat'].units = "degrees_north"
+            dst['ylat'][:] = ylat
             #time
             dst.createVariable('time', 'f4', ('time',))
-            dst['time'].long_name = 'Time'
-            dst['time'].standard_name = 'time'
+            dst['time'].standard_name = "time"
+            dst['time'].units = "days since 1-1-1 00:00:0.0"
             dst['time'][:] = nc_salt['time'][1:rnday+2]
             #ssh
-            dst.createVariable('ssh', 'f4', ('time', 'lat', 'lon',), fill_value=True)
-            dst['ssh'].long_name = "sea_surface_elevation (m)"
-            dst['ssh'][:,:,:] = nc_ssh['ssh'][8:8*(rnday+1)+1:8,0,jdx_min:jdx_max+1,idx_min:idx_max+1]
+            dst.createVariable('surf_el', 'f4', ('time', 'ylat', 'xlon',), fill_value=-30000.0)
+            dst['surf_el'].long_name = "sea_surface_elevation (m)"
+            dst['surf_el'].add_offset = 0.
+            dst['surf_el'].scale_factor = 0.001
+            ssh = nc_ssh['ssh'][8:8*(rnday+1)+1:8,0,jdx_min:jdx_max+1,idx_min:idx_max+1]
+            dst['surf_el'][:,:,:] = ssh
 
         with Dataset(outdir / 'TS_1.nc', 'w', format='NETCDF3_CLASSIC') as dst:
             dst.setncatts({"Conventions": "cf-1.0"})
             #dimensions
-            dst.createDimension('lon', xlon.shape[0])
-            dst.createDimension('lat', ylat.shape[0])
+            dst.createDimension('xlon', xlon.shape[0])
+            dst.createDimension('ylat', ylat.shape[0])
             dst.createDimension('lev', nc_salt['lev'].shape[0])
             dst.createDimension('time', None)
 
             # variables
             # lon
-            dst.createVariable('lon', 'f4', ('lon',))
-            dst['lon'].long_name = "Longitude"
-            dst['lon'].standard_name = "longitude"
-            dst['lon'].units = "degrees_east"
-            dst['lon'][:] = xlon
+            dst.createVariable('xlon', 'f4', ('xlon',))
+            dst['xlon'].long_name = "Longitude"
+            dst['xlon'].standard_name = "longitude"
+            dst['xlon'].units = "degrees_east"
+            dst['xlon'][:] = xlon
             # lat 
-            dst.createVariable('lat', 'f4', ('lat',))
-            dst['lat'].long_name = "Latitude"
-            dst['lat'].standard_name = "latitude"
-            dst['lat'].units = "degrees_north"
-            dst['lat'][:] = ylat
+            dst.createVariable('ylat', 'f4', ('ylat',))
+            dst['ylat'].long_name = "Latitude"
+            dst['ylat'].standard_name = "latitude"
+            dst['ylat'].units = "degrees_north"
+            dst['ylat'][:] = ylat
             #lev
             dst.createVariable('lev', 'f4', ('lev',))
             dst['lev'].long_name = "altitude"
@@ -274,39 +356,45 @@ class OpenBoundaryInventory():
             dst['lev'][:] = nc_salt['lev'][:]
             #time
             dst.createVariable('time', 'f4', ('time',))
-            dst['time'].long_name = 'Time'
-            dst['time'].standard_name = 'time'
+            dst['time'].standard_name = "time"
+            dst['time'].units = "days since 1-1-1 00:00:0.0"
             dst['time'][:] = nc_salt['time'][1:rnday+2]
             #salt 
-            dst.createVariable('salinity', 'f4', ('time', 'lev', 'lat', 'lon',), fill_value=True)
+            dst.createVariable('salinity', 'f4', ('time', 'lev', 'ylat', 'xlon',), fill_value=-30000.)
             dst['salinity'].long_name = "sea_water_salinity (psu)"
-            dst['salinity'][:,:,:,:] = nc_salt['salinity'][1:rnday+2,:,jdx_min:jdx_max+1,idx_min:idx_max+1]
+            dst['salinity'].add_offset = 20.
+            dst['salinity'].scale_factor = 0.001
+            sss = nc_salt['salinity'][1:rnday+2,:,jdx_min:jdx_max+1,idx_min:idx_max+1]
+            dst['salinity'][:,:,:,:] = sss
             #temp
-            dst.createVariable('temperature', 'f4', ('time', 'lev', 'lat', 'lon',), fill_value=True)
+            dst.createVariable('temperature', 'f4', ('time', 'lev', 'ylat', 'xlon',), fill_value=-30000.)
             dst['temperature'].long_name = "sea_water_potential_temperature (degc)"
-            dst['temperature'][:,:,:,:] = nc_temp['temperature'][1:rnday+2,:,jdx_min:jdx_max+1,idx_min:idx_max+1]
+            dst['temperature'].add_offset = 20.
+            dst['temperature'].scale_factor = 0.001
+            sst = nc_temp['temperature'][1:rnday+2,:,jdx_min:jdx_max+1,idx_min:idx_max+1]
+            dst['temperature'][:,:,:,:] = sst
 
         with Dataset(outdir / 'UV_1.nc', 'w', format='NETCDF3_CLASSIC') as dst:
             dst.setncatts({"Conventions": "cf-1.0"})
             #dimensions
-            dst.createDimension('lon', xlon.shape[0])
-            dst.createDimension('lat', ylat.shape[0])
+            dst.createDimension('xlon', xlon.shape[0])
+            dst.createDimension('ylat', ylat.shape[0])
             dst.createDimension('lev', nc_salt['lev'].shape[0])
             dst.createDimension('time', None)
 
             # variables
             # lon
-            dst.createVariable('lon', 'f4', ('lon',))
-            dst['lon'].long_name = "Longitude"
-            dst['lon'].standard_name = "longitude"
-            dst['lon'].units = "degrees_east"
-            dst['lon'][:] = xlon
+            dst.createVariable('xlon', 'f4', ('xlon',))
+            dst['xlon'].long_name = "Longitude"
+            dst['xlon'].standard_name = "longitude"
+            dst['xlon'].units = "degrees_east"
+            dst['xlon'][:] = xlon
             # lat 
-            dst.createVariable('lat', 'f4', ('lat',))
-            dst['lat'].long_name = "Latitude"
-            dst['lat'].standard_name = "latitude"
-            dst['lat'].units = "degrees_north"
-            dst['lat'][:] = ylat
+            dst.createVariable('ylat', 'f4', ('ylat',))
+            dst['ylat'].long_name = "Latitude"
+            dst['ylat'].standard_name = "latitude"
+            dst['ylat'].units = "degrees_north"
+            dst['ylat'][:] = ylat
             #lev
             dst.createVariable('lev', 'f4', ('lev',))
             dst['lev'].long_name = "altitude"
@@ -314,14 +402,20 @@ class OpenBoundaryInventory():
             dst['lev'][:] = nc_salt['lev'][:]
             #time
             dst.createVariable('time', 'f4', ('time',))
-            dst['time'].long_name = 'Time'
-            dst['time'].standard_name = 'time'
+            dst['time'].standard_name = "time"
+            dst['time'].units = "days since 1-1-1 00:00:0.0"
             dst['time'][:] = nc_salt['time'][1:rnday+2]
             #uvel
-            dst.createVariable('u', 'f4', ('time', 'lev', 'lat', 'lon',), fill_value=True)
-            dst['u'].long_name = "eastward_sea_water_velocity (m/s)"
-            dst['u'][:,:,:,:] = nc_uvel['u'][1:rnday+2,:,jdx_min:jdx_max+1,idx_min:idx_max+1]
+            dst.createVariable('water_u', 'f4', ('time', 'lev', 'ylat', 'xlon',), fill_value=-30000.)
+            dst['water_u'].long_name = "eastward_sea_water_velocity (m/s)"
+            dst['water_u'].add_offset = 0.
+            dst['water_u'].scale_factor = 0.001
+            uvel = nc_uvel['u'][1:rnday+2,:,jdx_min:jdx_max+1,idx_min:idx_max+1]
+            dst['water_u'][:,:,:,:] = uvel
             #vvel
-            dst.createVariable('v', 'f4', ('time', 'lev', 'lat', 'lon',), fill_value=True)
-            dst['v'].long_name = "northward_sea_water_velocity (m/s)"
-            dst['v'][:,:,:,:] = nc_vvel['v'][1:rnday+2,:,jdx_min:jdx_max+1,idx_min:idx_max+1]
+            dst.createVariable('water_v', 'f4', ('time', 'lev', 'ylat', 'xlon',), fill_value=-30000.)
+            dst['water_v'].long_name = "northward_sea_water_velocity (m/s)"
+            dst['water_v'].add_offset = 0.
+            dst['water_v'].scale_factor = 0.001
+            vvel = nc_vvel['v'][1:rnday+2,:,jdx_min:jdx_max+1,idx_min:idx_max+1]
+            dst['water_v'][:,:,:,:] = vvel

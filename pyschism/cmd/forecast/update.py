@@ -73,7 +73,7 @@ class HotstartDriver:
                 model_domain=obj.hotstart_domain,
                 dt=obj.args.timestep,
                 rnday=obj.args.forecast_days,
-                ihfskip=obj.args.ihfskip,
+                #ihfskip=obj.args.ihfskip,
                 start_date=obj.target_datetime,
                 # ibc=obj.ibc,
                 stations=obj.stations,

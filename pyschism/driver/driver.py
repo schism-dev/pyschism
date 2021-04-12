@@ -186,16 +186,16 @@ class ModelDriver:
             self.hotstart.fetch_data(
                 outdir, self.model_domain.hgrid, self.start_date)
             self.obnd = OpenBoundaryInventory()
-            self.obnd.fetch_data(outdir, self.start_date, rnday=3,
-                                 idx_min=2687, idx_max=2714, jdx_min=1181, jdx_max=1634)
 
         if vgrid:
             vgrid = 'vgrid.in' if vgrid is True else vgrid
             self.model_domain.vgrid = Vgrid.from_binary(
                 self.model_domain.hgrid)
+            # TODO: Unhardcode indexes
+            self.obnd.fetch_data(outdir, self.start_date, rnday=3,
+                                 idx_min=2687, idx_max=2714, jdx_min=1181,
+                                 jdx_max=1634)
 
-            #self.model_domain.vgrid.write(outdir / vgrid, overwrite)
-# lcui
         if fgrid:
             fgrid = f'{self.model_domain.fgrid.fname}' if fgrid is True \
                     else fgrid
