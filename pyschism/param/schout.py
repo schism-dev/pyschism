@@ -109,7 +109,7 @@ class Nhot:
 class NhotWrite:
 
     def __set__(self, obj, nhot_write: int):
-        obj.__dict__['nhot_write'] = nhot_write
+        obj.__dict__['nhot_write'] = 576 #nhot_write
         obj.__dict__['nhot'] = 1
 
     def __get__(self, obj, val):

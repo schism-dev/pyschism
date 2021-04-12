@@ -1,7 +1,9 @@
+import os
 import pathlib
 import subprocess
 import tempfile
 import shutil
+from typing import Union
 
 
 class Vgrid:
@@ -11,12 +13,13 @@ class Vgrid:
         self._vgrid = self._get_2D_string()
 
     @classmethod
-    def from_binary(cls, hgrid, *args, **kwargs):
+    def from_binary(cls, outdir: Union[str, os.PathLike], hgrid, *args, **kwargs):
         _tmpdir = tempfile.TemporaryDirectory()
         tmpdir = pathlib.Path(_tmpdir.name)
         hgrid.write(tmpdir / 'hgrid.gr3')
         subprocess.check_call(['gen_vqs'], cwd=tmpdir)
-        outdir = pathlib.Path(output_directory)
+        outdir = pathlib.Path(outdir)
+        print(f'write vgrid to dir {outdir}')
         #outdir = pathlib.Path('./')
         shutil.copy2(tmpdir / 'vgrid.in', outdir / 'vgrid.in')
         
