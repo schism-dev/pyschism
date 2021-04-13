@@ -5,23 +5,29 @@ import tempfile
 import shutil
 from typing import Union
 
+from pyschism.mesh.hgrid import Hgrid
+
 
 class Vgrid:
 
     def __init__(self):
         """Represents a SCHISM vertical grid."""
-        self._vgrid = self._get_2D_string()
+        #self._vgrid = self._get_2D_string()
+        pass
 
     @classmethod
     def from_binary(cls, outdir: Union[str, os.PathLike], hgrid, *args, **kwargs):
         _tmpdir = tempfile.TemporaryDirectory()
         tmpdir = pathlib.Path(_tmpdir.name)
+        hgrid = Hgrid.open(hgrid)
         hgrid.write(tmpdir / 'hgrid.gr3')
         subprocess.check_call(['gen_vqs'], cwd=tmpdir)
         outdir = pathlib.Path(outdir)
         print(f'write vgrid to dir {outdir}')
-        #outdir = pathlib.Path('./')
-        shutil.copy2(tmpdir / 'vgrid.in', outdir / 'vgrid.in')
+        if not outdir.is_file():
+            shutil.copy2(tmpdir / 'vgrid.in', outdir)
+        else:
+            shutil.copy2(tmpdir / 'vgrid.in', outdir / 'vgrid.in')
         
         obj = cls()
         #obj._vgrid = open(tmpdir / 'vgrid.in').read()

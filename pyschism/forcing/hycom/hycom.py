@@ -3,6 +3,9 @@ import numpy as np
 from datetime import datetime,timedelta
 import logging
 import pathlib
+import tempfile
+import subprocess
+import shutil
 from typing import Union
 
 from netCDF4 import Dataset
@@ -70,6 +73,7 @@ class Nudge:
             rnu = 0.
             if distmin <= rlmax:
                 rnu = (1-distmin/rlmax)*rnu_max
+            print(f'node id is {idn}')
             line = [f"{idn}"]
             line.extend([f"{x:<.7e}" for x in coords])
             line.extend([f"{rnu:<.7e}"])
@@ -93,9 +97,12 @@ class HotStartInventory():
         self.start_date = start_date
 
         outdir = pathlib.Path(outdir)
-        if outdir.name != '':
-            outdir /= 'hotstart'
-        outdir.mkdir(exist_ok=True)
+        #if outdir.name != '':
+        #    outdir /= 'hotstart'
+        #outdir.mkdir(exist_ok=True)
+
+        _tmpdir = tempfile.TemporaryDirectory()
+        tmpdir = pathlib.Path(_tmpdir.name)
 
         bbox = self.hgrid.get_bbox(crs='epsg:4326', output_type='bbox')
  
@@ -129,7 +136,7 @@ class HotStartInventory():
                 xlon[ilon] = xlon[ilon] - 360.
         ylat = lat[lat_idxs]
 
-        with Dataset(outdir / 'SSH_1.nc', 'w', format='NETCDF3_CLASSIC') as dst:
+        with Dataset(tmpdir / 'SSH_1.nc', 'w', format='NETCDF3_CLASSIC') as dst:
             dst.setncatts({"Conventions": "cf-1.0"})
             #dimensions
             dst.createDimension('xlon', xlon.shape[0])
@@ -161,7 +168,7 @@ class HotStartInventory():
             dst['surf_el'].scale_factor = 0.001
             dst['surf_el'][:,:,:] = nc_ssh['ssh'][8:9,0,lat_idxs,lon_idxs]
 
-        with Dataset(outdir / 'TS_1.nc', 'w', format='NETCDF3_CLASSIC') as dst: 
+        with Dataset(tmpdir / 'TS_1.nc', 'w', format='NETCDF3_CLASSIC') as dst: 
             dst.setncatts({"Conventions": "cf-1.0"})
             #dimensions
             dst.createDimension('xlon', xlon.shape[0])
@@ -207,7 +214,7 @@ class HotStartInventory():
                 dst['salinity'][:,k,:,:] = nc_salt['salinity'][1:2,k,lat_idxs,lon_idxs]
                 dst['temperature'][:,k,:,:] = nc_temp['temperature'][1:2,k,lat_idxs,lon_idxs]
 
-        with Dataset(outdir / 'UV_1.nc', 'w', format='NETCDF3_CLASSIC') as dst:
+        with Dataset(tmpdir / 'UV_1.nc', 'w', format='NETCDF3_CLASSIC') as dst:
             dst.setncatts({"Conventions": "cf-1.0"})
             #dimensions
             dst.createDimension('xlon', xlon.shape[0])
@@ -254,7 +261,20 @@ class HotStartInventory():
                 dst['water_v'][:,k,:,:] = nc_vvel['v'][1:2,k,lat_idxs,lon_idxs]
 
        #symlink estaury.gr3 and *.in file 
-       # os.symlink(estaury.gr3, './start/estuary.gr3')
+        hgrid.write(tmpdir / 'hgrid.gr3')
+        hgrid.write(tmpdir / 'hgrid.ll')
+        src = '/sciclone/data10/lcui01/ICOGS3D_dep/estuary.gr3'
+        dst = tmpdir / 'estuary.gr3'
+        os.symlink(src, dst)
+        src2 = '/sciclone/data10/lcui01/ICOGS3D_dep/gen_hot_3Dth_from_nc.in'
+        dst2 = tmpdir / 'gen_hot_3Dth_from_nc.in'
+        os.symlink(src2, dst2)
+        src3 = '/sciclone/data10/lcui01/ICOGS3D_dep/vgrid.in'
+        dst3 = tmpdir / 'vgrid.in'
+        os.symlink(src3, dst3)
+        cmd = 'gen_hot_3Dth_from_hycom.exe < gen_hot_3Dth_from_nc.in'
+        subprocess.check_call(cmd, shell=True, cwd=tmpdir)
+        shutil.copy2(tmpdir /'hotstart.nc', outdir / 'hotstart.nc')
 
 class OpenBoundaryInventory():
 
@@ -262,15 +282,18 @@ class OpenBoundaryInventory():
 
         pass
 
-    def fetch_data(self, outdir: Union[str, os.PathLike], start_date, rnday, idx_min, idx_max, jdx_min, jdx_max):
+    def fetch_data(self, outdir: Union[str, os.PathLike], hgrid, start_date, rnday, idx_min, idx_max, jdx_min, jdx_max):
 
         self.start_date = start_date
         self.rnday = rnday
 
         outdir = pathlib.Path(outdir)
-        if outdir.name != '':
-            outdir /= '3Dth'
-        outdir.mkdir(exist_ok=True)
+        #if outdir.name != '':
+        #    outdir /= '3Dth'
+        #outdir.mkdir(exist_ok=True)
+
+        _tmpdir = tempfile.TemporaryDirectory()
+        tmpdir = pathlib.Path(_tmpdir.name)
 
         #Go to yesterday's directory to get tomorrow's data
         dt = self.start_date - timedelta(days=1)
@@ -295,7 +318,7 @@ class OpenBoundaryInventory():
                 xlon[ilon] = xlon[ilon] - 360.
         ylat = lat[jdx_min:jdx_max+1]
 
-        with Dataset(outdir / 'SSH_1.nc', 'w', format='NETCDF3_CLASSIC') as dst:
+        with Dataset(tmpdir / 'SSH_1.nc', 'w', format='NETCDF3_CLASSIC') as dst:
             dst.setncatts({"Conventions": "cf-1.0"})
             #dimensions
             dst.createDimension('xlon', xlon.shape[0])
@@ -328,7 +351,7 @@ class OpenBoundaryInventory():
             ssh = nc_ssh['ssh'][8:8*(rnday+1)+1:8,0,jdx_min:jdx_max+1,idx_min:idx_max+1]
             dst['surf_el'][:,:,:] = ssh
 
-        with Dataset(outdir / 'TS_1.nc', 'w', format='NETCDF3_CLASSIC') as dst:
+        with Dataset(tmpdir / 'TS_1.nc', 'w', format='NETCDF3_CLASSIC') as dst:
             dst.setncatts({"Conventions": "cf-1.0"})
             #dimensions
             dst.createDimension('xlon', xlon.shape[0])
@@ -374,7 +397,7 @@ class OpenBoundaryInventory():
             sst = nc_temp['temperature'][1:rnday+2,:,jdx_min:jdx_max+1,idx_min:idx_max+1]
             dst['temperature'][:,:,:,:] = sst
 
-        with Dataset(outdir / 'UV_1.nc', 'w', format='NETCDF3_CLASSIC') as dst:
+        with Dataset(tmpdir / 'UV_1.nc', 'w', format='NETCDF3_CLASSIC') as dst:
             dst.setncatts({"Conventions": "cf-1.0"})
             #dimensions
             dst.createDimension('xlon', xlon.shape[0])
@@ -419,3 +442,30 @@ class OpenBoundaryInventory():
             dst['water_v'].scale_factor = 0.001
             vvel = nc_vvel['v'][1:rnday+2,:,jdx_min:jdx_max+1,idx_min:idx_max+1]
             dst['water_v'][:,:,:,:] = vvel
+
+        #symlink estaury.gr3 and *.in file 
+        hgrid.write(tmpdir / 'hgrid.gr3')
+        hgrid.write(tmpdir / 'hgrid.ll')
+        src = '/sciclone/data10/lcui01/ICOGS3D_dep/estuary.gr3'
+        dst = tmpdir / 'estuary.gr3'
+        os.symlink(src, dst)
+        src2 = '/sciclone/data10/lcui01/ICOGS3D_dep/gen_hot_3Dth_from_nc.in'
+        dst2 = tmpdir / 'gen_hot_3Dth_from_nc.in'
+        os.symlink(src2, dst2)
+        src3 = '/sciclone/data10/lcui01/ICOGS3D_dep/vgrid.in'
+        dst3 = tmpdir / 'vgrid.in'
+        os.symlink(src3, dst3)
+        cmd = 'gen_hot_3Dth_from_hycom.exe < gen_hot_3Dth_from_nc.in'
+        subprocess.check_call(cmd, shell=True, cwd=tmpdir)
+        #shutil.copy2(tmpdir /'*.th.nc', outdir)
+        shutil.copy2(tmpdir /'elev2D.th.nc', outdir / 'elev2D.th.nc')
+        shutil.copy2(tmpdir /'SAL_3D.th.nc', outdir / 'SAL_3D.th.nc')
+        shutil.copy2(tmpdir /'TEM_3D.th.nc', outdir / 'TEM_3D.th.nc')
+        shutil.copy2(tmpdir /'uv3D.th.nc', outdir / 'uv3D.th.nc')
+
+        #Generate nudging input
+        subprocess.check_call(['gen_nudge2'], cwd=tmpdir)
+        #cmd = 'gen_nudge_from_hycom < gen_hot_3Dth_from_nc.in'
+        subprocess.check_call(['gen_nudge_from_hycom'], cwd=tmpdir)
+        shutil.copy2(tmpdir /'SAL_nu.nc', outdir)
+        shutil.copy2(tmpdir /'TEM_nu.nc', outdir)

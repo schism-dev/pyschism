@@ -1,5 +1,7 @@
+import os
 import pathlib
 import subprocess
+import shutil
 import tempfile
 from typing import Union
 
@@ -54,19 +56,24 @@ class Watertype(Gr3Field):
     pass
 
 
-class Shapiro(Gr3Field):
+class Shapiro:
 
     @classmethod
-    def from_binary(cls, hgrid, dst_crs, ref_slope):
+    def from_binary(cls, outdir: Union[str, os.PathLike], hgrid, dst_crs):
+
         _tmpdir = tempfile.TemporaryDirectory()
         tmpdir = pathlib.Path(_tmpdir.name)
         hgrid = hgrid.copy()
         hgrid.transform_to(dst_crs)
         hgrid.write(tmpdir / 'hgrid.gr3')
-        subprocess.check_call(['gen_slope_filter', ref_slope], cwd=tmpdir)
-        obj = cls.open(tmpdir / 'slope_filter.gr3')
-        obj.description = 'shapiro'
-        return obj
+        subprocess.check_call(['gen_slope_filter'], cwd=tmpdir)
+        outdir = pathlib.Path(outdir)
+        print(f'write vgrid to dir {outdir}')
+        shutil.copy2(tmpdir / 'slope_filter.gr3', outdir / 'shapiro.gr3')
+
+        #obj = cls.open(tmpdir / 'slope_filter.gr3')
+        #obj.description = 'shapiro'
+        #return obj
 
 
 class Windrot(Gr3Field):

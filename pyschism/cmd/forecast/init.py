@@ -121,7 +121,9 @@ class VgridPath:
                     vgrid_path.unlink()
             if obj.args.vgrid is None:
                 if not vgrid_path.exists():
-                    Vgrid().write(vgrid_path)
+                    hgrid_path = obj.__dict__.get('hgrid_path')
+                    Vgrid().from_binary(vgrid_path, hgrid_path)
+                    #Vgrid().write(vgrid_path)
             else:
                 shutil.copy2(
                     obj.args.vgrid, vgrid_path, follow_symlinks=True)

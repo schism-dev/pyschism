@@ -17,7 +17,7 @@ from pyschism.forcing.hycom.hycom import HotStartInventory, OpenBoundaryInventor
 from pyschism.param import Param
 from pyschism.server import ServerConfig
 from pyschism.stations import Stations
-from pyschism.mesh.gridgr3 import Albedo,Diffmax,Diffmin,Watertype
+from pyschism.mesh.gridgr3 import Albedo,Diffmax,Diffmin,Watertype, Shapiro
 from pyschism.mesh.prop import Fluxflag, Tvdflag
 from pyschism.mesh.vgrid import Vgrid
 from pyschism.dates import pivot_time, localize_datetime, nearest_cycle_date
@@ -113,6 +113,7 @@ class ModelDriver:
             diffmax = True,
             diffmin = True,
             watertype = True,
+            shapiro = True,
             fluxflag = True,
             tvdflag = True,
             rtofs = True,
@@ -153,6 +154,11 @@ class ModelDriver:
             self.watertype = Diffmax.constant(self.model_domain.hgrid, 1.0)
             self.watertype.write(outdir / 'watertype.gr3',overwrite)
 
+        if shapiro:
+           shapiro = Shapiro()
+           self.shapiro = shapiro.from_binary(outdir, self.model_domain.hgrid,\
+              'EPSG:26918')
+        
         if fluxflag:
             self.fluxflag = Fluxflag.constant(self.model_domain.hgrid, -1)
             with open(outdir / 'fluxflag.prop', 'w+') as fid:
@@ -170,16 +176,17 @@ class ModelDriver:
             with open(outdir / 'tvd.prop', 'w+') as fid:
                 fid.writelines(self.tvdflag)
 
-        if vgrid:
+        #if vgrid:
             #vgrid = 'vgrid.in' if vgrid is True else vgrid
-            Vgrid.from_binary(outdir, self.model_domain.hgrid)
+            #Vgrid.from_binary(outdir, self.model_domain.hgrid)
+            #write(output / 'vgrid.in')
 
         if rtofs:
             self.start_date = nearest_cycle_date()
-            self.hotstart = HotStartInventory()
-            self.hotstart.fetch_data(outdir, self.model_domain.hgrid, self.start_date)
+            #self.hotstart = HotStartInventory()
+            #self.hotstart.fetch_data(outdir, self.model_domain.hgrid, self.start_date)
             self.obnd = OpenBoundaryInventory()
-            self.obnd.fetch_data(outdir, self.start_date, rnday=3, \
+            self.obnd.fetch_data(outdir, self.model_domain.hgrid, self.start_date, rnday=3, \
                 idx_min=2687, idx_max=2714, jdx_min=1181, jdx_max=1634)
 #lcui
         if fgrid:
