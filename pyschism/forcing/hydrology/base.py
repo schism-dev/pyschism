@@ -94,9 +94,10 @@ class TimeHistoryFile:
 
     def write(self, path: Union[str, os.PathLike], overwrite: bool = False):
         path = pathlib.Path(path)
-        if path.exists() and overwrite is not True:
+        if (path / self.filename).exists() and overwrite is not True:
             raise IOError('File exists and overwrite is not True.')
-        open(path / self.filename, 'w').write(str(self))
+        with open(path / self.filename, 'w') as f:
+            f.write(str(self))
 
 
 class Vsource(TimeHistoryFile):
@@ -160,9 +161,10 @@ class SourceSink:
 
     def write(self, path: Union[str, os.PathLike], overwrite: bool = False):
         path = pathlib.Path(path)
-        if path.exists() and overwrite is not True:
+        if (path / self.filename).exists() and overwrite is not True:
             raise IOError('File exists and overwrite is not True.')
-        open(path / self.filename, 'w').write(str(self))
+        with open(path / self.filename, 'w') as f:
+            f.write(str(self))
 
 
 class Hydrology:
@@ -170,9 +172,9 @@ class Hydrology:
     # TODO: This class is missing a time interpolator.
     _data = {}
 
-    def __init__(self, start_date: datetime = None, rnday: timedelta = None):
-        self.start_date = start_date
-        self.rnday = rnday
+    # def __init__(self, start_date: datetime = None, rnday: timedelta = None):
+    #     self.start_date = start_date
+    #     self.rnday = rnday
 
     def __len__(self):
         return len(self._data)
@@ -419,7 +421,9 @@ class Hydrology:
 
     @property
     def start_date(self):
-        if self._start_date is None:
+        if not hasattr(self, '_start_date'):
+            return self.df.time.min()
+        elif self._start_date is None:
             return self.df.time.min()
         return self._start_date
 
@@ -433,6 +437,8 @@ class Hydrology:
 
     @property
     def rnday(self):
+        if not hasattr(self, '_rnday'):
+            return self.df.time.max() - self.df.time.min()
         if self._rnday is None:
             return self.df.time.max() - self.df.time.min()
         return self._rnday

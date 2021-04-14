@@ -1,3 +1,7 @@
+import signal
+import os
+import errno
+from functools import wraps
 from datetime import datetime, timedelta
 from enum import Enum
 import pathlib
@@ -18,7 +22,7 @@ from pyschism.forcing.atmosphere.nws.nws2.sflux import (
     PrcComponent,
     RadComponent,
 )
-from pyschism.dates import pivot_time, localize_datetime, nearest_cycle_date
+from pyschism.dates import nearest_zulu, localize_datetime, nearest_cycle
 
 BASE_URL = 'https://nomads.ncep.noaa.gov/dods'
 logger = logging.getLogger(__name__)
@@ -35,17 +39,40 @@ class BaseURL(Enum):
         raise ValueError(f'{name} is not a valid GFS product.')
 
 
+class TimeoutError(Exception):
+    pass
+
+
+def timeout(seconds=10, error_message=os.strerror(errno.ETIME)):
+    def decorator(func):
+        def _handle_timeout(signum, frame):
+            raise TimeoutError(error_message)
+
+        def wrapper(*args, **kwargs):
+            signal.signal(signal.SIGALRM, _handle_timeout)
+            signal.alarm(seconds)
+            try:
+                result = func(*args, **kwargs)
+            finally:
+                signal.alarm(0)
+            return result
+
+        return wraps(func)(wrapper)
+
+    return decorator
+
+
 class GFSInventory:
 
     def __init__(self, product='gfs_0p25_1hr', start_date=None, rnday=4,
                  bbox=None):
         self.product = GFSProduct(product) if not \
             isinstance(product, GFSProduct) else product
-        self.start_date = nearest_cycle_date() if start_date is None else \
+        self.start_date = nearest_cycle() if start_date is None else \
             localize_datetime(start_date).astimezone(pytz.utc)
         self.rnday = rnday if isinstance(rnday, timedelta) else \
             timedelta(days=rnday)
-        if self.start_date != nearest_cycle_date(self.start_date):
+        if self.start_date != nearest_cycle(self.start_date):
             raise NotImplementedError(
                 'Argment start_date is does not align with any GFS cycle '
                 'times.')
@@ -55,17 +82,21 @@ class GFSInventory:
             self.output_interval
         ).astype(datetime)}
 
-        for dt in self.pivot_times:
+        for dt in self.nearest_zulus:
             if None not in list(self._files.values()):
                 break
             base_url = BASE_URL + f'/{self.product.value}' + \
-                f'/gfs{pivot_time(dt).strftime("%Y%m%d")}'
+                f'/gfs{nearest_zulu(dt).strftime("%Y%m%d")}'
             for cycle in reversed(range(0, 24, 6)):
                 test_url = f'{base_url}/' + \
                            f'{self.product.name.lower()}_{cycle:02d}z'
                 try:
                     logger.info(f'Checking url: {test_url}')
-                    nc = Dataset(test_url)
+
+                    @timeout()
+                    def get_netcdf_timeout():
+                        return Dataset(test_url)
+                    nc = get_netcdf_timeout()
                     logger.info('Success!')
                 except OSError as e:
                     if e.errno == -70:
@@ -74,6 +105,7 @@ class GFSInventory:
                     elif e.errno == -73:
                         nc = False
 
+                        @timeout()
                         def retry():
                             try:
                                 return Dataset(test_url)
@@ -111,7 +143,7 @@ class GFSInventory:
             def put_nc_field():
                 try:
                     dst[sflux_varname][i, :, :] = nc.variables[gfs_varname][
-                            self.get_nc_time_index(nc, dt), lat_idxs, lon_idxs]
+                        self.get_nc_time_index(nc, dt), lat_idxs, lon_idxs]
                     return True
                 except RuntimeError:
                     logger.info('Failed! retrying...')
@@ -142,8 +174,8 @@ class GFSInventory:
 
     def get_sflux_timevector(self):
         timevec = list(self._files.keys())
-        _pivot_time = pivot_time(np.min(timevec))
-        return [(localize_datetime(x) - _pivot_time) / timedelta(days=1)
+        _nearest_zulu = nearest_zulu(np.min(timevec))
+        return [(localize_datetime(x) - _nearest_zulu) / timedelta(days=1)
                 for x in timevec]
 
     def xy_grid(self):
@@ -157,16 +189,16 @@ class GFSInventory:
         return np.meshgrid(np.array(lon), self.lat[lat_idxs])
 
     @property
-    def pivot_time(self):
-        if not hasattr(self, '_pivot_time'):
-            self._pivot_time = pivot_time()
-        return self._pivot_time
+    def nearest_zulu(self):
+        if not hasattr(self, '_nearest_zulu'):
+            self._nearest_zulu = nearest_zulu()
+        return self._nearest_zulu
 
     @property
-    def pivot_times(self):
+    def nearest_zulus(self):
         return np.arange(
-            self.pivot_time,
-            self.pivot_time - timedelta(days=10),
+            self.nearest_zulu,
+            self.nearest_zulu - timedelta(days=10),
             -timedelta(days=1),
         ).astype(datetime)
 
@@ -226,6 +258,9 @@ class GlobalForecastSystem(SfluxDataset):
         self.dswrf_name = 'dswrfsfc'
         self.product = GFSProduct(product) if not \
             isinstance(product, GFSProduct) else product
+        self.air = None
+        self.prc = None
+        self.rad = None
 
     def fetch_data(
             self,
@@ -238,7 +273,7 @@ class GlobalForecastSystem(SfluxDataset):
     ):
         """Fetches GFS data from NOMADS server. """
         logger.info('Fetching GFS data.')
-        self.start_date = nearest_cycle_date() if start_date is None else \
+        self.start_date = nearest_cycle() if start_date is None else \
             localize_datetime(start_date).astimezone(pytz.utc)
         self.rnday = rnday if isinstance(rnday, timedelta) else \
             timedelta(days=rnday)
@@ -255,7 +290,7 @@ class GlobalForecastSystem(SfluxDataset):
                 f"air_{inventory.product.value}_"
                 f"{str(self.start_date)}.nc",
                 'w', format='NETCDF3_CLASSIC'
-                    ) as dst:
+            ) as dst:
 
                 # global attributes
                 dst.setncatts({"Conventions": "CF-1.0"})
@@ -280,7 +315,7 @@ class GlobalForecastSystem(SfluxDataset):
                 dst.createVariable('time', 'f4', ('time',))
                 dst['time'].long_name = 'Time'
                 dst['time'].standard_name = 'time'
-                date = pivot_time(self.start_date)
+                date = nearest_zulu(self.start_date)
                 dst['time'].units = f'days since {date.year}-{date.month}'\
                                     f'-{date.day} 00:00'\
                                     f'{date.tzinfo}'
@@ -294,7 +329,8 @@ class GlobalForecastSystem(SfluxDataset):
                         ('time', 'ny_grid', 'nx_grid')
                     )
                     logger.info(f'Put field {var}')
-                    inventory.put_sflux_field(getattr(self, f'{var}_name'), dst, var)
+                    inventory.put_sflux_field(
+                        getattr(self, f'{var}_name'), dst, var)
 
                 # prmsl
                 dst['prmsl'].long_name = "Pressure reduced to MSL"
@@ -330,7 +366,7 @@ class GlobalForecastSystem(SfluxDataset):
                 f"prc_{inventory.product.value}_"
                 f"{str(self.start_date)}.nc",
                 'w', format='NETCDF3_CLASSIC'
-                    ) as dst:
+            ) as dst:
 
                 # global attributes
                 dst.setncatts({"Conventions": "CF-1.0"})
@@ -354,7 +390,7 @@ class GlobalForecastSystem(SfluxDataset):
                 dst.createVariable('time', 'f4', ('time',))
                 dst['time'].long_name = 'Time'
                 dst['time'].standard_name = 'time'
-                date = pivot_time(self.start_date)
+                date = nearest_zulu(self.start_date)
                 dst['time'].units = f'days since {date.year}-{date.month}'\
                                     f'-{date.day} 00:00'\
                                     f'{date.tzinfo}'
@@ -365,7 +401,8 @@ class GlobalForecastSystem(SfluxDataset):
                     dst.createVariable(var, float,
                                        ('time', 'ny_grid', 'nx_grid'))
                     logger.info(f'Put field {var}')
-                    inventory.put_sflux_field(getattr(self, f'{var}_name'), dst, var)
+                    inventory.put_sflux_field(
+                        getattr(self, f'{var}_name'), dst, var)
                 # prate
                 dst['prate'].long_name = "Surface Precipitation Rate"
                 dst['prate'].standard_name = "air_pressure_at_sea_level"
@@ -377,7 +414,7 @@ class GlobalForecastSystem(SfluxDataset):
                 f"rad_{inventory.product.value}_"
                 f"{str(self.start_date)}.nc",
                 'w', format='NETCDF3_CLASSIC'
-                    ) as dst:
+            ) as dst:
                 # global attributes
                 dst.setncatts({"Conventions": "CF-1.0"})
                 # dimensions
@@ -400,7 +437,7 @@ class GlobalForecastSystem(SfluxDataset):
                 dst.createVariable('time', 'f4', ('time',))
                 dst['time'].long_name = 'Time'
                 dst['time'].standard_name = 'time'
-                date = pivot_time(self.start_date)
+                date = nearest_zulu(self.start_date)
                 dst['time'].units = f'days since {date.year}-{date.month}'\
                                     f'-{date.day} 00:00'\
                                     f'{date.tzinfo}'
@@ -411,7 +448,8 @@ class GlobalForecastSystem(SfluxDataset):
                     dst.createVariable(var, float,
                                        ('time', 'ny_grid', 'nx_grid'))
                     logger.info(f'Put field {var}')
-                    inventory.put_sflux_field(getattr(self, f'{var}_name'), dst, var)
+                    inventory.put_sflux_field(
+                        getattr(self, f'{var}_name'), dst, var)
 
                 # dlwrf
                 dst['dlwrf'].long_name = "Downward Long Wave Radiation "\
@@ -428,9 +466,12 @@ class GlobalForecastSystem(SfluxDataset):
                 dst['dswrf'].units = "W/m^2"
 
         self.resource = self.tmpdir
-        self.air = AirComponent(self.fields)
-        self.prc = PrcComponent(self.fields)
-        self.rad = RadComponent(self.fields)
+        if air is True:
+            self.air = AirComponent(self.fields)
+        if prc is True:
+            self.prc = PrcComponent(self.fields)
+        if rad is True:
+            self.rad = RadComponent(self.fields)
 
     @property
     def tmpdir(self):

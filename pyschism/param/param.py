@@ -23,18 +23,11 @@ class Param:
             self,
             dt: Union[int, float, timedelta] = None,
             rnday: Union[int, float, timedelta] = None,
-            # dramp: Union[int, float, timedelta] = None,
-            # start_date: datetime = None,
             ibc: Union[Stratification, int, str] = Stratification.BAROTROPIC,
-            # drampbc: Union[int, float, timedelta] = None,
             nspool: Union[int, float, timedelta] = None,
             ihfskip: Union[int, timedelta] = None,
-            # nhot_write: Union[int, timedelta, bool] = None,
-            # stations: Stations = None,
-            # **surface_outputs
     ):
 
-        logger.info('Initializing param')
         self.core = CORE()
         self.core.ibc = ibc
         self.core.rnday = rnday
@@ -43,18 +36,8 @@ class Param:
         self.core.ihfskip = ihfskip
 
         self.opt = OPT()
-        # self.opt.dramp = dramp
-        # self.opt.drampbc = drampbc
-        # self.opt.start_date
-
 
         self.schout = SCHOUT()
-        # self._model_domain = model_domain
-        # self.core = CORE(ibc, rnday, dt, nspool, ihfskip)
-        # self.opt = OPT(dramp, drampbc, start_date)
-        # self.schout = SCHOUT(dt, rnday, **surface_outputs)
-        # self._nhot_write = nhot_write
-        # self._stations = stations
 
     def __str__(self):
         return f"{str(self.core)}\n\n{str(self.opt)}\n\n{str(self.schout)}\n"

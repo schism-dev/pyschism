@@ -1,6 +1,7 @@
 from abc import ABC
 from collections import defaultdict
 from functools import lru_cache
+import hashlib
 import logging
 from itertools import permutations
 import os
@@ -615,6 +616,10 @@ class Gr3(ABC):
     @property
     def bbox(self):
         return self.get_bbox()
+
+    @property
+    def md5(self):
+        return hashlib.md5(str(self).encode()).hexdigest()
 
 
 def edges_to_rings(edges):

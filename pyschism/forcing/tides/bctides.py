@@ -4,11 +4,10 @@ from enum import Enum
 from functools import lru_cache
 import logging
 
-import numpy as np
 
-from pyschism.domain import ModelDomain
+from pyschism.driver import ModelDriver
 from pyschism.forcing.tides.tides import Tides
-from pyschism.param.param import Param
+
 
 _logger = logging.getLogger(__name__)
 
@@ -115,39 +114,39 @@ class itrtypeWritter(Enum):
 
 class Bctides:
 
-    def __init__(self, model_domain: ModelDomain, param: Param,
-                 cutoff_depth: float = 50.):
+    def __init__(self, driver: ModelDriver, cutoff_depth: float = 50.):
         """Provides an interface to write bctides.in to file. """
         _logger.info('Initializing Bctides.')
         # check if start_date was given in case tidal forcings are requested.
         # Note: This is done twice so that this class can be used independently
         # from Param to just write bctides files
-        afc = model_domain.get_active_forcing_constituents()
-        if len(afc) > 0 and param.opt.start_date is None:
-            raise Exception('start_date argument is required for simulating '
-                            'tidal forcing.')
+        # afc = driver.config.forcings.tides.get_active_forcing_constituents()
+        # if len(afc) > 0 and param.opt.start_date is None:
+        #     raise Exception('start_date argument is required for simulating '
+        #                     'tidal forcing.')
 
-        self._model_domain = model_domain
-        self._param = param
+        # self._model_domain = model_domain
+        # self._param = param
+        self.driver = driver
         self._cutoff_depth = cutoff_depth
 
-        # init the main tidal forcing object
-        tides = Tides()
-        for const in tides.all_constituents:
-            tides.use_constituent(
-                const,
-                potential=True if const in
-                self.get_active_potential_constituents() else False,
-                forcing=True if const in
-                self.get_active_forcing_constituents() else False
-            )
-        self.__tidal_forcing = tides
+        # # init the main tidal forcing object
+        # tides = Tides()
+        # for const in tides.all_constituents:
+        #     tides.use_constituent(
+        #         const,
+        #         potential=True if const in
+        #         self.get_active_potential_constituents() else False,
+        #         forcing=True if const in
+        #         self.get_active_forcing_constituents() else False
+        #     )
+        self.__tidal_forcing = driver.config.forcings.tides
 
     def __str__(self):
         f = f"{self.start_date}\n" \
             f"{self.ntip} {self._cutoff_depth}\n"
         if self.ntip > 0:
-            for constituent in self.get_active_potential_constituents():
+            for constituent in self.tidal_forcing.get_active_potential_constituents():
                 forcing = self.tidal_forcing(
                     self.start_date, self.rnday, constituent)
                 f += f'{constituent} \n' \
@@ -156,7 +155,7 @@ class Bctides:
                      f'{forcing[2]:G} ' \
                      f'{forcing[3]:G} ' \
                      f'{forcing[4]:G}\n'
-        afc = self._model_domain.get_active_forcing_constituents()
+        afc = self.tidal_forcing.get_active_forcing_constituents()
         f += f'{len(afc):d}\n'
         for constituent in afc:
             forcing = self.tidal_forcing(
@@ -176,31 +175,31 @@ class Bctides:
                  f'{itrtypeWritter[data["forcing"].itrtype.name].value(data, self)}'
         return f
 
-    @lru_cache(maxsize=1)
-    def get_active_potential_constituents(self):
-        # PySCHISM allows the user to input the tidal potentials and forcings
-        # individually at each boundary, however, SCHISM supports only a global
-        # specification. Here, we collect all the activated tidal potentials
-        # on each boundary and activate them all globally
-        # set active tidal potential constituents
-        const = dict()
-        for id, data in self._model_domain.open_boundaries:
-            forcing = data['forcing']
-            if isinstance(forcing, Tides):
-                for active in forcing.get_active_potential_constituents():
-                    const[active] = True
-        return tuple(const.keys())
+    # @lru_cache(maxsize=1)
+    # def get_active_potential_constituents(self):
+    #     # PySCHISM allows the user to input the tidal potentials and forcings
+    #     # individually at each boundary, however, SCHISM supports only a global
+    #     # specification. Here, we collect all the activated tidal potentials
+    #     # on each boundary and activate them all globally
+    #     # set active tidal potential constituents
+    #     const = dict()
+    #     for id, data in self._model_domain.open_boundaries:
+    #         forcing = data['forcing']
+    #         if isinstance(forcing, Tides):
+    #             for active in forcing.get_active_potential_constituents():
+    #                 const[active] = True
+    #     return tuple(const.keys())
 
-    @lru_cache(maxsize=1)
-    def get_active_forcing_constituents(self):
-        # set active tidal forcing constituents
-        const = dict()
-        for id, data in self._model_domain.open_boundaries:
-            forcing = data['forcing']
-            if isinstance(forcing, Tides):
-                for active in forcing.get_active_forcing_constituents():
-                    const[active] = True
-        return tuple(const.keys())
+    # @lru_cache(maxsize=1)
+    # def get_active_forcing_constituents(self):
+    #     # set active tidal forcing constituents
+    #     const = dict()
+    #     for id, data in self._model_domain.open_boundaries:
+    #         forcing = data['forcing']
+    #         if isinstance(forcing, Tides):
+    #             for active in forcing.get_active_forcing_constituents():
+    #                 const[active] = True
+    #     return tuple(const.keys())
 
     def write(self, path, overwrite=False):
         with open(path, 'w') as f:
@@ -208,15 +207,15 @@ class Bctides:
 
     @property
     def start_date(self):
-        return self._param.opt.start_date
+        return self.driver.param.opt.start_date
 
     @property
     def rnday(self):
-        return self._param.core.rnday
+        return self.driver.param.core.rnday
 
     @property
     def ntip(self):
-        return len(self.get_active_potential_constituents())
+        return len(self.tidal_forcing.get_active_potential_constituents())
 
     @property
     def tidal_forcing(self):

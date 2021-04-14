@@ -1,11 +1,14 @@
 from datetime import datetime, timedelta
 import pathlib
-from typing import Union
+from typing import Union, TYPE_CHECKING
 
 import pytz
 
 from pyschism.forcing.tides.tides import Tides
 from pyschism.mesh import Hgrid
+
+if TYPE_CHECKING:
+    from pyschism.driver import ModelDriver
 
 
 def datetime_is_naive(d) -> bool:
@@ -87,9 +90,36 @@ class Bctides:
         self._temperature = temperature
         self._salinity = salinity
         self._tracers = [] if tracers is None or tracers is False else tracers
-        self._tides = Tides(database=tidal_database, elevation=elevation,
+        self._tides = Tides(tidal_database=tidal_database, elevation=elevation,
                             velocity=velocity)
         self.tides.use_all()
+        self.tides.start_date = self.start_date
+        self.tides.rnday = self.rnday
+
+    @classmethod
+    def from_driver(
+            cls,
+            driver: 'ModelDriver',
+            cutoff_depth=50.,
+            elevation=True,
+            velocity=False,
+            temperature=False,
+            salinity=False,
+            tracers=False
+    ):
+        obj = cls(
+            hgrid=driver.config.hgrid,
+            start_date=driver.param.opt.start_date,
+            rnday=driver.param.core.rnday,
+            cutoff_depth=cutoff_depth,
+            elevation=elevation,
+            velocity=velocity,
+            temperature=temperature,
+            salinity=salinity,
+            tracers=tracers,
+            )
+        obj._tides = driver.config.forcings.tides
+        return obj
 
     def __str__(self):
         f = [
@@ -125,7 +155,8 @@ class Bctides:
         path = pathlib.Path(path)
         if path.exists() and not overwrite:
             raise IOError('path exists and overwrite is False')
-        open(path, 'w').write(str(self))
+        with open(path, 'w') as f:
+            f.write(str(self))
 
     def get_forcing(self, boundary):
 

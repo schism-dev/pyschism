@@ -2,6 +2,7 @@ from collections import OrderedDict
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 import logging
+import os
 from typing import Union, Callable
 
 import numpy as np
@@ -42,7 +43,7 @@ class Tides(bctypes.BoundaryCondition):
             self,
             elevation: bool = True,
             velocity: bool = False,
-            database: Union[str, TidalDatabase] = TidalDatabase.HAMTIDE,
+            tidal_database: Union[str, TidalDatabase] = TidalDatabase.HAMTIDE,
     ):
         """Main class for requesting tidal boundary forcing for a SCHISM run.
 
@@ -56,14 +57,14 @@ class Tides(bctypes.BoundaryCondition):
             database (optional): Tidal database to use in order to obtain
                 boundary initial conditions, defaults to TidalDatabase.TPXO
         """
-        _logger.info('Initializing tidal boundary conditions.')
         super().__init__(
             iettype=bctypes.InitialElevationType.TIDAL
             if elevation is True else bctypes.InitialElevationType.NONE,
             ifltype=bctypes.InitialFlowType.TIDAL
             if velocity is True else bctypes.InitialFlowType.NONE)
 
-        self.forcing_database = database
+        self.forcing_database = tidal_database
+        self.use_all()
 
     def __iter__(self):
         for constituent in self.active_constituents:
@@ -84,9 +85,6 @@ class Tides(bctypes.BoundaryCondition):
                 self.get_orbital_frequency(constituent),  # FF*
                 self.get_nodal_factor(start_date, rnday, constituent),  # Amig*
                 self.get_greenwich_factor(start_date, rnday, constituent))  # FACE* # noqa:E501
-
-    def fetch_data(self, hgrid, start_date, rnday):
-        pass
 
     def get_elevation(self, constituent, vertices):
         if constituent.lower() == 'z0':

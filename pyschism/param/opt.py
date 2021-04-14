@@ -6,9 +6,11 @@ from typing import Union
 import f90nml
 import pytz
 
+from pyschism import dates
 from pyschism.enums import Coriolis
 from pyschism.forcing.atmosphere.nws import NWS
 from pyschism.forcing.atmosphere.nws.nws2 import NWS2
+from pyschism.mesh.fgrid import NchiType
 
 PARAM_TEMPLATE = pathlib.Path(__file__).parent / 'param.nml.template'
 PARAM_DEFAULTS = f90nml.read(PARAM_TEMPLATE)['opt']
@@ -178,10 +180,6 @@ class OptMeta(type):
 class OPT(metaclass=OptMeta):
     """ Provides error checking implementation for OPT group """
 
-    # dramp = Dramp()
-    # drampbc = Drampbc()
-    # start_date = StartDate()
-    # nchi = Nchi()
     # ics = Ics()
     # ncor = Ncor()
     # sfea0 = Sfea0()
@@ -190,31 +188,34 @@ class OPT(metaclass=OptMeta):
 
     def __init__(
             self,
-            # dramp: Union[int, float, timedelta] = None,
-            # drampbc: Union[int, float, timedelta] = None,
-            # drampwind:,
-            # start_date: datetime = None
+            start_date: datetime = None,
+            dramp: Union[int, float, timedelta] = None,
+            drampbc: Union[int, float, timedelta] = None,
+            dramp_ss: Union[float, timedelta] = None,
+            drampwafo: Union[float, timedelta] = None,
+            drampwind: Union[float, timedelta] = None,
+            ics=None,
+            nchi: Union[int, NchiType] = None,
+            hmin_man=None,
+            dbz_min=None,
+            dbz_decay=None,
     ):
-        # _logger.info('Iniatializing OPT.')
-        # self.dramp = dramp
-        # self.drampbc = drampbc
-        # self.start_date = start_date
-        # TODO: Generate descriptors for the following properties:
-        # wtiminc = 150. !time step for atmos. forcing. Default: same as dt
-        # nrampwind = 1 !ramp-up option for atmos. forcing
-        # drampwind = 1. !needed if nrampwind/=0; ramp-up period in days
-        # iwindoff = 0 !needed only if nws/=0; '1': needs windfactor.gr3
-        # iwind_form = -1 !needed if nws/=0
-        # impose_net_flux = 0
-        pass
+        self.start_date = start_date
+        self.dramp = dramp
+        self.drampbc = drampbc
+        self.dramp_ss = dramp_ss
+        self.drampwafo = drampwafo
+        self.drampwind = drampwind
+        self.ics = ics
+        self.nchi = nchi
+        self.hmin_man = hmin_man
+        self.dbz_min = dbz_min
+        self.dbz_decay = dbz_decay
 
     def __str__(self):
         data = []
         for key, _ in PARAM_DEFAULTS.items():
             current = getattr(self, key)
-            if key in ['dramp', 'drampbc']:
-                if current is not None:
-                    current = current.total_seconds() / (60*60*24)
             if current is not None:
                 if not isinstance(current, list):
                     data.append(f'  {key}={current}')
@@ -229,10 +230,6 @@ class OPT(metaclass=OptMeta):
         data = {}
         for key, _ in PARAM_DEFAULTS.items():
             current = getattr(self, key)
-            if key in ['dramp', 'drampbc']:
-                if current is not None:
-                    current = current.total_seconds() / \
-                        timedelta(days=1).total_seconds()
             if current is not None:
                 if not isinstance(current, list):
                     data[key] = current
@@ -244,11 +241,247 @@ class OPT(metaclass=OptMeta):
         return data
 
     @property
-    def dramp(self) -> timedelta:
+    def start_date(self) -> Union[datetime, None]:
+        return self._start_date
+
+    @start_date.setter
+    def start_date(self, start_date: Union[datetime, None]):
+        if start_date is not None:
+            start_date = dates.localize_datetime(start_date)
+            self.start_year = start_date.year
+            self.start_month = start_date.month
+            self.start_day = start_date.day
+            self.start_hour = start_date.hour
+            self.start_hour += start_date.minute / 60.
+            self.utc_start = -start_date.utcoffset().total_seconds() / 3600.  # type: ignore[union-attr]  # noqa: E501
+        else:
+            self.start_year = None
+            self.start_month = None
+            self.start_day = None
+            self.start_hour = None
+            self.utc_start = None
+        self._start_date = start_date
+
+    @property
+    def start_year(self) -> Union[int, None]:
+        return self._start_year
+
+    @start_year.setter
+    def start_year(self, start_year: Union[int, None]):
+        if start_year is not None:
+            start_year = int(start_year)
+        self._start_year = start_year
+
+    @property
+    def start_month(self) -> Union[int, None]:
+        return self._start_month
+
+    @start_month.setter
+    def start_month(self, start_month: Union[int, None]):
+        if start_month is not None:
+            start_month = int(start_month)
+        self._start_month = start_month
+
+    @property
+    def start_day(self) -> Union[int, None]:
+        return self._start_day
+
+    @start_day.setter
+    def start_day(self, start_day: Union[int, None]):
+        if start_day is not None:
+            start_day = int(start_day)
+        self._start_day = start_day
+
+    @property
+    def start_hour(self) -> Union[float, None]:
+        return self._start_hour
+
+    @start_hour.setter
+    def start_hour(self, start_hour: Union[float, None]):
+        if start_hour is not None:
+            start_hour = float(start_hour)
+        self._start_hour = start_hour
+
+    @property
+    def utc_start(self) -> Union[float, None]:
+        return self._utc_start
+
+    @utc_start.setter
+    def utc_start(self, utc_start: Union[float, None]):
+        if utc_start is not None:
+            utc_start = float(utc_start)
+        self._utc_start = utc_start
+
+    @property
+    def dramp(self) -> Union[float, None]:
         return self._dramp
 
     @dramp.setter
     def dramp(self, dramp: Union[float, timedelta, None]):
         if dramp is not None:
+            if not isinstance(dramp, timedelta):
+                dramp = timedelta(days=float(dramp))
+            self._dramp = float(dramp / timedelta(days=1))
+        else:
+            self._dramp = None
 
-            self.nramp = 1
+    @property
+    def nramp(self) -> Union[int, None]:
+        if not hasattr(self, '_nramp') and self.dramp is not None:
+            return 1
+        elif hasattr(self, '_nramp'):
+            return self._nramp
+
+    @nramp.setter
+    def nramp(self, nramp: Union[int, None]):
+        if nramp not in [0, 1]:
+            raise ValueError('Argument nramp must be 0, 1.')
+        self._nramp = nramp
+
+    @nramp.deleter
+    def nramp(self):
+        if hasattr(self, '_nramp'):
+            del self._nramp
+
+    @property
+    def drampbc(self) -> Union[float, None]:
+        return self._drampbc
+
+    @drampbc.setter
+    def drampbc(self, drampbc: Union[float, timedelta, None]):
+        if drampbc is not None:
+            if not isinstance(drampbc, timedelta):
+                drampbc = timedelta(days=float(drampbc))
+            self._drampbc = float(drampbc / timedelta(days=1))
+        else:
+            self._drampbc = None
+
+    @property
+    def nrampbc(self) -> Union[int, None]:
+        if not hasattr(self, '_nrampbc') and self.drampbc is not None:
+            return 1
+        elif hasattr(self, '_nrampbc'):
+            return self._nrampbc
+
+    @nrampbc.setter
+    def nrampbc(self, nrampbc: Union[int, None]):
+        if nrampbc not in [0, 1]:
+            raise ValueError('Argument nrampbc must be 0, 1.')
+        self._nrampbc = nrampbc
+
+    @nrampbc.deleter
+    def nrampbc(self):
+        if hasattr(self, '_nrampbc'):
+            del self._nrampbc
+
+    @property
+    def dramp_ss(self) -> Union[float, None]:
+        return self._dramp_ss
+
+    @dramp_ss.setter
+    def dramp_ss(self, dramp_ss: Union[float, timedelta, None]):
+        if dramp_ss is not None:
+            if not isinstance(dramp_ss, timedelta):
+                dramp_ss = timedelta(days=float(dramp_ss))
+            self._dramp_ss = float(dramp_ss / timedelta(days=1))
+        else:
+            self._dramp_ss = None
+
+    @property
+    def nramp_ss(self) -> Union[int, None]:
+        if not hasattr(self, '_nramp_ss') and self.dramp_ss is not None:
+            return 1
+        elif hasattr(self, '_nramp_ss'):
+            return self._nramp_ss
+
+    @nramp_ss.setter
+    def nramp_ss(self, nramp_ss: Union[int, None]):
+        if nramp_ss not in [0, 1]:
+            raise ValueError('Argument nramp_ss must be 0, 1.')
+        self._nramp_ss = nramp_ss
+
+    @nramp_ss.deleter
+    def nramp_ss(self):
+        if hasattr(self, '_nramp_ss'):
+            del self._nramp_ss
+
+    @property
+    def drampwafo(self) -> Union[float, None]:
+        return self._drampwafo
+
+    @drampwafo.setter
+    def drampwafo(self, drampwafo: Union[float, timedelta, None]):
+        if drampwafo is not None:
+            if not isinstance(drampwafo, timedelta):
+                drampwafo = timedelta(days=float(drampwafo))
+            self._drampwafo = float(drampwafo / timedelta(days=1))
+        else:
+            self._drampwafo = None
+
+    @property
+    def nrampwafo(self) -> Union[int, None]:
+        if not hasattr(self, '_nrampwafo') and self.drampwafo is not None:
+            return 1
+        elif hasattr(self, '_nrampwafo'):
+            return self._nrampwafo
+
+    @nrampwafo.setter
+    def nrampwafo(self, nrampwafo: Union[int, None]):
+        if nrampwafo not in [0, 1]:
+            raise ValueError('Argument nrampwafo must be 0, 1.')
+        self._nrampwafo = nrampwafo
+
+    @nrampwafo.deleter
+    def nrampwafo(self):
+        if hasattr(self, '_nrampwafo'):
+            del self._nrampwafo
+
+    @property
+    def drampwind(self) -> Union[float, None]:
+        return self._drampwind
+
+    @drampwind.setter
+    def drampwind(self, drampwind: Union[float, timedelta, None]):
+        if drampwind is not None:
+            if not isinstance(drampwind, timedelta):
+                drampwind = timedelta(days=float(drampwind))
+            self._drampwind = float(drampwind / timedelta(days=1))
+        else:
+            self._drampwind = None
+
+    @property
+    def nrampwind(self) -> Union[int, None]:
+        if not hasattr(self, '_nrampwind') and self.drampwind is not None:
+            return 1
+        elif hasattr(self, '_nrampwind'):
+            return self._nrampwind
+
+    @nrampwind.setter
+    def nrampwind(self, nrampwind: Union[int, None]):
+        if nrampwind not in [0, 1]:
+            raise ValueError('Argument nrampwind must be 0, 1.')
+        self._nrampwind = nrampwind
+
+    @nrampwind.deleter
+    def nrampwind(self):
+        if hasattr(self, '_nrampwind'):
+            del self._nrampwind
+
+    @property
+    def nchi(self) -> Union[int, None]:
+        return self._nchi
+
+    @nchi.setter
+    def nchi(self, nchi: Union[int, NchiType, None]):
+        if not isinstance(nchi, NchiType) and nchi is not None:
+            nchi = NchiType(nchi).value
+        self._nchi = nchi
+
+    @property
+    def ic_elev(self) -> None:
+        return self._ic_elev
+
+    @ic_elev.setter
+    def ic_elev(self, ic_elev: Union[int, None]):
+        assert ic_elev in [0, 1, None]
+        self._ic_elev = ic_elev

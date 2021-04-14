@@ -17,7 +17,7 @@ from pyschism.forcing.atmosphere.nws.nws2.sflux import (
     PrcComponent,
     RadComponent,
 )
-from pyschism.dates import pivot_time, localize_datetime, nearest_cycle_date
+from pyschism.dates import nearest_zulu, localize_datetime, nearest_cycle
 
 BASE_URL = 'https://nomads.ncep.noaa.gov/dods'
 logger = logging.getLogger(__name__)
@@ -26,11 +26,16 @@ logger = logging.getLogger(__name__)
 class HRRRInventory:
 
     def __init__(self, start_date=None, rnday=2, bbox=None):
-        self.start_date = nearest_cycle_date() if start_date is None else \
+        self.start_date = nearest_cycle() if start_date is None else \
             localize_datetime(start_date).astimezone(pytz.utc)
         self.rnday = rnday if isinstance(rnday, timedelta) else \
             timedelta(days=rnday)
-        if self.start_date != nearest_cycle_date(self.start_date):
+        if self.rnday > timedelta(days=2) - timedelta(hours=1):
+            raise ValueError(
+                'Maximum run days for HRRR is '
+                f'{timedelta(days=2) - timedelta(hours=1)} but got {rnday}.')
+
+        if self.start_date != nearest_cycle(self.start_date):
             raise NotImplementedError(
                 'Argment start_date is does not align with any HRRR cycle '
                 'times.')
@@ -40,11 +45,11 @@ class HRRRInventory:
             self.output_interval
         ).astype(datetime)}
 
-        for dt in self.pivot_times:
+        for dt in self.nearest_zulus:
             if None not in list(self._files.values()):
                 break
             base_url = BASE_URL + f'/{self.product}' + \
-                f'/hrrr{pivot_time(dt).strftime("%Y%m%d")}'
+                f'/hrrr{nearest_zulu(dt).strftime("%Y%m%d")}'
             # cycle
             for cycle in reversed(range(0, 24, int(self.output_interval.total_seconds() / 3600))):
                 test_url = f'{base_url}/' + \
@@ -131,8 +136,8 @@ class HRRRInventory:
 
     def get_sflux_timevector(self):
         timevec = list(self._files.keys())
-        _pivot_time = pivot_time(np.min(timevec))
-        return [(localize_datetime(x) - _pivot_time) / timedelta(days=1)
+        _nearest_zulu = nearest_zulu(np.min(timevec))
+        return [(localize_datetime(x) - _nearest_zulu) / timedelta(days=1)
                 for x in timevec]
 
     def xy_grid(self):
@@ -140,16 +145,16 @@ class HRRRInventory:
         return np.meshgrid(self.lon[lon_idxs], self.lat[lat_idxs])
 
     @property
-    def pivot_time(self):
-        if not hasattr(self, '_pivot_time'):
-            self._pivot_time = pivot_time()
-        return self._pivot_time
+    def nearest_zulu(self):
+        if not hasattr(self, '_nearest_zulu'):
+            self._nearest_zulu = nearest_zulu()
+        return self._nearest_zulu
 
     @property
-    def pivot_times(self):
+    def nearest_zulus(self):
         return np.arange(
-            self.pivot_time,
-            self.pivot_time - timedelta(days=2),
+            self.nearest_zulu,
+            self.nearest_zulu - timedelta(days=2),
             -timedelta(days=1),
         ).astype(datetime)
 
@@ -223,7 +228,7 @@ class HRRR(SfluxDataset):
     ):
         """Fetches HRRR data from NOMADS server. """
         logger.info('Fetching HRRR data.')
-        self.start_date = nearest_cycle_date() if start_date is None else \
+        self.start_date = nearest_cycle() if start_date is None else \
             localize_datetime(start_date).astimezone(pytz.utc)
         self.rnday = rnday if isinstance(rnday, timedelta) else \
             timedelta(days=rnday)
@@ -264,7 +269,7 @@ class HRRR(SfluxDataset):
                 dst.createVariable('time', 'f4', ('time',))
                 dst['time'].long_name = 'Time'
                 dst['time'].standard_name = 'time'
-                date = pivot_time(self.start_date)
+                date = nearest_zulu(self.start_date)
                 dst['time'].units = f'days since {date.year}-{date.month}'\
                                     f'-{date.day} 00:00'\
                                     f'{date.tzinfo}'
@@ -338,7 +343,7 @@ class HRRR(SfluxDataset):
                 dst.createVariable('time', 'f4', ('time',))
                 dst['time'].long_name = 'Time'
                 dst['time'].standard_name = 'time'
-                date = pivot_time(self.start_date)
+                date = nearest_zulu(self.start_date)
                 dst['time'].units = f'days since {date.year}-{date.month}'\
                                     f'-{date.day} 00:00'\
                                     f'{date.tzinfo}'
@@ -384,7 +389,7 @@ class HRRR(SfluxDataset):
                 dst.createVariable('time', 'f4', ('time',))
                 dst['time'].long_name = 'Time'
                 dst['time'].standard_name = 'time'
-                date = pivot_time(self.start_date)
+                date = nearest_zulu(self.start_date)
                 dst['time'].units = f'days since {date.year}-{date.month}'\
                                     f'-{date.day} 00:00'\
                                     f'{date.tzinfo}'
@@ -412,9 +417,12 @@ class HRRR(SfluxDataset):
                 dst['dswrf'].units = "W/m^2"
 
         self.resource = self.tmpdir
-        self.air = AirComponent(self.fields)
-        self.prc = PrcComponent(self.fields)
-        self.rad = RadComponent(self.fields)
+        if air is True:
+            self.air = AirComponent(self.fields)
+        if prc is True:
+            self.prc = PrcComponent(self.fields)
+        if rad is True:
+            self.rad = RadComponent(self.fields)
 
     @property
     def tmpdir(self):

@@ -5,9 +5,9 @@ from typing import Union
 import f90nml  # type: ignore[import]
 
 from pyschism.enums import NWSType
-from pyschism.mesh.base import Gr3
 from pyschism.forcing.atmosphere.nws.nws import NWS
 from pyschism.forcing.atmosphere.nws.nws2.sflux import SfluxDataset
+from pyschism.mesh import Gr3, gridgr3
 
 
 SFLUX_DEFAULTS = f90nml.read(
@@ -16,32 +16,29 @@ SFLUX_DEFAULTS = f90nml.read(
 
 class NWS2(NWS):
 
-    def __init__(self, sflux_1: SfluxDataset,
-                 sflux_2: SfluxDataset = None):
+    def __init__(
+            self,
+            sflux_1: SfluxDataset,
+            sflux_2: SfluxDataset = None,
+            windrot: gridgr3.Windrot = None
+    ):
         """Loads SfluxDataset to use as NWS2 input. """
-
-        # for key, item in SFLUX_DEFAULTS['sflux_inputs'].items():
-        #     print(key, item)
-        #     setattr(self, key, item)
 
         self.sflux_1 = sflux_1
         self.sflux_2 = sflux_2
+        self.windrot = windrot
 
-    def __call__(self, model_driver):
-        super().__call__(model_driver)
+    def fetch_data(self, start_date=None, rnday=None, bbox=None, **kwargs):
         if hasattr(self.sflux_1, 'fetch_data'):
-            self.sflux_1.fetch_data(
-                self._start_date, self._rnday,
-                bbox=model_driver.model_domain.hgrid.get_bbox(
-                    'EPSG:4326', output_type='bbox'))
+            self.sflux_1.fetch_data(start_date, rnday, bbox=bbox, **kwargs)
         if self.sflux_2 is not None:
             if hasattr(self.sflux_2, 'fetch_data'):
                 self.sflux_2.fetch_data(
-                    self._start_date, self._rnday,
-                    # bbox=model_driver.model_domain.hgrid.get_bbox(
-                    #     'EPSG:4326', output_type='bbox')
+                    start_date,
+                    rnday,
+                    bbox=bbox,
+                    **kwargs
                     )
-        self.windrot = model_driver.model_domain.hgrid
 
     def __str__(self):
         data = []
@@ -49,7 +46,7 @@ class NWS2(NWS):
         return f'&sflux_inputs\n{data}/\n'
 
     def write(self, path: Union[str, os.PathLike], overwrite: bool = False,
-              wind_rot: bool = True):
+              windrot: bool = True):
         # write sflux namelist
         path = pathlib.Path(path)
         if path.name != 'sflux':
@@ -59,16 +56,20 @@ class NWS2(NWS):
             f.write(str(self))
         # write sflux data
         self.sflux_1.write(
-            path, 1, overwrite, start_date=self._start_date, rnday=self._rnday)
+            path, 1, overwrite,
+            # start_date=self.start_date,
+            # rnday=self._rnday
+        )
         if self.sflux_2 is not None:
             self.sflux_2.write(
-                path, 2, overwrite, start_date=self._start_date,
-                rnday=self._rnday)
+                path, 2, overwrite,
+                # start_date=self.start_date,
+                # rnday=self._rnday
+                )
         # # write windrot data
-        if self.windrot is not None:
-            if wind_rot is True:
-                self.windrot.write(path.parent / 'windrot_geo2proj.gr3',
-                                   overwrite)
+        if windrot is not False and self.windrot is not None:
+            windrot = 'windrot_geo2proj.gr3' if windrot is True else windrot
+            self.windrot.write(path.parent / 'windrot_geo2proj.gr3', overwrite)
 
     @property
     def dtype(self) -> NWSType:
@@ -104,13 +105,20 @@ class NWS2(NWS):
         return self._windrot
 
     @windrot.setter
-    def windrot(self, grd):
-        if not isinstance(grd, Gr3):
-            raise TypeError(f'Argument grd must be of type {Gr3}, '
-                            f'not type {type(grd)}.')
-        data = grd.to_dict()
-        data.pop("boundaries", None)
-        data["nodes"] = {id: (coord, 0.) for id, (coord, _)
-                         in data["nodes"].items()}
-        self._windrot = Gr3(**data)
-        self._windrot.description = 'windrot'
+    def windrot(self, windrot: Union[gridgr3.Windrot, None]):
+        if not isinstance(windrot, (gridgr3.Windrot, type(None))):
+            raise TypeError(
+                f'Argument windrot must be of type {gridgr3.Windrot} or None, '
+                f'not type {type(windrot)}.')
+        self._windrot = windrot
+
+    @property
+    def timevector(self):
+        if self.sflux_2 is None:
+            return self.sflux_1.timevector
+        rnday_1 = self.sflux_1.timevector[-1] - self.sflux_1.timevector[0]
+        rnday_2 = self.sflux_2.timevector[-1] - self.sflux_2.timevector[0]
+        if rnday_2 <= rnday_1:
+            return self.sflux_2.timevector
+        else:
+            return self.sflux_1.timevector

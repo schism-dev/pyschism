@@ -64,6 +64,7 @@ class Fgrid(Gr3):
         obj = cls(**{k: v for k, v in hgrid.to_dict().items() if k
                      in ['nodes', 'elements', 'description', 'crs']})
         obj.values[:] = value
+        obj.description = f'{cls.__name__.lower()} {obj.crs}'
         return obj
 
     def add_region(

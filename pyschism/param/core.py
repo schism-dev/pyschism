@@ -25,11 +25,14 @@ class IbcType(Enum):
 class CoreMeta(type):
 
     def __new__(meta, name, bases, attrs):
-        attrs.update(**PARAM_DEFAULTS)
+        for key, value in PARAM_DEFAULTS.items():
+            attrs[key] = value
         return type(name, bases, attrs)
 
 
-class CORE(metaclass=CoreMeta):
+class CORE(
+    # metaclass=CoreMeta
+):
     """ Provides error checking implementation for CORE group """
 
     mandatory = ['ipre', 'ibc', 'ibtp', 'rnday', 'dt', 'nspool', 'ihfskip']
@@ -53,18 +56,26 @@ class CORE(metaclass=CoreMeta):
         self.ihfskip = ihfskip
 
     def __str__(self):
-        data = '\n'.join([
-            f"  {key}={str(getattr(self, key))}" for key in self.to_dict()])
+        data = []
+        for key, default in PARAM_DEFAULTS.items():
+            if hasattr(self, key):
+                current = getattr(self, key)
+            else:
+                continue
+            if key in self.mandatory:
+                data.append(f"  {key}={str(current)}")
+            elif default != current:
+                data.append(f"  {key}={str(current)}")
+        data = '\n'.join(data)
         return f"&CORE\n{data}\n/"
 
     def to_dict(self):
         output = {}
         for key, default in PARAM_DEFAULTS.items():
-            current = getattr(self, key)
-            if key == 'rnday':
-                current = current.total_seconds() / (60.*60.*24)
-            if key == 'dt':
-                current = current.total_seconds()
+            if hasattr(self, f'{key}'):
+                current = getattr(self, f'{key}')
+            else:
+                current = None
             if key in self.mandatory:
                 output[key] = current
             elif default != current:
@@ -120,23 +131,30 @@ class CORE(metaclass=CoreMeta):
         self._ibtp = ibtp
 
     @property
-    def rnday(self) -> float:
+    def rnday(self) -> Union[float, None]:
         return self._rnday
 
     @rnday.setter
-    def rnday(self, rnday: Union[float, timedelta]):
-        if not isinstance(rnday, timedelta):
-            rnday = timedelta(days=float(rnday))
-        self._rnday = rnday.total_seconds() / timedelta(days=1).total_seconds()
+    def rnday(self, rnday: Union[float, timedelta, None]):
+        if rnday is not None:
+            if not isinstance(rnday, timedelta):
+                rnday = timedelta(days=float(rnday))
+            self._rnday = rnday / timedelta(days=1)
+        else:
+            self._rnday = None
 
     @property
-    def dt(self):
+    def dt(self) -> Union[float, None]:
         return self._dt
 
     @dt.setter
-    def dt(self, dt: Union[float, timedelta]):
+    def dt(self, dt: Union[float, timedelta, None]):
+        if dt is None:
+            dt = timedelta(seconds=150.)
+
         if not isinstance(dt, timedelta):
             dt = timedelta(seconds=float(dt))
+
         self._dt = dt.total_seconds()
 
     @property
@@ -145,16 +163,19 @@ class CORE(metaclass=CoreMeta):
 
     @nspool.setter
     def nspool(self, nspool: Union[int, float, timedelta, None]):
-        if nspool is None:
+        if nspool is None and self.rnday is not None:
             nspool = int(round(self.rnday / self.dt))
         if isinstance(nspool, timedelta):
-            nspool = int(round(nspool / self.dt))
+            nspool = int(round(nspool.total_seconds() / self.dt))
         if isinstance(nspool, float):
             nspool = int(round(timedelta(hours=nspool) / self.dt))
         if isinstance(nspool, (int, float)):
-            if nspool <= 0:
+            if nspool < 0:
                 raise ValueError("nspool must be positive.")
-        self._nspool = int(nspool)
+        if nspool is not None:
+            self._nspool = int(nspool)
+        else:
+            self._nspool = None
 
     @property
     def ihfskip(self):
@@ -166,14 +187,17 @@ class CORE(metaclass=CoreMeta):
         if not isinstance(ihfskip, (int, timedelta, type(None))):
             raise TypeError('Argument ihfskip must be int, timedelta or None.')
 
-        if ihfskip is None:
-            ihfskip = int(round(self.rnday / self.dt))
+        if ihfskip is None and self.rnday is not None:
+            ihfskip = int(round(timedelta(days=self.rnday).total_seconds() / self.dt))
 
         if isinstance(ihfskip, timedelta):
             ihfskip = int(round(ihfskip / self.dt))
 
-        if not (ihfskip / self.nspool).is_integer():
-            raise ValueError("ihfskip/nspool must be an integer but got  "
-                             f"{ihfskip}/{self.nspool}={ihfskip/self.nspool}")
+        if isinstance(self.nspool, int):
+            if self.nspool > 0:
+                if not (ihfskip / self.nspool).is_integer():
+                    raise ValueError(
+                        'ihfskip/nspool must be an integer but got '
+                        f'{ihfskip}/{self.nspool}={ihfskip/self.nspool}')
 
         self._ihfskip = ihfskip

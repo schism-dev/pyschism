@@ -18,6 +18,7 @@ class Gr3Field(Gr3):
         obj = cls(**{k: v for k, v in hgrid.to_dict().items() if k
                      in ['nodes', 'elements', 'description', 'crs']})
         obj.values[:] = value
+        obj.description = f'{cls.__name__.lower()} {obj.crs}'
         return obj
 
     def add_region(
@@ -25,7 +26,6 @@ class Gr3Field(Gr3):
             region: Union[Polygon, MultiPolygon],
             value
     ):
-        # Assuming input polygons are in EPSG:4326
         if isinstance(region, Polygon):
             region = [region]
         gdf1 = gpd.GeoDataFrame(
@@ -84,6 +84,20 @@ class Windrot(Gr3Field):
     pass
 
 
+class ElevIc(Gr3Field):
+
+    @classmethod
+    def default(cls, hgrid, offset=-0.1):
+        obj = cls.constant(hgrid, 0.)
+        mask = np.logical_and(
+                hgrid.values > 0.,
+                obj.values < hgrid.values
+            )
+        idxs = np.where(mask)
+        obj.values[idxs] = hgrid.values[idxs] + offset
+        return obj
+
+
 class Nudge(Gr3Field):
 
     """
@@ -135,8 +149,6 @@ class Nudge(Gr3Field):
                 for j in opbd:
                     tmp = np.square(lon[int(idn)-1]-lon[int(j)-1]) +  \
                         np.square(lat[int(idn)-1]-lat[int(j)-1])
-                    # print(tmp)
-                    # exit()
                     rl2 = np.sqrt(tmp)
                     if rl2 < distmin:
                         distmin = rl2
@@ -148,7 +160,5 @@ class Nudge(Gr3Field):
             line.extend([f"{rnu:<.7e}"])
             line.extend("\n")
             out.append(" ".join(line))
-            print(out)
-            exit()
             with open(outdir / 'TEM_nudge.gr3', 'w+') as fid:
                 fid.writelines(out)

@@ -255,6 +255,10 @@ class BaseComponent(ABC):
         rad: ['dlwrf', 'dswrf']
         """
 
+    @property
+    def timevector(self):
+        return getattr(self, self.var_types[0]).datetime_array
+
 
 class AirComponent(BaseComponent):
 
@@ -380,9 +384,6 @@ class SfluxDataset:
         self.rad = RadComponent(self.fields, dlwrf_name=dlwrf_name,
                                 dswrf_name=dswrf_name)
 
-    def __call__(self, model_driver):
-        pass
-
     def write(self, outdir: Union[str, os.PathLike], level: int,
               overwrite: bool = False, start_date: datetime = None,
               rnday: Union[float, int, timedelta] = None):
@@ -390,6 +391,21 @@ class SfluxDataset:
         if outdir.name != 'sflux':
             outdir /= 'sflux'
         outdir.mkdir(exist_ok=True)
-        self.air.write(outdir, level, overwrite, start_date, rnday)
-        self.prc.write(outdir, level, overwrite, start_date, rnday)
-        self.rad.write(outdir, level, overwrite, start_date, rnday)
+
+        if hasattr(self, 'air'):
+            if self.air is not None:
+                self.air.write(outdir, level, overwrite, start_date, rnday)
+
+        if hasattr(self, 'prc'):
+            if self.prc is not None:
+                self.prc.write(outdir, level, overwrite, start_date, rnday)
+
+        if hasattr(self, 'rad'):
+            if self.rad is not None:
+                self.rad.write(outdir, level, overwrite, start_date, rnday)
+
+    @property
+    def timevector(self):
+        for attr in ['air', 'prc', 'rad']:
+            if hasattr(self, attr):
+                return getattr(self, attr).timevector
