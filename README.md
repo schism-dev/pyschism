@@ -1,5 +1,5 @@
 # PySCHISM
-![coverage](tests/coverage.svg)
+[![codecov](https://codecov.io/gh/schism-dev/pyschism/branch/main/graph/badge.svg?token=BQWB1QKJ3Q)](https://codecov.io/gh/schism-dev/pyschism)
 
 ## A Python interface for SCHISM model runs.
 
