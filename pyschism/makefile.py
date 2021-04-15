@@ -8,10 +8,11 @@ from pyschism.server import ServerConfig, SlurmConfig
 
 class Makefile(ABC):
 
-    def __init__(self, server_config: ServerConfig = None):
+    def __init__(self, server_config: ServerConfig = None, hotstart=None):
         if server_config is None:
             server_config = ServerConfig()
         self.server_config = server_config
+        self.hotstart = hotstart
 
     def write(self, path: Union[str, os.PathLike], overwrite: bool = False):
         path = pathlib.Path(path)
@@ -71,9 +72,22 @@ default: symlinks
 
     @property
     def run(self):
-        return r"""
-run: default
-    @set -e;\
+        f = [
+            '',
+            'run:',
+            '    @set -e;\\',
+        ]
+
+        if self.hotstart is not None:
+            f.extend([
+                f'    pushd {self.hotstart.path.parent};\\',
+                f'    {self.hotstart.binary} -i {self.hotstart.iteration};\\',
+                '    popd;\\',
+                f'    mv {self.hotstart.path} ./hotstart.nc;\\',
+            ])
+
+        return '\n'.join([line.replace("    ", "\t") for line in f]) + r"""
+    touch outputs/mirror.out outputs/fatal.error;\
     eval 'tail -f outputs/mirror.out  outputs/fatal.error &';\
     tail_pid=$${!};\
     ${MPI_LAUNCHER} ${NPROC} ${SCHISM_BINARY};\
@@ -135,9 +149,21 @@ slurm: symlinks
 
     @property
     def run(self):
-        return r"""
-run: $(if ! $("$(wildcard $(SLURM_JOB_FILE))",""), slurm)
-    @set -e;\
+        f1 = [
+            '',
+            'run:',
+            '    @set -e;\\',
+        ]
+
+        if self.hotstart is not None:
+            f1.extend([
+                f'    pushd {self.hotstart.path.parent};\\',
+                f'    {self.hotstart.binary} -i {self.hotstart.iteration};\\',
+                '    popd;\\',
+                f'    mv {self.hotstart.path} ./hotstart.nc;\\',
+            ])
+
+        return '\n'.join([line.replace("    ", "\t") for line in f1]) + r"""
     touch ${SLURM_LOG_FILE};\
     eval 'tail -f ${SLURM_LOG_FILE} outputs/mirror.out outputs/fatal.error &';\
     tail_pid=$${!};\
@@ -157,7 +183,7 @@ run: $(if ! $("$(wildcard $(SLURM_JOB_FILE))",""), slurm)
 
 class MakefileDriver:
 
-    def __new__(cls, server_config: ServerConfig = None):
+    def __new__(cls, server_config: ServerConfig = None, hotstart=None):
         if isinstance(server_config, SlurmConfig):
-            return SlurmMakefile(server_config)
-        return DefaultMakefile(server_config)
+            return SlurmMakefile(server_config, hotstart=hotstart)
+        return DefaultMakefile(server_config, hotstart=hotstart)

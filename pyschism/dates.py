@@ -74,23 +74,28 @@ class SpinupTime:
         self.spinup_time = None
 
 
-def nearest_zulu(input_datetime=None):
+def nearest_zulu(input_datetime=None, method='floor'):
     """
     "pivot time" is defined as the nearest floor t00z for any given datetime.
     If this function is called without arguments, it will return the pivot time
     for the current datetime in UTC.
     """
-    input_datetime = nearest_cycle() if input_datetime is None else \
-        localize_datetime(input_datetime).astimezone(pytz.utc)
+    input_datetime = nearest_cycle(method=method) if input_datetime is None \
+        else localize_datetime(input_datetime).astimezone(pytz.utc)
     return localize_datetime(
         datetime(input_datetime.year, input_datetime.month, input_datetime.day)
     )
 
 
-def nearest_cycle(input_datetime=None, period=6):
+def nearest_cycle(input_datetime=None, period=6, method='floor'):
+    assert method in ['floor', 'ceil']
+    if method == 'floor':
+        method = np.floor
+    if method == 'ceil':
+        method = np.ceil
     if input_datetime is None:
         input_datetime = localize_datetime(datetime.utcnow())
-    current_cycle = int(period * np.floor(input_datetime.hour / period))
+    current_cycle = int(period * method(input_datetime.hour / period))
     return pytz.timezone('UTC').localize(
         datetime(input_datetime.year, input_datetime.month,
                  input_datetime.day, current_cycle))

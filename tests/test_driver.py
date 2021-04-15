@@ -17,7 +17,7 @@ from pyschism.forcing.hydrology import NWM
 
 
 DATA_DIRECTORY = pathlib.Path(__file__).parent.absolute() / 'data'
-FORT14 = DATA_DIRECTORY / "NetCDF_Shinnecock_Inlet/fort.14"
+HGRID = DATA_DIRECTORY / "GulfStreamDevel/hgrid.gr3"
 
 logging.basicConfig(level=logging.INFO, force=True)
 
@@ -25,25 +25,24 @@ logging.basicConfig(level=logging.INFO, force=True)
 class ModelConfigurationTestCase(unittest.TestCase):
 
     def setUp(self):
-        if not FORT14.is_file():
-            url = "https://www.dropbox.com/s/1wk91r67cacf132/"
-            url += "NetCDF_shinnecock_inlet.tar.bz2?dl=1"
+        if not HGRID.is_file():
+            url = "https://www.dropbox.com/s/mjaxaqeggy721um/"
+            url += "Gulf_Stream_develop.tar.gz?dl=1"
             g = urllib.request.urlopen(url)
             tmpfile = tempfile.NamedTemporaryFile()
             with open(tmpfile.name, 'b+w') as f:
                 f.write(g.read())
-            with tarfile.open(tmpfile.name, "r:bz2") as tar:
-                tar.extractall(DATA_DIRECTORY / "NetCDF_Shinnecock_Inlet")
+            with tarfile.open(tmpfile.name, "r:gz") as tar:
+                tar.extractall(DATA_DIRECTORY / "GulfStreamDevel")
 
     def test_basic_config_2d(self):
 
-        import os
         config = ModelConfig(
-            Hgrid.open(os.getenv('NWM_TEST_MESH'), crs='epsg:4326'),
-            tides=Tides(tidal_database='tpxo'),
+            Hgrid.open(HGRID, crs='epsg:4326'),
+            tides=Tides(),
             atmosphere=NWS2(
                 GFS(),
-                HRRR()
+                # HRRR()
             ),
             hydrology=NWM()
         )
@@ -56,7 +55,7 @@ class ModelConfigurationTestCase(unittest.TestCase):
         coldstart = config.coldstart(
             start_date=nearest_cycle - spinup_time,
             end_date=nearest_cycle,
-            # timestep=300.,
+            timestep=300.,
             dramp=spinup_time,
             dramp_ss=spinup_time,
             drampwind=spinup_time,
@@ -65,14 +64,14 @@ class ModelConfigurationTestCase(unittest.TestCase):
             dahv=True,
         )
 
-        # # optionally run or write the coldstart object
-        # if shutil.which('pschism_TVD-VL') is not None:
-        #     coldstart.run('/tmp/test/coldstart', overwrite=True)
+        # optionally run or write the coldstart object
+        if shutil.which('pschism_TVD-VL') is not None:
+            coldstart.run('/tmp/test/coldstart', overwrite=True)
 
-        # else:
-        #     tmpdir = tempfile.TemporaryDirectory()
-        #     coldstart.write(tmpdir.name)
-        coldstart.outdir = '/tmp/test/coldstart'
+        else:
+            ctmpdir = tempfile.TemporaryDirectory()
+            coldstart.write(ctmpdir.name)
+
         hotstart = config.hotstart(
             coldstart,
             timestep=300.,
@@ -81,12 +80,12 @@ class ModelConfigurationTestCase(unittest.TestCase):
             elev=True,
             dahv=True,
         )
+
         if shutil.which('pschism_TVD-VL') is not None:
-            # optionally run or write the coldstart object
             hotstart.run('/tmp/test/hotstart', overwrite=True)
         else:
-            tmpdir = tempfile.TemporaryDirectory()
-            hotstart.write(tmpdir.name)
+            htmpdir = tempfile.TemporaryDirectory()
+            hotstart.write(htmpdir.name)
 
 
 if __name__ == '__main__':

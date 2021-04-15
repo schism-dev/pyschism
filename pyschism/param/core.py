@@ -168,7 +168,8 @@ class CORE(
         if isinstance(nspool, timedelta):
             nspool = int(round(nspool.total_seconds() / self.dt))
         if isinstance(nspool, float):
-            nspool = int(round(timedelta(hours=nspool) / self.dt))
+            nspool = int(
+                round(timedelta(hours=nspool).total_seconds() / self.dt))
         if isinstance(nspool, (int, float)):
             if nspool < 0:
                 raise ValueError("nspool must be positive.")
@@ -191,7 +192,7 @@ class CORE(
             ihfskip = int(round(timedelta(days=self.rnday).total_seconds() / self.dt))
 
         if isinstance(ihfskip, timedelta):
-            ihfskip = int(round(ihfskip / self.dt))
+            ihfskip = int(round(ihfskip.total_seconds() / self.dt))
 
         if isinstance(self.nspool, int):
             if self.nspool > 0:

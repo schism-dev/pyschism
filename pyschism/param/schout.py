@@ -42,42 +42,42 @@ _logger = logging.getLogger(__name__)
 #         iof[self._index] = int(val)
 
 
-# class SurfaceOutputVars:
+class SurfaceOutputVars:
 
-#     def __init__(self):
-#         self._surface_output_vars = {
-#             'iof_hydro': [(var.value, i) for i, var
-#                           in enumerate(IofHydroVariables)],
-#             'iof_dvd': [(var.value, i) for i, var
-#                         in enumerate(IofDvdVariables)],
-#             'iof_wwm': [(var.value, i) for i, var
-#                         in enumerate(IofWwmVariables)],
-#             'iof_gen': [(var.value, i) for i, var
-#                         in enumerate(IofGenVariables)],
-#             'iof_age': [(var.value, i) for i, var
-#                         in enumerate(IofAgeVariables)],
-#             'iof_sed': [(var.value, i) for i, var
-#                         in enumerate(IofSedVariables)],
-#             'iof_eco': [(var.value, i) for i, var
-#                         in enumerate(IofEcoVariables)],
-#             'iof_icm': [(var.value, i) for i, var
-#                         in enumerate(IofIcmVariables)],
-#             'iof_cos': [(var.value, i) for i, var
-#                         in enumerate(IofCosVariables)],
-#             'iof_fib': [(var.value, i) for i, var
-#                         in enumerate(IofFibVariables)],
-#             'iof_sed2d': [(var.value, i) for i, var
-#                           in enumerate(IofSed2dVariables)],
-#             'iof_marsh': [(var.value, i) for i, var
-#                           in enumerate(IofMarshVariables)],
-#             'iof_ice': [(var.value, i) for i, var
-#                         in enumerate(IofIceVariables)],
-#             'iof_ana': [(var.value, i) for i, var
-#                         in enumerate(IofAnaVariables)],
-#         }
+    def __init__(self):
+        self._surface_output_vars = {
+            'iof_hydro': [(var.value, i) for i, var
+                          in enumerate(IofHydroVariables)],
+            'iof_dvd': [(var.value, i) for i, var
+                        in enumerate(IofDvdVariables)],
+            'iof_wwm': [(var.value, i) for i, var
+                        in enumerate(IofWwmVariables)],
+            'iof_gen': [(var.value, i) for i, var
+                        in enumerate(IofGenVariables)],
+            'iof_age': [(var.value, i) for i, var
+                        in enumerate(IofAgeVariables)],
+            'iof_sed': [(var.value, i) for i, var
+                        in enumerate(IofSedVariables)],
+            'iof_eco': [(var.value, i) for i, var
+                        in enumerate(IofEcoVariables)],
+            'iof_icm': [(var.value, i) for i, var
+                        in enumerate(IofIcmVariables)],
+            'iof_cos': [(var.value, i) for i, var
+                        in enumerate(IofCosVariables)],
+            'iof_fib': [(var.value, i) for i, var
+                        in enumerate(IofFibVariables)],
+            'iof_sed2d': [(var.value, i) for i, var
+                          in enumerate(IofSed2dVariables)],
+            'iof_marsh': [(var.value, i) for i, var
+                          in enumerate(IofMarshVariables)],
+            'iof_ice': [(var.value, i) for i, var
+                        in enumerate(IofIceVariables)],
+            'iof_ana': [(var.value, i) for i, var
+                        in enumerate(IofAnaVariables)],
+        }
 
-#     def __get__(self, obj, val):
-#         return self._surface_output_vars
+    def __get__(self, obj, val):
+        return self._surface_output_vars
 
 
 # class Nhot:

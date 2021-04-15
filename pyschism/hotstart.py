@@ -7,7 +7,6 @@ import subprocess
 from typing import Union
 
 import f90nml
-import numpy as np
 
 from pyschism import dates
 
@@ -51,23 +50,30 @@ class Hotstart(ABC):
 
 class CombineHotstartBinary(Hotstart):
 
-    def __init__(self, path: Union[str, os.PathLike], iteration=None):
+    def __init__(self, path: Union[str, os.PathLike], iteration=None,
+                 binary='combine_hotstart7'):
         path = pathlib.Path(path)
-        if iteration is None:
-            combine_hotstart = path.glob('hotstart_[0-9][0-9][0-9][0-9]_*.nc')
-            increments = set([file.name.split('_')[-1].split('.nc')[0]
-                              for file in combine_hotstart])
-            iteration = np.max(
-                [int(increment) for increment in increments])
-        subprocess.check_call(
-            ["combine_hotstart7", '-i', f'{iteration}'], cwd=path)
-        self._path = path / f"hotstart_it={iteration}.nc"
-        self._iteration = iteration
+        self.binary = binary
+        if iteration is not None:
+            self.iteration = iteration
+        else:
+            param = path / 'param.out.nml'
+            if param.exists():
+                param = f90nml.read(param)
+            else:
+                param = f90nml.read(path.parent / 'param.nml')
+            self.iteration = int(
+                timedelta(days=param['core']['rnday']) /
+                timedelta(seconds=param['core']['dt']))
+        self._path = pathlib.Path(path) / f"hotstart_it={self.iteration}.nc"
+
+    def run(self):
+        subprocess.check_call([
+            f'{self.binary}', '-i', f'{self.iteration}'], cwd=self.path.parent)
 
     @property
     def time(self):
-        # return Param.read(self.path.parent / 'param.nml').start_date
-        param = f90nml.read(self.path.parent / 'param.out.nml')
+        param = f90nml.read(self.path.parent.parent / 'param.nml')
         start_hour = float(param['opt']['start_hour'])
         hours = int(start_hour)
         minutes = int((start_hour*60) % 60)
@@ -86,6 +92,18 @@ class CombineHotstartBinary(Hotstart):
     def iteration(self):
         return self._iteration
 
+    @iteration.setter
+    def iteration(self, iteration: int):
+        self._iteration = int(iteration)
+
     @property
     def path(self):
         return self._path
+
+    @property
+    def binary(self) -> pathlib.Path:
+        return self._binary
+
+    @binary.setter
+    def binary(self, binary):
+        self._binary = pathlib.Path(binary)

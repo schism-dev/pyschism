@@ -13,17 +13,22 @@ class Vgrid:
         self._vgrid = self._get_2D_string()
 
     @classmethod
-    def from_binary(cls, hgrid, *args, **kwargs):
+    def from_binary(cls, hgrid, binary='gen_vqs'):
         _tmpdir = tempfile.TemporaryDirectory()
         tmpdir = pathlib.Path(_tmpdir.name)
         hgrid.write(tmpdir / 'hgrid.gr3')
-        subprocess.check_call(['gen_vqs'], cwd=tmpdir)
-        obj = cls()
-        return obj
+        subprocess.check_call([binary], cwd=tmpdir)
+        return cls.open(tmpdir / 'vgrid.in')
 
-    @staticmethod
-    def open(path):
-        raise NotImplementedError('Vgrid.open()')
+    @classmethod
+    def open(cls, path):
+        path = pathlib.Path(path)
+        if path.name != 'vgrid.in':
+            raise TypeError('Not a valid vgrid.in file.')
+        obj = cls()
+        with open(path) as f:
+            obj._vgrid = f.read()
+        return obj
 
     def __str__(self):
         return self._vgrid

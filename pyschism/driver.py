@@ -185,8 +185,10 @@ class ModelDriver:
         # set core parameters
         self.param.core.dt = dt
         self.param.core.rnday = rnday
-        self.param.core.nspool = nspool
-        self.param.core.ihfskip = ihfskip
+        self.param.core.nspool = nspool if nspool is not None \
+            else self.param.core.rnday
+        self.param.core.ihfskip = ihfskip if ihfskip is not None \
+            else timedelta(days=self.param.core.rnday)
         if self.config.vgrid.is2D():
             self.param.core.ibc = Stratification.BAROTROPIC
         else:
@@ -239,6 +241,7 @@ class ModelDriver:
             is not None else self.outdir
         self.write(self.outdir, overwrite=overwrite,
                    use_param_template=use_param_template)
+        # breakpoint()
         subprocess.check_call(
             ["make", "run"],
             cwd=self.outdir
