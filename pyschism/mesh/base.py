@@ -261,8 +261,8 @@ class Elements:
         return self._quads
 
     @property
-    def nside(self):
-        if not hasattr(self, '_ns'):
+    def side(self):
+        if not hasattr(self, '_side'):
             for i in np.arange(3):
                 i1 = np.mod(i+3,3)
                 i2 = np.mod(i+4,3)
@@ -278,8 +278,8 @@ class Elements:
         
             y = np.sort(x, axis=1)
             uy = np.unique(y, axis=0)
-            self._ns = uy.shape[0]
-        return self._ns
+            self._side = uy #.shape[0]
+        return self._side
 
     @property
     def triangulation(self):
