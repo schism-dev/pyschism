@@ -262,22 +262,23 @@ class Elements:
 
     @property
     def nside(self):
-        for i in np.arange(3):
-            i1 = np.mod(i+3,3)
-            i2 = np.mod(i+4,3)
-            if i==0:
-                x=np.c_[self.triangles[:, i1], self.triangles[:, i2]]
-            else:
-                x=np.r_[x, np.c_[self.triangles[:, i1], self.triangles[:, i2]]]
+        if not hasattr(self, '_ns'):
+            for i in np.arange(3):
+                i1 = np.mod(i+3,3)
+                i2 = np.mod(i+4,3)
+                if i==0:
+                    x=np.c_[self.triangles[:, i1], self.triangles[:, i2]]
+                else:
+                    x=np.r_[x, np.c_[self.triangles[:, i1], self.triangles[:, i2]]]
 
-        for i in np.arange(4):
-            i1 = np.mod(i+4,4)
-            i2 = np.mod(i+5,4)
-            x=np.r_[x, np.c_[self.quads[:, i1], self.quads[:, i2]]]
+            for i in np.arange(4):
+                i1 = np.mod(i+4,4)
+                i2 = np.mod(i+5,4)
+                x=np.r_[x, np.c_[self.quads[:, i1], self.quads[:, i2]]]
         
-        y = np.sort(x, axis=1)
-        uy = np.unique(y, axis=0)
-        self._ns = uy.shape[0]
+            y = np.sort(x, axis=1)
+            uy = np.unique(y, axis=0)
+            self._ns = uy.shape[0]
         return self._ns
 
     @property
