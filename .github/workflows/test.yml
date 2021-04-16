@@ -6,8 +6,6 @@ jobs:
   tests:
     name: Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
-    container:
-      image: schismdev/pyschism-unittest:latest
     strategy:
       fail-fast: false
       matrix:
@@ -42,6 +40,8 @@ jobs:
         run: coverage report -m
       - name: Upload coverage to Codecov
         if: matrix.python-version == 3.9
+        container:
+          image: schismdev/pyschism-unittest:latest
         uses: codecov/codecov-action@v1
         with:
           flags: python${{ matrix.python-version }}-${{ runner.os }}
