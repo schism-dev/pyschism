@@ -8,3 +8,7 @@ ENV NWM_TEST_MESH /data/nwm_test_mesh/hgrid.gr3
 
 RUN mkdir -p /root/.local/share/nwm \
 	&& wget -P /root/.local/share/nwm -O NWM_channel_hydrofabric.tar.gz https://www.nohrsc.noaa.gov/pub/staff/keicher/NWM_live/web/data_tools/NWM_channel_hydrofabric.tar.gz
+
+RUN mkdir /opt/hostedtoolcache
+
+ENV AGENT_TOOLSDIRECTORY /opt/hostedtoolcache
