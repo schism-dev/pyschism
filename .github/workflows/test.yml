@@ -12,7 +12,7 @@ jobs:
         python-version: [ 3.7, 3.8, 3.9 ]
 
     steps:
-      - uses: schismdev/pyschism-unittest:latest
+      - uses: docker://schismdev/pyschism-unittest:latest
         with:
           entrypoint: /user/bin/bash
       - name: Checkout repository
