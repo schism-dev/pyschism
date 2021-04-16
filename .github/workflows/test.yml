@@ -5,7 +5,9 @@ on: [ push ]
 jobs:
   tests:
     name: Python ${{ matrix.python-version }}
-    runs-on: schismdev/pyschism-arch-unittests:latest
+    runs-on: ubuntu-latest
+    container:
+      image: schismdev/pyschism-unittest:latest
     strategy:
       fail-fast: false
       matrix:
