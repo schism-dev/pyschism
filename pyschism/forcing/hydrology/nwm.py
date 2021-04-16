@@ -427,7 +427,7 @@ class NationalWaterModel(Hydrology):
                 "the pyschism cache...")
             try:
                 wget.download(
-                    'http://www.nohrsc.noaa.gov/pub/staff/keicher/NWM_live/'
+                    'https://www.nohrsc.noaa.gov/pub/staff/keicher/NWM_live/'
                     'web/data_tools/NWM_channel_hydrofabric.tar.gz',
                     out=str(self._nwm_file))
             except urllib.error.HTTPError as e:
