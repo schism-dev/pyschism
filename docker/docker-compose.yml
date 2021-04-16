@@ -1,0 +1,15 @@
+version: '3.9'
+
+services:
+  pyschism-arch-linux-base:
+    image: schismdev/pyschism-unittest:latest
+    build:
+      context: ./
+      dockerfile: arch-linux-base.Dockerfile
+
+
+  pyschism-arch:
+    image: schismdev/pyschism-arch-unittest:latest
+    build:
+      context: ./
+      dockerfile: pyschism-arch-unittest.Dockerfile

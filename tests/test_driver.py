@@ -1,6 +1,7 @@
 #! /usr/bin/env python
 from datetime import timedelta
 import logging
+import os
 import pathlib
 import shutil
 import tarfile
@@ -16,16 +17,16 @@ from pyschism.forcing.atmosphere import NWS2, GFS, HRRR
 from pyschism.forcing.hydrology import NWM
 
 
-DATA_DIRECTORY = pathlib.Path(__file__).parent.absolute() / 'data'
-HGRID = DATA_DIRECTORY / "GulfStreamDevel/hgrid.gr3"
-
 logging.basicConfig(level=logging.INFO, force=True)
 
 
 class ModelConfigurationTestCase(unittest.TestCase):
 
     def setUp(self):
-        if not HGRID.is_file():
+        hgrid = os.getenv('NWM_TEST_MESH')
+        if hgrid is None:
+            data_directory = pathlib.Path(__file__).parent.absolute() / 'data'
+            hgrid = data_directory / "GulfStreamDevel/hgrid.gr3"
             url = "https://www.dropbox.com/s/mjaxaqeggy721um/"
             url += "Gulf_Stream_develop.tar.gz?dl=1"
             g = urllib.request.urlopen(url)
@@ -33,12 +34,13 @@ class ModelConfigurationTestCase(unittest.TestCase):
             with open(tmpfile.name, 'b+w') as f:
                 f.write(g.read())
             with tarfile.open(tmpfile.name, "r:gz") as tar:
-                tar.extractall(DATA_DIRECTORY / "GulfStreamDevel")
+                tar.extractall(data_directory / "GulfStreamDevel")
+        self.hgrid = hgrid
 
     def test_basic_config_2d(self):
 
         config = ModelConfig(
-            Hgrid.open(HGRID, crs='epsg:4326'),
+            Hgrid.open(self.hgrid, crs='epsg:4326'),
             tides=Tides(),
             atmosphere=NWS2(
                 GFS(),
@@ -74,8 +76,8 @@ class ModelConfigurationTestCase(unittest.TestCase):
 
         hotstart = config.hotstart(
             coldstart,
+            end_date=timedelta(days=1),
             timestep=300.,
-            end_date=timedelta(days=2) - timedelta(hours=2),
             nspool=timedelta(hours=1),
             elev=True,
             dahv=True,
