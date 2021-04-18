@@ -10,11 +10,13 @@ import unittest
 import urllib.request
 
 from pyschism import dates
-from pyschism.mesh import Hgrid
+from pyschism.mesh import Hgrid, Vgrid
+from pyschism.mesh.fgrid import DragCoefficient
 from pyschism.driver import ModelConfig
-from pyschism.forcing.tides import Tides
 from pyschism.forcing.atmosphere import NWS2, GFS, HRRR
+from pyschism.forcing.baroclinic import RTOFS
 from pyschism.forcing.hydrology import NWM
+from pyschism.forcing.tides import Tides
 
 
 logging.basicConfig(level=logging.INFO, force=True)
@@ -22,31 +24,21 @@ logging.basicConfig(level=logging.INFO, force=True)
 
 class ModelConfigurationTestCase(unittest.TestCase):
 
-    def setUp(self):
-        hgrid = os.getenv('NWM_TEST_MESH')
-        if hgrid is None:
-            data_directory = pathlib.Path(__file__).parent.absolute() / 'data'
-            hgrid = data_directory / "GulfStreamDevel/hgrid.gr3"
-            url = "https://www.dropbox.com/s/mjaxaqeggy721um/"
-            url += "Gulf_Stream_develop.tar.gz?dl=1"
-            g = urllib.request.urlopen(url)
-            tmpfile = tempfile.NamedTemporaryFile()
-            with open(tmpfile.name, 'b+w') as f:
-                f.write(g.read())
-            with tarfile.open(tmpfile.name, "r:gz") as tar:
-                tar.extractall(data_directory / "GulfStreamDevel")
-        self.hgrid = hgrid
-
-    def test_basic_config_2d(self):
-
+    def test_basic_config_baroclinic(self):
+        hgrid = Hgrid.open('data/baroclinic/hgrid.gr3', crs='epsg:4326')
+        # import os
+        # hgrid = Hgrid.open(os.getenv('NWM_TEST_MESH'), crs='epsg:4326')
         config = ModelConfig(
-            Hgrid.open(self.hgrid, crs='epsg:4326'),
+            hgrid,
+            vgrid=Vgrid.from_binary(hgrid),
+            fgrid=DragCoefficient.constant(hgrid, 0.2),
             tides=Tides(),
             atmosphere=NWS2(
                 GFS(),
-                # HRRR()
+                HRRR()
             ),
-            hydrology=NWM()
+            hydrology=NWM(),
+            baroclinic=RTOFS()
         )
 
         # create reference dates
@@ -67,7 +59,7 @@ class ModelConfigurationTestCase(unittest.TestCase):
         )
 
         # optionally run or write the coldstart object
-        if shutil.which('pschism_TVD-VL') is not None:
+        if shutil.which('_pschism_TVD-VL') is not None:
             coldstart.run('/tmp/test/coldstart', overwrite=True)
 
         else:
@@ -83,7 +75,7 @@ class ModelConfigurationTestCase(unittest.TestCase):
             dahv=True,
         )
 
-        if shutil.which('pschism_TVD-VL') is not None:
+        if shutil.which('_pschism_TVD-VL') is not None:
             hotstart.run('/tmp/test/hotstart', overwrite=True)
         else:
             htmpdir = tempfile.TemporaryDirectory()

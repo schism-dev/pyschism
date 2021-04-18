@@ -402,7 +402,7 @@ class ForecastCli(metaclass=ForecastCliMeta):
     def spinup_time(self):
         if not hasattr(self, '_spinup_time'):
             if self.args.spinup_days is None:
-                self._spinup_time = timedelta(days=0.25)
+                self._spinup_time = timedelta(days=0.)
             else:
                 self._spinup_time = timedelta(
                     days=float(self.args.spinup_days))
@@ -441,7 +441,9 @@ def add_forecast_init(actions):
     _add_tidal_constituents(init)
     _add_atmospheric_forcing(init)
     _add_hydrologic_forcing(init)
-    init.add_argument('--use-shapiro', action='store_true')
+    init.add_argument('--shapiro', action='store_true')
+    init.add_argument('--shapiro-bin', action='store_true')
+
     # TODO: Additional forcings.
     # _add_wave_forcing(forecast)
     model_outputs = init.add_argument_group('model_outputs')

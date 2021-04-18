@@ -24,24 +24,6 @@ from pyschism.enums import (
 _logger = logging.getLogger(__name__)
 
 
-# class OutputVariableDescriptor:
-
-#     def __init__(self, iof_type, name, index):
-#         self._iof_type = iof_type
-#         self._name = name
-#         self._index = index
-
-#     def __get__(self, obj, val):
-#         return bool(getattr(obj, f'_{self._iof_type}')[self._index])
-
-#     def __set__(self, obj, val: bool):
-#         if not isinstance(val, bool):
-#             raise TypeError(f'Argument to {self._name} must be boolean, not '
-#                             f'type {type(val)}.')
-#         iof = getattr(obj, f'_{self._iof_type}')
-#         iof[self._index] = int(val)
-
-
 class SurfaceOutputVars:
 
     def __init__(self):
@@ -80,71 +62,47 @@ class SurfaceOutputVars:
         return self._surface_output_vars
 
 
-# class Nhot:
+class OutputVariableDescriptor:
 
-#     def __set__(self, obj, nhot: int):
-#         if nhot not in [0, 1]:
-#             raise ValueError(f"nhot must be 0 or 1, not {nhot}")
-#         obj.__dict__['nhot'] = nhot
+    def __init__(self, iof_type, name, index):
+        self._iof_type = iof_type
+        self._name = name
+        self._index = index
 
-#     def __get__(self, obj, val):
-#         return obj.__dict__.get('nhot')
+    def __get__(self, obj, val):
+        return bool(getattr(obj, f'_{self._iof_type}')[self._index])
 
-
-# class NhotWrite:
-
-#     def __set__(self, obj, nhot_write: int):
-#         obj.__dict__['nhot_write'] = 576 #nhot_write
-#         obj.__dict__['nhot'] = 1
-
-#     def __get__(self, obj, val):
-#         return obj.__dict__.get('nhot_write')
+    def __set__(self, obj, val: bool):
+        if not isinstance(val, bool):
+            raise TypeError(f'Argument to {self._name} must be boolean, not '
+                            f'type {type(val)}.')
+        iof = getattr(obj, f'_{self._iof_type}')
+        iof[self._index] = int(val)
 
 
-# class IoutSta:
+class SchoutMeta(type):
 
-#     def __set__(self, obj, iout_sta: int):
-#         if iout_sta not in [0, 1]:
-#             raise ValueError(f"iout_sta must be 0 or 1, not {iout_sta}")
-#         obj.__dict__['iout_sta'] = iout_sta
+    surface_output_vars = SurfaceOutputVars()
 
-#     def __get__(self, obj, val):
-#         return obj.__dict__.get('iout_sta')
+    def __new__(meta, name, bases, attrs):
+        for iof_type in meta.surface_output_vars.keys():
+            attrs[f'_{iof_type}'] = len(SchoutType[iof_type].value)*[0]
 
-
-# class NspoolSta:
-
-#     def __set__(self, obj, nspool_sta: Union[int, timedelta]):
-#         obj.__dict__['nspool_sta'] = nspool_sta
-#         obj.__dict__['iout_sta'] = 1
-
-#     def __get__(self, obj, val):
-#         return obj.__dict__.get('nspool_sta')
-
-
-# class SchoutMeta(type):
-
-#     surface_output_vars = SurfaceOutputVars()
-
-#     def __new__(meta, name, bases, attrs):
-#         for iof_type in meta.surface_output_vars.keys():
-#             attrs[f'_{iof_type}'] = len(SchoutType[iof_type].value)*[0]
-
-#         for iof_type, vardata in meta.surface_output_vars.items():
-#             for name, index in vardata:
-#                 attrs[name] = OutputVariableDescriptor(iof_type, name, index)
-#         attrs['surface_output_vars'] = meta.surface_output_vars
-#         return type(name, bases, attrs)
+        for iof_type, vardata in meta.surface_output_vars.items():
+            for name, index in vardata:
+                attrs[name] = OutputVariableDescriptor(iof_type, name, index)
+        output_vars = []
+        for iof_, outputs in meta.surface_output_vars.items():
+            for name, id in outputs:
+                output_vars.append(name)
+        attrs['surface_output_vars'] = output_vars
+        return type(name, bases, attrs)
 
 
 class SCHOUT(
-        # metaclass=SchoutMeta
+        metaclass=SchoutMeta
 ):
     """ Provides error checking implementation for SCHOUT group """
-    # _iout_sta = IoutSta()
-    # _nhot = Nhot()
-    # nhot_write = NhotWrite()
-    # nspool_sta = NspoolSta()
 
     def __init__(
             self,
@@ -163,16 +121,12 @@ class SCHOUT(
         self.nhot_write = nhot_write
         self.nspool_sta = nspool_sta
 
-        # for key, val in outputs.items():
-        #     setattr(self, key, val)
-        # self._dt = dt.total_seconds() if isinstance(dt, timedelta) \
-        #     else float(dt)
-        # self._rnday = rnday.total_seconds() / 3600. if isinstance(
-        #         rnday, timedelta) else float(rnday)
+        for key, val in outputs.items():
+            setattr(self, key, val)
 
-    # def __iter__(self):
-    #     for outvar in self._surface_output_vars:
-    #         yield outvar, getattr(self, outvar)
+    def __iter__(self):
+        for outvar in self._surface_output_vars:
+            yield outvar, getattr(self, outvar)
 
     def __str__(self):
         schout = ["&SCHOUT"]

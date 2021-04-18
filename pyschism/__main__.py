@@ -5,7 +5,7 @@ import logging
 
 from pytz import timezone
 
-from pyschism.cmd.forecast.forecast import ForecastCli, add_forecast
+from pyschism.cmd.forecast import ForecastCli, add_forecast
 from pyschism.cmd.bctides import BctidesCli, add_bctides
 from pyschism.cmd.stations import StationsCli, add_stations
 from pyschism.cmd.hgrid import HgridCli, add_hgrid

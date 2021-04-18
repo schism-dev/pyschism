@@ -8,6 +8,7 @@ import geopandas as gpd
 import numpy as np
 from shapely.geometry import Polygon, MultiPolygon, Point
 
+from pyschism.forcing.baroclinic import BaroclinicForcing
 from pyschism.mesh.base import Gr3
 
 
@@ -98,11 +99,33 @@ class ElevIc(Gr3Field):
         return obj
 
 
+class TempIc(Gr3Field):
+
+    @classmethod
+    def from_forcing(cls, gr3: Gr3, forcing: BaroclinicForcing, date):
+        obj = cls.constant(gr3, np.nan)
+        obj.values[:] = forcing.temperature.interpolate(obj, date)
+        return obj
+
+
+class SaltIc(Gr3Field):
+
+    @classmethod
+    def from_forcing(cls, gr3: Gr3, forcing: BaroclinicForcing, date):
+        obj = cls.constant(gr3, np.nan)
+        obj.values[:] = forcing.salinity.interpolate(obj, date)
+        return obj
+
+
+class Estuary(Gr3Field):
+    pass
+
+
 class Nudge(Gr3Field):
 
     """
     This class is to generate nudge.gr3 file. The time complexity is O(n^2), which
-    is bad for large mesh. 
+    is bad for large mesh.
     """
 
     def __init__(self):
