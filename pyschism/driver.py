@@ -255,11 +255,20 @@ class ModelDriver:
             is not None else self.outdir
         self.write(self.outdir, overwrite=overwrite,
                    use_param_template=use_param_template)
-        # breakpoint()
+        # Make sure we are using a fresh fatal.error file since we can't catch
+        # blowup from mpiexec exit codes.
+        error_file = self.outdir / 'outputs/fatal.error'
+        if error_file.exists() and overwrite is not True:
+            raise IOError('File exists and overwrite is not True.')
+        error_file.unlink()
         subprocess.check_call(
             ["make", "run"],
             cwd=self.outdir
         )
+        with open(error_file) as f:
+            error = f.read()
+        if 'ABORT' in error:
+            raise Exception(f'SCHISM exited with error:\n{error}')
 
     @property
     def config(self) -> 'ModelConfig':

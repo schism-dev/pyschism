@@ -9,6 +9,9 @@ from scipy.interpolate import griddata
 import xarray
 
 
+import tqdm
+import tqdm_logging_wrapper
+
 from pyschism import dates
 from pyschism.forcing.baroclinic.base import BaroclinicForcing, BaroclinicComponent
 from pyschism.mesh.base import Gr3
@@ -23,9 +26,29 @@ class RTOFSBaroclinicComponent(BaroclinicComponent):
             gr3.get_bbox(crs='epsg:4326', output_type='bbox'))
 
         zi = None
-        for pivot_date, dataset in self.datasets.items():
+        # for pivot_date, dataset in self.datasets.items():
+        #     check_date = np.datetime64(dates.nearest_zulu(time).replace(
+        #                 tzinfo=None))
+        #     idx = np.where(
+        #         ~np.isnan(dataset.time.where(dataset.time == check_date)))[0]
+        #     if len(idx) > 0:
+        #         if idx[0] == 0:
+        #             continue
+        #         else:
+        #             logging.info(
+        #                 f'Downloading RTOFS data for variable {self.ncvar} '
+        #                 f'for requested date {time}, rounded as {check_date}.')
+        #             lon_idxs, lat_idxs = self._modified_bbox_indexes(bbox)
+        #             zi = dataset[self.ncvar][idx[0], lev_index,
+        #                                      lat_idxs, lon_idxs].values
+        # if zi is None:
+        for pivot_date in self.datasets.keys():
+            dataset = xarray.open_dataset(
+                'http://nomads.ncep.noaa.gov:80/dods/rtofs/rtofs_global'
+                f'{pivot_date.strftime("%Y%m%d")}/'
+                f'rtofs_glo_3dz_nowcast_daily_{self.nowcast_varname}')
             check_date = np.datetime64(dates.nearest_zulu(time).replace(
-                        tzinfo=None))
+                    tzinfo=None))
             idx = np.where(
                 ~np.isnan(dataset.time.where(dataset.time == check_date)))[0]
             if len(idx) > 0:
@@ -35,30 +58,25 @@ class RTOFSBaroclinicComponent(BaroclinicComponent):
                     logging.info(
                         f'Downloading RTOFS data for variable {self.ncvar} '
                         f'for requested date {time}, rounded as {check_date}.')
-                    lon_idxs, lat_idxs = self._modified_bbox_indexes(bbox)
-                    zi = dataset[self.ncvar][idx[0], lev_index,
-                                             lat_idxs, lon_idxs].values
 
-        if zi is None:
-            for pivot_date in self.datasets.keys():
-                dataset = xarray.open_dataset(
-                    'http://nomads.ncep.noaa.gov:80/dods/rtofs/rtofs_global'
-                    f'{pivot_date.strftime("%Y%m%d")}/'
-                    f'rtofs_glo_3dz_nowcast_daily_{self.nowcast_varname}')
-                check_date = np.datetime64(dates.nearest_zulu(time).replace(
-                        tzinfo=None))
-                idx = np.where(
-                    ~np.isnan(dataset.time.where(dataset.time == check_date)))[0]
-                if len(idx) > 0:
-                    if idx[0] == 0:
-                        continue
-                    else:
-                        logging.info(
-                            f'Downloading RTOFS data for variable {self.ncvar} '
-                            f'for requested date {time}, rounded as {check_date}.')
-                        lon_idxs, lat_idxs = self._modified_bbox_indexes(bbox)
-                        zi = dataset[self.ncvar][idx[0], lev_index,
-                                                 lat_idxs, lon_idxs].values
+                    # items = [1, 2, 3]
+                    # items_iter = tqdm.tqdm(items)
+                    # logger.info(f"Items: {items}")
+                    # with tqdm_logging_wrapper.wrap_logging_for_tqdm(items_iter), items_iter:
+                    #     for item in items_iter:
+                    #         logger.info(f"Item: {item}")
+
+                    lon_idxs, lat_idxs = self._modified_bbox_indexes(
+                        bbox,
+                        pixel_buffer=2
+                    )
+                    items_iter = tqdm.tqdm(lat_idxs)
+                    zi = np.full((len(lat_idxs), len(lon_idxs)), np.nan)
+                    with tqdm_logging_wrapper.wrap_logging_for_tqdm(
+                            items_iter), items_iter:
+                        for i, row in enumerate(items_iter):
+                            zi[i, :] = dataset[self.ncvar][
+                                idx[0], lev_index, row, lon_idxs].values
 
         if zi is None:
             raise ValueError(f'No RTOFS data for requested date {time}.')
@@ -66,7 +84,6 @@ class RTOFSBaroclinicComponent(BaroclinicComponent):
         xi, yi = self._xy_grid(lon_idxs, lat_idxs)
         xi, yi, zi = xi.flatten(), yi.flatten(), zi.flatten()
         rtofs_idxs = np.where(~np.isnan(zi))
-
         values = griddata(
             (xi[rtofs_idxs], yi[rtofs_idxs]),
             zi[rtofs_idxs],
@@ -163,12 +180,23 @@ class RTOFSBaroclinicComponent(BaroclinicComponent):
                 bbox.ymax
             )
 
-    def _modified_bbox_indexes(self, bbox):
+    def _modified_bbox_indexes(
+            self,
+            bbox,
+            pixel_buffer=0
+    ):
         dataset = list(self.datasets.values())[-1]
         lat_idxs = np.where((dataset.lat >= bbox.ymin)
                             & (dataset.lat <= bbox.ymax))[0]
         lon_idxs = np.where((dataset.lon >= bbox.xmin)
                             & (dataset.lon <= bbox.xmax))[0]
+        lon_idxs = lon_idxs.tolist()
+        lat_idxs = lat_idxs.tolist()
+        for i in range(pixel_buffer):
+            lon_idxs.insert(lon_idxs[0] - 1, 0)
+            lon_idxs.append(lon_idxs[-1] + 1)
+            lat_idxs.insert(lat_idxs[0] - 1, 0)
+            lat_idxs.append(lat_idxs[-1] + 1)
         return lon_idxs, lat_idxs
 
 

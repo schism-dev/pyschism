@@ -25,13 +25,10 @@ logging.basicConfig(level=logging.INFO, force=True)
 class ModelConfigurationTestCase(unittest.TestCase):
 
     def test_basic_config_baroclinic(self):
-        hgrid = Hgrid.open('data/baroclinic/hgrid.gr3', crs='epsg:4326')
-        # import os
-        # hgrid = Hgrid.open(os.getenv('NWM_TEST_MESH'), crs='epsg:4326')
         config = ModelConfig(
-            hgrid,
-            vgrid=Vgrid.from_binary(hgrid),
-            fgrid=DragCoefficient.constant(hgrid, 0.2),
+            Hgrid.open('data/baroclinic/hgrid.gr3', crs='epsg:4326'),
+            vgrid=Vgrid.open('data/baroclinic/vgrid.in'),
+            fgrid=DragCoefficient.open('data/baroclinic/drag.gr3', crs='epsg:4326'),
             tides=Tides(),
             atmosphere=NWS2(
                 GFS(),
@@ -63,8 +60,11 @@ class ModelConfigurationTestCase(unittest.TestCase):
             coldstart.run('/tmp/test/coldstart', overwrite=True)
 
         else:
-            ctmpdir = tempfile.TemporaryDirectory()
-            coldstart.write(ctmpdir.name)
+            # ctmpdir = tempfile.TemporaryDirectory()
+            coldstart.write(
+                # ctmpdir.name
+                '/tmp/test/coldstart', overwrite=True
+                )
 
         hotstart = config.hotstart(
             coldstart,
@@ -78,8 +78,11 @@ class ModelConfigurationTestCase(unittest.TestCase):
         if shutil.which('_pschism_TVD-VL') is not None:
             hotstart.run('/tmp/test/hotstart', overwrite=True)
         else:
-            htmpdir = tempfile.TemporaryDirectory()
-            hotstart.write(htmpdir.name)
+            # htmpdir = tempfile.TemporaryDirectory()
+            hotstart.write(
+                # htmpdir.name
+                '/tmp/test/hotstart', overwrite=True
+                )
 
 
 if __name__ == '__main__':

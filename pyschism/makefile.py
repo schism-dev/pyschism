@@ -87,11 +87,13 @@ default: symlinks
             ])
 
         return '\n'.join([line.replace("    ", "\t") for line in f]) + r"""
+    rm -rf outputs/mirror.out outputs/fatal.error;\
     touch outputs/mirror.out outputs/fatal.error;\
     eval 'tail -f outputs/mirror.out  outputs/fatal.error &';\
     tail_pid=$${!};\
     ${MPI_LAUNCHER} ${NPROC} ${SCHISM_BINARY};\
-    kill "$${tail_pid}"
+    kill "$${tail_pid}";\
+    exit $${?}
 """
 
 

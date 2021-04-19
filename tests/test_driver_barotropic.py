@@ -37,7 +37,7 @@ class ModelConfigurationTestCase(unittest.TestCase):
                 tar.extractall(data_directory / "GulfStreamDevel")
         self.hgrid = hgrid
 
-    def test_basic_config(self):
+    def _test_basic_config(self):
 
         config = ModelConfig(
             Hgrid.open(self.hgrid, crs='epsg:4326'),
@@ -85,6 +85,63 @@ class ModelConfigurationTestCase(unittest.TestCase):
         else:
             htmpdir = tempfile.TemporaryDirectory()
             hotstart.write(htmpdir.name)
+
+    def test_basic_config_passive_ts(self):
+        # WIP: ibc=1, ibtp=1
+        from pyschism.forcing.baroclinic import RTOFS
+        config = ModelConfig(
+            Hgrid.open(self.hgrid, crs='epsg:4326'),
+            tides=Tides(),
+            atmosphere=NWS2(GFS()),
+            baroclinic=RTOFS(),
+            hydrology=NWM(),
+        )
+
+        # create reference dates
+        nearest_cycle = dates.nearest_cycle()
+        spinup_time = timedelta(days=1)
+
+        # create a coldstart object
+        coldstart = config.coldstart(
+            start_date=nearest_cycle - spinup_time,
+            end_date=nearest_cycle,
+            timestep=300.,
+            dramp=spinup_time,
+            dramp_ss=spinup_time,
+            drampwind=spinup_time,
+            nspool=timedelta(hours=1),
+            elev=True,
+            dahv=True,
+        )
+
+        # optionally run or write the coldstart object
+        if shutil.which('_pschism_TVD-VL') is not None:
+            coldstart.run('/tmp/test/coldstart', overwrite=True)
+
+        else:
+            # ctmpdir = tempfile.TemporaryDirectory()
+            coldstart.write(
+                # ctmpdir.name
+                '/tmp/test/coldstart', overwrite=True
+                )
+
+        hotstart = config.hotstart(
+            coldstart,
+            end_date=timedelta(days=1),
+            timestep=300.,
+            nspool=timedelta(hours=1),
+            elev=True,
+            dahv=True,
+        )
+
+        if shutil.which('_pschism_TVD-VL') is not None:
+            hotstart.run('/tmp/test/hotstart', overwrite=True)
+        else:
+            # htmpdir = tempfile.TemporaryDirectory()
+            hotstart.write(
+                # htmpdir.name
+                '/tmp/test/hotstart', overwrite=True
+                )
 
 
 if __name__ == '__main__':
