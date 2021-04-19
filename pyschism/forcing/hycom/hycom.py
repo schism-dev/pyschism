@@ -7,6 +7,8 @@ import tempfile
 import subprocess
 import shutil
 from typing import Union
+from numba import jit, prange
+from time import time
 
 from netCDF4 import Dataset
 from matplotlib.transforms import Bbox
@@ -24,13 +26,31 @@ class Nudge:
     """
 
     def __init__(self):
-
+  
         pass
 
     def gen_nudge(self, outdir: Union[str, os.PathLike], hgrid):
+
+        @jit(nopython=True, parallel=True)
+        def compute_nudge(lon, lat, nnode, opbd2, out):
+
+            for idn in prange(nnode):
+                if idn in opbd2:
+                    rnu = rnu_max
+                    distmin = 0.
+                else:
+                    distmin = np.finfo(np.float64).max
+                    for j in opbd2:
+                        tmp = np.square(lon[idn]-lon[j-1]) + np.square(lat[idn]-lat[j-1])
+                        rl2 = np.sqrt(tmp)
+                        if rl2 < distmin:
+                            distmin=rl2
+                rnu = 0.
+                if distmin <= rlmax:
+                    rnu = (1-distmin/rlmax)*rnu_max
+                out[idn] = rnu
         
         #self.hgrid = hgrid
-
         outdir = pathlib.Path(outdir)
 
         hgrid = hgrid.to_dict()
@@ -45,43 +65,63 @@ class Nudge:
 
         bnd = hgrid['boundaries']
         opbd = bnd[None][0]['indexes']
+        opbd2 = []
+        for idn in opbd:
+            opbd2.append(int(idn))
 
         #Max relax distance in degr
         rlmax = 1.5
         #Max relax strength in days
         rnu_day = 0.25
-
         rnu = 0
         rnu_max = 1./rnu_day/86400.
-        out = [f"{rlmax}, {rnu_day}"]
-        out.extend("\n")
-        out.append(f"{NE} {NP}")
-        out.extend("\n")
-        print(f'Max relax distnce is {rlmax}')
+
+        out = np.zeros([NP])
+        t0 = time()
+        compute_nudge(lon, lat, NP, opbd2, out)
+        print(f'It took {time() -t0}')
+
+        nudge = [f"{rlmax}, {rnu_day}"]
+        nudge.extend("\n")
+        nudge.append(f"{NE} {NP}")
+        nudge.extend("\n")
         for idn, (coords, values) in nodes.items():
-            if idn in opbd:
-                rnu = rnu_max
-                distmin = 0.
-            else:
-                distmin = np.finfo(np.float64).max
-                for j in opbd:
-                    tmp = np.square(lon[int(idn)-1]-lon[int(j)-1]) +  \
-                        np.square(lat[int(idn)-1]-lat[int(j)-1])
-                    rl2 = np.sqrt(tmp)
-                    if rl2 < distmin:
-                        distmin=rl2
-            rnu = 0.
-            if distmin <= rlmax:
-                rnu = (1-distmin/rlmax)*rnu_max
-            print(f'node id is {idn}')
             line = [f"{idn}"]
             line.extend([f"{x:<.7e}" for x in coords])
-            line.extend([f"{rnu:<.7e}"])
+            line.extend([f"{out[int(idn)-1]:<.7e}"])
             line.extend("\n")
-            out.append(" ".join(line))
+            nudge.append(" ".join(line))
 
-            with open(outdir / 'TEM_nudge.gr3','w+') as fid:
-                fid.writelines(out)
+        for id, element in elements.items():
+            line = [f"{id}"]
+            line.append(f"{len(element)}")
+            line.extend([f"{e}" for e in element])
+            line.extend("\n")
+            nudge.append(" ".join(line))
+
+        with open(outdir / 'nudge_pyschism.gr3','w+') as fid:
+            fid.writelines(nudge)
+
+#        @staticmethod
+#        @jit(nopython=True, parallel=True) 
+#        def compute_nudge(lon, lat, nnode, opbd2, out):
+#
+#            for idn in prange(nnode):
+#                if idn in opbd2:
+#                    rnu = rnu_max
+#                    distmin = 0.
+#                else:
+#                    distmin = np.finfo(np.float64).max
+#                    for j in opbd2:
+#                        tmp = np.square(lon[idn]-lon[j-1]) + np.square(lat[idn]-lat[j-1])
+#                        rl2 = np.sqrt(tmp)
+#                        if rl2 < distmin:
+#                            distmin=rl2
+#                rnu = 0.
+#                if distmin <= rlmax:
+#                    rnu = (1-distmin/rlmax)*rnu_max
+#                out[idn] = rnu
+
 
 class HotStartInventory():
 
@@ -90,6 +130,10 @@ class HotStartInventory():
         pass
 
     logger.info('Fetching RTOFS data')
+    '''
+    The tmpdir is not enough for saving executed files, which will
+    cause segmentation fault.
+    '''
 
     def fetch_data(self, outdir: Union[str, os.PathLike], hgrid, start_date):
 
@@ -97,9 +141,9 @@ class HotStartInventory():
         self.start_date = start_date
 
         outdir = pathlib.Path(outdir)
-        #if outdir.name != '':
-        #    outdir /= 'hotstart'
-        #outdir.mkdir(exist_ok=True)
+        if outdir.name != '':
+            outdir /= 'hotstart'
+        outdir.mkdir(exist_ok=True)
 
         _tmpdir = tempfile.TemporaryDirectory()
         tmpdir = pathlib.Path(_tmpdir.name)
@@ -136,7 +180,7 @@ class HotStartInventory():
                 xlon[ilon] = xlon[ilon] - 360.
         ylat = lat[lat_idxs]
 
-        with Dataset(tmpdir / 'SSH_1.nc', 'w', format='NETCDF3_CLASSIC') as dst:
+        with Dataset(outdir / 'SSH_1.nc', 'w', format='NETCDF3_CLASSIC') as dst:
             dst.setncatts({"Conventions": "cf-1.0"})
             #dimensions
             dst.createDimension('xlon', xlon.shape[0])
@@ -168,7 +212,7 @@ class HotStartInventory():
             dst['surf_el'].scale_factor = 0.001
             dst['surf_el'][:,:,:] = nc_ssh['ssh'][8:9,0,lat_idxs,lon_idxs]
 
-        with Dataset(tmpdir / 'TS_1.nc', 'w', format='NETCDF3_CLASSIC') as dst: 
+        with Dataset(outdir / 'TS_1.nc', 'w', format='NETCDF3_CLASSIC') as dst: 
             dst.setncatts({"Conventions": "cf-1.0"})
             #dimensions
             dst.createDimension('xlon', xlon.shape[0])
@@ -214,7 +258,7 @@ class HotStartInventory():
                 dst['salinity'][:,k,:,:] = nc_salt['salinity'][1:2,k,lat_idxs,lon_idxs]
                 dst['temperature'][:,k,:,:] = nc_temp['temperature'][1:2,k,lat_idxs,lon_idxs]
 
-        with Dataset(tmpdir / 'UV_1.nc', 'w', format='NETCDF3_CLASSIC') as dst:
+        with Dataset(outdir / 'UV_1.nc', 'w', format='NETCDF3_CLASSIC') as dst:
             dst.setncatts({"Conventions": "cf-1.0"})
             #dimensions
             dst.createDimension('xlon', xlon.shape[0])
@@ -261,20 +305,20 @@ class HotStartInventory():
                 dst['water_v'][:,k,:,:] = nc_vvel['v'][1:2,k,lat_idxs,lon_idxs]
 
        #symlink estaury.gr3 and *.in file 
-        hgrid.write(tmpdir / 'hgrid.gr3')
-        hgrid.write(tmpdir / 'hgrid.ll')
+        hgrid.write(outdir / 'hgrid.gr3')
+        hgrid.write(outdir / 'hgrid.ll')
         src = '/sciclone/data10/lcui01/ICOGS3D_dep/estuary.gr3'
-        dst = tmpdir / 'estuary.gr3'
+        dst = outdir / 'estuary.gr3'
         os.symlink(src, dst)
         src2 = '/sciclone/data10/lcui01/ICOGS3D_dep/gen_hot_3Dth_from_nc.in'
-        dst2 = tmpdir / 'gen_hot_3Dth_from_nc.in'
+        dst2 = outdir / 'gen_hot_3Dth_from_nc.in'
         os.symlink(src2, dst2)
         src3 = '/sciclone/data10/lcui01/ICOGS3D_dep/vgrid.in'
-        dst3 = tmpdir / 'vgrid.in'
+        dst3 = outdir / 'vgrid.in'
         os.symlink(src3, dst3)
         cmd = 'gen_hot_3Dth_from_hycom.exe < gen_hot_3Dth_from_nc.in'
-        subprocess.check_call(cmd, shell=True, cwd=tmpdir)
-        shutil.copy2(tmpdir /'hotstart.nc', outdir / 'hotstart.nc')
+        subprocess.check_call(cmd, shell=True, cwd=outdir)
+       # shutil.move(outdir / 'hotstart.nc')
 
 class OpenBoundaryInventory():
 
@@ -288,9 +332,9 @@ class OpenBoundaryInventory():
         self.rnday = rnday
 
         outdir = pathlib.Path(outdir)
-        #if outdir.name != '':
-        #    outdir /= '3Dth'
-        #outdir.mkdir(exist_ok=True)
+        if outdir.name != '':
+            outdir /= '3Dth'
+        outdir.mkdir(exist_ok=True)
 
         _tmpdir = tempfile.TemporaryDirectory()
         tmpdir = pathlib.Path(_tmpdir.name)
@@ -318,7 +362,13 @@ class OpenBoundaryInventory():
                 xlon[ilon] = xlon[ilon] - 360.
         ylat = lat[jdx_min:jdx_max+1]
 
-        with Dataset(tmpdir / 'SSH_1.nc', 'w', format='NETCDF3_CLASSIC') as dst:
+        #xlon = lon[idx_min:idx_max+1]
+        #for ilon in range(xlon.size):
+        #    if xlon[ilon] > 180.:
+        #        xlon[ilon] = xlon[ilon] - 360.
+        #ylat = lat[jdx_min:jdx_max+1]
+
+        with Dataset(outdir / 'SSH_1.nc', 'w', format='NETCDF3_64BIT_OFFSET') as dst:
             dst.setncatts({"Conventions": "cf-1.0"})
             #dimensions
             dst.createDimension('xlon', xlon.shape[0])
@@ -351,7 +401,7 @@ class OpenBoundaryInventory():
             ssh = nc_ssh['ssh'][8:8*(rnday+1)+1:8,0,jdx_min:jdx_max+1,idx_min:idx_max+1]
             dst['surf_el'][:,:,:] = ssh
 
-        with Dataset(tmpdir / 'TS_1.nc', 'w', format='NETCDF3_CLASSIC') as dst:
+        with Dataset(outdir / 'TS_1.nc', 'w', format='NETCDF3_64BIT_OFFSET') as dst:
             dst.setncatts({"Conventions": "cf-1.0"})
             #dimensions
             dst.createDimension('xlon', xlon.shape[0])
@@ -397,7 +447,7 @@ class OpenBoundaryInventory():
             sst = nc_temp['temperature'][1:rnday+2,:,jdx_min:jdx_max+1,idx_min:idx_max+1]
             dst['temperature'][:,:,:,:] = sst
 
-        with Dataset(tmpdir / 'UV_1.nc', 'w', format='NETCDF3_CLASSIC') as dst:
+        with Dataset(outdir / 'UV_1.nc', 'w', format='NETCDF3_64BIT_OFFSET') as dst:
             dst.setncatts({"Conventions": "cf-1.0"})
             #dimensions
             dst.createDimension('xlon', xlon.shape[0])
@@ -444,28 +494,26 @@ class OpenBoundaryInventory():
             dst['water_v'][:,:,:,:] = vvel
 
         #symlink estaury.gr3 and *.in file 
-        hgrid.write(tmpdir / 'hgrid.gr3')
-        hgrid.write(tmpdir / 'hgrid.ll')
+        hgrid.write(outdir / 'hgrid.gr3')
+        hgrid.write(outdir / 'hgrid.ll')
         src = '/sciclone/data10/lcui01/ICOGS3D_dep/estuary.gr3'
-        dst = tmpdir / 'estuary.gr3'
+        dst = outdir / 'estuary.gr3'
         os.symlink(src, dst)
         src2 = '/sciclone/data10/lcui01/ICOGS3D_dep/gen_hot_3Dth_from_nc.in'
-        dst2 = tmpdir / 'gen_hot_3Dth_from_nc.in'
+        dst2 = outdir / 'gen_hot_3Dth_from_nc.in'
         os.symlink(src2, dst2)
         src3 = '/sciclone/data10/lcui01/ICOGS3D_dep/vgrid.in'
-        dst3 = tmpdir / 'vgrid.in'
+        dst3 = outdir / 'vgrid.in'
         os.symlink(src3, dst3)
         cmd = 'gen_hot_3Dth_from_hycom.exe < gen_hot_3Dth_from_nc.in'
-        subprocess.check_call(cmd, shell=True, cwd=tmpdir)
-        #shutil.copy2(tmpdir /'*.th.nc', outdir)
-        shutil.copy2(tmpdir /'elev2D.th.nc', outdir / 'elev2D.th.nc')
-        shutil.copy2(tmpdir /'SAL_3D.th.nc', outdir / 'SAL_3D.th.nc')
-        shutil.copy2(tmpdir /'TEM_3D.th.nc', outdir / 'TEM_3D.th.nc')
-        shutil.copy2(tmpdir /'uv3D.th.nc', outdir / 'uv3D.th.nc')
+        subprocess.check_call(cmd, shell=True, cwd=outdir)
+        #shutil.move(tmpdir /'elev2D.th.nc', outdir / 'elev2D.th.nc')
+        #shutil.move(tmpdir /'SAL_3D.th.nc', outdir / 'SAL_3D.th.nc')
+        #shutil.move(tmpdir /'TEM_3D.th.nc', outdir / 'TEM_3D.th.nc')
+        #shutil.move(tmpdir /'uv3D.th.nc', outdir / 'uv3D.th.nc')
 
         #Generate nudging input
-        subprocess.check_call(['gen_nudge2'], cwd=tmpdir)
-        #cmd = 'gen_nudge_from_hycom < gen_hot_3Dth_from_nc.in'
+        subprocess.check_call(['gen_nudge2'], cwd=outdir)
         subprocess.check_call(['gen_nudge_from_hycom'], cwd=tmpdir)
-        shutil.copy2(tmpdir /'SAL_nu.nc', outdir)
-        shutil.copy2(tmpdir /'TEM_nu.nc', outdir)
+        #shutil.move(tmpdir /'SAL_nu.nc', outdir)
+        #shutil.move(tmpdir /'TEM_nu.nc', outdir)
