@@ -248,6 +248,17 @@ class Elements:
         return self._triangles
 
     @property
+    def tri_idxs(self):
+        if not hasattr(self, '_tri_idxs'):
+            tri_idxs = np.full(len(self.elements), -99, dtype=int)
+            for i, element in enumerate(self.elements.values()):
+                if len(element) == 3:
+                    tri_idxs[i] = i
+            new_arr = np.delete(tri_idxs, np.where(tri_idxs == -99))
+            self._tri_idxs = new_arr
+        return self._tri_idxs 
+
+    @property
     def quadrilaterals(self):
         return self.quads
 
@@ -259,6 +270,17 @@ class Elements:
                  for element in self.elements.values()
                  if len(element) == 4])
         return self._quads
+
+    @property
+    def qua_idxs(self):
+        if not hasattr(self, '_qua_idxs'):
+            qua_idxs = np.full(len(self.elements), -99, dtype=int)
+            for i, element in enumerate(self.elements.values()):
+                if len(element) == 4:
+                    qua_idxs[i] = i
+            new_arr = np.delete(qua_idxs, np.where(qua_idxs == -99))
+            self._qua_idxs = new_arr
+        return self._qua_idxs   
 
     @property
     def side(self):
