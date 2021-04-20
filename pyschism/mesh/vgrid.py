@@ -5,6 +5,8 @@ import tempfile
 import shutil
 from typing import Union
 
+import numpy as np
+
 from pyschism.mesh.hgrid import Hgrid
 
 
@@ -36,6 +38,52 @@ class Vgrid:
     @staticmethod
     def open(path):
         raise NotImplementedError('Vgrid.open()')
+
+    '''
+    read_vgrid is based on:
+    https://github.com/wzhengui/pylibs/blob/master/Utility/schism_file.py
+    '''
+    @staticmethod
+    def read_vgrid(fname):
+        fid=open(fname, 'r')
+        lines=fid.readlines()
+        fid.close()
+
+        ivcor=int(lines[0].strip().split()[0])
+        nvrt=int(lines[1].strip().split()[0])
+
+        if ivcor == 1:
+            lines=lines[2:]
+            kbp=np.array([int(i.split()[1])-1 for i in lines])
+            NP=len(kbp)
+            print(NP)
+            sigma=-np.ones([NP,nvrt])
+            for i, line in enumerate(lines):
+                sigma[i,kbp[i]:]=np.array(line.strip().split()[2:]).astype('float')
+        elif ivcor == 2:
+            kz, h_s=lines[1].strip().split()[1:3]
+            kz=int(kz)
+            h_s=float(kz)
+            
+            #read z grid
+            ztot=[]
+            irec=2
+            for i in np.arange(kz):
+                irec=irec+1
+                ztot.append(lines[irec].strip().split()[1])
+            ztot=np.array(ztot).astype('float')
+
+            #read s grid
+            sigma=[]
+            irec=irec+2
+            nsigma=nvrt-kz+1
+            h_c, theta_b, theta_f=np.array(lines[irec].strip().split()[:3]).astype('float')
+            for i in np.arange(nsigma):
+                irec=irec+1
+                sigma.append(lines[irec].strip().split()[1])
+            sigma=np.array(sigma).astype('float')
+
+        return sigma
 
     def __str__(self):
         return self._vgrid
