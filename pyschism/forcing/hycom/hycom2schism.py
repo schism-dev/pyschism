@@ -203,7 +203,7 @@ class HotStartInventory():
                 '''
                 print('**** Accessing GOFS data*****') 
                 base_url='https://tds.hycom.org/thredds/dodsC/GLBy0.08/expt_93.0/FMRC/runs/GLBy0.08_930_FMRC_RUN_'
-                nc=Dataset(f'{baseurl_gofs}'
+                nc=Dataset(f'{base_url}'
                     f'{date.strftime("%Y-%m-%dT12:00:00Z")}/')
                 lon=nc['lon'][:]
                 lat=nc['lat'][:]
