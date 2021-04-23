@@ -597,70 +597,70 @@ class OpenBoundaryInventory():
             print(f'Interpolation takes {time()-t0} seconds')
 
             #Write to files
-            t0=time()
+        t0=time()
 
-            with Dataset(outdir / 'SAL_3D.th.nc', 'w', format='NETCDF4') as dst:
+        with Dataset(outdir / 'SAL_3D.th.nc', 'w', format='NETCDF4') as dst:
+        #dimensions
+            dst.createDimension('nOpenBndNodes', NOP)
+            dst.createDimension('one', one)
+            dst.createDimension('time', None)
+            dst.createDimension('nLevels', nvrt)
+            dst.createDimension('nComponents', nComp1)
+        #variables
+            dst.createVariable('time_step', 'f', ('one',))
+            dst['time_step'][:] = 86400
+
+            dst.createVariable('time', 'f', ('time',))
+            dst['time'][:] = ndt
+
+            dst.createVariable('time_series', 'f', ('time', 'nOpenBndNodes', 'nLevels', 'nComponents'))
+            dst['time_series'][:,:,:,:] = timeseries_s
+
+        with Dataset(outdir / 'TEM_3D.th.nc', 'w', format='NETCDF4') as dst:
             #dimensions
-                dst.createDimension('nOpenBndNodes', NOP)
-                dst.createDimension('one', one)
-                dst.createDimension('time', None)
-                dst.createDimension('nLevels', nvrt)
-                dst.createDimension('nComponents', nComp1)
+            dst.createDimension('nOpenBndNodes', NOP)
+            dst.createDimension('one', one)
+            dst.createDimension('time', None)
+            dst.createDimension('nLevels', nvrt)
+            dst.createDimension('nComponents', nComp1)
             #variables
-                dst.createVariable('time_step', 'f', ('one',))
-                dst['time_step'][:] = 86400
+            dst.createVariable('time_step', 'f', ('one',))
+            dst['time_step'][:] = 86400
 
-                dst.createVariable('time', 'f', ('time',))
-                dst['time'][:] = ndt
+            dst.createVariable('time', 'f', ('time',))
+            dst['time'][:] = ndt
 
-                dst.createVariable('time_series', 'f', ('time', 'nOpenBndNodes', 'nLevels', 'nComponents'))
-                dst['time_series'][:,:,:,:] = timeseries_s
+        with Dataset(outdir / 'uv3D.th.nc', 'w', format='NETCDF4') as dst:
+            #dimensions
+            dst.createDimension('nOpenBndNodes', NOP)
+            dst.createDimension('one', one)
+            dst.createDimension('time', None)
+            dst.createDimension('nLevels', nvrt)
+            dst.createDimension('nComponents', nComp2)
+            #variables
+            dst.createVariable('time_step', 'f', ('one',))
+            dst['time_step'][:] = 86400
 
-            with Dataset(outdir / 'TEM_3D.th.nc', 'w', format='NETCDF4') as dst:
-                #dimensions
-                dst.createDimension('nOpenBndNodes', NOP)
-                dst.createDimension('one', one)
-                dst.createDimension('time', None)
-                dst.createDimension('nLevels', nvrt)
-                dst.createDimension('nComponents', nComp1)
-                #variables
-                dst.createVariable('time_step', 'f', ('one',))
-                dst['time_step'][:] = 86400
+            dst.createVariable('time', 'f', ('time',))
+            dst['time'][:] = ndt
+            
+            dst.createVariable('time_series', 'f', ('time', 'nOpenBndNodes', 'nLevels', 'nComponents'))
+            dst['time_series'][:,:,:,:] = timeseries_uv
 
-                dst.createVariable('time', 'f', ('time',))
-                dst['time'][:] = ndt
+        with Dataset(outdir / 'elev2D.th.nc', 'w', format='NETCDF4') as dst:
+            #dimensions
+            dst.createDimension('nOpenBndNodes', NOP)
+            dst.createDimension('one', one)
+            dst.createDimension('time', None)
+            dst.createDimension('nComponents', nComp1)
+            #variables
+            dst.createVariable('time_step', 'f', ('one',))
+            dst['time_step'][:] = 86400
 
-            with Dataset(outdir / 'uv3D.th.nc', 'w', format='NETCDF4') as dst:
-                #dimensions
-                dst.createDimension('nOpenBndNodes', NOP)
-                dst.createDimension('one', one)
-                dst.createDimension('time', None)
-                dst.createDimension('nLevels', nvrt)
-                dst.createDimension('nComponents', nComp2)
-                #variables
-                dst.createVariable('time_step', 'f', ('one',))
-                dst['time_step'][:] = 86400
+            dst.createVariable('time', 'f', ('time',))
+            dst['time'][:] = ndt
 
-                dst.createVariable('time', 'f', ('time',))
-                dst['time'][:] = ndt
-                
-                dst.createVariable('time_series', 'f', ('time', 'nOpenBndNodes', 'nLevels', 'nComponents'))
-                dst['time_series'][:,:,:,:] = timeseries_uv
+            dst.createVariable('time_series', 'f', ('time', 'nOpenBndNodes', 'nComponents'))
+            dst['time_series'][:,:,:] = timeseries_el
 
-            with Dataset(outdir / 'elev2D.th.nc', 'w', format='NETCDF4') as dst:
-                #dimensions
-                dst.createDimension('nOpenBndNodes', NOP)
-                dst.createDimension('one', one)
-                dst.createDimension('time', None)
-                dst.createDimension('nComponents', nComp1)
-                #variables
-                dst.createVariable('time_step', 'f', ('one',))
-                dst['time_step'][:] = 86400
-
-                dst.createVariable('time', 'f', ('time',))
-                dst['time'][:] = ndt
-
-                dst.createVariable('time_series', 'f', ('time', 'nOpenBndNodes', 'nComponents'))
-                dst['time_series'][:,:,:] = timeseries_el
-
-            print(f'Writing hotstart.nc takes {time()-t0} seconds')
+        print(f'Writing hotstart.nc takes {time()-t0} seconds')
