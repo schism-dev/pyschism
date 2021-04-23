@@ -652,7 +652,7 @@ class OpenBoundaryInventory():
                 dst.createDimension('nOpenBndNodes', NOP)
                 dst.createDimension('one', one)
                 dst.createDimension('time', None)
-                dst.createDimension('nComponents', nComponents)
+                dst.createDimension('nComponents', nComp1)
                 #variables
                 dst.createVariable('time_step', 'f', ('one',))
                 dst['time_step'][:] = 86400

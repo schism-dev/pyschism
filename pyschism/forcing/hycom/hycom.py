@@ -102,27 +102,6 @@ class Nudge:
         with open(outdir / 'nudge_pyschism.gr3','w+') as fid:
             fid.writelines(nudge)
 
-#        @staticmethod
-#        @jit(nopython=True, parallel=True) 
-#        def compute_nudge(lon, lat, nnode, opbd2, out):
-#
-#            for idn in prange(nnode):
-#                if idn in opbd2:
-#                    rnu = rnu_max
-#                    distmin = 0.
-#                else:
-#                    distmin = np.finfo(np.float64).max
-#                    for j in opbd2:
-#                        tmp = np.square(lon[idn]-lon[j-1]) + np.square(lat[idn]-lat[j-1])
-#                        rl2 = np.sqrt(tmp)
-#                        if rl2 < distmin:
-#                            distmin=rl2
-#                rnu = 0.
-#                if distmin <= rlmax:
-#                    rnu = (1-distmin/rlmax)*rnu_max
-#                out[idn] = rnu
-
-
 class HotStartInventory():
 
     def __init__(self):
