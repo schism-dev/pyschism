@@ -25,13 +25,14 @@ logger = logging.getLogger(__name__)
 class Nudge:
 
     def __init__(self):
+
+        self.include = None
   
-        pass
 
     def gen_nudge(self, outdir: Union[str, os.PathLike], hgrid):
 
         @jit(nopython=True, parallel=True)
-        def compute_nudge(lon, lat, nnode, opbd2, out):
+        def compute_nudge(lon, lat, nnode, opbd2, idxs_nudge, out):
 
             for idn in prange(nnode):
                 if idn in opbd2:
@@ -47,6 +48,7 @@ class Nudge:
                 rnu = 0.
                 if distmin <= rlmax:
                     rnu = (1-distmin/rlmax)*rnu_max
+                    idxs_nudge[idn]=idn
                 out[idn] = rnu
         
         #self.hgrid = hgrid
@@ -76,9 +78,13 @@ class Nudge:
         rnu_max = 1./rnu_day/86400.
 
         out = np.zeros([NP])
+        idxs_nudge=np.full(NP, -99, dtype=int)
         t0 = time()
-        compute_nudge(lon, lat, NP, opbd2, out)
-        print(f'It took {time() -t0}')
+        compute_nudge(lon, lat, NP, opbd2, idxs_nudge, out)
+        print(f'It took {time() -t0} sencods')
+
+        idxs_nudge=np.delete(idxs_nudge, np.where(idxs_nudge == -99))
+        self.include=idxs_nudge
 
         nudge = [f"{rlmax}, {rnu_day}"]
         nudge.extend("\n")
@@ -98,8 +104,212 @@ class Nudge:
             line.extend("\n")
             nudge.append(" ".join(line))
 
-        with open(outdir / 'nudge_pyschism.gr3','w+') as fid:
+        with open(outdir / 'TEM_nudge.gr3','w+') as fid:
             fid.writelines(nudge)
+
+        shutil.copy2(outdir / 'TEM_nudge.gr3', outdir / 'SAL_nudge.gr3')
+ 
+        return self.include
+
+    def fetch_data(self, outdir: Union[str, os.PathLike], hgrid, vgrid, start_date, rnday):
+
+        outdir = pathlib.Path(outdir)
+
+        self.start_date = start_date
+        self.rnday=rnday
+        date = self.start_date - timedelta(days=1)
+
+        vd=Vgrid()
+        sigma=vd.read_vgrid(vgrid)
+
+        #Get the index for nudge
+        include = self.gen_nudge(outdir,hgrid)
+        print(include)
+
+        hgrid=hgrid.to_dict()
+        nodes=Nodes(hgrid['nodes'])
+        #get coords of SCHISM
+        loni=nodes.coords[:,0]
+        lati=nodes.coords[:,1]
+
+        #get bathymetry
+        depth=nodes.values
+        idxs=np.where(depth < 0.11)
+        depth[idxs]=0.11
+        #compute zcor
+        zcor=depth[:,None]*sigma
+        nvrt=zcor.shape[1]
+
+        loni=np.array(loni)
+        lati=np.array(lati)
+
+        nlon=loni[include] 
+        nlat=lati[include]
+        zcor2=zcor[include,:]
+
+
+        xmin, xmax = np.min(nlon), np.max(nlon)
+        ymin, ymax = np.min(nlat), np.max(nlat)
+
+        xmin = xmin + 360. if xmin < 0 else xmin
+        xmax = xmax + 360. if xmax < 0 else xmax
+        bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
+
+        #construct schism grid
+        lon2i=np.tile(nlon,[nvrt,1]).T
+        lat2i=np.tile(nlat,[nvrt,1]).T
+        bxyz=np.c_[zcor2.reshape(np.size(zcor2)),lat2i.reshape(np.size(lat2i)),lon2i.reshape(np.size(lon2i))]
+        print('Computing SCHISM zcor is done!')
+
+        #Get hycom data
+        baseurl_rtofs='http://nomads.ncep.noaa.gov:80/dods/rtofs/rtofs_global'
+        baseurl_gofs='https://tds.hycom.org/thredds/dodsC/GLBy0.08/expt_93.0/FMRC/runs/GLBy0.08_930_FMRC_RUN_'
+
+        planA=False
+        planB=True
+        planC=False
+
+        #Plan A: ROTFS 
+        if planA:
+            try:
+                print('**** Accessing RTOFS data*****')
+                nc_salt=Dataset(f'{baseurl_rtofs}'
+                    f'{date.strftime("%Y%m%d")}/rtofs_glo_3dz_nowcast_daily_salt')
+                nc_temp=Dataset(f'{baseurl_rtofs}'
+                    f'{date.strftime("%Y%m%d")}/rtofs_glo_3dz_nowcast_daily_temp')
+                lon=nc_salt['lon'][:]
+                lat=nc_salt['lat'][:]
+                dep=nc_salt['lev'][:]
+
+                lat_idxs=np.where((lat>=bbox.ymin) & (lat<=bbox.ymax))[0]
+                lon_idxs=np.where((lon>=bbox.xmin-2.0) & (lon<=bbox.xmax+2.0))[0]
+
+                salt=nc_salt['salinity'][1:7,:,lat_idxs,lon_idxs]
+                temp=nc_temp['temperature'][1:7,:,lat_idxs,lon_idxs]
+
+            except Exception as e:
+                print(e)
+                planB = True
+
+        if planB:
+            try:
+                print('**** Accessing GOFS data*****')
+                nc=Dataset(f'{baseurl_gofs}'
+                    f'{date.strftime("%Y-%m-%dT12:00:00Z")}')
+                lon=nc['lon'][:]
+                lat=nc['lat'][:]
+                dep=nc['depth'][:]
+
+                lat_idxs=np.where((lat>=bbox.ymin)&(lat<=bbox.ymax))[0]
+                lon_idxs=np.where((lon>=bbox.xmin-2.0) & (lon<=bbox.xmax+2.0))[0]
+
+                salt=nc['salinity'][4::8,:,lat_idxs,lon_idxs]
+                temp=nc['water_temp'][4::8,:,lat_idxs,lon_idxs]
+
+            except Exception as e:
+                print(e)
+                planC=True
+
+        if planC:
+            try:
+                print('**** Accessing GOFS best time series dataset*****')
+                nc=Dataset('https://tds.hycom.org/thredds/dodsC/GLBy0.08/expt_93.0/FMRC/GLBy0.08_930_FMRC_best.ncd')
+                lon=nc['lon'][:]
+                lat=nc['lat'][:]
+                dep=nc['depth'][:]
+
+                lat_idxs=np.where((lat>=bbox.ymin)&(lat<=bbox.ymax))[0]
+                lon_idxs=np.where((lon>=bbox.xmin-2.0) & (lon<=bbox.xmax+2.0))[0]
+
+                salt=nc['salinity'][4::8,:,lat_idxs,lon_idxs]
+                temp=nc['water_temp'][4::8,:,lat_idxs,lon_idxs]
+
+            except Exception as e:
+                print(e)
+
+        print('****Interpolation starts****')
+        #Interpolate HYCOM to SCHISM
+        lon=lon[lon_idxs]
+        for ilon in range(lon_idxs.size):
+            if lon[ilon] > 180:
+                lon[ilon] = lon[ilon]-360.
+        lat=lat[lat_idxs]
+
+        #change missing value to nan
+        idxs = np.where(salt > 30000)
+        salt[idxs]=float('nan')
+        idxs = np.where(temp > 30000)
+        temp[idxs]=float('nan')
+
+        nNode=len(include) 
+        one=1
+        ntimes=self.rnday+1
+
+        timeseries_s=np.zeros([ntimes,nNode,nvrt,one])
+        timeseries_t=np.zeros([ntimes,nNode,nvrt,one])
+        ndt=np.zeros([ntimes])
+        t0 = time()
+
+        for it in np.arange(ntimes):
+            ndt[it]=it*24*3600.
+            #salt
+            salt_fd=sp.interpolate.RegularGridInterpolator((dep,lat,lon),np.squeeze(salt[it,:,:,:]),'nearest', bounds_error=False, fill_value = float('nan'))
+            salt_int = salt_fd(bxyz)
+            idxs = np.isnan(salt_int)
+            if np.sum(idxs)!=0:
+                salt_int[idxs]=sp.interpolate.griddata(bxyz[~idxs,:], salt_int[~idxs], bxyz[idxs,:],'nearest')
+            idxs = np.isnan(salt_int)
+            if np.sum(idxs)!=0:
+                print(f'There is still missing value for salinity!')
+                sys.exit()
+            salt_int = salt_int.reshape(zcor2.shape)
+            timeseries_s[it,:,:,0]=salt_int
+
+            #temp
+            temp_fd=sp.interpolate.RegularGridInterpolator((dep,lat,lon),np.squeeze(temp[it,:,:,:]),'nearest', bounds_error=False, fill_value = float('nan'))
+            temp_int = temp_fd(bxyz)
+            idxs = np.isnan(temp_int)
+            if np.sum(idxs)!=0:
+                temp_int[idxs]=sp.interpolate.griddata(bxyz[~idxs,:], temp_int[~idxs], bxyz[idxs,:],'nearest')
+            idxs = np.isnan(temp_int)
+            if np.sum(idxs)!=0:
+                print(f'There is still missing value for temperature!')
+                sys.exit()
+            temp_int = temp_int.reshape(zcor2.shape)
+            timeseries_t[it,:,:,0]=temp_int
+
+        with Dataset(outdir / 'SAL_nu.nc', 'w', format='NETCDF4') as dst:
+        #dimensions
+            dst.createDimension('node', nNode)
+            dst.createDimension('nLevels', nvrt)
+            dst.createDimension('one', one)
+            dst.createDimension('time', None)
+        #variables
+            dst.createVariable('time', 'f', ('time',))
+            dst['time'][:] = ndt
+
+            dst.createVariable('map_to_global_node', 'f', ('node',))
+            dst['map_to_global_node'][:] = include+1
+
+            dst.createVariable('tracer_concentration', 'f', ('time', 'node', 'nLevels', 'one'))
+            dst['time_series'][:,:,:,:] = timeseries_s
+
+        with Dataset(outdir / 'TEM_nu.nc', 'w', format='NETCDF4') as dst:
+        #dimensions
+            dst.createDimension('node', nNode)
+            dst.createDimension('nLevels', nvrt)
+            dst.createDimension('one', one)
+            dst.createDimension('time', None)
+        #variables
+            dst.createVariable('time', 'f', ('time',))
+            dst['time'][:] = ndt
+
+            dst.createVariable('map_to_global_node', 'f', ('node',))
+            dst['map_to_global_node'][:] = include+1
+
+            dst.createVariable('tracer_concentration', 'f', ('time', 'node', 'nLevels', 'one'))
+            dst['time_series'][:,:,:,:] = timeseries_t
+
 
 class InitialTS():
 
@@ -108,10 +318,6 @@ class InitialTS():
         pass
 
     logger.info('Fetching RTOFS data')
-    '''
-    The tmpdir is not enough for saving executed files, which will
-    cause segmentation fault.
-    '''
 
     def fetch_data(self, outdir: Union[str, os.PathLike], hgrid, vgrid, start_date):
 
@@ -186,7 +392,7 @@ class InitialTS():
                 dep=nc_salt['lev'][:]
 
                 lat_idxs=np.where((lat>=bbox.ymin) & (lat<=bbox.ymax))[0]
-                lon_idxs=np.where((lon>=bbox.xmin-1.0) & (lon<=bbox.xmax+1.0))[0]
+                lon_idxs=np.where((lon>=bbox.xmin-2.0) & (lon<=bbox.xmax+2.0))[0]
 
                 salt=np.squeeze(nc_salt['salinity'][1,:,lat_idxs,lon_idxs])
                 temp=np.squeeze(nc_temp['temperature'][1,:,lat_idxs,lon_idxs])
@@ -210,7 +416,7 @@ class InitialTS():
                 dep=nc['depth'][:]
 
                 lat_idxs=np.where((lat>=bbox.ymin)&(lat<=bbox.ymax))[0]
-                lon_idxs=np.where((lon>=bbox.xmin-1.0) & (lon<=bbox.xmax+1.0))[0]
+                lon_idxs=np.where((lon>=bbox.xmin-2.0) & (lon<=bbox.xmax+2.0))[0]
 
                 salt=np.squeeze(nc['salinity'][4,:,lat_idxs,lon_idxs])
                 temp=np.squeeze(nc['water_temp'][4,:,lat_idxs,lon_idxs])
@@ -463,7 +669,7 @@ class OpenBoundaryInventory():
                 dep=nc['depth'][:]
 
                 lat_idxs=np.where((lat>=bbox.ymin)&(lat<=bbox.ymax))[0]
-                lon_idxs=np.where((lon>=bbox.xmin-1.0) & (lon<=bbox.xmax+1.0))[0]
+                lon_idxs=np.where((lon>=bbox.xmin-2.0) & (lon<=bbox.xmax+2.0))[0]
 
                 salt=nc['salinity'][4::8,:,lat_idxs,lon_idxs]
                 temp=nc['water_temp'][4::8,:,lat_idxs,lon_idxs]
@@ -484,7 +690,7 @@ class OpenBoundaryInventory():
                 dep=nc['depth'][:]
 
                 lat_idxs=np.where((lat>=bbox.ymin)&(lat<=bbox.ymax))[0]
-                lon_idxs=np.where((lon>=bbox.xmin-1.0) & (lon<=bbox.xmax+1.0))[0]
+                lon_idxs=np.where((lon>=bbox.xmin-2.0) & (lon<=bbox.xmax+2.0))[0]
 
                 salt=nc['salinity'][4::8,:,lat_idxs,lon_idxs]
                 temp=nc['water_temp'][4::8,:,lat_idxs,lon_idxs]
@@ -629,6 +835,9 @@ class OpenBoundaryInventory():
 
             dst.createVariable('time', 'f', ('time',))
             dst['time'][:] = ndt
+
+            dst.createVariable('time_series', 'f', ('time', 'nOpenBndNodes', 'nLevels', 'nComponents'))
+            dst['time_series'][:,:,:,:] = timeseries_t
 
         with Dataset(outdir / 'uv3D.th.nc', 'w', format='NETCDF4') as dst:
             #dimensions
