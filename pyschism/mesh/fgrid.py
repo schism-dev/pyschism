@@ -127,15 +127,41 @@ class ManningsN(Fgrid):
 class RoughnessLength(Fgrid):
 
     def __init__(self, *argv, **kwargs):
+        self.dzb_min = 0.5
+        self.dzb_decay = 0.
         super().__init__(NchiType.ROUGHNESS_LENGTH, *argv, **kwargs)
 
 
 class DragCoefficient(Fgrid):
 
     def __init__(self, *argv, **kwargs):
-        self.dzb_min = 0.5
-        self.dzb_decay = 0.
         super().__init__(NchiType.DRAG_COEFFICIENT, *argv, **kwargs)
+
+    @classmethod
+    def linear_with_depth(
+            cls,
+            hgrid: Union[str, os.PathLike, Gr3],
+            depth1: float = -1.0,
+            depth2: float = -3.0,
+            bfric_river: float = 0.0025,
+            bfric_land: float = 0.025):
+
+        obj = cls.constant(hgrid, np.nan)
+
+        '''
+        Note: pyschism treated bathymetry as negative in the water,
+             postive on the land. So here we have to negative the depth
+             value depth1 - (-hgrid.values)
+        ''' 
+        values = (bfric_river + (depth1+hgrid.values) \
+                * (bfric_land-bfric_river)/(depth1-depth2))
+
+        values[values > bfric_land] = bfric_land
+        values[values < bfric_river] = bfric_river
+
+        obj.values[:] = values
+
+        return obj
 
 
 class FrictionDispatch(Enum):
