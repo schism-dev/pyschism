@@ -249,6 +249,17 @@ class Elements:
         return self._triangles
 
     @property
+    def tri_idxs(self):
+        if not hasattr(self, '_tri_idxs'):
+            tri_idxs = np.full(len(self.elements), -99, dtype=int)
+            for i, element in enumerate(self.elements.values()):
+                if len(element) == 3:
+                    tri_idxs[i] = i
+            new_arr = np.delete(tri_idxs, np.where(tri_idxs == -99))
+            self._tri_idxs = new_arr
+        return self._tri_idxs 
+
+    @property
     def quadrilaterals(self):
         return self.quads
 
@@ -260,6 +271,38 @@ class Elements:
                  for element in self.elements.values()
                  if len(element) == 4])
         return self._quads
+
+    @property
+    def qua_idxs(self):
+        if not hasattr(self, '_qua_idxs'):
+            qua_idxs = np.full(len(self.elements), -99, dtype=int)
+            for i, element in enumerate(self.elements.values()):
+                if len(element) == 4:
+                    qua_idxs[i] = i
+            new_arr = np.delete(qua_idxs, np.where(qua_idxs == -99))
+            self._qua_idxs = new_arr
+        return self._qua_idxs   
+
+    @property
+    def side(self):
+        if not hasattr(self, '_side'):
+            for i in np.arange(3):
+                i1 = np.mod(i+3,3)
+                i2 = np.mod(i+4,3)
+                if i==0:
+                    x=np.c_[self.triangles[:, i1], self.triangles[:, i2]]
+                else:
+                    x=np.r_[x, np.c_[self.triangles[:, i1], self.triangles[:, i2]]]
+
+            for i in np.arange(4):
+                i1 = np.mod(i+4,4)
+                i2 = np.mod(i+5,4)
+                x=np.r_[x, np.c_[self.quads[:, i1], self.quads[:, i2]]]
+        
+            y = np.sort(x, axis=1)
+            uy = np.unique(y, axis=0)
+            self._side = uy #.shape[0]
+        return self._side
 
     @property
     def triangulation(self):
