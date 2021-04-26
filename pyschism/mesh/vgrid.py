@@ -21,7 +21,7 @@ class Vgrid:
     def from_binary(cls, outdir: Union[str, os.PathLike], hgrid, *args, **kwargs):
         _tmpdir = tempfile.TemporaryDirectory()
         tmpdir = pathlib.Path(_tmpdir.name)
-        hgrid = Hgrid.open(hgrid)
+        hgrid = Hgrid.open(hgrid, crs='EPSG:4326')
         hgrid.write(tmpdir / 'hgrid.gr3')
         subprocess.check_call(['gen_vqs'], cwd=tmpdir)
         outdir = pathlib.Path(outdir)
