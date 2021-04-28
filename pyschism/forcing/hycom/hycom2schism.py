@@ -292,7 +292,7 @@ class Nudge:
             dst['map_to_global_node'][:] = include+1
 
             dst.createVariable('tracer_concentration', 'f', ('time', 'node', 'nLevels', 'one'))
-            dst['time_series'][:,:,:,:] = timeseries_s
+            dst['tracer_concentration'][:,:,:,:] = timeseries_s
 
         with Dataset(outdir / 'TEM_nu.nc', 'w', format='NETCDF4') as dst:
         #dimensions
@@ -308,7 +308,7 @@ class Nudge:
             dst['map_to_global_node'][:] = include+1
 
             dst.createVariable('tracer_concentration', 'f', ('time', 'node', 'nLevels', 'one'))
-            dst['time_series'][:,:,:,:] = timeseries_t
+            dst['tracer_concentration'][:,:,:,:] = timeseries_t
 
 
 class InitialTS():
