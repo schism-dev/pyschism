@@ -42,8 +42,8 @@ class Tides(bctypes.BoundaryCondition):
     def __init__(
             self,
             elevation: bool = True,
-            velocity: bool = False,
-            tidal_database: Union[str, TidalDatabase] = TidalDatabase.HAMTIDE,
+            velocity: bool = True,
+            tidal_database: Union[str, TidalDatabase] = TidalDatabase.TPXO,
     ):
         """Main class for requesting tidal boundary forcing for a SCHISM run.
 
@@ -64,7 +64,7 @@ class Tides(bctypes.BoundaryCondition):
             if velocity is True else bctypes.InitialFlowType.NONE)
 
         self.forcing_database = tidal_database
-        self.use_all()
+        self.use_major()
 
     def __iter__(self):
         for constituent in self.active_constituents:

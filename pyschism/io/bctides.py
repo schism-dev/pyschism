@@ -74,11 +74,11 @@ class Bctides:
             rnday: timedelta,
             cutoff_depth=50.,
             elevation=True,
-            velocity=False,
+            velocity=True,
             temperature=False,
             salinity=False,
             tracers=False,
-            tidal_database='hamtide',
+            tidal_database='tpxo',
             # ts_database='hycom',
     ):
         self._hgrid = hgrid
@@ -102,7 +102,7 @@ class Bctides:
             driver: 'ModelDriver',
             cutoff_depth=50.,
             elevation=True,
-            velocity=False,
+            velocity=True,
             temperature=False,
             salinity=False,
             tracers=False

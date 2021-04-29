@@ -18,7 +18,6 @@ from matplotlib.transforms import Bbox
 from pyschism.mesh.base import Nodes, Elements
 from pyschism.mesh.vgrid import Vgrid
 
-from pyschism.dates import localize_datetime, nearest_cycle_date, pivot_time
 
 logger = logging.getLogger(__name__)
 
@@ -184,8 +183,8 @@ class Nudge:
                 lat_idxs=np.where((lat>=bbox.ymin) & (lat<=bbox.ymax))[0]
                 lon_idxs=np.where((lon>=bbox.xmin-2.0) & (lon<=bbox.xmax+2.0))[0]
 
-                salt=nc_salt['salinity'][1:7,:,lat_idxs,lon_idxs]
-                temp=nc_temp['temperature'][1:7,:,lat_idxs,lon_idxs]
+                salt=nc_salt['salinity'][1:,:,lat_idxs,lon_idxs]
+                temp=nc_temp['temperature'][1:,:,lat_idxs,lon_idxs]
 
             except Exception as e:
                 print(e)
@@ -292,7 +291,7 @@ class Nudge:
             dst['map_to_global_node'][:] = include+1
 
             dst.createVariable('tracer_concentration', 'f', ('time', 'node', 'nLevels', 'one'))
-            dst['time_series'][:,:,:,:] = timeseries_s
+            dst['tracer_concentration'][:,:,:,:] = timeseries_s
 
         with Dataset(outdir / 'TEM_nu.nc', 'w', format='NETCDF4') as dst:
         #dimensions
@@ -308,8 +307,9 @@ class Nudge:
             dst['map_to_global_node'][:] = include+1
 
             dst.createVariable('tracer_concentration', 'f', ('time', 'node', 'nLevels', 'one'))
-            dst['time_series'][:,:,:,:] = timeseries_t
+            dst['tracer_concentration'][:,:,:,:] = timeseries_t
 
+        print(f'Writing *_nu.nc takes {time()-t0} seconds')
 
 class InitialTS():
 
@@ -872,4 +872,4 @@ class OpenBoundaryInventory():
             dst.createVariable('time_series', 'f', ('time', 'nOpenBndNodes', 'nComponents'))
             dst['time_series'][:,:,:] = timeseries_el
 
-        print(f'Writing hotstart.nc takes {time()-t0} seconds')
+        print(f'Writing *th.nc takes {time()-t0} seconds')

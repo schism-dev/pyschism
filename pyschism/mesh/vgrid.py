@@ -36,9 +36,15 @@ class Vgrid:
             obj._vgrid = f.read()
         return obj
 
-    @staticmethod
-    def open(path):
-        raise NotImplementedError('Vgrid.open()')
+    @classmethod
+    def open(cls, path):
+        path = pathlib.Path(path)
+        if path.name != 'vgrid.in':
+            raise TypeError('Not a valid vgrid.in file')
+        obj = cls()
+        with open(path) as f:
+            obj._vgrid = f.read()
+        return obj
 
     '''
     read_vgrid is based on:

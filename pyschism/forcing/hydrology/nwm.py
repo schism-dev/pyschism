@@ -275,7 +275,8 @@ def streamflow_lookup(file, indexes):
     data = []
     # TODO: read scaling factor directly from netcdf file?
     for indxs in indexes:
-        data.append(0.01*np.sum(streamflow[indxs]))
+        #Dataset already considered scale_factor and offset
+        data.append(np.sum(streamflow[indxs]))
     return data
 
 

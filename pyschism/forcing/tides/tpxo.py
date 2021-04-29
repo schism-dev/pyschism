@@ -63,7 +63,7 @@ class TPXO(TidalDataProvider):
         if not hasattr(self, '_constituents'):
             self._constituents = [
                 c.capitalize() for c in self.h['con'][:].astype(
-                    '|S1').tostring().decode('utf-8').split()]
+                    '|S1').tobytes().decode('utf-8').split()]
         return self._constituents
 
     @property

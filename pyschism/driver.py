@@ -18,6 +18,7 @@ from pyschism.forcing.atmosphere.nws.nws2 import NWS2
 from pyschism.forcing.baroclinic import BaroclinicForcing
 from pyschism.makefile import MakefileDriver
 from pyschism.mesh import Hgrid, Vgrid, Fgrid, ManningsN, gridgr3
+from pyschism.mesh.prop import Fluxflag, Tvdflag
 from pyschism.param import Param
 from pyschism.server.base import ServerConfig
 from pyschism.stations import Stations
@@ -151,8 +152,8 @@ class Gr3FieldTypes(Enum):
     DIFFMIN = gridgr3.Diffmin
     DIFFMAX = gridgr3.Diffmax
     WATERTYPE = gridgr3.Watertype
-    FLUXFLAG = gridgr3.Fluxflag
-    TVDFLAG = gridgr3.Tvdflag
+    #FLUXFLAG = gridgr3.Fluxflag
+    #TVDFLAG = gridgr3.Tvdflag
     WINDROT = gridgr3.Windrot
     ESTUARY = gridgr3.Estuary
 
@@ -334,6 +335,8 @@ class ModelDriver:
             diffmax=True,
             diffmin=True,
             watertype=True,
+            windrot=True,
+            shapiro=True,
             fluxflag=True,
             tvdflag=True,
             elev_ic=True,
@@ -383,26 +386,30 @@ class ModelDriver:
             self.config.albedo.write(self.outdir / albedo, overwrite)
 
         if diffmin is not False and self.config.diffmin is not None:
-            # self.diffmax = Diffmax.constant(self.model_domain.hgrid, 1.0)
             diffmin = 'diffmin.gr3' if diffmin is True else diffmin
             self.config.diffmin.write(self.outdir / diffmin, overwrite)
 
         if diffmax is not False and self.config.diffmax is not None:
-            # self.diffmin = Diffmax.constant(self.model_domain.hgrid, 1.0e-6)
             diffmax = 'diffmax.gr3' if diffmax is True else diffmax
             self.config.diffmax.write(self.outdir / diffmax, overwrite)
 
         if watertype is not False and self.config.watertype is not None:
-            # self.watertype = Diffmax.constant(self.model_domain.hgrid, 1.0)
             watertype = 'watertype.gr3' if watertype is True else watertype
             self.config.watertype.write(self.outdir / watertype, overwrite)
 
+        if windrot is not False and self.config.windrot is not None:
+            windrot = 'windrot_geo2proj.gr3' if windrot is True else windrot
+            self.config.windrot.write(self.outdir / windrot, overwrite)
+
+        if shapiro is not False and self.config.shapiro is not None:
+           self.config.shapiro.from_binary(self.outdir, self.config.hgrid, 'epsg:26918')
+
         if fluxflag is not False and self.config.fluxflag is not None:
             # self.fluxflag = Fluxflag.constant(self.model_domain.hgrid, -1)
-            # with open(self.outdir / 'fluxflag.prop', 'w+') as fid:
-            #     fid.writelines(self.fluxflag)
-            fluxflag = 'fluxflag.prop' if fluxflag is True else fluxflag
-            self.config.fluxflag.write(self.outdir / fluxflag)
+             with open(self.outdir / 'fluxflag.prop', 'w+') as fid:
+                 fid.writelines(self.config.fluxflag)
+            #fluxflag = 'fluxflag.prop' if fluxflag is True else fluxflag
+            #self.config.fluxflag.write(self.outdir / fluxflag, overwrite)
 
         if tvdflag is not False and self.config.tvdflag is not None:
             # Hard-wire the polygon at this point.
@@ -417,10 +424,10 @@ class ModelDriver:
             # poly = Polygon(coords)
             # self.tvdflag = Tvdflag.define_by_region(
             #     hgrid=self.model_domain.hgrid, region=poly, value=1)
-            # with open(outdir / 'tvd.prop', 'w+') as fid:
-            #     fid.writelines(self.tvdflag)
-            fluxflag = 'tvd.prop' if fluxflag is True else fluxflag
-            self.config.tvdflag.write(self.outdir / 'tvd.prop')
+             with open(self.outdir / 'tvd.prop', 'w+') as fid:
+                 fid.writelines(self.config.tvdflag)
+            #fluxflag = 'tvd.prop' if fluxflag is True else fluxflag
+            #self.config.tvdflag.write(self.outdir / 'tvd.prop')
 
         # if rtofs is not False:
         #     self.start_date = nearest_cycle_date()
@@ -525,13 +532,14 @@ class ModelConfig(metaclass=ModelConfigMeta):
             diffmin: gridgr3.Diffmin = None,
             diffmax: gridgr3.Diffmax = None,
             watertype: gridgr3.Watertype = None,
-            fluxflag: gridgr3.Fluxflag = None,
-            tvdflag: gridgr3.Tvdflag = None,
             elev_ic: gridgr3.ElevIc = None,
             temp_ic: gridgr3.TempIc = None,
             salt_ic: gridgr3.TempIc = None,
             windrot: gridgr3.Windrot = None,
             estuary: gridgr3.Estuary = None,
+            shapiro: gridgr3.Shapiro = None,
+            fluxflag: Fluxflag = None,
+            tvdflag: Tvdflag = None,
             tides: Tides = None,
             atmosphere: NWS = None,
             hydrology: Union[Hydrology, List[Hydrology]] = None,
@@ -550,6 +558,7 @@ class ModelConfig(metaclass=ModelConfigMeta):
         self.diffmin = diffmin
         self.diffmax = diffmax
         self.watertype = watertype
+        self.shapiro = shapiro
         self.fluxflag = fluxflag
         self.tvdflag = tvdflag
         self.elev_ic = elev_ic
