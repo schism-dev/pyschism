@@ -308,62 +308,47 @@ class AWSDataInventory:
             self.start_date + self.rnday + self.output_interval,
             self.output_interval
         ).astype(datetime)}
+        print(self._files)
 
-        for requested_time, fname in self._files.items():
+        self.data = self.s3.list_objects_v2(
+                    Bucket=self.bucket,
+                    Delimiter='/',
+                    Prefix=f'nwm.{self.start_date.strftime("%Y%m%d")}'
+                           f'/{self.product}/'
+                )
+
+        for requested_time, _ in self._files.items():
             logger.info(f'Requesting NWM data for time {requested_time}')
             self._files[requested_time] = self.request_data(requested_time)
+
+    def request_data(self, request_time):
+
+        file_metadata = list(reversed(sorted([
+            _['Key'] for _ in self.data['Contents'] if 'channel' in _['Key']
+        ])))
+
+        for key in file_metadata[0:240:3]:
+            if request_time != self.key2date(key):
+                continue
+            print(self.key2date(key))
+            print(request_time)
+            filename = pathlib.Path(self.tmpdir.name) / key
+            filename.parent.mkdir(parents=True, exist_ok=True)
+
+            with open(filename, 'wb') as f:
+                logger.info(f'Downloading file {key}, ')
+                self.s3.download_fileobj(self.bucket, key, f)
+            return filename
+
 
     def key2date(self, key):
         base_date_str = f'{key.split("/")[0].split(".")[-1]}'
         timedelta_str = key.split(
             'channel_rt_1.')[-1].split('.')[0].strip('f')
         return datetime.strptime(base_date_str, '%Y%m%d') \
-            + timedelta(hours=int(key.split('.')[2].strip('tz'))) \
             + timedelta(hours=float(timedelta_str))
-
-    def request_data(self, requested_time, target_date=None, max_retry=5,
-                     retry_count=0):
-
-        if retry_count > max_retry:
-            raise Exception(f'No data for requested time {target_date}')
-
-        target_date = requested_time if target_date is None else target_date
-        data = self.s3.list_objects_v2(
-                    Bucket=self.bucket,
-                    Delimiter='/',
-                    Prefix=f'nwm.{requested_time.strftime("%Y%m%d")}'
-                           f'/{self.product}/'
-                )
-        if 'Contents' not in data:
-            retry_count += 1
-            return self.request_data(
-                requested_time - self.output_interval,
-                target_date=requested_time,
-                max_retry=max_retry,
-                retry_count=retry_count
-            )
-
-        file_metadata = list(reversed(sorted([
-            _['Key'] for _ in data['Contents'] if 'channel' in _['Key']
-        ])))
-        for key in file_metadata:
-            if target_date != self.key2date(key):
-                continue
-            filename = pathlib.Path(self.tmpdir.name) / key
-            filename.parent.mkdir(parents=True, exist_ok=True)
-            with open(filename, 'wb') as f:
-                logger.info(
-                    f'Downloading file {key}, '
-                    f'time={target_date}.')
-                self.s3.download_fileobj(self.bucket, key, f)
-            return filename
-        retry_count += 1
-        self.request_data(
-            requested_time - self.output_interval,
-            target_date=requested_time,
-            max_retry=max_retry,
-            retry_count=retry_count
-        )
+            #+ timedelta(hours=int(key.split('.')[2].strip('tz'))) #\
+            #+ timedelta(hours=float(timedelta_str))
 
     def get_nc_pairing_indexes(self, pairings: NWMElementPairings):
         nc_feature_id = Dataset(self.files[0])['feature_id'][:]
