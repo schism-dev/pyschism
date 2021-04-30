@@ -330,8 +330,8 @@ class AWSDataInventory:
         for key in file_metadata[0:240:3]:
             if request_time != self.key2date(key):
                 continue
-            print(self.key2date(key))
-            print(request_time)
+            #print(self.key2date(key))
+            #print(request_time)
             filename = pathlib.Path(self.tmpdir.name) / key
             filename.parent.mkdir(parents=True, exist_ok=True)
 
