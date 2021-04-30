@@ -18,7 +18,7 @@ class Vgrid:
         pass
 
     @classmethod
-    def from_binary(cls, hgrid, binary='gen_vqs'):
+    def from_binary(cls, outdir: Union[str, os.PathLike], hgrid, *args, **kwargs):
         _tmpdir = tempfile.TemporaryDirectory()
         tmpdir = pathlib.Path(_tmpdir.name)
         hgrid = Hgrid.open(hgrid, crs='EPSG:4326')
@@ -32,8 +32,8 @@ class Vgrid:
             shutil.copy2(tmpdir / 'vgrid.in', outdir / 'vgrid.in')
         
         obj = cls()
-        with open(path) as f:
-            obj._vgrid = f.read()
+        #with open(path) as f:
+        #    obj._vgrid = f.read()
         return obj
 
     @classmethod
