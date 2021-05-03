@@ -82,51 +82,49 @@ class GFSInventory:
             self.output_interval
         ).astype(datetime)}
 
-        for dt in self.nearest_zulus:
-            if None not in list(self._files.values()):
-                break
-            base_url = BASE_URL + f'/{self.product.value}' + \
-                f'/gfs{nearest_zulu(dt).strftime("%Y%m%d")}'
-            for cycle in reversed(range(0, 24, 6)):
-                test_url = f'{base_url}/' + \
-                           f'{self.product.name.lower()}_{cycle:02d}z'
-                try:
-                    logger.info(f'Checking url: {test_url}')
+        base_url = BASE_URL + f'/{self.product.value}' + \
+            f'/gfs{self.start_date.strftime("%Y%m%d")}'
+        test_url = f'{base_url}/' + \
+                   f'{self.product.name.lower()}_00z'
+        logger.info(f'Fetching data from {test_url}')
+        try:
+            logger.info(f'Checking url: {test_url}')
 
-                    @timeout()
-                    def get_netcdf_timeout():
+            @timeout()
+            def get_netcdf_timeout():
+                return Dataset(test_url)
+            nc = get_netcdf_timeout()
+            logger.info('Success!')
+        except OSError as e:
+            if e.errno == -70:
+                print()
+            elif e.errno == -73:
+                nc = False
+
+                @timeout()
+                def retry():
+                    try:
                         return Dataset(test_url)
-                    nc = get_netcdf_timeout()
-                    logger.info('Success!')
-                except OSError as e:
-                    if e.errno == -70:
-                        print()
-                        continue
-                    elif e.errno == -73:
-                        nc = False
+                    except Exception:
+                        return False
 
-                        @timeout()
-                        def retry():
-                            try:
-                                return Dataset(test_url)
-                            except Exception:
-                                return False
+                while not isinstance(nc, Dataset):
+                    nc = retry()
+            else:
+                raise e
 
-                        while not isinstance(nc, Dataset):
-                            nc = retry()
-                    else:
-                        raise e
-                file_dates = self.get_nc_datevector(nc)
-                for _datetime in reversed(list(self._files.keys())):
-                    if _datetime in file_dates:
-                        if self._files[_datetime] is None:
-                            self._files[_datetime] = nc
-                if not any(nc is None for nc in self._files.values()):
-                    break
+        #self.nc_datevector = self.get_nc_datevector(nc)
+        #print(f'nc datevector is {nc_datevector}')
+        self.nc = nc
 
-        missing_records = [dt for dt, nc in self._files.items() if nc is None]
-        if len(missing_records) > 0:
-            raise ValueError(f'No GFS data for dates: {missing_records}.')
+        #for dt, nc in self._files.items():
+        #    print(f'dt is {dt}, nc is {nc}')
+        #for nc in self._files.values():
+        #    print(f'nc is {nc}')
+
+        #if not any(nc is None for nc in self._files.values()):
+        #    raise NotImplementedError(
+        #        'No netcdf file found!')
 
         self._bbox = self._modified_bbox(bbox)
 
@@ -134,25 +132,25 @@ class GFSInventory:
                         sflux_varname: str):
 
         lon_idxs, lat_idxs = self._modified_bbox_indexes(self._bbox)
-        for i, (dt, nc) in enumerate(self._files.items()):
-            logger.info(
-                f'Putting GFS field {gfs_varname} for time {dt} as '
-                f'{sflux_varname} from file '
-                f'{nc.filepath().replace(f"{BASE_URL}/", "")}.')
+        logger.info(
+            f'Putting GFS field {gfs_varname} as '
+            f'{sflux_varname} from file '
+            f'{self.nc.filepath().replace(f"{BASE_URL}/", "")}.')
 
-            def put_nc_field():
-                try:
-                    dst[sflux_varname][i, :, :] = nc.variables[gfs_varname][
-                        self.get_nc_time_index(nc, dt), lat_idxs, lon_idxs]
-                    return True
-                except RuntimeError:
-                    logger.info('Failed! retrying...')
-                    return False
+        def put_nc_field():
+            try:
+                ntimes=self.rnday*24
+                dst[sflux_varname][:, :, :] = self.nc.variables[gfs_varname][
+                    :-1:, lat_idxs, lon_idxs]
+                return True
+            except RuntimeError:
+                logger.info('Failed! retrying...')
+                return False
 
-            success = False
-            while success is False:
-                success = put_nc_field()
-            dst.sync()
+        success = False
+        while success is False:
+            success = put_nc_field()
+        dst.sync()
 
     def get_nc_time_index(self, nc, dt):
         return np.where(np.in1d(self.get_nc_datevector(nc), [dt]))[0][0]
@@ -173,8 +171,11 @@ class GFSInventory:
             return self.get_nc_datevector(nc)
 
     def get_sflux_timevector(self):
-        timevec = list(self._files.keys())
+        #timevec = list(self._files.keys())
+        timevec = list(self.get_nc_datevector(self.nc))
+        #print(timevec)
         _nearest_zulu = nearest_zulu(np.min(timevec))
+        #print(f'_nearest_zulu is {_nearest_zulu}')
         return [(localize_datetime(x) - _nearest_zulu) / timedelta(days=1)
                 for x in timevec]
 
@@ -211,19 +212,19 @@ class GFSInventory:
     @property
     def lon(self):
         if not hasattr(self, '_lon'):
-            nc = self._files[list(self._files.keys())[0]]
-            self._lon = nc.variables['lon'][:]
+            #nc = self._files[list(self._files.keys())[0]]
+            self._lon = self.nc.variables['lon'][:]
             if not hasattr(self, '_lat'):
-                self._lat = nc.variables['lat'][:]
+                self._lat = self.nc.variables['lat'][:]
         return self._lon
 
     @property
     def lat(self):
         if not hasattr(self, '_lat'):
-            nc = self._files[list(self._files.keys())[0]]
-            self._lat = nc.variables['lat'][:]
+            #nc = self._files[list(self._files.keys())[0]]
+            self._lat = self.nc.variables['lat'][:]
             if not hasattr(self, '_lon'):
-                self._lon = nc.variables['lon'][:]
+                self._lon = self.nc.variables['lon'][:]
         return self._lat
 
     def _modified_bbox(self, bbox=None):
@@ -272,8 +273,8 @@ class GlobalForecastSystem(SfluxDataset):
             bbox: Bbox = None,
     ):
         """Fetches GFS data from NOMADS server. """
-        logger.info('Fetching GFS data.')
-        self.start_date = nearest_cycle() if start_date is None else \
+        logger.info('Fetching GFS data from a day early')
+        self.start_date = nearest_cycle()-timedelta(days=1) if start_date is None else \
             localize_datetime(start_date).astimezone(pytz.utc)
         self.rnday = rnday if isinstance(rnday, timedelta) else \
             timedelta(days=rnday)
@@ -315,7 +316,7 @@ class GlobalForecastSystem(SfluxDataset):
                 dst.createVariable('time', 'f4', ('time',))
                 dst['time'].long_name = 'Time'
                 dst['time'].standard_name = 'time'
-                date = nearest_zulu(self.start_date)
+                date = self.start_date
                 dst['time'].units = f'days since {date.year}-{date.month}'\
                                     f'-{date.day} 00:00'\
                                     f'{date.tzinfo}'
@@ -390,7 +391,7 @@ class GlobalForecastSystem(SfluxDataset):
                 dst.createVariable('time', 'f4', ('time',))
                 dst['time'].long_name = 'Time'
                 dst['time'].standard_name = 'time'
-                date = nearest_zulu(self.start_date)
+                date = self.start_date
                 dst['time'].units = f'days since {date.year}-{date.month}'\
                                     f'-{date.day} 00:00'\
                                     f'{date.tzinfo}'
@@ -437,7 +438,7 @@ class GlobalForecastSystem(SfluxDataset):
                 dst.createVariable('time', 'f4', ('time',))
                 dst['time'].long_name = 'Time'
                 dst['time'].standard_name = 'time'
-                date = nearest_zulu(self.start_date)
+                date = self.start_date
                 dst['time'].units = f'days since {date.year}-{date.month}'\
                                     f'-{date.day} 00:00'\
                                     f'{date.tzinfo}'
