@@ -308,7 +308,7 @@ class AWSDataInventory:
             self.start_date + self.rnday + self.output_interval,
             self.output_interval
         ).astype(datetime)}
-        print(self._files)
+        #print(self._files)
 
         self.data = self.s3.list_objects_v2(
                     Bucket=self.bucket,

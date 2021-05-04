@@ -274,10 +274,13 @@ class GlobalForecastSystem(SfluxDataset):
     ):
         """Fetches GFS data from NOMADS server. """
         logger.info('Fetching GFS data from a day early')
-        self.start_date = nearest_cycle()-timedelta(days=1) if start_date is None else \
+        self.start_date = nearest_cycle() if start_date is None else \
             localize_datetime(start_date).astimezone(pytz.utc)
         self.rnday = rnday if isinstance(rnday, timedelta) else \
             timedelta(days=rnday)
+
+        self.start_date = self.start_date-timedelta(days=1)
+
         inventory = GFSInventory(
             self.product,
             self.start_date,
