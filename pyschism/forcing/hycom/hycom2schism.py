@@ -14,6 +14,8 @@ import scipy as sp
 from numba import jit, prange
 from netCDF4 import Dataset
 from matplotlib.transforms import Bbox
+from metpy.units import units
+from metpy.calc import potential_temperature, height_to_pressure_std
 
 from pyschism.mesh.base import Nodes, Elements
 from pyschism.mesh.vgrid import Vgrid
@@ -205,6 +207,22 @@ class Nudge:
                 salt=nc['salinity'][4::8,:,lat_idxs,lon_idxs]
                 temp=nc['water_temp'][4::8,:,lat_idxs,lon_idxs]
 
+                #Convert in-situ temperature to potential T
+                print('convert to potential T')
+                hgt=units('meter')*dep
+                pressure=height_to_pressure_std(hgt)
+
+                ntimes=temp.shape[0]
+                nlev=temp.shape[1]
+                ny=temp.shape[2]
+                nx=temp.shape[3]
+                pre=np.tile(pressure,ny*nx).reshape(nlev, ny, nx)
+                potentialT=np.ndarray(shape=(ntimes,nlev,ny,nx), dtype=float)
+                for it in np.arange(ntimes):
+                   temp2=units('degC')*np.squeeze(temp[it,:,:,:])
+                   pt=potential_temperature(pre, temp2).to('degC')
+                   potentialT[it,:,:,:]=np.array(pt)
+
             except Exception as e:
                 print(e)
                 planC=True
@@ -223,6 +241,23 @@ class Nudge:
                 salt=nc['salinity'][4::8,:,lat_idxs,lon_idxs]
                 temp=nc['water_temp'][4::8,:,lat_idxs,lon_idxs]
 
+
+                #Convert in-situ temperature to potential T
+                print('convert to potential T')
+                hgt=units('meter')*dep
+                pressure=height_to_pressure_std(hgt)
+
+                ntimes=temp.shape[0]
+                nlev=temp.shape[1]
+                ny=temp.shape[2]
+                nx=temp.shape[3]
+                pre=np.tile(pressure,ny*nx).reshape(nlev, ny, nx)
+                potentialT=np.ndarray(shape=(ntimes,nlev,ny,nx), dtype=float)
+                for it in np.arange(ntimes):
+                   temp2=units('degC')*np.squeeze(temp[it,:,:,:])
+                   pt=potential_temperature(pre, temp2).to('degC')
+                   potentialT[it,:,:,:]=np.array(pt)
+
             except Exception as e:
                 print(e)
 
@@ -237,8 +272,8 @@ class Nudge:
         #change missing value to nan
         idxs = np.where(salt > 30000)
         salt[idxs]=float('nan')
-        idxs = np.where(temp > 30000)
-        temp[idxs]=float('nan')
+        #idxs = np.where(temp > 30000)
+        #temp[idxs]=float('nan')
 
         nNode=len(include) 
         one=1
@@ -265,7 +300,7 @@ class Nudge:
             timeseries_s[it,:,:,0]=salt_int
 
             #temp
-            temp_fd=sp.interpolate.RegularGridInterpolator((dep,lat,lon),np.squeeze(temp[it,:,:,:]),'nearest', bounds_error=False, fill_value = float('nan'))
+            temp_fd=sp.interpolate.RegularGridInterpolator((dep,lat,lon),np.squeeze(potentialT[it,:,:,:]),'nearest', bounds_error=False, fill_value = float('nan'))
             temp_int = temp_fd(bxyz)
             idxs = np.isnan(temp_int)
             if np.sum(idxs)!=0:
@@ -420,6 +455,24 @@ class InitialTS():
 
                 salt=np.squeeze(nc['salinity'][4,:,lat_idxs,lon_idxs])
                 temp=np.squeeze(nc['water_temp'][4,:,lat_idxs,lon_idxs])
+
+
+                #Convert in-situ temperature to potential T
+                print('convert to potential T')
+                hgt=units('meter')*dep
+                pressure=height_to_pressure_std(hgt)
+
+                ntimes=temp.shape[0]
+                nlev=temp.shape[1]
+                ny=temp.shape[2]
+                nx=temp.shape[3]
+                pre=np.tile(pressure,ny*nx).reshape(nlev, ny, nx)
+                potentialT=np.ndarray(shape=(ntimes,nlev,ny,nx), dtype=float)
+                for it in np.arange(ntimes):
+                   temp2=units('degC')*np.squeeze(temp[it,:,:,:])
+                   pt=potential_temperature(pre, temp2).to('degC')
+                   potentialT[it,:,:,:]=np.array(pt)
+
             except Exception as e:
                 print(e)
                 planC=True
@@ -456,7 +509,7 @@ class InitialTS():
         #print(salt_int.shape)
 
         #temperature
-        temp_fd=sp.interpolate.RegularGridInterpolator((dep,lat,lon),temp,'nearest', bounds_error=False, fill_value=float('nan'))
+        temp_fd=sp.interpolate.RegularGridInterpolator((dep,lat,lon),potentialT,'nearest', bounds_error=False, fill_value=float('nan'))
         temp_int = temp_fd(bxyz)
         idxs = np.isnan(temp_int)
         if np.sum(idxs)!=0:
@@ -677,6 +730,23 @@ class OpenBoundaryInventory():
                 vvel=nc['water_v'][4::8,:,lat_idxs,lon_idxs]
                 ssh=nc['surf_el'][4::8,lat_idxs,lon_idxs]
 
+
+                #Convert in-situ temperature to potential T
+                print('convert to potential T')
+                hgt=units('meter')*dep
+                pressure=height_to_pressure_std(hgt)
+
+                ntimes=temp.shape[0]
+                nlev=temp.shape[1]
+                ny=temp.shape[2]
+                nx=temp.shape[3]
+                pre=np.tile(pressure,ny*nx).reshape(nlev, ny, nx)
+                potentialT=np.ndarray(shape=(ntimes,nlev,ny,nx), dtype=float)
+                for it in np.arange(ntimes):
+                   temp2=units('degC')*np.squeeze(temp[it,:,:,:])
+                   pt=potential_temperature(pre, temp2).to('degC')
+                   potentialT[it,:,:,:]=np.array(pt)
+
             except Exception as e:
                 print(e)
                 planC=True
@@ -697,6 +767,22 @@ class OpenBoundaryInventory():
                 uvel=nc['water_u'][4::8,:,lat_idxs,lon_idxs]
                 vvel=nc['water_v'][4::8,:,lat_idxs,lon_idxs]
                 ssh=nc['surf_el'][4::8,lat_idxs,lon_idxs]
+
+                #Convert in-situ temperature to potential T
+                print('convert to potential T')
+                hgt=units('meter')*dep
+                pressure=height_to_pressure_std(hgt)
+
+                ntimes=temp.shape[0]
+                nlev=temp.shape[1]
+                ny=temp.shape[2]
+                nx=temp.shape[3]
+                pre=np.tile(pressure,ny*nx).reshape(nlev, ny, nx)
+                potentialT=np.ndarray(shape=(ntimes,nlev,ny,nx), dtype=float)
+                for it in np.arange(ntimes):
+                   temp2=units('degC')*np.squeeze(temp[it,:,:,:])
+                   pt=potential_temperature(pre, temp2).to('degC')
+                   potentialT[it,:,:,:]=np.array(pt)
 
             except Exception as e:
                 print(e)
@@ -750,7 +836,7 @@ class OpenBoundaryInventory():
             timeseries_s[it,:,:,0]=salt_int
 
             #temp
-            temp_fd=sp.interpolate.RegularGridInterpolator((dep,lat,lon),np.squeeze(temp[it,:,:,:]),'nearest', bounds_error=False, fill_value = float('nan'))
+            temp_fd=sp.interpolate.RegularGridInterpolator((dep,lat,lon),np.squeeze(potentialT[it,:,:,:]),'nearest', bounds_error=False, fill_value = float('nan'))
             temp_int = temp_fd(bxyz)
             idxs = np.isnan(temp_int)
             if np.sum(idxs)!=0:
