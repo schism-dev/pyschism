@@ -283,26 +283,66 @@ class Elements:
             self._qua_idxs = new_arr
         return self._qua_idxs   
 
-    @property
-    def side(self):
-        if not hasattr(self, '_side'):
-            for i in np.arange(3):
-                i1 = np.mod(i+3,3)
-                i2 = np.mod(i+4,3)
-                if i==0:
-                    x=np.c_[self.triangles[:, i1], self.triangles[:, i2]]
-                else:
-                    x=np.r_[x, np.c_[self.triangles[:, i1], self.triangles[:, i2]]]
+    #@property
+    #def side(self):
+    #    if not hasattr(self, '_side'):
+    #        for i in np.arange(3):
+    #            i1 = np.mod(i+3,3)
+    #            i2 = np.mod(i+4,3)
+    #            if i==0:
+    #                x=np.c_[self.triangles[:, i1], self.triangles[:, i2]]
+    #            else:
+    #                x=np.r_[x, np.c_[self.triangles[:, i1], self.triangles[:, i2]]]
+    #
+    #        for i in np.arange(4):
+    #            i1 = np.mod(i+4,4)
+    #            i2 = np.mod(i+5,4)
+    #            x=np.r_[x, np.c_[self.quads[:, i1], self.quads[:, i2]]]
+    #    
+    #        y = np.sort(x, axis=1)
+    #        uy = np.unique(y, axis=0)
+    #        self._side = uy #.shape[0]
+    #    return self._side
 
-            for i in np.arange(4):
-                i1 = np.mod(i+4,4)
-                i2 = np.mod(i+5,4)
-                x=np.r_[x, np.c_[self.quads[:, i1], self.quads[:, i2]]]
-        
-            y = np.sort(x, axis=1)
-            uy = np.unique(y, axis=0)
-            self._side = uy #.shape[0]
-        return self._side
+    #from pyPoseidon schism.py
+    @staticmethod
+    def remove_reversed_duplicates(iterable):
+        # Create a set for already seen elements
+        seen = set()
+        for item in iterable:
+            # Lists are mutable so we need tuples for the set-operations.
+            tup = tuple(item)
+            if tup not in seen:
+                # If the tuple is not in the set append it in REVERSED order.
+                seen.add(tup[::-1])
+                # If you also want to remove normal duplicates uncomment the next line
+                #seen.add(tup)
+                yield item
+
+    @property
+    def sides(self):
+        if not hasattr(self, '_sides'):
+            sides=[]
+            for element in self.elements.values():
+                if len(element) == 3:
+                    results = list(map(self.nodes.get_index_by_id, element))
+                    #print(len(results))
+                    #print(f'nodes are {results[0]}, {results[1]}, {results[2]}')
+                    sides.append([results[1],results[2]])
+                    sides.append([results[2],results[0]])
+                    sides.append([results[0],results[1]])
+
+                elif len(element) == 4: 
+                    results = list(map(self.nodes.get_index_by_id, element))
+                    #print(f'nodes are {p1}, {p2}, {p3}, {p4}')
+                    sides.append([results[1],results[2]])
+                    sides.append([results[2],results[3]])
+                    sides.append([results[3],results[0]])
+                    sides.append([results[0],results[1]])
+
+            #Remove duplicates
+            self._sides=np.array(list(self.remove_reversed_duplicates(sides)))
+        return self._sides
 
     @property
     def triangulation(self):
