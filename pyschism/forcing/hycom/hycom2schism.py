@@ -354,7 +354,13 @@ class InitialTS():
 
     logger.info('Fetching RTOFS data')
 
-    def fetch_data(self, outdir: Union[str, os.PathLike], hgrid, vgrid, start_date):
+    def fetch_data(
+            self, 
+            outdir: Union[str, os.PathLike], 
+            hgrid, 
+            vgrid, 
+            start_date, 
+            include_eluv=True):
 
         outdir = pathlib.Path(outdir)
 
@@ -399,8 +405,9 @@ class InitialTS():
         qidxs = elements.qua_idxs
         #qnd = quads.shape[1]
 
-        side = elements.side
+        side = elements.sides
         nside = side.shape[0]
+        print(f'# of side is {nside}')
 
         #construct schism grid
         lon2i=np.tile(loni,[nvrt,1]).T
@@ -409,8 +416,8 @@ class InitialTS():
         print('Computing SCHISM zcor is done!')
 
         #Get hycom data
-        planA=True
-        planB=False
+        planA=False
+        planB=True
         planC=False
 
         #Plan A: ROTFS 
@@ -430,7 +437,18 @@ class InitialTS():
                 lon_idxs=np.where((lon>=bbox.xmin-2.0) & (lon<=bbox.xmax+2.0))[0]
 
                 salt=np.squeeze(nc_salt['salinity'][1,:,lat_idxs,lon_idxs])
-                temp=np.squeeze(nc_temp['temperature'][1,:,lat_idxs,lon_idxs])
+                potentialT=np.squeeze(nc_temp['temperature'][1,:,lat_idxs,lon_idxs])
+
+                if include_eluv:
+                    nc_uvel=Dataset(f'{base_url}'
+                        f'{date.strftime("%Y%m%d")}/rtofs_glo_3dz_nowcast_daily_uvel')
+                    nc_vvel=Dataset(f'{base_url}'
+                        f'{date.strftime("%Y%m%d")}/rtofs_glo_3dz_nowcast_daily_vvel')
+                    nc_ssh=Dataset(f'{base_url}'
+                        f'{date.strftime("%Y%m%d")}/rtofs_glo_2ds_forecast_3hrly_diag')
+                    uvel=nc_uvel['u'][1,:,lat_idxs,lon_idxs]
+                    vvel=nc_vvel['v'][1,:,lat_idxs,lon_idxs]
+                    ssh=nc_ssh['ssh'][8,lat_idxs,lon_idxs]
 
             except Exception as e:
                 print(e)
@@ -456,22 +474,25 @@ class InitialTS():
                 salt=np.squeeze(nc['salinity'][4,:,lat_idxs,lon_idxs])
                 temp=np.squeeze(nc['water_temp'][4,:,lat_idxs,lon_idxs])
 
+                if include_eluv:
+                    uvel=nc['water_u'][4,:,lat_idxs,lon_idxs]
+                    vvel=nc['water_v'][4,:,lat_idxs,lon_idxs]
+                    ssh=nc['surf_el'][4,lat_idxs,lon_idxs]
 
                 #Convert in-situ temperature to potential T
                 print('convert to potential T')
                 hgt=units('meter')*dep
                 pressure=height_to_pressure_std(hgt)
 
-                ntimes=temp.shape[0]
-                nlev=temp.shape[1]
-                ny=temp.shape[2]
-                nx=temp.shape[3]
+                #ntimes=temp.shape[0]
+                nlev=temp.shape[0]
+                ny=temp.shape[1]
+                nx=temp.shape[2]
                 pre=np.tile(pressure,ny*nx).reshape(nlev, ny, nx)
-                potentialT=np.ndarray(shape=(ntimes,nlev,ny,nx), dtype=float)
-                for it in np.arange(ntimes):
-                   temp2=units('degC')*np.squeeze(temp[it,:,:,:])
-                   pt=potential_temperature(pre, temp2).to('degC')
-                   potentialT[it,:,:,:]=np.array(pt)
+                #potentialT=np.ndarray(shape=(ntimes,nlev,ny,nx), dtype=float)
+                temp2=units('degC')*np.squeeze(temp)
+                pt=potential_temperature(pre, temp2).to('degC')
+                potentialT=np.array(pt)
 
             except Exception as e:
                 print(e)
@@ -492,8 +513,18 @@ class InitialTS():
         #change missing value to nan
         idxs = np.where(salt > 30000)
         salt[idxs]=float('nan')
-        idxs = np.where(temp > 30000)
-        temp[idxs]=float('nan')
+
+        if planA:
+            idxs = np.where(temp > 30000)
+            temp[idxs]=float('nan')
+
+        if include_eluv:
+            idxs = np.where(uvel > 30000)
+            uvel[idxs]=float('nan')
+            idxs = np.where(vvel > 30000)
+            vvel[idxs]=float('nan')
+            idxs = np.where(ssh > 30000)
+            ssh[idxs]=float('nan')
 
         t0 = time()
         salt_fd=sp.interpolate.RegularGridInterpolator((dep,lat,lon),salt,'nearest', bounds_error=False, fill_value = float('nan'))
@@ -521,6 +552,45 @@ class InitialTS():
         temp_int = temp_int.reshape(zcor.shape)
         #print(temp_int.shape)
 
+        if include_eluv:
+            #uvel
+            uvel_fd=sp.interpolate.RegularGridInterpolator((dep,lat,lon),uvel,'nearest', bounds_error=False, fill_value = float('nan'))
+            uvel_int = uvel_fd(bxyz)
+            idxs = np.isnan(uvel_int)
+            if np.sum(idxs)!=0:
+                uvel_int[idxs]=sp.interpolate.griddata(bxyz[~idxs,:], uvel_int[~idxs], bxyz[idxs,:],'nearest')
+            idxs = np.isnan(uvel_int)
+            if np.sum(idxs)!=0:
+                print(f'There is still missing value for u-velocity!')
+                sys.exit()
+            uvel_int = uvel_int.reshape(zcor.shape)
+            print(f'uvel_int size is {uvel_int.shape}')
+
+            #vvel
+            vvel_fd=sp.interpolate.RegularGridInterpolator((dep,lat,lon),vvel,'nearest', bounds_error=False, fill_value = float('nan'))
+            vvel_int = vvel_fd(bxyz)
+            idxs = np.isnan(vvel_int)
+            if np.sum(idxs)!=0:
+                vvel_int[idxs]=sp.interpolate.griddata(bxyz[~idxs,:], vvel_int[~idxs], bxyz[idxs,:],'nearest')
+            idxs = np.isnan(vvel_int)
+            if np.sum(idxs)!=0:
+                print(f'There is still missing value for v-velocity!')
+                sys.exit()
+            vvel_int = vvel_int.reshape(zcor.shape)
+
+            #ssh
+            ssh_fd=sp.interpolate.RegularGridInterpolator((lat,lon),ssh,'nearest', bounds_error=False, fill_value = float('nan'))
+            ssh_int = ssh_fd(bxy)
+            idxs = np.isnan(ssh_int)
+            if np.sum(idxs)!=0:
+                ssh_int[idxs]=sp.interpolate.griddata(bxy[~idxs,:], ssh_int[~idxs], bxy[idxs,:],'nearest')
+
+            idxs = np.isnan(ssh_int)
+            if np.sum(idxs)!=0:
+                print(f'There is still missing value for ssh!')
+                sys.exit()
+            print(f'ssh_int size is {ssh_int.shape}')
+
         print(f'Interpolation takes {time()-t0} seconds')
 
         #Create hotstart.nc
@@ -543,6 +613,17 @@ class InitialTS():
             #quads 
             tr_el[qidxs,k,0] = np.mean(salt_int[quads[:,:],k], axis=1)
             tr_el[qidxs,k,1] = np.mean(temp_int[quads[:,:],k], axis=1)
+
+        #Compute su2 and sv2
+        su2 = np.zeros([nside, nvrt])
+        sv2 = np.zeros([nside, nvrt])
+        if include_eluv:
+            for iside in np.arange(nside):
+                id1=side[iside,0]
+                id2=side[iside,1]
+                su2[iside,:]=(uvel_int[id1,:]+uvel_int[id2,:])/2.0
+                sv2[iside,:]=(vvel_int[id1,:]+vvel_int[id2,:])/2.0
+        print(f'su2 size is {su2.shape}')
 
         with Dataset(outdir / 'hotstart.nc', 'w', format='NETCDF4') as dst:
             #dimensions
@@ -573,7 +654,7 @@ class InitialTS():
             dst['idry'][:] = np.zeros(NP).astype('int32')
 
             dst.createVariable('eta2', 'd', ('node',))
-            dst['eta2'][:] = np.zeros(NP)
+            dst['eta2'][:] = ssh_int #np.zeros(NP)
 
             dst.createVariable('we', 'd', ('elem', 'nVert'))
             dst['we'][:,:] = np.zeros([NE,nvrt])
@@ -588,10 +669,10 @@ class InitialTS():
             dst['tr_nd0'][:,:,:] = tr_nd
 
             dst.createVariable('su2', 'd', ('side', 'nVert'))
-            dst['su2'][:,:] = np.zeros([nside,nvrt])
+            dst['su2'][:,:] = su2 #np.zeros([nside,nvrt])
 
             dst.createVariable('sv2', 'd', ('side', 'nVert'))
-            dst['sv2'][:,:] = np.zeros([nside,nvrt])
+            dst['sv2'][:,:] = sv2 #np.zeros([nside,nvrt])
  
             dst.createVariable('q2', 'd', ('node', 'nVert'))
             dst['q2'][:,:] = np.zeros([NP,nvrt])
@@ -675,8 +756,8 @@ class OpenBoundaryInventory():
         baseurl_rtofs='http://nomads.ncep.noaa.gov:80/dods/rtofs/rtofs_global'
         baseurl_gofs='https://tds.hycom.org/thredds/dodsC/GLBy0.08/expt_93.0/FMRC/runs/GLBy0.08_930_FMRC_RUN_'
 
-        planA=True
-        planB=False
+        planA=False
+        planB=True
         planC=False
 
         #Plan A: ROTFS 
