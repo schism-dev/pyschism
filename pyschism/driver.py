@@ -18,6 +18,7 @@ from pyschism.forcing.atmosphere.nws.nws2 import NWS2
 from pyschism.forcing.baroclinic import BaroclinicForcing
 from pyschism.makefile import MakefileDriver
 from pyschism.mesh import Hgrid, Vgrid, Fgrid, ManningsN, gridgr3
+from pyschism.mesh.vgrid import SZ
 from pyschism.param import Param
 from pyschism.server.base import ServerConfig
 from pyschism.stations import Stations
@@ -260,7 +261,8 @@ class ModelDriver:
         error_file = self.outdir / 'outputs/fatal.error'
         if error_file.exists() and overwrite is not True:
             raise IOError('File exists and overwrite is not True.')
-        error_file.unlink()
+        if error_file.exists() and overwrite is True:
+            error_file.unlink()
         subprocess.check_call(
             ["make", "run"],
             cwd=self.outdir
@@ -699,7 +701,7 @@ class ModelConfig(metaclass=ModelConfigMeta):
     @vgrid.setter
     def vgrid(self, vgrid: Union[Vgrid, None]):
         if vgrid is None:
-            vgrid = Vgrid()
+            vgrid = SZ.default()
         if not isinstance(vgrid, Vgrid):
             raise_type_error('vgrid', vgrid, Vgrid)
         self._vgrid = vgrid

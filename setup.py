@@ -61,6 +61,8 @@ setuptools.setup(
         'boto3',
         'rtree',
         'requests',
+        'numba',
+        'pygeos',
     ],
     entry_points={'console_scripts': ['pyschism = pyschism.__main__:main']},
     tests_require=['nose'],

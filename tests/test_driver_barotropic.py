@@ -37,7 +37,7 @@ class ModelConfigurationTestCase(unittest.TestCase):
                 tar.extractall(data_directory / "GulfStreamDevel")
         self.hgrid = hgrid
 
-    def _test_basic_config(self):
+    def test_basic_config(self):
 
         config = ModelConfig(
             Hgrid.open(self.hgrid, crs='epsg:4326'),
@@ -86,7 +86,7 @@ class ModelConfigurationTestCase(unittest.TestCase):
             htmpdir = tempfile.TemporaryDirectory()
             hotstart.write(htmpdir.name)
 
-    def test_basic_config_passive_ts(self):
+    def _test_basic_config_passive_ts(self):
         # WIP: ibc=1, ibtp=1
         from pyschism.forcing.baroclinic import RTOFS
         config = ModelConfig(
