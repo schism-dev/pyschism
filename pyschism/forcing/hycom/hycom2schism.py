@@ -654,7 +654,11 @@ class InitialTS():
             dst['idry'][:] = np.zeros(NP).astype('int32')
 
             dst.createVariable('eta2', 'd', ('node',))
-            dst['eta2'][:] = ssh_int #np.zeros(NP)
+            if include_eluv:
+                dst['eta2'][:] = ssh_int
+            else:
+                dst['eta2'][:] = np.zeros(NP)
+    
 
             dst.createVariable('we', 'd', ('elem', 'nVert'))
             dst['we'][:,:] = np.zeros([NE,nvrt])
