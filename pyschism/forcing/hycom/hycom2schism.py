@@ -1032,6 +1032,7 @@ class OpenBoundaryInventory():
             dst.createDimension('nOpenBndNodes', NOP)
             dst.createDimension('one', one)
             dst.createDimension('time', None)
+            dst.createDimension('nLevels', one)
             dst.createDimension('nComponents', nComp1)
             #variables
             dst.createVariable('time_step', 'f', ('one',))
@@ -1040,7 +1041,7 @@ class OpenBoundaryInventory():
             dst.createVariable('time', 'f', ('time',))
             dst['time'][:] = ndt
 
-            dst.createVariable('time_series', 'f', ('time', 'nOpenBndNodes', 'nComponents'))
-            dst['time_series'][:,:,:] = timeseries_el
+            dst.createVariable('time_series', 'f', ('time', 'nOpenBndNodes', 'nLevels', 'nComponents'))
+            dst['time_series'][:,:,:,:] = timeseries_el
 
         print(f'Writing *th.nc takes {time()-t0} seconds')
