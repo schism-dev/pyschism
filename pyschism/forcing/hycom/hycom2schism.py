@@ -330,11 +330,7 @@ class Nudge:
             dst['map_to_global_node'][:] = include+1
 
             dst.createVariable('tracer_concentration', 'f', ('time', 'node', 'nLevels', 'one'))
-<<<<<<< HEAD
             dst['tracer_concentration'][:, :, :, :] = timeseries_s
-=======
-            dst['tracer_concentration'][:,:,:,:] = timeseries_s
->>>>>>> origin/ICOGS3D
 
         with Dataset(outdir / 'TEM_nu.nc', 'w', format='NETCDF4') as dst:
             # dimensions
@@ -350,13 +346,9 @@ class Nudge:
             dst['map_to_global_node'][:] = include+1
 
             dst.createVariable('tracer_concentration', 'f', ('time', 'node', 'nLevels', 'one'))
-<<<<<<< HEAD
             dst['tracer_concentration'][:, :, :, :] = timeseries_t
 
         print(f'Writing *_nu.nc takes {time()-t0} seconds')
-=======
-            dst['tracer_concentration'][:,:,:,:] = timeseries_t
->>>>>>> origin/ICOGS3D
 
 
 class InitialTS():
@@ -675,7 +667,15 @@ class InitialTS():
             dst['idry'][:] = np.zeros(NP).astype('int32')
 
             dst.createVariable('eta2', 'd', ('node',))
+<<<<<<< HEAD
             dst['eta2'][:] = ssh_int  # np.zeros(NP)
+=======
+            if include_eluv:
+                dst['eta2'][:] = ssh_int
+            else:
+                dst['eta2'][:] = np.zeros(NP)
+    
+>>>>>>> origin/ICOGS3D_new
 
             dst.createVariable('we', 'd', ('elem', 'nVert'))
             dst['we'][:,:] = np.zeros([NE, nvrt])
@@ -1050,6 +1050,7 @@ class OpenBoundaryInventory():
             dst.createDimension('nOpenBndNodes', NOP)
             dst.createDimension('one', one)
             dst.createDimension('time', None)
+            dst.createDimension('nLevels', one)
             dst.createDimension('nComponents', nComp1)
             #variables
             dst.createVariable('time_step', 'f', ('one',))
@@ -1058,7 +1059,7 @@ class OpenBoundaryInventory():
             dst.createVariable('time', 'f', ('time',))
             dst['time'][:] = ndt
 
-            dst.createVariable('time_series', 'f', ('time', 'nOpenBndNodes', 'nComponents'))
-            dst['time_series'][:,:,:] = timeseries_el
+            dst.createVariable('time_series', 'f', ('time', 'nOpenBndNodes', 'nLevels', 'nComponents'))
+            dst['time_series'][:,:,:,:] = timeseries_el
 
         print(f'Writing *th.nc takes {time()-t0} seconds')
