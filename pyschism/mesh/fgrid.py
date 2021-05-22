@@ -141,7 +141,6 @@ class DragCoefficient(Fgrid):
     def linear_with_depth(
             cls,
             hgrid: Union[str, os.PathLike, Gr3],
-<<<<<<< HEAD
             depth1: float = -1.0,  # Are depth1 and depth2 positive up or positive down?
             depth2: float = -3.0,
             bfric_river: float = 0.0025,
@@ -152,23 +151,6 @@ class DragCoefficient(Fgrid):
 
         values = (bfric_river + (depth1 + hgrid.values) *
                   (bfric_land - bfric_river) / (depth1-depth2))
-=======
-            depth1: float = -1.0,
-            depth2: float = -3.0,
-            bfric_river: float = 0.0025,
-            bfric_land: float = 0.025):
-
-        obj = cls.constant(hgrid, np.nan)
-
-        '''
-        Note: pyschism treated bathymetry as negative in the water,
-             postive on the land. So here we have to negative the depth
-             value depth1 - (-hgrid.values)
-        ''' 
-        values = (bfric_river + (depth1+hgrid.values) \
-                * (bfric_land-bfric_river)/(depth1-depth2))
->>>>>>> origin/ICOGS3D
-
         values[values > bfric_land] = bfric_land
         values[values < bfric_river] = bfric_river
 
