@@ -17,7 +17,7 @@ class VgridType(Enum):
 
     @classmethod
     def _missing_(cls, name):
-        raise ValueError(f'{name} is not a valid vgrid type.')
+        raise ValueError(f'ivcor={name} is not a valid vgrid type.')
 
 
 class Vgrid(ABC):
@@ -26,11 +26,15 @@ class Vgrid(ABC):
     def __str__(self):
         raise NotImplementedError
 
+    @staticmethod
+    def default():
+        return SZ.default()
+
     @classmethod
     def from_binary(cls, hgrid, binary='gen_vqs'):
         _tmpdir = tempfile.TemporaryDirectory()
         tmpdir = pathlib.Path(_tmpdir.name)
-        hgrid = Hgrid.open(hgrid)
+        hgrid = Hgrid.open(hgrid, crs='EPSG:4326')
         hgrid.write(tmpdir / 'hgrid.gr3')
         subprocess.check_call([binary], cwd=tmpdir)
         return cls.open(tmpdir / 'vgrid.in')
@@ -46,6 +50,7 @@ class Vgrid(ABC):
                 int(f.read().strip().split()[0])).name].value.open(path)
 
     def write(self, path, overwrite=False):
+        path = pathlib.Path(path)
         if path.is_file() and not overwrite:
             raise Exception(
                 'File exists, pass overwrite=True to allow overwrite.')
@@ -67,6 +72,9 @@ class Vgrid(ABC):
         if str(self) == str(SZ.default()):
             return True
         return False
+
+    def is3D(self):
+        return ~self.is2D()
 
 
 class LSC2(Vgrid):
@@ -137,17 +145,20 @@ class SZ(Vgrid):
     def __str__(self):
         f = [
             f'{self.ivcor:d} !ivcor',
-            f'{self.nvrt:d} {self.kz:d} {self.h_s:G} !nvrt, kz (# of Z-levels); h_s (transition depth between S and Z)',
+            f'{self.nvrt:d} {self.kz:d} {self.h_s:G} '
+            '!nvrt, kz (# of Z-levels); h_s '
+            ' (transition depth between S and Z)',
             'Z levels',
         ]
-        for item_0, item_1 in self.ztot:
-            f.append(f'{int(item_0):d} {item_1:G}')
+        for row in self.ztot:
+            f.append(f'{int(row[0]):d} {row[1]:G}')
         f.extend([
             'S levels',
-            f'{self.h_c:G} {self.theta_b:G} {self.theta_f:G}  !h_c, theta_b, theta_f',
+            f'{self.h_c:G} {self.theta_b:G} {self.theta_f:G} '
+            ' !h_c, theta_b, theta_f',
             ])
-        for item_0, item_1 in self.sigma:
-            f.append(f'{int(item_0)} {item_1:G}')
+        for row in self.sigma:
+            f.append(f'{int(row[0])} {row[1]:G}')
         return '\n'.join(f)
 
     @classmethod
@@ -173,7 +184,7 @@ class SZ(Vgrid):
         irec = 2
         for i in np.arange(kz):
             irec = irec+1
-            ztot.append(lines[irec].strip().split()[1])
+            ztot.append([i+1, lines[irec].strip().split()[1]])
         ztot = np.array(ztot).astype('float')
 
         # read s grid
@@ -184,9 +195,8 @@ class SZ(Vgrid):
             lines[irec].strip().split()[:3]).astype('float')
         for i in np.arange(nsigma):
             irec = irec + 1
-            sigma.append(lines[irec].strip().split()[1])
-        sigma = np.array(sigma).astype('float')  # mixed types, first col is 
-
+            sigma.append([i+1, lines[irec].strip().split()[1]])
+        sigma = np.array(sigma).astype('float')
         return cls(h_s, ztot, h_c, theta_b, theta_f, sigma)
 
     @classmethod

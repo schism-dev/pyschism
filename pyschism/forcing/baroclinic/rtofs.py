@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 import logging
-from typing import List
+from typing import Dict
 import warnings
 
 from matplotlib.transforms import Bbox
@@ -42,11 +42,7 @@ class RTOFSBaroclinicComponent(BaroclinicComponent):
         #             zi = dataset[self.ncvar][idx[0], lev_index,
         #                                      lat_idxs, lon_idxs].values
         # if zi is None:
-        for pivot_date in self.datasets.keys():
-            dataset = xarray.open_dataset(
-                'http://nomads.ncep.noaa.gov:80/dods/rtofs/rtofs_global'
-                f'{pivot_date.strftime("%Y%m%d")}/'
-                f'rtofs_glo_3dz_nowcast_daily_{self.nowcast_varname}')
+        for pivot_date, dataset in self.datasets.items():
             check_date = np.datetime64(dates.nearest_zulu(time).replace(
                     tzinfo=None))
             idx = np.where(
@@ -68,15 +64,29 @@ class RTOFSBaroclinicComponent(BaroclinicComponent):
 
                     lon_idxs, lat_idxs = self._modified_bbox_indexes(
                         bbox,
-                        pixel_buffer=2
+                        pixel_buffer=100
                     )
                     items_iter = tqdm.tqdm(lat_idxs)
-                    zi = np.full((len(lat_idxs), len(lon_idxs)), np.nan)
+                    zi0 = np.full((len(lat_idxs), len(lon_idxs)), np.nan)
                     with tqdm_logging_wrapper.wrap_logging_for_tqdm(
                             items_iter), items_iter:
                         for i, row in enumerate(items_iter):
-                            zi[i, :] = dataset[self.ncvar][
+                            zi0[i, :] = dataset[self.ncvar][
                                 idx[0], lev_index, row, lon_idxs].values
+
+                    lon_idxs, lat_idxs = self._modified_bbox_indexes(
+                        bbox,
+                        # pixel_buffer=100
+                    )
+                    items_iter = tqdm.tqdm(lat_idxs)
+                    zi1 = np.full((len(lat_idxs), len(lon_idxs)), np.nan)
+                    with tqdm_logging_wrapper.wrap_logging_for_tqdm(
+                            items_iter), items_iter:
+                        for i, row in enumerate(items_iter):
+                            zi1[i, :] = dataset[self.ncvar][
+                                idx[0], lev_index, row, lon_idxs].values
+
+                    breakpoint()
 
         if zi is None:
             raise ValueError(f'No RTOFS data for requested date {time}.')
@@ -112,7 +122,7 @@ class RTOFSBaroclinicComponent(BaroclinicComponent):
         return timedelta(days=1)
 
     @property
-    def datasets(self) -> List[xarray.Dataset]:
+    def datasets(self) -> Dict[datetime, xarray.Dataset]:
         if not hasattr(self, '_datasets'):
             self._datasets = {}
             for pivot_date in [dates.nearest_zulu() - timedelta(days=i)

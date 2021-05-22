@@ -61,7 +61,7 @@
 ! Hotstart option. 0: cold start; 1: hotstart with time reset to 0; 2: 
 ! continue from the step in hotstart.nc
 !-----------------------------------------------------------------------
-  ihot = 0
+  ihot = 1 
 
 !-----------------------------------------------------------------------
 ! Equation of State type used
@@ -76,7 +76,7 @@
 !-----------------------------------------------------------------------
 ! Main ramp option
 !-----------------------------------------------------------------------
-  nramp = 1 !ramp-up option (1: on; 0: off)
+  nramp = 0 !ramp-up option (1: on; 0: off)
   dramp = 1. !needed if nramp=1; ramp-up period in days
 
   nrampbc = 0 !ramp-up flag for baroclinic force
@@ -118,7 +118,7 @@
 ! if indvel=ihorcon=0. To transition between eddying/non-eddying regimes, use
 ! indvel=0, ihorcon/=0, and ishapiro=-1 (shapiro.gr3).
 !-----------------------------------------------------------------------
-  ishapiro = 1 !on/off flag. Default: 0
+  ishapiro = -1 !on/off flag. Default: 0
   shapiro0 = 0.5 !Shapiro filter strength, needed only if ishapiro=1; max is 0.5 
   niter_shap = 1 !needed of ishapiro/=0 - # of iterations with Shapiro filter. Suggested: 1
 
@@ -204,7 +204,7 @@
 ! than once, and the code will accumulate the volumes, but for mass conc, one of
 ! the specified values will be taken (no summation).
 !-----------------------------------------------------------------------
-  if_source = 0 
+  if_source = 1 
   nramp_ss = 1 !needed if if_source=1; ramp-up flag for source/sinks
   dramp_ss = 3 !needed if if_source=1; ramp-up period in days
 
@@ -225,7 +225,7 @@
 !           and may remove this constant in the future.
 !           If iwbl/=0, nchi must =1.
 !-----------------------------------------------------------------------
-  nchi = -1 
+  nchi = 0 
   dzb_min = 0.5 !needed if nchi=1; min. bottom boundary layer thickness [m].
   !dzb_decay = 0. !needed if nchi=1; a decay const. [-]. should =0
   hmin_man = 1. !needed if nchi=-1: min. depth in Manning's formulation [m]
@@ -288,7 +288,7 @@
 !  flag_ic(9) = 1 !FIB
 !  flag_ic(10) = 1 !TIMOR
 !  flag_ic(11) = 1 !FABM
-   flag_ic(1:11) = 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+   flag_ic(1:11) = 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0
 
 !  ic_GEN = 1 !user defined module
 !  ic_AGE = 1 !Age
@@ -394,7 +394,7 @@
 ! Also if itr_met==3 and h_tvd>=1.e5, some parts of the code are bypassed for efficiency
 ! Controls for WENO are not yet in place
 !-----------------------------------------------------------------------
-  itr_met = 1 !Default: 1
+  itr_met = 4 !Default: 1
   h_tvd = 5. !used only if itr_met>=2; cut-off depth (m) 
   !If itr_met=3 or 4, need the following 2 tolerances of convergence. The convergence
   !is achieved when sqrt[\sum_i(T_i^s+1-T_i^s)^2]<=eps1_tvd_imp*sqrt[\sum_i(T_i^s)^2]+eps2_tvd_imp
@@ -440,9 +440,9 @@
 ! If WWM is enabled and icou_elfe_wwm>0 and iwind_form=-2, stress is overwritten by WWM.
 ! In all cases, if USE_ICE the stress in ice-covered portion is calculated by ICE routine.
 !-----------------------------------------------------------------------
-  nws = 0 
+  nws = 2 
   wtiminc = 150. !time step for atmos. forcing. Default: same as dt
-  nrampwind = 1 !ramp-up option for atmos. forcing
+  nrampwind = 0 !ramp-up option for atmos. forcing
   drampwind = 1. !needed if nrampwind/=0; ramp-up period in days
 !  iwindoff = 0 !needed only if nws/=0; '1': needs windfactor.gr3
   iwind_form = -1 !needed if nws/=0
@@ -464,7 +464,7 @@
 !-----------------------------------------------------------------------
 ! Turbulence closure.
 !-----------------------------------------------------------------------
-  itur = 0 !Default: 0
+  itur = 3 !Default: 0
   dfv0 = 1.e-2 !needed if itur=0
   dfh0 = 1.e-4 !needed if itur=0
   mid = 'KL' !needed if itur=3,5. Use KE if itur=5 

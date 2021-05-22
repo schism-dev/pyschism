@@ -38,11 +38,13 @@ class ModelConfigurationTestCase(unittest.TestCase):
         self.hgrid = hgrid
 
     def test_basic_config(self):
-
         config = ModelConfig(
             Hgrid.open(self.hgrid, crs='epsg:4326'),
             tides=Tides(),
-            atmosphere=NWS2(GFS()),
+            atmosphere=NWS2(
+                GFS(),
+                # HRRR()
+            ),
             hydrology=NWM(),
         )
 

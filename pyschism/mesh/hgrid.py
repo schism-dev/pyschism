@@ -72,9 +72,9 @@ class HgridBoundaries:
                             'geometry': LineString(hgrid.vertices[indexes])
                             })
 
-        self._ocean = gpd.GeoDataFrame(ocean_boundaries)
-        self._land = gpd.GeoDataFrame(land_boundaries)
-        self._interior = gpd.GeoDataFrame(interior_boundaries)
+        self._ocean = gpd.GeoDataFrame(ocean_boundaries, crs=hgrid.crs)
+        self._land = gpd.GeoDataFrame(land_boundaries, crs=hgrid.crs)
+        self._interior = gpd.GeoDataFrame(interior_boundaries, crs=hgrid.crs)
         self._hgrid = hgrid
         self._data = boundaries
 

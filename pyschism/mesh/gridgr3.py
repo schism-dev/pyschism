@@ -1,7 +1,6 @@
 import os
 import pathlib
 import subprocess
-import shutil
 import tempfile
 from typing import Union
 
@@ -24,6 +23,10 @@ class Gr3Field(Gr3):
         obj.description = f'{cls.__name__.lower()} {obj.crs}'
         return obj
 
+    @classmethod
+    def default(cls, hgrid):
+        raise NotImplementedError(f'No default defined for {cls.__name__}.')
+
     def add_region(
             self,
             region: Union[Polygon, MultiPolygon],
@@ -44,36 +47,37 @@ class Gr3Field(Gr3):
 
 
 class Albedo(Gr3Field):
-    """ Class for writing albedo.gr3 file with constant value"""
-    pass
+
+    @classmethod
+    def default(cls, hgrid):
+        return cls.constant(hgrid, 0.15)
 
 
 class Diffmax(Gr3Field):
-    pass
+
+    @classmethod
+    def default(cls, hgrid):
+        return cls.constant(hgrid, 1.)
 
 
 class Diffmin(Gr3Field):
-    pass
+
+    @classmethod
+    def default(cls, hgrid):
+        return cls.constant(hgrid, 1e-6)
 
 
 class Watertype(Gr3Field):
-    pass
 
-
-class Fluxflag(Gr3Field):
-    pass
-
-
-class Tvdflag(Gr3Field):
-    pass
+    @classmethod
+    def default(cls, hgrid):
+        return cls.constant(hgrid, 1.)
 
 
 class Shapiro(Gr3Field):
 
-
     @classmethod
     def from_binary(cls, outdir: Union[str, os.PathLike], hgrid, dst_crs):
-
         _tmpdir = tempfile.TemporaryDirectory()
         tmpdir = pathlib.Path(_tmpdir.name)
         hgrid = hgrid.copy()
@@ -87,7 +91,10 @@ class Shapiro(Gr3Field):
 
 
 class Windrot(Gr3Field):
-    pass
+
+    @classmethod
+    def default(cls, hgrid):
+        return cls.constant(hgrid, 0.)
 
 
 class ElevIc(Gr3Field):
@@ -128,25 +135,26 @@ class Estuary(Gr3Field):
 
 class Nudge(Gr3Field):
 
-    """
-    This class is to generate nudge.gr3 file. The time complexity is O(n^2), which
-    is bad for large mesh.
-    """
-
-    def gen_nudge(self, outdir: Union[str, os.PathLike], hgrid):
+    def __init__(self, hgrid, rlmax=1.5, rnu_day=0.25):
 
         @jit(nopython=True, parallel=True)
-        def compute_nudge(lon, lat, nnode, opbd2, out):
+        def compute_nudge(lon, lat, opbd, out):
+
+            nnode = lon.shape[0]
+
+            rnu_max = 1./rnu_day/86400.
 
             for idn in prange(nnode):
-                if idn in opbd2:
+                if idn in opbd:
                     rnu = rnu_max
                     distmin = 0.
                 else:
                     distmin = np.finfo(np.float64).max
-                    for j in opbd2:
-                        tmp = np.square(lon[idn]-lon[j-1]) + np.square(lat[idn]-lat[j-1])
-                        rl2 = np.sqrt(tmp)
+                    for j in opbd:
+                        rl2 = np.sqrt(
+                            np.square(lon[idn] - lon[j-1])
+                            + np.square(lat[idn] - lat[j-1])
+                            )
                         if rl2 < distmin:
                             distmin = rl2
                 rnu = 0.
@@ -154,50 +162,16 @@ class Nudge(Gr3Field):
                     rnu = (1-distmin/rlmax)*rnu_max
                 out[idn] = rnu
 
-        outdir = pathlib.Path(outdir)
+        opbd = []
+        for row in hgrid.boundaries.ocean.itertuples():
+            opbd.extend(row.indexes.tolist())
 
-        hgrid = hgrid.to_dict()
-        nodes = hgrid['nodes']
-        elements = hgrid['elements']
-        NE, NP = len(elements), len(nodes)
-        lon = []
-        lat = []
-        for id, (coords, values) in nodes.items():
-            lon.append(coords[0])
-            lat.append(coords[1])
+        out = np.zeros(hgrid.values.shape)
+        lon, lat = hgrid.get_xy(crs='epsg:4326')
+        compute_nudge(lon, lat, opbd, out)
+        self.values[:] = out
+        self.description = f"{rlmax}, {rnu_day}"
 
-        bnd = hgrid['boundaries']
-        opbd = bnd[None][0]['indexes']
-        opbd2 = []
-        for idn in opbd:
-            opbd2.append(int(idn))
-
-        # Max relax distance in degr
-        rlmax = 1.5
-        # Max relax strength in days
-        rnu_day = 0.25
-        rnu_max = 1./rnu_day/86400.
-
-        out = np.zeros([NP])
-        compute_nudge(lon, lat, NP, opbd2, out)
-
-        nudge = [f"{rlmax}, {rnu_day}"]
-        nudge.extend("\n")
-        nudge.append(f"{NE} {NP}")
-        nudge.extend("\n")
-        for idn, (coords, values) in nodes.items():
-            line = [f"{idn}"]
-            line.extend([f"{x:<.7e}" for x in coords])
-            line.extend([f"{out[int(idn)-1]:<.7e}"])
-            line.extend("\n")
-            nudge.append(" ".join(line))
-
-        for id, element in elements.items():
-            line = [f"{id}"]
-            line.append(f"{len(element)}")
-            line.extend([f"{e}" for e in element])
-            line.extend("\n")
-            nudge.append(" ".join(line))
-
-        with open(outdir / 'nudge_pyschism.gr3', 'w+') as fid:
-            fid.writelines(nudge)
+    @classmethod
+    def default(cls, hgrid):
+        return cls(hgrid)

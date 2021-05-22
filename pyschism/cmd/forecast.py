@@ -15,7 +15,7 @@ from pyschism.enums import ForecastProduct
 from pyschism.forcing.atmosphere import NWS2, GFS, HRRR
 from pyschism.forcing.hydrology import NWM
 from pyschism.forcing.tides import Tides
-from pyschism.mesh import Hgrid, Vgrid, Fgrid, gridgr3, ManningsN
+from pyschism.mesh import Hgrid, Vgrid, Fgrid, gridgr3, ManningsN, prop
 from pyschism.param.schout import SurfaceOutputVars
 
 logger = logging.getLogger(__name__)
@@ -30,12 +30,15 @@ class GridGr3Type(Enum):
     DIFFMAX = gridgr3.Diffmax
     DIFFMIN = gridgr3.Diffmin
     WATERTYPE = gridgr3.Watertype
-    FLUXFLAG = gridgr3.Fluxflag
-    TVDFLAG = gridgr3.Tvdflag
     SHAPIRO = gridgr3.Shapiro
     WINDROT = gridgr3.Windrot
     ELEV_IC = gridgr3.ElevIc
     NUDGE = gridgr3.Nudge
+
+
+class PropType(Enum):
+    FLUXFLAG = prop.Fluxflag
+    TVDFLAG = prop.Tvdflag
 
 
 class GridGr3Descriptor:
@@ -249,7 +252,7 @@ class ForecastCli(metaclass=ForecastCliMeta):
                     )
                 else:
                     if self.args.vgrid is None:
-                        Vgrid().write(
+                        Vgrid.default().write(
                             self._vgrid_path,
                             overwrite=self.args.overwrite)
                     else:
@@ -309,6 +312,14 @@ class ForecastCli(metaclass=ForecastCliMeta):
         if not hasattr(self, '_fgrid'):
             self._fgrid = Fgrid.open(self.fgrid_path, crs=self.args.fgrid_crs)
         return self._fgrid
+
+    @property
+    def fluxflag(self):
+        if not hasattr(self, '_fluxflag'):
+            # TODO
+            fluxflag = None
+            self._fluxflag = fluxflag
+        return self._fluxflag
 
     @property
     def tides(self):
@@ -832,8 +843,8 @@ def icm():
         34: ("ICM_SEDPOC2", "bottom POC g2 conc"),
         35: ("ICM_SEDPOC3", "bottom POC g3 conc"),
         36: ("ICM_EROH2S", "erosion flux H2S"),
-        37: ("ICM_EROLPOC", "ersoion flux LPOC"),
-        38: ("ICM_ERORPOC", "ersoion flux RPOC"),
+        37: ("ICM_EROLPOC", "erosion flux LPOC"),
+        38: ("ICM_ERORPOC", "erosion flux RPOC"),
         39: ("ICM_DO_consumption", "DO consumption"),
         40: ("ICM_GP1", "PB growth #1"),
         41: ("ICM_GP2", "PB growth #2"),

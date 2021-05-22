@@ -1,4 +1,5 @@
 from pyschism.forcing.tides import Tides
+# from pyschism.forcing.tides.bctides import Bctides
 from pyschism.forcing.atmosphere import GlobalForecastSystem
 from pyschism.forcing.hydrology.base import Hydrology
 from pyschism.forcing.hydrology.nwm import NationalWaterModel
@@ -13,4 +14,5 @@ __all__ = [
     'NationalWaterModel', 'NWM',
     "Hydrology",
     'NWS',
+    # 'Bctides',
 ]

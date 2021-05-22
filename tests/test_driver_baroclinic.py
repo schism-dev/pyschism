@@ -1,20 +1,19 @@
 #! /usr/bin/env python
 from datetime import timedelta
 import logging
-import os
-import pathlib
+# import os
+# import pathlib
 import shutil
-import tarfile
-import tempfile
+# import tarfile
+# import tempfile
 import unittest
-import urllib.request
+# import urllib.request
 
 from pyschism import dates
-from pyschism.mesh import Hgrid, Vgrid
-from pyschism.mesh.fgrid import DragCoefficient
+from pyschism.mesh import Hgrid, Vgrid, Fgrid
 from pyschism.driver import ModelConfig
 from pyschism.forcing.atmosphere import NWS2, GFS, HRRR
-from pyschism.forcing.baroclinic import RTOFS
+from pyschism.forcing.baroclinic import RTOFS, GOFS
 from pyschism.forcing.hydrology import NWM
 from pyschism.forcing.tides import Tides
 
@@ -28,14 +27,15 @@ class ModelConfigurationTestCase(unittest.TestCase):
         config = ModelConfig(
             Hgrid.open('data/baroclinic/hgrid.gr3', crs='epsg:4326'),
             vgrid=Vgrid.open('data/baroclinic/vgrid.in'),
-            fgrid=DragCoefficient.open('data/baroclinic/drag.gr3', crs='epsg:4326'),
+            fgrid=Fgrid.open('data/baroclinic/drag.gr3', crs='epsg:4326'),
             tides=Tides(),
             atmosphere=NWS2(
                 GFS(),
-                HRRR()
+                # HRRR()
             ),
             hydrology=NWM(),
-            baroclinic=RTOFS()
+            # baroclinic=RTOFS()
+            baroclinic=GOFS()
         )
 
         # create reference dates

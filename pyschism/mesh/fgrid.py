@@ -2,7 +2,6 @@ from enum import Enum
 import os
 import pathlib
 from typing import Union
-from copy import deepcopy
 import numpy as np
 
 from pyproj import CRS  # type: ignore[import]
@@ -128,15 +127,37 @@ class ManningsN(Fgrid):
 class RoughnessLength(Fgrid):
 
     def __init__(self, *argv, **kwargs):
+        self.dzb_min = 0.5
+        self.dzb_decay = 0.
         super().__init__(NchiType.ROUGHNESS_LENGTH, *argv, **kwargs)
 
 
 class DragCoefficient(Fgrid):
 
     def __init__(self, *argv, **kwargs):
-        self.dzb_min = 0.5
-        self.dzb_decay = 0.
         super().__init__(NchiType.DRAG_COEFFICIENT, *argv, **kwargs)
+
+    @classmethod
+    def linear_with_depth(
+            cls,
+            hgrid: Union[str, os.PathLike, Gr3],
+            depth1: float = -1.0,  # Are depth1 and depth2 positive up or positive down?
+            depth2: float = -3.0,
+            bfric_river: float = 0.0025,
+            bfric_land: float = 0.025
+    ):
+
+        obj = cls.constant(hgrid, np.nan)
+
+        values = (bfric_river + (depth1 + hgrid.values) *
+                  (bfric_land - bfric_river) / (depth1-depth2))
+
+        values[values > bfric_land] = bfric_land
+        values[values < bfric_river] = bfric_river
+
+        obj.values[:] = values
+
+        return obj
 
 
 class FrictionDispatch(Enum):

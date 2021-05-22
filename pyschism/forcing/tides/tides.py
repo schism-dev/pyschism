@@ -2,16 +2,22 @@ from collections import OrderedDict
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 import logging
-import os
-from typing import Union, Callable
+# import os
+from typing import Callable, List, Union
 
 import numpy as np
 
-from pyschism.forcing.tides import bctypes
+# from pyschism.forcing.tides import bctypes
 from pyschism.forcing.tides.tpxo import TPXO
 from pyschism.forcing.tides.hamtide import HAMTIDE
+# from pyschism.forcing.baroclinic.gofs import GOFS
+# from pyschism.forcing.baroclinic.rtofs import RTOFS
 
 _logger = logging.getLogger(__name__)
+
+MAJOR_CONSTITUENTS = ('Q1', 'O1', 'P1', 'K1', 'N2', 'M2', 'S2', 'K2')
+MINOR_CONSTITUENTS = ('Mm', 'Mf', 'M4', 'MN4', 'MS4', '2N2', 'S1')
+ALL_CONSTITUENTS = MAJOR_CONSTITUENTS + MINOR_CONSTITUENTS
 
 
 class TidalDatabase(Enum):
@@ -35,15 +41,20 @@ class ActiveConstituents:
         return obj.__dict__['active_constituents']
 
 
-class Tides(bctypes.BoundaryCondition):
-
+class Tides(
+        # bctypes.BoundaryCondition
+):
     _active_constituents = ActiveConstituents()
 
     def __init__(
             self,
             elevation: bool = True,
-            velocity: bool = False,
-            tidal_database: Union[str, TidalDatabase] = TidalDatabase.HAMTIDE,
+            velocity: bool = True,
+            tidal_database: Union[str, TidalDatabase] = TidalDatabase.TPXO,
+            constituents='all',
+            # subtidal_elevation: bool = False,
+            # subtidal_velocity: bool = False,
+            # subtidal_database: Union[str, SubTidalDatabase] = None,
     ):
         """Main class for requesting tidal boundary forcing for a SCHISM run.
 
@@ -57,14 +68,33 @@ class Tides(bctypes.BoundaryCondition):
             database (optional): Tidal database to use in order to obtain
                 boundary initial conditions, defaults to TidalDatabase.TPXO
         """
-        super().__init__(
-            iettype=bctypes.InitialElevationType.TIDAL
-            if elevation is True else bctypes.InitialElevationType.NONE,
-            ifltype=bctypes.InitialFlowType.TIDAL
-            if velocity is True else bctypes.InitialFlowType.NONE)
+        self.elevation = elevation
+        self.velocity = velocity
+        self.tidal_database = tidal_database
+        self._init_constituents(constituents)
 
-        self.forcing_database = tidal_database
-        self.use_all()
+    def _init_constituents(self, constituents):
+
+        if isinstance(constituents, str):
+            constituents = [constituents]
+
+        constituents = list(constituents) if constituents is not None else []
+
+        if 'all' in constituents and len(constituents) > 1:
+            raise ValueError('When using all, must only pass one')
+
+        elif 'major' in constituents and len(constituents) > 1:
+            raise ValueError('When using major, must only pass one')
+
+        if 'all' in constituents:
+            self.use_all()
+
+        elif 'major' in constituents:
+            self.use_major()
+
+        else:
+            for constituent in constituents:
+                self.use_constituent(constituent)
 
     def __iter__(self):
         for constituent in self.active_constituents:
@@ -90,15 +120,15 @@ class Tides(bctypes.BoundaryCondition):
         if constituent.lower() == 'z0':
             return np.full((vertices.shape[0],), float(self._Z0)), \
                     np.full((vertices.shape[0],), 0.)
-        return self.forcing_database.get_elevation(constituent, vertices)
+        return self.tidal_database.get_elevation(constituent, vertices)
 
     def get_velocity(self, constituent, vertices):
         if constituent.lower() == 'z0':
             return tuple(4*[np.full((vertices.shape[0],), 0.)])
-        return self.forcing_database.get_velocity(constituent, vertices)
+        return self.tidal_database.get_velocity(constituent, vertices)
 
     def use_all(self, potential=True, forcing=True):
-        for constituent in self.all_constituents:
+        for constituent in self.tidal_database.constituents:
             if constituent not in self.tidal_potential_amplitudes:
                 potential = False
             self._active_constituents[constituent] = {
@@ -107,8 +137,9 @@ class Tides(bctypes.BoundaryCondition):
             }
 
     def use_major(self, potential=True, forcing=True):
-        for constituent in self.major_constituents:
-            self.use_constituent(constituent, potential, forcing)
+        for constituent in self.tidal_database.constituents:
+            if constituent in self.major_constituents:
+                self.use_constituent(constituent, potential, forcing)
 
     def use_constituent(self, constituent, potential=True, forcing=True):
         if constituent not in self.constituents:
@@ -468,20 +499,16 @@ class Tides(bctypes.BoundaryCondition):
     def active_constituents(self):
         return self._active_constituents.copy()
 
-    major_constituents = ('Q1', 'O1', 'P1', 'K1', 'N2', 'M2', 'S2', 'K2')
-
-    minor_constituents = ('Mm', 'Mf', 'M4', 'MN4', 'MS4', '2N2', 'S1')
-
     @property
     def all_constituents(self):
-        if isinstance(self.forcing_database, HAMTIDE):
+        if isinstance(self.tidal_database, HAMTIDE):
             return self.major_constituents
-        elif isinstance(self.forcing_database, TPXO):
+        elif isinstance(self.tidal_database, TPXO):
             return (*self.major_constituents, *self.minor_constituents)
         else:
             raise NotImplementedError(
                 'Unhandled forcing database instance of type '
-                f'{type(self.forcing_database)}')
+                f'{type(self.tidal_database)}')
 
     orbital_frequencies = {
         'M4':      0.0002810378050173,
@@ -679,21 +706,13 @@ class Tides(bctypes.BoundaryCondition):
         return len(self.get_active_forcing_constituents())
 
     @property
-    def forcing_database(self):
-        return self._forcing_database
+    def tidal_database(self):
+        return self._tidal_database
 
-    @forcing_database.setter
-    def forcing_database(self, database: str):
+    @tidal_database.setter
+    def tidal_database(self, database: str):
         if isinstance(database, str):
             database = TidalDatabase[database.upper()].value()
         if isinstance(database, TidalDatabase):
             database = database.value()
-        self._forcing_database = database
-
-    @property
-    def constituents(self):
-        return self.all_constituents
-
-    @property
-    def active_constituents(self):
-        return self._active_constituents.copy()
+        self._tidal_database = database

@@ -110,3 +110,19 @@ def localize_datetime(d):
 
 def utcnow():
     return localize_datetime(datetime.utcnow())
+
+
+def round_time(dt: datetime, date_delta: timedelta):
+    """Round a datetime object to a multiple of a timedelta
+    d : datetime.datetime object, default now.
+    date_delta : timedelta object, we round to a multiple of this, default 1 minute.
+    Author: Thierry Husson 2012 - Use it as you want but don't blame me.
+            Stijn Nevens 2014 - Changed to use only datetime objects as variables
+    https://stackoverflow.com/questions/3463930/how-to-round-the-minute-of-a-datetime-object
+    """
+    d = dt.replace(tzinfo=None)
+    roundTo = date_delta.total_seconds()
+    seconds = (d - d.min).seconds
+    # // is a floor division, not a comment on following line:
+    rounding = (seconds+roundTo/2) // roundTo * roundTo
+    return d + timedelta(0, rounding-seconds, - d.microsecond)

@@ -11,14 +11,13 @@ import numpy as np
 from pyschism import dates
 from pyschism.enums import Stratification
 from pyschism.hotstart import Hotstart
-from pyschism.io import Bctides
 from pyschism.forcing import Tides, Hydrology
 from pyschism.forcing.atmosphere.nws.nws import NWS
 from pyschism.forcing.atmosphere.nws.nws2 import NWS2
 from pyschism.forcing.baroclinic import BaroclinicForcing
+from pyschism.forcing.bctides.bctides import Bctides
 from pyschism.makefile import MakefileDriver
-from pyschism.mesh import Hgrid, Vgrid, Fgrid, ManningsN, gridgr3
-from pyschism.mesh.vgrid import SZ
+from pyschism.mesh import Hgrid, Vgrid, Fgrid, ManningsN, gridgr3, prop
 from pyschism.param import Param
 from pyschism.server.base import ServerConfig
 from pyschism.stations import Stations
@@ -152,14 +151,17 @@ class Gr3FieldTypes(Enum):
     DIFFMIN = gridgr3.Diffmin
     DIFFMAX = gridgr3.Diffmax
     WATERTYPE = gridgr3.Watertype
-    FLUXFLAG = gridgr3.Fluxflag
-    TVDFLAG = gridgr3.Tvdflag
     WINDROT = gridgr3.Windrot
     ESTUARY = gridgr3.Estuary
 
     @classmethod
     def _missing_(cls, name):
         raise ValueError(f'{name} is not a valid {gridgr3.Gr3Field} type.')
+
+
+class PropFieldType(Enum):
+    FLUXFLAG = prop.Fluxflag
+    TVDFLAG = prop.Tvdflag
 
 
 class ModelDriver:
@@ -320,6 +322,23 @@ class ModelDriver:
                 raise_type_error('stations', stations, Stations)
         self._stations = stations
 
+    @property
+    def bctides(self):
+        if self.config.forcings.tides is not None:
+            self._bctides = Bctides.from_driver(
+                    self,
+                    # cutoff_depth=50.,
+                    # elevation=True,
+                    # velocity=True,
+                    # temperature=True if self.config.forcings.baroclinic is not None else False,
+                    # salinity=True if self.config.forcings.baroclinic is not None else False,
+
+                    # tracers=self.config.forcings.tracers,
+                    # tidal_database=self.config.forcings.tides.tidal_database,
+                    # ts_database=self.config.forcings.baroclinic,
+                )
+            return self._bctides
+
     def write(
             self,
             output_directory,
@@ -336,6 +355,8 @@ class ModelDriver:
             diffmax=True,
             diffmin=True,
             watertype=True,
+            windrot=True,
+            shapiro=True,
             fluxflag=True,
             tvdflag=True,
             elev_ic=True,
@@ -380,77 +401,30 @@ class ModelDriver:
             self.param.write(self.outdir / param, overwrite,
                              use_template=use_param_template)
 
-        if albedo is not False and self.config.albedo is not None:
-            albedo = 'albedo.gr3' if albedo is True else albedo
-            self.config.albedo.write(self.outdir / albedo, overwrite)
+        def obj_write(var, obj, default_filename, overwrite):
+            if var is not False and obj is not None:
+                var = default_filename if var is True else var
+                obj.write(self.outdir / var, overwrite)
 
-        if diffmin is not False and self.config.diffmin is not None:
-            # self.diffmax = Diffmax.constant(self.model_domain.hgrid, 1.0)
-            diffmin = 'diffmin.gr3' if diffmin is True else diffmin
-            self.config.diffmin.write(self.outdir / diffmin, overwrite)
+        obj_write(albedo, self.config.albedo, 'albedo.gr3', overwrite)
+        obj_write(diffmin, self.config.diffmin, 'diffmin.gr3', overwrite)
+        obj_write(diffmax, self.config.diffmax, 'diffmax.gr3', overwrite)
+        obj_write(watertype, self.config.watertype, 'watertype.gr3', overwrite)
+        obj_write(windrot, self.config.windrot, 'windrot_geo2proj.gr3', overwrite)
+        obj_write(shapiro, self.config.shapiro, 'shapiro.gr3', overwrite)
+        obj_write(fluxflag, self.config.fluxflag, 'fluxflag.prop', overwrite)
+        obj_write(tvdflag, self.config.tvdflag, 'tvdflag.prop', overwrite)
+        obj_write(temp_ic, self.config.temp_ic, 'temp.ic', overwrite)
+        obj_write(salt_ic, self.config.salt_ic, 'salt.ic', overwrite)
+        obj_write(elev_ic, self.config.elev_ic, 'elev.ic', overwrite)
+        obj_write(stations, self.stations, 'stations.in', overwrite)
 
-        if diffmax is not False and self.config.diffmax is not None:
-            # self.diffmin = Diffmax.constant(self.model_domain.hgrid, 1.0e-6)
-            diffmax = 'diffmax.gr3' if diffmax is True else diffmax
-            self.config.diffmax.write(self.outdir / diffmax, overwrite)
-
-        if watertype is not False and self.config.watertype is not None:
-            # self.watertype = Diffmax.constant(self.model_domain.hgrid, 1.0)
-            watertype = 'watertype.gr3' if watertype is True else watertype
-            self.config.watertype.write(self.outdir / watertype, overwrite)
-
-        if fluxflag is not False and self.config.fluxflag is not None:
-            # self.fluxflag = Fluxflag.constant(self.model_domain.hgrid, -1)
-            # with open(self.outdir / 'fluxflag.prop', 'w+') as fid:
-            #     fid.writelines(self.fluxflag)
-            fluxflag = 'fluxflag.prop' if fluxflag is True else fluxflag
-            self.config.fluxflag.write(self.outdir / fluxflag)
-
-        if tvdflag is not False and self.config.tvdflag is not None:
-            # Hard-wire the polygon at this point.
-            # coords = [(-75.340506, 40.843483), (-75.533474, 40.436019), (-75.796036, 39.535807),
-            #           (-75.672664, 39.339972), (-75.305709,
-            #                                     39.460000), (-75.103251, 39.636884),
-            #           (-74.692008, 39.744277), (-74.391485,
-            #                                     40.009603), (-74.359851, 40.252818),
-            #           (-74.514858, 40.745565), (-74.834362,
-            #                                     40.957194), (-75.210807, 40.935083),
-            #           (-75.283565, 40.925607)]
-            # poly = Polygon(coords)
-            # self.tvdflag = Tvdflag.define_by_region(
-            #     hgrid=self.model_domain.hgrid, region=poly, value=1)
-            # with open(outdir / 'tvd.prop', 'w+') as fid:
-            #     fid.writelines(self.tvdflag)
-            fluxflag = 'tvd.prop' if fluxflag is True else fluxflag
-            self.config.tvdflag.write(self.outdir / 'tvd.prop')
-
-        # if rtofs is not False:
-        #     self.start_date = nearest_cycle_date()
-        #     self.hotstart = HotStartInventory()
-        #     self.hotstart.fetch_data(
-        #         outdir, self.model_domain.hgrid, self.start_date)
-        #     self.obnd = OpenBoundaryInventory()
-        #     self.obnd.fetch_data(outdir, self.start_date, rnday=3, bbox=self.config.hgrid.get_bbox())
-
-        if temp_ic is not False and self.config.temp_ic is not None:
-            temp_ic = 'temp.ic' if temp_ic is True else temp_ic
-            self.config.temp_ic.write(self.outdir / temp_ic, overwrite)
-
-        if salt_ic is not False and self.config.salt_ic is not None:
-            salt_ic = 'salt.ic' if salt_ic is True else salt_ic
-            self.config.salt_ic.write(self.outdir / salt_ic, overwrite)
-
-        if elev_ic is not False and self.config.elev_ic is not None:
-            elev_ic = 'elev.ic' if elev_ic is True else elev_ic
-            self.config.elev_ic.write(self.outdir / elev_ic, overwrite)
-
-        # update forcings
         self.config.forcings.fetch_data(self)
 
-        if bctides is not False and self.config.forcings.tides is not None:
+        if bctides is not False and self.bctides is not None:
+            # TODO: We need a smarter way to generate bctides.in
             bctides = 'bctides.in' if bctides is True else bctides
-            Bctides.from_driver(self).write(
-                self.outdir / bctides, overwrite)
+            self.bctides.write(bctides, overwrite)
 
         if nws is not False and self.config.forcings.atmosphere is not None:
             if isinstance(self.config.forcings.atmosphere, NWS2):
@@ -461,10 +435,6 @@ class ModelDriver:
             else:
                 self.nws.write(self.outdir, overwrite)
 
-        if stations is not False and self.stations is not None:
-            stations = 'station.in' if stations is True else stations
-            self.stations.write(self.outdir / stations, overwrite)
-
         if hydrology is not False \
                 and self.config.forcings.hydrology is not None:
             for hydrology in self.config.forcings.hydrology:
@@ -472,6 +442,44 @@ class ModelDriver:
 
         MakefileDriver(self.server_config, hotstart=self.hotstart).write(
             self.outdir / 'Makefile', overwrite)
+
+        # if shapiro is not False and self.config.shapiro is not None:
+        #     self.config.shapiro.from_binary(self.outdir, self.config.hgrid, 'epsg:26918')
+
+        # if fluxflag is not False and self.config.fluxflag is not None:
+        #     self.fluxflag = Fluxflag.constant(self.model_domain.hgrid, -1)
+        #     with open(self.outdir / 'fluxflag.prop', 'w+') as fid:
+        #         fid.writelines(self.config.fluxflag)
+        #     fluxflag = 'fluxflag.prop' if fluxflag is True else fluxflag
+        #     self.config.fluxflag.write(self.outdir / fluxflag, overwrite)
+
+        # if tvdflag is not False and self.config.tvdflag is not None:
+        #     # Hard-wire the polygon at this point.
+        #     # coords = [(-75.340506, 40.843483), (-75.533474, 40.436019), (-75.796036, 39.535807),
+        #     #           (-75.672664, 39.339972), (-75.305709,
+        #     #                                     39.460000), (-75.103251, 39.636884),
+        #     #           (-74.692008, 39.744277), (-74.391485,
+        #     #                                     40.009603), (-74.359851, 40.252818),
+        #     #           (-74.514858, 40.745565), (-74.834362,
+        #     #                                     40.957194), (-75.210807, 40.935083),
+        #     #           (-75.283565, 40.925607)]
+        #     # poly = Polygon(coords)
+        #     # self.tvdflag = Tvdflag.define_by_region(
+        #     #     hgrid=self.model_domain.hgrid, region=poly, value=1)
+        #      with open(self.outdir / 'tvd.prop', 'w+') as fid:
+        #          fid.writelines(self.config.tvdflag)
+        #     #fluxflag = 'tvd.prop' if fluxflag is True else fluxflag
+        #     #self.config.tvdflag.write(self.outdir / 'tvd.prop')
+
+        # if rtofs is not False:
+        #     self.start_date = nearest_cycle_date()
+        #     self.hotstart = HotStartInventory()
+        #     self.hotstart.fetch_data(
+        #         outdir, self.model_domain.hgrid, self.start_date)
+        #     self.obnd = OpenBoundaryInventory()
+        #     self.obnd.fetch_data(outdir, self.start_date, rnday=3, bbox=self.config.hgrid.get_bbox())
+
+        # update forcings
 
 
 class Gridgr3Descriptor:
@@ -527,13 +535,14 @@ class ModelConfig(metaclass=ModelConfigMeta):
             diffmin: gridgr3.Diffmin = None,
             diffmax: gridgr3.Diffmax = None,
             watertype: gridgr3.Watertype = None,
-            fluxflag: gridgr3.Fluxflag = None,
-            tvdflag: gridgr3.Tvdflag = None,
             elev_ic: gridgr3.ElevIc = None,
             temp_ic: gridgr3.TempIc = None,
             salt_ic: gridgr3.TempIc = None,
             windrot: gridgr3.Windrot = None,
             estuary: gridgr3.Estuary = None,
+            shapiro: gridgr3.Shapiro = None,
+            fluxflag: prop.Fluxflag = None,
+            tvdflag: prop.Tvdflag = None,
             tides: Tides = None,
             atmosphere: NWS = None,
             hydrology: Union[Hydrology, List[Hydrology]] = None,
@@ -552,6 +561,7 @@ class ModelConfig(metaclass=ModelConfigMeta):
         self.diffmin = diffmin
         self.diffmax = diffmax
         self.watertype = watertype
+        self.shapiro = shapiro
         self.fluxflag = fluxflag
         self.tvdflag = tvdflag
         self.elev_ic = elev_ic
@@ -701,7 +711,7 @@ class ModelConfig(metaclass=ModelConfigMeta):
     @vgrid.setter
     def vgrid(self, vgrid: Union[Vgrid, None]):
         if vgrid is None:
-            vgrid = SZ.default()
+            vgrid = Vgrid.default()
         if not isinstance(vgrid, Vgrid):
             raise_type_error('vgrid', vgrid, Vgrid)
         self._vgrid = vgrid
