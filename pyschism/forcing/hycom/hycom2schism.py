@@ -330,7 +330,11 @@ class Nudge:
             dst['map_to_global_node'][:] = include+1
 
             dst.createVariable('tracer_concentration', 'f', ('time', 'node', 'nLevels', 'one'))
+<<<<<<< HEAD
             dst['tracer_concentration'][:, :, :, :] = timeseries_s
+=======
+            dst['tracer_concentration'][:,:,:,:] = timeseries_s
+>>>>>>> origin/ICOGS3D
 
         with Dataset(outdir / 'TEM_nu.nc', 'w', format='NETCDF4') as dst:
             # dimensions
@@ -346,9 +350,13 @@ class Nudge:
             dst['map_to_global_node'][:] = include+1
 
             dst.createVariable('tracer_concentration', 'f', ('time', 'node', 'nLevels', 'one'))
+<<<<<<< HEAD
             dst['tracer_concentration'][:, :, :, :] = timeseries_t
 
         print(f'Writing *_nu.nc takes {time()-t0} seconds')
+=======
+            dst['tracer_concentration'][:,:,:,:] = timeseries_t
+>>>>>>> origin/ICOGS3D
 
 
 class InitialTS():
