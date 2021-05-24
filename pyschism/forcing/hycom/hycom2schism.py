@@ -511,20 +511,20 @@ class InitialTS():
         lat=lat[lat_idxs]
 
         #change missing value to nan
-        idxs = np.where(salt > 30000)
-        salt[idxs]=float('nan')
+        #idxs = np.where(salt > 30000)
+        #salt[idxs]=float('nan')
 
-        if planA:
-            idxs = np.where(temp > 30000)
-            temp[idxs]=float('nan')
+        #if planA:
+        #    idxs = np.where(temp > 30000)
+        #    temp[idxs]=float('nan')
 
-        if include_eluv:
-            idxs = np.where(uvel > 30000)
-            uvel[idxs]=float('nan')
-            idxs = np.where(vvel > 30000)
-            vvel[idxs]=float('nan')
-            idxs = np.where(ssh > 30000)
-            ssh[idxs]=float('nan')
+        #if include_eluv:
+        #    idxs = np.where(uvel > 30000)
+        #    uvel[idxs]=float('nan')
+        #    idxs = np.where(vvel > 30000)
+        #    vvel[idxs]=float('nan')
+        #    idxs = np.where(ssh > 30000)
+        #    ssh[idxs]=float('nan')
 
         t0 = time()
         salt_fd=sp.interpolate.RegularGridInterpolator((dep,lat,lon),salt,'nearest', bounds_error=False, fill_value = float('nan'))
@@ -602,17 +602,17 @@ class InitialTS():
 
         #Compute tr_nd and tr_el
         tr_nd = np.zeros([NP, nvrt, 2])
-        tr_nd[:,:,0] = salt_int
-        tr_nd[:,:,1] = temp_int
+        tr_nd[:,:,0] = temp_int
+        tr_nd[:,:,1] = salt_int
         tr_el = np.zeros([NE, nvrt, 2])
 
         for k in np.arange(nvrt):
             #triangles
-            tr_el[tidxs,k,0] = np.mean(salt_int[tris[:,:],k], axis=1)
-            tr_el[tidxs,k,1] = np.mean(temp_int[tris[:,:],k], axis=1)
+            tr_el[tidxs,k,0] = np.mean(temp_int[tris[:,:],k], axis=1)
+            tr_el[tidxs,k,1] = np.mean(salt_int[tris[:,:],k], axis=1)
             #quads 
-            tr_el[qidxs,k,0] = np.mean(salt_int[quads[:,:],k], axis=1)
-            tr_el[qidxs,k,1] = np.mean(temp_int[quads[:,:],k], axis=1)
+            tr_el[qidxs,k,0] = np.mean(temp_int[quads[:,:],k], axis=1)
+            tr_el[qidxs,k,1] = np.mean(salt_int[quads[:,:],k], axis=1)
 
         #Compute su2 and sv2
         su2 = np.zeros([nside, nvrt])
