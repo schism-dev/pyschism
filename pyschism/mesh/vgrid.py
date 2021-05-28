@@ -150,15 +150,25 @@ class SZ(Vgrid):
             ' (transition depth between S and Z)',
             'Z levels',
         ]
-        for row in self.ztot:
-            f.append(f'{int(row[0]):d} {row[1]:G}')
+        # print(self.ztot)
+        # exit()
+        for row in enumerate(self.ztot):
+            # f.append(f'{int(row[0]):d} {row[1]:G}')
+            # line = [f'']
+            for i, x in enumerate(row):
+                print(i, x)
+                # line.append(f' {i+1:d} {x:G}')
+                f.append(f'{i+1:d} {x:G}')
         f.extend([
             'S levels',
             f'{self.h_c:G} {self.theta_b:G} {self.theta_f:G} '
             ' !h_c, theta_b, theta_f',
             ])
-        for row in self.sigma:
-            f.append(f'{int(row[0])} {row[1]:G}')
+        for row in enumerate(self.sigma):
+            # f.append(f'{int(row[0])} {row[1]:G}')
+            for i, x in enumerate(row):
+                # line.append(f' {i+1:d} {x:G}')
+                f.append(f'{i+1:d} {x:G}')
         return '\n'.join(f)
 
     @classmethod
@@ -184,9 +194,10 @@ class SZ(Vgrid):
         irec = 2
         for i in np.arange(kz):
             irec = irec+1
-            ztot.append([i+1, lines[irec].strip().split()[1]])
+            ztot.append(lines[irec].strip().split()[1])
+        print(ztot)
         ztot = np.array(ztot).astype('float')
-
+        print(ztot)
         # read s grid
         sigma = []
         irec = irec+2
@@ -195,17 +206,14 @@ class SZ(Vgrid):
             lines[irec].strip().split()[:3]).astype('float')
         for i in np.arange(nsigma):
             irec = irec + 1
-            sigma.append([i+1, lines[irec].strip().split()[1]])
+            sigma.append(lines[irec].strip().split()[1])
         sigma = np.array(sigma).astype('float')
         return cls(h_s, ztot, h_c, theta_b, theta_f, sigma)
 
     @classmethod
     def default(cls):
-        ztot = np.array([[1, -1.e6]])
-        sigma = np.array([
-            [1, -1],
-            [2, 0.]
-        ])
+        ztot = np.array([-1.e6])
+        sigma = np.array([-1, 0.])
         return cls(1.e6, ztot, 40., 1., 1.e-4, sigma)
 
     @property

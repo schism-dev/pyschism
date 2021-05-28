@@ -103,7 +103,7 @@ class GOFSBaroclinicComponent(BaroclinicComponent):
                 if required_date in datevector:
                     datasets[required_date] = self.forecast_datasets.values[i]
                     break
-
+        # print(datasets.keys())
         for date, ds in datasets.items():
             if ds is None:
                 raise ValueError(f'No data for date {date}.')
@@ -174,81 +174,67 @@ class GOFSElevation(GOFSBaroclinicComponent):
     def sampling_interval(self):
         return timedelta(hours=3.)
 
-    def write(self, path, hgrid, start_date, run_days, overwrite=False):
+    def put_ncdata(self, boundary, dst, start_date, run_days, overwrite=False,
+                   offset=0, output_interval=timedelta(hours=24),
+                   pixel_buffer=10):
+        for i, (time, dataset) in enumerate(
+            self.get_datasets(
+                start_date,
+                run_days,
+                output_interval
+            ).items()
+        ):
+            logger.info(
+                'Saving GOFS surf_el data for date: '
+                f'{start_date+i*output_interval} '
+                f'approximated as {time}.'
+                )
 
-        path = pathlib.Path(path)
-        if path.exists() and overwrite is not True:
-            raise IOError('File exists and overwrite is not True.')
-
-        nOpenBndNodes = 0
-        for boundary in hgrid.boundaries.ocean().itertuples():
-            nOpenBndNodes += len(boundary.indexes)
-        output_interval = timedelta(days=1)
-
-        with Dataset(path, 'w', format='NETCDF4') as dst:
-
-            # dimensions
-            dst.createDimension('nOpenBndNodes', nOpenBndNodes)
-            dst.createDimension('one', 1)
-            dst.createDimension('time', None)
-            dst.createDimension('nComponents', 1)
-
-            # variables
-            dst.createVariable('time', 'f', ('time',))
-            dst.createVariable('time_series', 'f',
-                               ('time', 'nOpenBndNodes', 'nComponents'))
-            dst.createVariable('time_step', 'f', ('one',))
-            dst['time_step'][:] = int(output_interval.total_seconds())
-            for i, (time, dataset) in enumerate(
-                self.get_datasets(
-                    start_date, run_days, output_interval).items()
-            ):
-                logger.info(
-                    'Saving GOFS surf_el data for date: '
-                    f'{start_date+i*output_interval} '
-                    f'approximated as {time}.'
-                    )
-                ds_base_date = datetime.strptime(
-                    ''.join(dataset['time'].units.split()[2:-1]),
-                    '%Y-%m-%d%H:%M:%S.%f')
-                ds_timevector = [ds_base_date + timedelta(hours=x)
-                                 for x in dataset['time'][:]]
-                time_idx = ds_timevector.index(time)
-                offset = 0
-                for j, boundary in enumerate(hgrid.boundaries.ocean().to_crs(
-                        'epsg:4326').itertuples()):
-                    bbox = self._modified_bbox(
-                        dataset, Bbox.from_extents(*boundary.geometry.bounds))
-                    lon_idxs, lat_idxs = self._modified_bbox_indexes(
-                            bbox,
-                            dataset,
-                            pixel_buffer=2
-                        )
-                    zi = np.full((len(lat_idxs), len(lon_idxs)), np.nan)
-                    for k, lat_idx in enumerate(lat_idxs):
-                        zi[k, :] = dataset[self.ncvar][
-                                            time_idx, lat_idx, lon_idxs]
-                    xi = dataset['lon'][lon_idxs]
-                    for idx in range(len(xi)):
-                        if xi[idx] > 180:
-                            xi[idx] = xi[idx]-360.
-                    yi = dataset['lat'][lat_idxs]
-                    xi, yi = np.meshgrid(xi, yi)
-                    xi = xi.flatten()
-                    yi = yi.flatten()
-                    zi = zi.flatten()
-                    xyq = np.array(boundary.geometry.coords)
-                    zq = griddata(
-                        (xi, yi),
-                        zi,
-                        (xyq[:, 0], xyq[:, 1]),
-                        method='linear',
-                        fill_value=np.nan,
-                    )
-                    if np.any(np.isnan(zq)):
-                        raise ValueError('Boundary contains NaNs.')
-                    dst['time_series'][time_idx, offset+j:len(zq)] = zq
-                    offset += len(zq)
+            ds_base_date = datetime.strptime(
+                ''.join(dataset['time'].units.split()[2:-1]),
+                '%Y-%m-%d%H:%M:%S.%f')
+            ds_timevector = [ds_base_date + timedelta(hours=x)
+                             for x in dataset['time'][:]]
+            time_idx = ds_timevector.index(time)
+            bbox = self._modified_bbox(
+                dataset, Bbox.from_extents(*boundary.geometry.bounds))
+            lon_idxs, lat_idxs = self._modified_bbox_indexes(
+                    bbox,
+                    dataset,
+                    pixel_buffer
+                )
+            zi = np.full((len(lat_idxs), len(lon_idxs)), np.nan)
+            for k, lat_idx in enumerate(lat_idxs):
+                zi[k, :] = dataset[self.ncvar][
+                                    time_idx, lat_idx, lon_idxs]
+            xi = dataset['lon'][lon_idxs]
+            for idx in range(len(xi)):
+                if xi[idx] > 180:
+                    xi[idx] = xi[idx]-360.
+            yi = dataset['lat'][lat_idxs]
+            xi, yi = np.meshgrid(xi, yi)
+            xi = xi.flatten()
+            yi = yi.flatten()
+            zi = zi.flatten()
+            xyq = np.array(boundary.geometry.coords)
+            zq = griddata(
+                (xi, yi),
+                zi,
+                (xyq[:, 0], xyq[:, 1]),
+                method='linear',
+                fill_value=np.nan,
+            )
+            nan_idxs = np.where(np.isnan(zq))
+            q_non_nan = np.where(~np.isnan(zi))
+            zq[nan_idxs] = griddata(
+                (xi[q_non_nan], yi[q_non_nan]),
+                zi[q_non_nan],
+                (xyq[nan_idxs, 0], xyq[nan_idxs, 1]),
+                method='nearest',
+            )
+            if np.any(np.isnan(zq)):
+                raise ValueError('Boundary contains NaNs.')
+            dst['time_series'][time_idx, offset:len(zq)] = zq
 
 
 def read_vgrid(fname):

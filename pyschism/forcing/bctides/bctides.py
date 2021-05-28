@@ -1,14 +1,19 @@
 from datetime import datetime, timedelta
 import pathlib
-from typing import Union, List, TYPE_CHECKING
+from typing import Any, Dict, Union, List, TYPE_CHECKING
 
 # import pytz
 # from pyschism import dates
 # from pyschism.driver import raise_type_error
 from pyschism.forcing.bctides import (
-    iettype, ifltype, itetype, isatype, itrtype)
+    iettype, ifltype, itetype, isatype,
+    itrtype
+)
 from pyschism.forcing.tides.tides import Tides, TidalDatabase
-from pyschism.mesh import Hgrid, Vgrid
+# from pyschism.mesh import (
+#     Hgrid,
+#     Vgrid
+# )
 
 if TYPE_CHECKING:
     from pyschism.driver import ModelDriver
@@ -73,26 +78,26 @@ class Bctides:
 
     def __init__(
             self,
-            hgrid: Hgrid,
+            hgrid,  #: Hgrid,
             start_date: datetime,
             rnday: timedelta,
-            vgrid: Vgrid = None,
-            elevation: iettype.Iettype = None,
-            velocity: ifltype.Ifltype = None,
-            temperature: itetype.Itetype = None,
-            salinity: isatype.Isatype = None,
-            tracers: Union[itrtype.Itrtype, List[itrtype.Itrtype]] = None,
+            vgrid=None,  #  : Vgrid = None,
+            # elevation: iettype.Iettype = None,
+            # velocity: ifltype.Ifltype = None,
+            # temperature: itetype.Itetype = None,
+            # salinity: isatype.Isatype = None,
+            # tracers: Union[itrtype.Itrtype, List[itrtype.Itrtype]] = None,
             cutoff_depth: float = 50.
     ):
         self.hgrid = hgrid
         self.start_date = start_date
         self.rnday = rnday
         self.vgrid = vgrid
-        self.elevation = elevation
-        self.velocity = velocity
-        self.temperature = temperature
-        self.salinity = salinity
-        self.tracers = list(tracers) if tracers is not None else []
+        # self.elevation = elevation
+        # self.velocity = velocity
+        # self.temperature = temperature
+        # self.salinity = salinity
+        # self.tracers = list(tracers) if tracers is not None else []
         self.cutoff_depth = cutoff_depth
 
     @classmethod
@@ -132,17 +137,18 @@ class Bctides:
                     f'{forcing[2]:G}',
                     f'{forcing[3]:G}',
                     f'{forcing[4]:G}']))
-        f.append(f'{self.tides.nbfr:d}')
-        for constituent in self.tides.get_active_forcing_constituents():
-            forcing = self.tides(
-                self.start_date, self.rnday, constituent)
-            f.append(' '.join([
-                f'{constituent}\n',
-                f'{forcing[2]:G}',
-                f'{forcing[3]:G}',
-                f'{forcing[4]:G}']))
-        f.append(f'{len(self.hgrid.boundaries.ocean())}')
-        for boundary in self.hgrid.boundaries.ocean().itertuples():
+        f.append(f'{self.nbfr:d}')
+        if self.nbfr > 0:
+            for constituent in self.tides.get_active_forcing_constituents():
+                forcing = self.tides(
+                    self.start_date, self.rnday, constituent)
+                f.append(' '.join([
+                    f'{constituent}\n',
+                    f'{forcing[2]:G}',
+                    f'{forcing[3]:G}',
+                    f'{forcing[4]:G}']))
+        f.append(f'{len(self.hgrid.boundaries.open)}')
+        for boundary in self.hgrid.boundaries.open.itertuples():
             f.append(self.get_forcing_string(boundary))
         return '\n'.join(f)
 
@@ -164,150 +170,149 @@ class Bctides:
         with open(bctides, 'w') as f:
             f.write(str(self))
         # write elev2D.th.nc
-        if self.elevation is not None:
-            if self.elevation.iettype in [4, 5]:
-                elev2D = output_directory / 'elev2D.th.nc' if elev2D is True \
-                    else elev2D
-                self.elevation.write(
+        elev2D = output_directory / 'elev2D.th.nc' if elev2D \
+            is True else elev2D
+        self.hgrid.boundaries.elev2d().write(
                     elev2D,
-                    self.hgrid,
                     self.start_date,
                     self.rnday,
+                    timedelta(hours=1),
                     overwrite
                 )
+        # write uv3D.th.nc
+        # self.hgrid.boundaries.uv3d().write(
+        #             uv3D,
+        #             self.start_date,
+        #             self.rnday,
+        #             overwrite
+        #         )
+        # for boundary in self.hgrid.boundaries.open.itertuples():
+        #     if boundary.iettype is not None:
+        #         if hasattr(boundary.iettype, 'write'):
+        #             elev2D = output_directory / 'elev2D.th.nc' if elev2D \
+        #                 is True else elev2D
+        #             boundary.iettype.write(
+        #                 elev2D,
+        #                 self.hgrid,
+        #                 self.start_date,
+        #                 self.rnday,
+        #                 overwrite
+        #             )
 
-        if self.velocity is not None:
-            if self.velocity.ifltype in [4, 5, -4, -5]:
-                uv3D = output_directory / 'uv3D.th.nc' if uv3D is True \
-                    else uv3D
-                self.velocity.write(
-                    uv3D,
-                    self.hgrid,
-                    self.vgrid,
-                    self.start_date,
-                    self.rnday,
-                    overwrite
-                )
-            elif self.velocity.ifltype == 1:
-                flux = output_directory / 'flux.th' if flux is True \
-                    else flux
-                self.velocity.write(flux, overwrite)
+        #             boundary.iettype.write()
 
-        def write_tracer(tracer):
-            tracer.write()
+        # if self.elevation is not None:
+        #     if self.elevation.iettype in [4, 5]:
+        #         elev2D = output_directory / 'elev2D.th.nc' if elev2D is True \
+        #             else elev2D
+        #         self.elevation.write(
+        #             elev2D,
+        #             self.hgrid,
+        #             self.start_date,
+        #             self.rnday,
+        #             overwrite
+        #         )
 
-        for tracer in [self.temperature, self.salinity, *self.tracers]:
-            if tracer is not None:
-                write_tracer(tracer)
+        # if self.velocity is not None:
+        #     if self.velocity.ifltype in [4, 5, -4, -5]:
+        #         uv3D = output_directory / 'uv3D.th.nc' if uv3D is True \
+        #             else uv3D
+        #         self.velocity.write(
+        #             uv3D,
+        #             self.hgrid,
+        #             self.vgrid,
+        #             self.start_date,
+        #             self.rnday,
+        #             overwrite
+        #         )
+        #     elif self.velocity.ifltype == 1:
+        #         flux = output_directory / 'flux.th' if flux is True \
+        #             else flux
+        #         self.velocity.write(flux, overwrite)
+
+        # def write_tracer(tracer):
+        #     tracer.write()
+
+        # for tracer in [self.temperature, self.salinity, *self.tracers]:
+        #     if tracer is not None:
+        #         write_tracer(tracer)
 
     def get_forcing_string(self, boundary):
 
-        def forcing_digit(pos):
-            if pos == 0:
-                return f'{len(boundary.indexes)}'
+        bctypes = [
+            boundary.iettype,
+            boundary.ifltype,
+            boundary.itetype,
+            boundary.isatype,
+        ]
 
-            elif pos == 1:
-                if self.elevation is None:
-                    return '0'
-                return str(self.elevation.iettype)
+        def get_focing_digit(bctype):
+            if bctype is not None:
+                # sensitive to MRO.
+                return str(getattr(
+                    bctype,
+                    f"{bctype.__class__.__bases__[0].__name__.lower()}"))
+            return '0'
+        line = [
+            f'{len(boundary.indexes)}',
+            *[digit for digit in map(get_focing_digit, bctypes)]
+        ]
 
-            elif pos == 2:
-                if self.velocity is None:
-                    return '0'
-                return str(self.velocity.ifltype)
-
-            elif pos == 3:
-                if self.temperature is None:
-                    return '0'
-                return str(self.temperature.itetype)
-
-            elif pos == 4:
-                if self.salinity is None:
-                    return '0'
-                return str(self.salinity.isatype)
-
-            elif pos >= 5:
-                if len(self.tracers) > 0:
-                    if self.tracers[5-pos] is not None:
-                        return str(self.tracers[5-pos].itrtype)
-                    return '0'
-                return '0'
-
-            else:
-                raise ValueError(f'Unhandled argument pos={pos}.')
-
-        f = [' '.join(list(map(forcing_digit, range(5 + len(self.tracers)))))]
-
-        for pos in range(1, 5 + len(self.tracers)):
-            if pos == 1:
-                if self.elevation is not None:
-                    f.append(
-                        self.elevation.get_boundary_string(
-                            self.hgrid, boundary))
-            elif pos == 2:
-                if self.velocity is not None:
-                    f.append(
-                        self.velocity.get_boundary_string(self.hgrid, boundary)
-                        )
-            elif pos == 3:
-                if self.temperature is not None:
-                    f.append(
-                        self.temperature.get_boundary_string(
-                            self.hgrid, boundary))
-            elif pos == 4:
-                if self.salinity is not None:
-                    f.append(
-                        self.salinity.get_boundary_string(self.hgrid, boundary)
-                        )
-            elif pos >= 5:
-                f.append(self.tracers[5+pos].get_boundary_string(
-                    self.hgrid, boundary))
-            else:
-                raise TypeError(f'Unhandled forcing at pos={pos}.')
+        f = [' '.join(line)]
+        for bctype in bctypes:
+            if bctype is not None:
+                f.append(bctype.get_boundary_string(self.hgrid, boundary))
         return '\n'.join(f)
-
-    @property
-    def hgrid(self):
-        return self._hgrid
-
-    @hgrid.setter
-    def hgrid(self, hgrid: Hgrid):
-        if not isinstance(hgrid, Hgrid):
-            raise_type_error('hgrid', hgrid, Hgrid)
-        self._hgrid = hgrid
 
     @property
     def tides(self):
         if not hasattr(self, '_tides'):
-            if self.elevation is None and self.velocity is None:
-                raise ValueError('Both elevation and velocity are disabled; at least one of the is required.')
-            elif self.elevation is not None and self.velocity is None:
-                self._tides = Tides(
-                    elevation=True,
-                    velocity=False,
-                    tidal_database=self.elevation.tides.tidal_database
-                    )
-            elif self.elevation is not None and self.velocity is not None:
-                self._tides = Tides(
-                    elevation=True,
-                    velocity=True,
-                    tidal_database=self.elevation.tides.tidal_database
-                    )
-            else:
-                raise ValueError(
-                    f'Unhandled combination: self.elevation={self.elvation} and '
-                    f'self.velocity={self.velocity}')
+            # get the first one you can find, since the Tides object is a
+            # singleton.
+            tides = None
+            for boundary in self.hgrid.boundaries.open.itertuples():
+                if boundary.iettype is not None:
+                    if hasattr(boundary.iettype, "tides"):
+                        tides = boundary.iettype.tides
+                        break
+                    elif boundary.ifltype is not None:
+                        if hasattr(boundary.ifltype, "tides"):
+                            tides = boundary.ifltype.tides
+                            break
+            self._tides = tides
         return self._tides
 
-    # @tides.setter
-    # def tides(self, tides):
-    #     if not isinstance(tides, (Tides, type(None))):
-    #         raise_type_error('tides', tides, Tides)
-    #     self._tides = tides
+    @property
+    def tracers(self) -> List[Dict[Any, Union[itrtype.Itrtype, None]]]:
+        # if not hasattr(self, '_tracers'):
+        #     # tracers: List[Dict[Any, Union[itrtype.Itrtype, None]]] = []
+        #     boundary_data = {}
+        #     for boundary in self.hgrid.boundaries.open.itertuples():
+        #         itrtypes = boundary.itrtype
+        #         if itrtypes is None:
+        #             tracers.append({})
+        #         for tracer in boundary.itr
+        #             tracers.append()
+        #         tracer.setdefault(
+
+        #             )
+
+        # _itrtype = boundary.itrtype
+        # return self._tracers
+        # TODO: Cheating for now...
+        return []
 
     @property
     def ntip(self):
+        if self.tides is None:
+            return 0
         return len(self.tides.get_active_potential_constituents())
+
+    @property
+    def nbfr(self):
+        if self.tides is None:
+            return 0
+        return self.tides.nbfr
 
     @property
     def Z0(self):
@@ -326,17 +331,6 @@ class Bctides:
     def cutoff_depth(self, cutoff_depth: float):
         self._cutoff_depth = float(cutoff_depth)
 
-    @property
-    def tidal_database(self):
-        return self._tidal_database
-
-    @tidal_database.setter
-    def tidal_database(self, tidal_database: Union[TidalDatabase, str]):
-        if tidal_database is not None:
-            if not isinstance(tidal_database, TidalDatabase):
-                tidal_database = TidalDatabase(tidal_database)
-        self._tidal_database = tidal_database
-
     # @property
     # def subtidal_database(self):
     #     return self._subtidal_database
@@ -348,42 +342,42 @@ class Bctides:
     #     else:
     #         self._subtidal_database = None
 
-    @property
-    def elevation(self):
-        return self._elevation
+    # @property
+    # def elevation(self):
+    #     return self._elevation
 
-    @elevation.setter
-    def elevation(self, elevation):
-        if elevation is not None:
-            assert isinstance(elevation, iettype.Iettype)
-        self._elevation = elevation
+    # @elevation.setter
+    # def elevation(self, elevation):
+    #     if elevation is not None:
+    #         assert isinstance(elevation, iettype.Iettype)
+    #     self._elevation = elevation
 
-    @property
-    def velocity(self):
-        return self._velocity
+    # @property
+    # def velocity(self):
+    #     return self._velocity
 
-    @velocity.setter
-    def velocity(self, velocity):
-        if velocity is not None:
-            assert isinstance(velocity, ifltype.Ifltype)
-        self._velocity = velocity
+    # @velocity.setter
+    # def velocity(self, velocity):
+    #     if velocity is not None:
+    #         assert isinstance(velocity, ifltype.Ifltype)
+    #     self._velocity = velocity
 
-    @property
-    def temperature(self):
-        return self._temperature
+    # @property
+    # def temperature(self):
+    #     return self._temperature
 
-    @temperature.setter
-    def temperature(self, temperature: Union[itetype.Itetype, None]):
-        if temperature is not None:
-            assert isinstance(temperature, itetype.Itetype)
-        self._temperature = temperature
+    # @temperature.setter
+    # def temperature(self, temperature: Union[itetype.Itetype, None]):
+    #     if temperature is not None:
+    #         assert isinstance(temperature, itetype.Itetype)
+    #     self._temperature = temperature
 
-    @property
-    def salinity(self):
-        return self._salinity
+    # @property
+    # def salinity(self):
+    #     return self._salinity
 
-    @salinity.setter
-    def salinity(self, salinity: Union[isatype.Isatype, None]):
-        if salinity is not None:
-            assert isinstance(salinity, isatype.Isatype)
-        self._salinity = salinity
+    # @salinity.setter
+    # def salinity(self, salinity: Union[isatype.Isatype, None]):
+    #     if salinity is not None:
+    #         assert isinstance(salinity, isatype.Isatype)
+    #     self._salinity = salinity

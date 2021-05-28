@@ -320,7 +320,10 @@ class OutputCollection:
             self.n_local_to_global.setdefault(nproc_id, n_local_to_global)
             self.e_local_to_global.setdefault(nproc_id, e_local_to_global)
             self.s_local_to_global.setdefault(nproc_id, s_local_to_global)
-        self.hgrid = Gr3(nodes=nodes, elements=elements, crs='epsg:4326')
+        # sort nodes
+        sorted_nodes = {str(i+1): nodes[str(i+1)] for i in range(len(nodes))}
+        sorted_elements = {str(i+1): elements[str(i+1)] for i in range(len(elements))}
+        self.hgrid = Gr3(nodes=sorted_nodes, elements=sorted_elements, crs='epsg:4326')
         for vargroup in self.surface_output_vars:
             for vartype in vargroup:
                 nc = Dataset(self.filenames[0])

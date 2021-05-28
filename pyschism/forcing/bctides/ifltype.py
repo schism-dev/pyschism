@@ -51,6 +51,10 @@ def get_boundary_string(self, hgrid, boundary):
 class TidalVelocity(Ifltype):
 
     def __init__(self, tides: Tides):
+        if not isinstance(tides, Tides):
+            raise TypeError(
+                f'Argument tides must be an isinstance of {Tides} not type'
+                f'{type(tides)}.')
         self.tides = tides
 
     def get_boundary_string(self, hgrid, boundary):
@@ -92,6 +96,10 @@ class SpatiallyVaryingTimeHistoryVelocity(Ifltype):
 class TidalAndSpatiallyVaryingVelocityTimeHistory(Ifltype):
 
     def __init__(self, tides, data_source):
+        if not isinstance(tides, Tides):
+            raise TypeError(
+                f'Argument tides must be an isinstance of {Tides} not type'
+                f'{type(tides)}.')
         self.tides = tides
         self.data_source = data_source
 
