@@ -470,10 +470,6 @@ class Hydrology:
         return self._df
 
 
-def get_local_azimutal_projection(lon, lat):
-    return CRS(f"+proj=aeqd +R=6371000 +units=m +lat_0={lat} +lon_0={lon}")
-
-
 def get_circle_of_radius(lon, lat, radius):
 
     local_azimuthal_projection = "+proj=aeqd +R=6371000 +units=m " \

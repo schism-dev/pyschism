@@ -176,7 +176,7 @@ class Bctides:
                     elev2D,
                     self.start_date,
                     self.rnday,
-                    timedelta(hours=1),
+                    timedelta(days=1),
                     overwrite
                 )
         # write uv3D.th.nc

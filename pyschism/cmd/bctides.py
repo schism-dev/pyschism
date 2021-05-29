@@ -3,11 +3,10 @@ from datetime import datetime, timedelta
 import json
 import logging
 import pathlib
-from time import time
+import warnings
 
 from pyproj import CRS
 
-from pyschism import dates
 # from pyschism.forcing.baroclinic import GOFS, RTOFS
 from pyschism.forcing.baroclinic.gofs import GOFSElevation
 # from pyschism.forcing.baroclinic.rtofs import RTOFSElevation
@@ -67,19 +66,21 @@ class BctidesCli:
         bctides.write(args.output_directory, overwrite=args.overwrite)
 
 
-class HgridCrsAction(argparse.Action):
-    def __call__(self, parser, namespace, values, option_string=None):
-        if values is not None:
-            values = CRS.from_user_input(values)
-        setattr(namespace, self.dest, values)
-
-
 class HgridAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
-        hgrid = Hgrid.open(values, crs=namespace.hgrid_crs)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            hgrid = Hgrid.open(values)
         if len(hgrid.boundaries.open) == 0:
             raise TypeError(f"Hgrid provided {values} contains no open boundaries.")
         setattr(namespace, self.dest, hgrid)
+
+
+class HgridCrsAction(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        if values is not None:
+            namespace.hgrid.nodes._crs = CRS.from_user_input(values)
+        setattr(namespace, self.dest, values)
 
 
 class VgridAction(argparse.Action):
@@ -356,9 +357,8 @@ def add_bctypes(bctides):
 def add_bctides(subparsers):
     bctides = subparsers.add_parser("bctides")
     bctides.add_argument(
-        "--hgrid",
+        "hgrid",
         action=HgridAction,
-        required=True,
     )
     bctides.add_argument(
         '--hgrid-crs',
@@ -386,7 +386,7 @@ def add_bctides(subparsers):
     #     type=str,
     #     type=lambda x: datetime.strptime(x, "%Y-%m-%dT%H:%M:%S"),
     #     # help=''
-    # )    bctides.add_argument("--output-directory", "-o", type=pathlib.Path, required=True)
+    # )
     bctides.add_argument("--output-directory", "-o", type=pathlib.Path, required=True)
     bctides.add_argument(
         "--vgrid",

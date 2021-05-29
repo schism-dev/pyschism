@@ -103,10 +103,13 @@ class GOFSBaroclinicComponent(BaroclinicComponent):
                 if required_date in datevector:
                     datasets[required_date] = self.forecast_datasets.values[i]
                     break
-        # print(datasets.keys())
+
+        missing_dates = []
         for date, ds in datasets.items():
             if ds is None:
-                raise ValueError(f'No data for date {date}.')
+                missing_dates.append(date)
+        if len(missing_dates) > 0:
+            raise ValueError(f'No data for dates {missing_dates}\n, got {datasets.keys()}.')
 
         return datasets
 
