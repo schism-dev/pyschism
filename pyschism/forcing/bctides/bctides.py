@@ -78,6 +78,7 @@ class Bctides:
             bctides: Union[bool, str] = True,
             elev2D: Union[bool, str] = True,
             uv3D: Union[bool, str] = True,
+            tem3D: Union[bool, str] = True,
             flux: Union[bool, str] = True,
             overwrite: bool = False
     ):
@@ -109,6 +110,17 @@ class Bctides:
                     timedelta(days=1),
                     overwrite
                 )
+        # write TEM_3D.th.nc
+        tem3D = output_directory / 'TEM_3D.th.nc' if tem3D \
+            is True else tem3D
+        self.hgrid.boundaries.tem3d(self.vgrid).write(
+                    tem3D,
+                    self.start_date,
+                    self.rnday,
+                    timedelta(days=1),
+                    overwrite
+                )
+
         # for boundary in self.hgrid.boundaries.open.itertuples():
         #     if boundary.iettype is not None:
         #         if hasattr(boundary.iettype, 'write'):

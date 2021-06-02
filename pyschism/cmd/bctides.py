@@ -181,6 +181,28 @@ class Ifltype5Action(argparse.Action):
         setattr(namespace, self.dest, values)
 
 
+class Itetype4Action(argparse.Action):
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        for boundary in namespace.hgrid.boundaries.open.itertuples():
+            namespace.hgrid.boundaries.set_forcing(
+                boundary.id,
+                itetype=self.const(baroclinic_databases[
+                    namespace.baroclinic_database]()))
+        setattr(namespace, self.dest, self.const)
+
+
+class Isatype4Action(argparse.Action):
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        for boundary in namespace.hgrid.boundaries.open.itertuples():
+            namespace.hgrid.boundaries.set_forcing(
+                boundary.id,
+                isatype=self.const(baroclinic_databases[
+                    namespace.baroclinic_database]()))
+        setattr(namespace, self.dest, self.const)
+
+
 def add_bctypes(bctides):
     _iettype = bctides.add_mutually_exclusive_group()
     _iettype.add_argument(
@@ -336,8 +358,9 @@ def add_bctypes(bctides):
     _itetype.add_argument(
         '--temp-3d',
         '--itetype-4',
-        action='store_const',
+        action=Itetype4Action,
         dest='itetype',
+        nargs=0,
         const=itetype.Itetype4,
     )
     _isatype = bctides.add_mutually_exclusive_group()

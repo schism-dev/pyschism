@@ -4,7 +4,7 @@ import numpy as np
 import geopandas as gpd
 from shapely.geometry import LineString
 
-
+from pyschism.forcing.bctides.mod3d import TEM_3D
 from pyschism.forcing.bctides.elev2d import Elev2D
 from pyschism.forcing.bctides.uv3d import UV3D
 from pyschism.forcing.bctides.iettype import Iettype
@@ -36,7 +36,7 @@ class HgridBoundaries:
                             'ifltype': None,
                             'itetype': None,
                             'isatype': None,
-                            'itrtype': None,
+                            'itrtype': {},
                             })
 
                 elif str(ibtype).endswith('1'):
@@ -87,6 +87,9 @@ class HgridBoundaries:
 
     def uv3d(self, vgrid):
         return UV3D(self.hgrid, vgrid)
+
+    def tem3d(self, vgrid):
+        return TEM_3D(self.hgrid, vgrid)
 
     def set_forcing(
             self,
