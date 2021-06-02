@@ -4,7 +4,7 @@ import numpy as np
 import geopandas as gpd
 from shapely.geometry import LineString
 
-from pyschism.forcing.bctides.mod3d import TEM_3D
+from pyschism.forcing.bctides.mod3d import TEM_3D, SAL_3D
 from pyschism.forcing.bctides.elev2d import Elev2D
 from pyschism.forcing.bctides.uv3d import UV3D
 from pyschism.forcing.bctides.iettype import Iettype
@@ -90,6 +90,9 @@ class HgridBoundaries:
 
     def tem3d(self, vgrid):
         return TEM_3D(self.hgrid, vgrid)
+
+    def sal3d(self, vgrid):
+        return SAL_3D(self.hgrid, vgrid)
 
     def set_forcing(
             self,

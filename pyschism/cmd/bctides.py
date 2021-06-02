@@ -394,8 +394,9 @@ def add_bctypes(bctides):
     _isatype.add_argument(
         '--salt-3d',
         '--isatype-4',
-        action='store_const',
+        action=Isatype4Action,
         dest='isatype',
+        nargs=0,
         const=isatype.Isatype4,
     )
 

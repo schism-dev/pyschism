@@ -525,6 +525,106 @@ class GOFSTemperature(GOFSBaroclinicComponent):
 
 class GOFSSalinity(GOFSBaroclinicComponent):
 
+    def put_ncdata(self, hgrid, vgrid, boundary, dst, start_date, run_days,
+                   overwrite=False, offset=0,
+                   output_interval=timedelta(hours=24), pixel_buffer=10):
+
+        for i, (time, dataset) in enumerate(
+            self.get_datasets(
+                start_date,
+                run_days,
+                output_interval
+            ).items()
+        ):
+            ds_base_date = datetime.strptime(
+                ''.join(dataset['time'].units.split()[2:-1]),
+                '%Y-%m-%d%H:%M:%S.%f')
+            ds_timevector = [ds_base_date + timedelta(hours=x)
+                             for x in dataset['time'][:]]
+            requested_date = dates.nearest_cycle(
+                start_date + i*output_interval,
+                period=3).replace(tzinfo=None)
+            time_idx = ds_timevector.index(requested_date)
+            logger.info(
+                'Saving GOFS salinity data for date: '
+                f'{start_date+i*output_interval} '
+                f'approximated as {ds_timevector[time_idx]} for '
+                f'boundary id={boundary.id}'
+                )
+            bounds = boundary.geometry.bounds
+            dx = (dataset['lon'][-1] - dataset['lon'][0]) / len(dataset['lon'])
+            dy = (dataset['lat'][-1] - dataset['lat'][0]) / len(dataset['lat'])
+            bounds = (
+                bounds[0] - 2*dx,
+                bounds[1] - 2*dy,
+                bounds[2] + 2*dx,
+                bounds[3] + 2*dy,
+                )
+            bbox = self._modified_bbox(
+                dataset, Bbox.from_extents(*bounds))
+            lon_idxs, lat_idxs = self._modified_bbox_indexes(
+                    bbox,
+                    dataset,
+                    pixel_buffer
+                )
+            # z_ui_idxs = list(range(dataset['depth'].shape[0]))
+            z_idxs = list(range(dataset['depth'].shape[0]))  # TODO: subset?
+            salt = np.full((len(z_idxs), len(lat_idxs), len(lon_idxs)), np.nan)
+            items_iter = tqdm.tqdm(lat_idxs)
+            with tqdm_logging_wrapper.wrap_logging_for_tqdm(
+                    items_iter), items_iter:
+                for k, lat_idx in enumerate(items_iter):
+                    salt[:, k, :] = dataset[self.ncvar][time_idx, z_idxs, lat_idx, lon_idxs]
+
+            xi = dataset['lon'][lon_idxs]
+            for idx in range(len(xi)):
+                if xi[idx] > 180:
+                    xi[idx] = xi[idx]-360.
+            yi = dataset['lat'][lat_idxs]
+
+            if vgrid.ivcor == 1:
+                bz = (hgrid.values[:, None]*vgrid.sigma)[boundary.indexes, :]
+            else:
+                raise NotImplementedError('vgrid.ivcor!=1')
+
+            xy = hgrid.get_xy(crs='epsg:4326')
+            bx = np.tile(xy[boundary.indexes, 0], (bz.shape[1],))
+            by = np.tile(xy[boundary.indexes, 1], (bz.shape[1],))
+            bzyx = np.vstack([-bz.flatten(), by, bx]).T
+            zi = dataset['depth'][z_idxs]
+
+            # First try with RegularGridInterpolator
+            salt_fd = RegularGridInterpolator(
+                (zi, yi, xi),
+                salt,
+                method='linear',
+                bounds_error=False,
+                fill_value=np.nan
+            )
+            salt_interp = salt_fd(bzyx)
+
+            # the boundary and the data don't intersect
+            if np.all(np.isnan(salt_interp)):
+                salt_idxs = np.where(~np.isnan(salt))
+                xyzi = np.vstack([
+                    np.tile(xi, salt.shape)[salt_idxs].flatten(),
+                    np.tile(yi, salt.shape)[salt_idxs].flatten(),
+                    np.tile(zi, salt.shape)[salt_idxs].flatten()
+                ]).T
+                salt_fd = NearestNDInterpolator(xyzi, salt[salt_idxs].flatten())
+                salt_interp = salt_fd(np.vstack([bx, by, -bz.flatten()]).T)
+            # the boundary and the data partially intersect
+            elif np.any(np.isnan(salt_interp)):
+                salt_idxs = np.where(~np.isnan(salt_interp))
+                salt_fd = NearestNDInterpolator(bzyx[salt_idxs], salt_interp[salt_idxs])
+                salt_idxs = np.where(np.isnan(salt_interp))
+                salt_interp[salt_idxs] = salt_fd(bzyx[salt_idxs])
+
+            if np.any(np.isnan(salt_interp)):
+                raise ValueError('No boundary  salt data for GOFS. '
+                                 'Try increasing pixel_buffer argument.')
+            dst['time_series'][i, offset:offset+bz.shape[0], :, :] = salt_interp.reshape(bz.shape)
+
     @property
     def product(self) -> str:
         return 'rtofs_glo_3dz_forecast_daily_salt'

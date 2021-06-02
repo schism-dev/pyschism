@@ -79,6 +79,7 @@ class Bctides:
             elev2D: Union[bool, str] = True,
             uv3D: Union[bool, str] = True,
             tem3D: Union[bool, str] = True,
+            sal3D: Union[bool, str] = True,
             flux: Union[bool, str] = True,
             overwrite: bool = False
     ):
@@ -115,6 +116,15 @@ class Bctides:
             is True else tem3D
         self.hgrid.boundaries.tem3d(self.vgrid).write(
                     tem3D,
+                    self.start_date,
+                    self.rnday,
+                    timedelta(days=1),
+                    overwrite
+                )
+        sal3D = output_directory / 'SAL_3D.th.nc' if sal3D \
+            is True else sal3D
+        self.hgrid.boundaries.sal3d(self.vgrid).write(
+                    sal3D,
                     self.start_date,
                     self.rnday,
                     timedelta(days=1),

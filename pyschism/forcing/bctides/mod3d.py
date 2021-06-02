@@ -108,3 +108,18 @@ class TEM_3D(MOD_3D):
     @property
     def name(self):
         return 'temperature'
+
+
+class SAL_3D(MOD_3D):
+
+    @property
+    def nComponents(self):
+        return 1
+
+    @property
+    def bctype(self):
+        return 'isatype'
+
+    @property
+    def name(self):
+        return 'salinity'
