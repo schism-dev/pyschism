@@ -502,11 +502,7 @@ class GOFSTemperature(GOFSBaroclinicComponent):
                 raise ValueError('No boundary  temperature data for GOFS. '
                                  'Try increasing pixel_buffer argument.')
             pressure = height_to_pressure_std(units('meter')*bz.flatten())
-            # print(zi)
-            # pre = np.tile(pressure, ny*nx).reshape(nlev, ny, nx)
             temp_interp = units('degC')*temp_interp
-            # temp_interp.reshape(bz.shape)
-            # print(temp_interp)
             temp_interp = potential_temperature(pressure, temp_interp).to('degC')
             dst['time_series'][i, offset:offset+bz.shape[0], :, :] = temp_interp.reshape(bz.shape)
 
