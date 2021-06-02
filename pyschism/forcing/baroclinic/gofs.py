@@ -1,15 +1,15 @@
 from datetime import datetime, timedelta
 from functools import lru_cache
-from typing import Dict, Union
-
 import logging
-import pathlib
+from typing import Dict, Union
 
 
 from matplotlib.transforms import Bbox
 from netCDF4 import Dataset
 import numpy as np
-from scipy.interpolate import griddata
+from scipy.interpolate import griddata, RegularGridInterpolator, NearestNDInterpolator
+import tqdm
+import tqdm_logging_wrapper
 
 
 from pyschism import dates
@@ -96,7 +96,6 @@ class GOFSBaroclinicComponent(BaroclinicComponent):
             required_end_date + sampling_interval,
             sampling_interval
         ).astype(datetime)
-
         datasets = {required_date: None for required_date in required_datevector}
         for required_date in required_datevector:
             for i, datevector in enumerate(self.forecast_datasets.datevectors()):
@@ -187,20 +186,32 @@ class GOFSElevation(GOFSBaroclinicComponent):
                 output_interval
             ).items()
         ):
-            logger.info(
-                'Saving GOFS surf_el data for date: '
-                f'{start_date+i*output_interval} '
-                f'approximated as {time}.'
-                )
-
             ds_base_date = datetime.strptime(
                 ''.join(dataset['time'].units.split()[2:-1]),
                 '%Y-%m-%d%H:%M:%S.%f')
             ds_timevector = [ds_base_date + timedelta(hours=x)
                              for x in dataset['time'][:]]
-            time_idx = ds_timevector.index(time)
+            requested_date = dates.nearest_cycle(
+                start_date + i*output_interval,
+                period=3).replace(tzinfo=None)
+            time_idx = ds_timevector.index(requested_date)
+            logger.info(
+                'Saving GOFS elev data for date: '
+                f'{start_date+i*output_interval} '
+                f'approximated as {ds_timevector[time_idx]} for '
+                f'boundary id={boundary.id}'
+                )
+            bounds = boundary.geometry.bounds
+            dx = (dataset['lon'][-1] - dataset['lon'][0]) / len(dataset['lon'])
+            dy = (dataset['lat'][-1] - dataset['lat'][0]) / len(dataset['lat'])
+            bounds = (
+                bounds[0] - 2*dx,
+                bounds[1] - 2*dy,
+                bounds[2] + 2*dx,
+                bounds[3] + 2*dy,
+                )
             bbox = self._modified_bbox(
-                dataset, Bbox.from_extents(*boundary.geometry.bounds))
+                dataset, Bbox.from_extents(*bounds))
             lon_idxs, lat_idxs = self._modified_bbox_indexes(
                     bbox,
                     dataset,
@@ -284,94 +295,150 @@ def read_vgrid(fname):
 
 class GOFSVelocity(GOFSBaroclinicComponent):
 
-    def write(self, path, hgrid, vgrid, start_date, run_days, overwrite=False):
+    @property
+    def product(self) -> str:
+        return 'rtofs_glo_2ds_forecast_3hrly_diag'
 
-        path = pathlib.Path(path)
-        if path.exists() and overwrite is not True:
-            raise IOError('File exists and overwrite is not True.')
+    @property
+    def ncvar(self):
+        return 'water_u', 'water_v'
 
-        nOpenBndNodes = 0
-        for boundary in hgrid.boundaries.ocean().itertuples():
-            nOpenBndNodes += len(boundary.indexes)
-        output_interval = timedelta(days=1)
-        import tempfile
-        tmpdir = tempfile.TemporaryDirectory()
-        vgrid.write(tmpdir.name+'/vgrid.in')
-        sigma = read_vgrid(tmpdir.name+'/vgrid.in')
-        depth = hgrid.values
-        idxs = np.where(depth < 0.11)
-        depth[idxs] = 0.11
-        breakpoint()
-        zcor = depth[:, None] * vgrid.sigma
-        nvrt = zcor.shape[1]
-        print(zcor)
-        print(nvrt)
-        exit()
-        with Dataset(path, 'w', format='NETCDF4') as dst:
+    @property
+    def sampling_interval(self):
+        return timedelta(hours=3.)
 
-            # dimensions
-            dst.createDimension('nOpenBndNodes', nOpenBndNodes)
-            dst.createDimension('one', 1)
-            dst.createDimension('time', None)
-            dst.createDimension('nComponents', 1)
-            dst.createDimension('nLevels', nvrt)
+    def put_ncdata(self, hgrid, vgrid, boundary, dst, start_date, run_days,
+                   overwrite=False, offset=0,
+                   output_interval=timedelta(hours=24), pixel_buffer=10):
 
-            # variables
-            dst.createVariable('time', 'f', ('time',))
-            dst.createVariable('time_series', 'f',
-                               ('time', 'nOpenBndNodes', 'nComponents'))
-            dst.createVariable('time_step', 'f', ('one',))
-            dst['time_step'][:] = int(output_interval.total_seconds())
-            for i, (time, dataset) in enumerate(
-                self.get_datasets(
-                    start_date, run_days, output_interval).items()
-            ):
-                logger.info(
-                    'Saving GOFS surf_el data for date: '
-                    f'{start_date+i*output_interval} '
-                    f'approximated as {time}.'
-                    )
-                ds_base_date = datetime.strptime(
-                    ''.join(dataset['time'].units.split()[2:-1]),
-                    '%Y-%m-%d%H:%M:%S.%f')
-                ds_timevector = [ds_base_date + timedelta(hours=x)
-                                 for x in dataset['time'][:]]
-                time_idx = ds_timevector.index(time)
-                offset = 0
-                for j, boundary in enumerate(hgrid.boundaries.ocean().to_crs(
-                        'epsg:4326').itertuples()):
-                    bbox = self._modified_bbox(
-                        dataset, Bbox.from_extents(*boundary.geometry.bounds))
-                    lon_idxs, lat_idxs = self._modified_bbox_indexes(
-                            bbox,
-                            dataset,
-                            pixel_buffer=2
-                        )
-                    zi = np.full((len(lat_idxs), len(lon_idxs)), np.nan)
-                    for k, lat_idx in enumerate(lat_idxs):
-                        zi[k, :] = dataset['surf_el'][
-                                            time_idx, lat_idx, lon_idxs]
-                    xi = dataset['lon'][lon_idxs]
-                    for idx in range(len(xi)):
-                        if xi[idx] > 180:
-                            xi[idx] = xi[idx]-360.
-                    yi = dataset['lat'][lat_idxs]
-                    xi, yi = np.meshgrid(xi, yi)
-                    xi = xi.flatten()
-                    yi = yi.flatten()
-                    zi = zi.flatten()
-                    xyq = np.array(boundary.geometry.coords)
-                    zq = griddata(
-                        (xi, yi),
-                        zi,
-                        (xyq[:, 0], xyq[:, 1]),
-                        method='linear',
-                        fill_value=np.nan,
-                    )
-                    if np.any(np.isnan(zq)):
-                        raise ValueError('Boundary contains NaNs.')
-                    dst['time_series'][time_idx, offset+j:len(zq)] = zq
-                    offset += len(zq)
+        for i, (time, dataset) in enumerate(
+            self.get_datasets(
+                start_date,
+                run_days,
+                output_interval
+            ).items()
+        ):
+            ds_base_date = datetime.strptime(
+                ''.join(dataset['time'].units.split()[2:-1]),
+                '%Y-%m-%d%H:%M:%S.%f')
+            ds_timevector = [ds_base_date + timedelta(hours=x)
+                             for x in dataset['time'][:]]
+            requested_date = dates.nearest_cycle(
+                start_date + i*output_interval,
+                period=3).replace(tzinfo=None)
+            time_idx = ds_timevector.index(requested_date)
+            logger.info(
+                'Saving GOFS water_uv data for date: '
+                f'{start_date+i*output_interval} '
+                f'approximated as {ds_timevector[time_idx]} for '
+                f'boundary id={boundary.id}'
+                )
+            bounds = boundary.geometry.bounds
+            dx = (dataset['lon'][-1] - dataset['lon'][0]) / len(dataset['lon'])
+            dy = (dataset['lat'][-1] - dataset['lat'][0]) / len(dataset['lat'])
+            bounds = (
+                bounds[0] - 2*dx,
+                bounds[1] - 2*dy,
+                bounds[2] + 2*dx,
+                bounds[3] + 2*dy,
+                )
+            bbox = self._modified_bbox(
+                dataset, Bbox.from_extents(*bounds))
+            lon_idxs, lat_idxs = self._modified_bbox_indexes(
+                    bbox,
+                    dataset,
+                    pixel_buffer
+                )
+            uvar, vvar = self.ncvar
+            # z_ui_idxs = list(range(dataset['depth'].shape[0]))
+            z_idxs = list(range(dataset['depth'].shape[0]))  # TODO: subset?
+            ui = np.full((len(z_idxs), len(lat_idxs), len(lon_idxs)), np.nan)
+            vi = np.full((len(z_idxs), len(lat_idxs), len(lon_idxs)), np.nan)
+            items_iter = tqdm.tqdm(lat_idxs)
+            with tqdm_logging_wrapper.wrap_logging_for_tqdm(
+                    items_iter), items_iter:
+                for k, lat_idx in enumerate(items_iter):
+                    ui[:, k, :] = dataset[uvar][time_idx, z_idxs, lat_idx, lon_idxs]
+                    vi[:, k, :] = dataset[vvar][time_idx, z_idxs, lat_idx, lon_idxs]
+
+            xi = dataset['lon'][lon_idxs]
+            for idx in range(len(xi)):
+                if xi[idx] > 180:
+                    xi[idx] = xi[idx]-360.
+            yi = dataset['lat'][lat_idxs]
+
+            if vgrid.ivcor == 1:
+                bz = (hgrid.values[:, None]*vgrid.sigma)[boundary.indexes, :]
+            else:
+                raise NotImplementedError('vgrid.ivcor!=1')
+
+            xy = hgrid.get_xy(crs='epsg:4326')
+            bx = np.tile(xy[boundary.indexes, 0], (bz.shape[1],))
+            by = np.tile(xy[boundary.indexes, 1], (bz.shape[1],))
+            bzyx = np.vstack([-bz.flatten(), by, bx]).T
+            zi = dataset['depth'][z_idxs]
+
+            # First try with RegularGridInterpolator
+            ui_fd = RegularGridInterpolator(
+                (zi, yi, xi),
+                ui,
+                method='linear',
+                bounds_error=False,
+                fill_value=np.nan
+            )
+            u_interp = ui_fd(bzyx)
+
+            # the boundary and the data don't intersect
+            if np.all(np.isnan(u_interp)):
+                ui_idxs = np.where(~np.isnan(ui))
+                xyzi = np.vstack([
+                    np.tile(xi, ui.shape)[ui_idxs].flatten(),
+                    np.tile(yi, ui.shape)[ui_idxs].flatten(),
+                    np.tile(zi, ui.shape)[ui_idxs].flatten()
+                ]).T
+                ui_fd = NearestNDInterpolator(xyzi, ui[ui_idxs].flatten())
+                u_interp = ui_fd(np.vstack([bx, by, -bz.flatten()]).T)
+            # the boundary and the data partially intersect
+            elif np.any(np.isnan(u_interp)):
+                ui_idxs = np.where(~np.isnan(u_interp))
+                ui_fd = NearestNDInterpolator(bzyx[ui_idxs], u_interp[ui_idxs])
+                ui_idxs = np.where(np.isnan(u_interp))
+                u_interp[ui_idxs] = ui_fd(bzyx[ui_idxs])
+
+            if np.any(np.isnan(u_interp)):
+                raise ValueError('No boundary  u velocity data for GOFS. '
+                                 'Try increasing pixel_buffer argument.')
+
+            vi_fd = RegularGridInterpolator(
+                (zi, yi, xi),
+                vi,
+                method='linear',
+                bounds_error=False,
+                fill_value=np.nan
+            )
+
+            v_interp = vi_fd(bzyx)
+
+            if np.all(np.isnan(v_interp)):
+                vi_idxs = np.where(~np.isnan(vi))
+                xi = np.tile(xi, vi.shape)[vi_idxs].flatten()
+                yi = np.tile(yi, vi.shape)[vi_idxs].flatten()
+                zi = np.tile(zi, vi.shape)[vi_idxs].flatten()
+                xyzi = np.vstack([xi, yi, zi]).T
+                vi_fd = NearestNDInterpolator(xyzi, vi[ui_idxs].flatten())
+                v_interp = ui_fd(np.vstack([bx, by, -bz.flatten()]).T)
+
+            elif np.any(np.isnan(v_interp)):
+                vi_idxs = np.where(~np.isnan(v_interp))
+                vi_fd = NearestNDInterpolator(bzyx[vi_idxs], v_interp[vi_idxs])
+                vi_idxs = np.where(np.isnan(v_interp))
+                v_interp[vi_idxs] = vi_fd(bzyx[vi_idxs])
+
+            if np.any(np.isnan(v_interp)):
+                raise ValueError('No boundary data for GOFS. Try increasing pixel_buffer argument.')
+
+            dst['time_series'][i, offset:offset+bz.shape[0], :, 0] = u_interp.reshape(bz.shape)
+            dst['time_series'][i, offset:offset+bz.shape[0], :, 1] = v_interp.reshape(bz.shape)
 
 
 class GOFSTemperature(GOFSBaroclinicComponent):

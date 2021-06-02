@@ -733,18 +733,19 @@ class OpenBoundaryInventory():
         vd=Vgrid()
         sigma=vd.read_vgrid(vgrid)
 
-        hgrid = hgrid.to_dict()
-        nodes = Nodes(hgrid['nodes']) 
+        # hgrid = hgrid.to_dict()
+        # nodes = Nodes(hgrid['nodes']) 
         #get coords of SCHISM
-        loni = nodes.coords[:,0]
-        lati = nodes.coords[:,1]
+        xy = hgrid.get_xy(crs='epsg:4326')
+        loni = xy[:, 0]
+        lati = xy[:, 1]
 
         #get bathymetry
         depth = nodes.values
         idxs = np.where(depth < 0.11)
         depth[idxs] = 0.11
         #compute zcor
-        zcor = depth[:,None]*sigma
+        zcor = depth[:, None]*sigma
         nvrt=zcor.shape[1]
 
         #Get open boundary

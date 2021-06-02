@@ -509,6 +509,9 @@ class Gr3(ABC):
     def get_xy(self, crs: Union[CRS, str] = None):
         return self.nodes.get_xy(crs)
 
+    def get_xyz(self, vgrid, crs: Union[CRS, str] = None):
+        return vgrid.get_xyz(self)
+
     def get_bbox(
             self,
             crs: Union[str, CRS] = None,

@@ -6,6 +6,7 @@ from shapely.geometry import LineString
 
 
 from pyschism.forcing.bctides.elev2d import Elev2D
+from pyschism.forcing.bctides.uv3d import UV3D
 from pyschism.forcing.bctides.iettype import Iettype
 from pyschism.forcing.bctides.ifltype import Ifltype
 from pyschism.forcing.bctides.itetype import Itetype
@@ -83,6 +84,9 @@ class HgridBoundaries:
 
     def elev2d(self):
         return Elev2D(self.hgrid)
+
+    def uv3d(self, vgrid):
+        return UV3D(self.hgrid, vgrid)
 
     def set_forcing(
             self,

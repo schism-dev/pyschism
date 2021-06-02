@@ -7,16 +7,19 @@ import warnings
 
 from pyproj import CRS
 
-# from pyschism.forcing.baroclinic import GOFS, RTOFS
-from pyschism.forcing.baroclinic.gofs import GOFSElevation
+from pyschism.forcing.baroclinic import GOFS  # , RTOFS
+# from pyschism.forcing.baroclinic.gofs import GOFSElevation
 # from pyschism.forcing.baroclinic.rtofs import RTOFSElevation
 from pyschism.forcing.tides import Tides
 from pyschism.forcing.bctides import Bctides, iettype, ifltype, itetype, isatype
 from pyschism.mesh import Hgrid, Vgrid
 
 
+logger = logging.getLogger(__name__)
+
+
 baroclinic_databases = {
-    'gofs': GOFSElevation,
+    'gofs': GOFS,
     # 'rtofs': RTOFSElevation,
 }
 
@@ -85,18 +88,11 @@ class HgridCrsAction(argparse.Action):
 
 class VgridAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
-        if values is None:
-            vgrid = Vgrid.default()
-        else:
-            vgrid = Vgrid.open(values)
-        setattr(namespace, self.dest, vgrid)
+        setattr(namespace, self.dest, Vgrid.open(values))
 
 
 class CustomBoundaryAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
-        # namespace.hgrid = Hgrid.open(values, namespace.hgrid_crs)
-        # from types import ModuleType
-
         if isinstance(values, str):
             if "iettype" in option_string:
                 values = json.loads(values)
@@ -157,6 +153,31 @@ class Ifltype3Action(argparse.Action):
             namespace.hgrid.boundaries.set_forcing(
                 boundary.id,
                 ifltype=values(get_tides(namespace)))
+        setattr(namespace, self.dest, values)
+
+
+class Ifltype4Action(argparse.Action):
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        for boundary in namespace.hgrid.boundaries.open.itertuples():
+            namespace.hgrid.boundaries.set_forcing(
+                boundary.id,
+                ifltype=self.const(baroclinic_databases[
+                    namespace.baroclinic_database]()))
+        setattr(namespace, self.dest, values)
+
+
+class Ifltype5Action(argparse.Action):
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        for boundary in namespace.hgrid.boundaries.open.itertuples():
+            namespace.hgrid.boundaries.set_forcing(
+                boundary.id,
+                ifltype=self.const(
+                    get_tides(namespace),
+                    baroclinic_databases[namespace.baroclinic_database]()
+                    )
+            )
         setattr(namespace, self.dest, values)
 
 
@@ -258,8 +279,9 @@ def add_bctypes(bctides):
         '--uv-3d',
         '--uv3D',
         '--ifltype-4',
-        action='store_const',
+        action=Ifltype4Action,
         dest='ifltype',
+        nargs=0,
         const=ifltype.Ifltype4,
     )
 
@@ -270,7 +292,8 @@ def add_bctypes(bctides):
         '--uv3D-tides',
         '--uv3D-tides',
         '--ifltype-5',
-        action='store_const',
+        action=Ifltype5Action,
+        nargs=0,
         dest='ifltype',
         const=ifltype.Ifltype5,
     )
@@ -391,6 +414,7 @@ def add_bctides(subparsers):
     bctides.add_argument(
         "--vgrid",
         action=VgridAction,
+        default=Vgrid.default(),
     )
     bctides.add_argument(
         '--tides',

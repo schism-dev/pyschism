@@ -68,7 +68,7 @@ class TidalVelocity(Ifltype):
 class SpatiallyVaryingTimeHistoryVelocity(Ifltype):
 
     def __init__(self, data_source):
-        self.data_source = data_source
+        self.data_source = data_source.velocity
 
     def write(
             self,
@@ -79,7 +79,7 @@ class SpatiallyVaryingTimeHistoryVelocity(Ifltype):
             run_days,
             overwrite: bool = False
     ):
-        self.data_source.velocity.write(
+        self.data_source.write(
             path,
             hgrid,
             vgrid,
@@ -87,6 +87,9 @@ class SpatiallyVaryingTimeHistoryVelocity(Ifltype):
             run_days,
             overwrite
         )
+
+    def get_boundary_string(self, hgrid, boundary):
+        return ''
 
     @property
     def ifltype(self):
@@ -101,7 +104,7 @@ class TidalAndSpatiallyVaryingVelocityTimeHistory(Ifltype):
                 f'Argument tides must be an isinstance of {Tides} not type'
                 f'{type(tides)}.')
         self.tides = tides
-        self.data_source = data_source
+        self.data_source = data_source.velocity
 
     def write(
             self,
@@ -112,7 +115,7 @@ class TidalAndSpatiallyVaryingVelocityTimeHistory(Ifltype):
             run_days,
             overwrite: bool = False
     ):
-        self.data_source.velocity.write(
+        self.data_source.write(
             path,
             hgrid,
             vgrid,

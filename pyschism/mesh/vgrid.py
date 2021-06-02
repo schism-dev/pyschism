@@ -10,6 +10,24 @@ import numpy as np
 from pyschism.mesh.hgrid import Hgrid
 
 
+def C_of_sigma(sigma, theta_b, theta_f):
+    assert theta_b <= 0. and theta_b <= 1.
+    assert theta_f <= 0. and theta_f <= 1.
+    A = (1-theta_b)(np.sinh(sigma*theta_f)/np.sinh(theta_f))
+    B_1 = np.tanh(theta_f*(sigma+0.5)) - np.tanh(theta_f/2.)
+    B = theta_b * (B_1 / (2.*np.tanh(theta_f/2.)))
+    return A + B
+
+
+def eta_of_sigma(sigma):
+    return 1 + sigma
+
+
+def S_to_Z(sigma):
+    # eq 3.1
+    pass
+
+
 class VgridType(Enum):
 
     LSC2 = 1
@@ -48,6 +66,10 @@ class Vgrid(ABC):
         with open(path) as f:
             return VgridTypeDispatch[VgridType(
                 int(f.read().strip().split()[0])).name].value.open(path)
+
+    @abstractmethod
+    def get_xyz(self, gr3, crs=None):
+        pass
 
     def write(self, path, overwrite=False):
         path = pathlib.Path(path)
@@ -103,6 +125,13 @@ class LSC2(Vgrid):
             f.append(' '.join(line))
         return '\n'.join(f)
 
+    def get_xyz(self, gr3, crs=None):
+        xy = gr3.get_xy(crs)
+        z = gr3.values[:, None]*self.sigma
+        x = np.tile(xy[:, 0], (z.shape[1],))
+        y = np.tile(xy[:, 0], (z.shape[1],))
+        return np.vstack([x, y, z.flatten()]).T
+
     @classmethod
     def open(cls, path):
 
@@ -119,7 +148,7 @@ class LSC2(Vgrid):
 
         kbp = np.array([int(i.split()[1])-1 for i in lines[2:]])
 
-        sigma = -np.ones([len(kbp), nvrt])
+        sigma = -np.ones((len(kbp), nvrt))
 
         for i, line in enumerate(lines[2:]):
             sigma[i, kbp[i]:] = np.array(
@@ -150,14 +179,8 @@ class SZ(Vgrid):
             ' (transition depth between S and Z)',
             'Z levels',
         ]
-        # print(self.ztot)
-        # exit()
         for row in enumerate(self.ztot):
-            # f.append(f'{int(row[0]):d} {row[1]:G}')
-            # line = [f'']
             for i, x in enumerate(row):
-                print(i, x)
-                # line.append(f' {i+1:d} {x:G}')
                 f.append(f'{i+1:d} {x:G}')
         f.extend([
             'S levels',
@@ -165,11 +188,12 @@ class SZ(Vgrid):
             ' !h_c, theta_b, theta_f',
             ])
         for row in enumerate(self.sigma):
-            # f.append(f'{int(row[0])} {row[1]:G}')
             for i, x in enumerate(row):
-                # line.append(f' {i+1:d} {x:G}')
                 f.append(f'{i+1:d} {x:G}')
         return '\n'.join(f)
+
+    def get_xyz(self, gr3, crs=None):
+        raise NotImplementedError('SZ.get_xyz')
 
     @classmethod
     def open(cls, path):
@@ -195,9 +219,7 @@ class SZ(Vgrid):
         for i in np.arange(kz):
             irec = irec+1
             ztot.append(lines[irec].strip().split()[1])
-        print(ztot)
         ztot = np.array(ztot).astype('float')
-        print(ztot)
         # read s grid
         sigma = []
         irec = irec+2

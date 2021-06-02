@@ -27,11 +27,43 @@ from pyschism.enums import (
 from pyschism.mesh.base import Gr3
 
 
-class Transect:
+def get_stack_id_by_datetime(dt: datetime, flattened_timevector, stacks) -> str:
+    output_stack = None
+    for stack_id, stack_data in stacks.items():
+        if dt in stack_data['timevector']:
+            output_stack = stack_id
+    if output_stack is None:
+        raise ValueError(
+            'The are no output slices corresponding to requested datetime:'
+            f' {dt}. Available datetimes are '
+            f'{flattened_timevector}.')
+    return output_stack
 
-    @classmethod
-    def from_fields(cls, start_coords, end_coords, interval):
-        pass
+
+def get_local_time_index(dt: datetime, stacks, flattened_timevector) -> str:
+    for stack_data in stacks.values():
+        if dt in stack_data['timevector']:
+            return stack_data['timevector'].index(dt)
+    raise ValueError(
+            'The are no output slices corresponding to requested datetime:'
+            f' {dt}. Available datetimes are '
+            f'{flattened_timevector}.')
+
+
+def aggregate_by_datetime(shape, filenames, n_local_to_global, hgrid, name, dt, stacks, flattened_timevector):
+    values = np.full(shape, np.nan)
+    stack_id = get_stack_id_by_datetime(dt, flattened_timevector, stacks)
+    local_time_index = get_local_time_index(dt, stacks, flattened_timevector)
+    for file in filenames:
+        cpu_id = file.name.split('_')[1]
+        _n_local_to_global = n_local_to_global[cpu_id]
+        local_node_ids = list(_n_local_to_global.keys())
+        global_node_ids = list(
+            map(lambda x: _n_local_to_global[x], local_node_ids))
+        idxs = list(map(hgrid.nodes.get_index_by_id, global_node_ids))
+        if file.name.endswith(f'{stack_id}.nc'):
+            values[idxs] = Dataset(file)[name][local_time_index, :]
+    return values
 
 
 class OutputVariable:
@@ -164,6 +196,32 @@ class OutputVariable:
         else:
             raise TypeError('Argument dt must be datetime, timedelta or int '
                             f'not type {type(dt)}')
+
+    def aggregate_parallel(self, nprocs=16):
+        from time import time
+        from multiprocessing import Pool
+        start = time()
+        with Pool(processes=nprocs) as p:
+            # shape, filenames, n_local_to_global, hgrid, name, dt, stacks, flattened_timevector
+            res = p.starmap(
+                aggregate_by_datetime,
+                [
+                    (self.shape, self.filenames, self.n_local_to_global,
+                     self.hgrid, self.name, dt, self.stacks,
+                     self.flattened_timevector)
+                    for dt in self.flattened_timevector
+                ]
+            )
+        p.join()
+        print(f'parallel took {time()-start}')
+        start = time()
+        for dt in self.flattened_timevector:
+            aggregate_by_datetime(
+                self.shape, self.filenames, self.n_local_to_global, self.hgrid,
+                self.name, dt, self.stacks,
+                self.flattened_timevector)
+        print(f'serial took {time()-start}')
+        # breakpoint()
 
     def aggregate_by_index(self, index):
         return self.aggregate_by_datetime(self.flattened_timevector[index])

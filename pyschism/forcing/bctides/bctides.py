@@ -23,103 +23,23 @@ def raise_type_error(argname, obj, cls):
     raise TypeError(
         f'Argument {argname} must be of type {cls}, not '
         f'type {type(obj)}.')
-# class HgridDescriptor:
-
-#     def __set__(self, obj, val: Hgrid):
-#         if not isinstance(val, Hgrid):
-#             raise TypeError(
-#                 f'Argument hgrid must be of type {Hgrid}, not type '
-#                 f'{type(val)}.')
-#         obj.__dict__['hgrid'] = val
-
-#     def __get__(self, obj, val):
-#         return obj.__dict__['hgrid']
-
-
-# class StartDateDescriptor:
-
-#     def __set__(self, obj, val: datetime):
-#         if not isinstance(val, datetime):
-#             raise TypeError(
-#                     f'Argument start_date must be of type {datetime}, '
-#                     f'not type {type(val)}.')
-#         if datetime_is_naive(val):
-#             val = pytz.timezone('UTC').localize(val)
-#         obj.__dict__['start_date'] = val
-
-#     def __get__(self, obj, val):
-#         return obj.__dict__['start_date']
-
-
-# class RndayDescriptor:
-
-#     def __set__(self, obj, val: Union[int, float, timedelta]):
-#         if not isinstance(val, (int, float, timedelta)):
-#             raise TypeError(
-#                 f'Argument rnday must be of type {int}, {float} or '
-#                 f'{timedelta}, not type {type(val)}.')
-#         if not isinstance(val, timedelta):
-#             val = timedelta(days=val)
-#         obj.__dict__['rnday'] = val
-
-#     def __get__(self, obj, val) -> timedelta:
-#         return obj.__dict__['rnday']
 
 
 class Bctides:
-
-    # _hgrid = HgridDescriptor()
-    # _start_date = StartDateDescriptor()
-    # _rnday = RndayDescriptor()
-    # start_date = dates.StartDate()
-    # end_date = dates.EndDate()
-    # spinunp_time = dates.SpinupTime()
-    # rnday = dates.StartDate()
 
     def __init__(
             self,
             hgrid,  #: Hgrid,
             start_date: datetime,
             rnday: timedelta,
-            vgrid=None,  #  : Vgrid = None,
-            # elevation: iettype.Iettype = None,
-            # velocity: ifltype.Ifltype = None,
-            # temperature: itetype.Itetype = None,
-            # salinity: isatype.Isatype = None,
-            # tracers: Union[itrtype.Itrtype, List[itrtype.Itrtype]] = None,
+            vgrid=None,
             cutoff_depth: float = 50.
     ):
         self.hgrid = hgrid
         self.start_date = start_date
         self.rnday = rnday
         self.vgrid = vgrid
-        # self.elevation = elevation
-        # self.velocity = velocity
-        # self.temperature = temperature
-        # self.salinity = salinity
-        # self.tracers = list(tracers) if tracers is not None else []
         self.cutoff_depth = cutoff_depth
-
-    @classmethod
-    def from_driver(cls, driver: 'ModelDriver'):
-        tides = driver.config.forcings.tides
-        baroclinic = driver.config.forcings.baroclinic
-        # elevation =
-        # velocity =
-        # temperature = 
-        # salinity = 
-        # tracers = 
-        return cls(
-            driver.config.hgrid,
-            driver.param.opt.start_date,
-            driver.param.core.rnday,
-            driver.config.vgrid,
-            elevation,
-            velocity,
-            temperature,
-            salinity,
-            tracers
-        )
 
     def __str__(self):
         f = [
@@ -180,12 +100,15 @@ class Bctides:
                     overwrite
                 )
         # write uv3D.th.nc
-        # self.hgrid.boundaries.uv3d().write(
-        #             uv3D,
-        #             self.start_date,
-        #             self.rnday,
-        #             overwrite
-        #         )
+        uv3D = output_directory / 'uv3D.th.nc' if uv3D \
+            is True else uv3D
+        self.hgrid.boundaries.uv3d(self.vgrid).write(
+                    uv3D,
+                    self.start_date,
+                    self.rnday,
+                    timedelta(days=1),
+                    overwrite
+                )
         # for boundary in self.hgrid.boundaries.open.itertuples():
         #     if boundary.iettype is not None:
         #         if hasattr(boundary.iettype, 'write'):
@@ -381,3 +304,46 @@ class Bctides:
     #     if salinity is not None:
     #         assert isinstance(salinity, isatype.Isatype)
     #     self._salinity = salinity
+
+
+# class HgridDescriptor:
+
+#     def __set__(self, obj, val: Hgrid):
+#         if not isinstance(val, Hgrid):
+#             raise TypeError(
+#                 f'Argument hgrid must be of type {Hgrid}, not type '
+#                 f'{type(val)}.')
+#         obj.__dict__['hgrid'] = val
+
+#     def __get__(self, obj, val):
+#         return obj.__dict__['hgrid']
+
+
+# class StartDateDescriptor:
+
+#     def __set__(self, obj, val: datetime):
+#         if not isinstance(val, datetime):
+#             raise TypeError(
+#                     f'Argument start_date must be of type {datetime}, '
+#                     f'not type {type(val)}.')
+#         if datetime_is_naive(val):
+#             val = pytz.timezone('UTC').localize(val)
+#         obj.__dict__['start_date'] = val
+
+#     def __get__(self, obj, val):
+#         return obj.__dict__['start_date']
+
+
+# class RndayDescriptor:
+
+#     def __set__(self, obj, val: Union[int, float, timedelta]):
+#         if not isinstance(val, (int, float, timedelta)):
+#             raise TypeError(
+#                 f'Argument rnday must be of type {int}, {float} or '
+#                 f'{timedelta}, not type {type(val)}.')
+#         if not isinstance(val, timedelta):
+#             val = timedelta(days=val)
+#         obj.__dict__['rnday'] = val
+
+#     def __get__(self, obj, val) -> timedelta:
+#         return obj.__dict__['rnday']
