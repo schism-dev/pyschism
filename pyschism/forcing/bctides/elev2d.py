@@ -17,6 +17,7 @@ class Elev2D:
             rnday,
             output_interval=timedelta(days=1),
             overwrite: bool = False,
+            progress_bar: bool = True,
     ):
         elev2D = pathlib.Path(elev2D)
         if elev2D.exists() and overwrite is not True:
@@ -64,7 +65,7 @@ class Elev2D:
                     boundary.iettype.data_source.put_ncdata(
                         boundary, dst, start_date, rnday, overwrite=overwrite,
                         offset=offset, output_interval=output_interval,
-                        pixel_buffer=10)
+                        pixel_buffer=10, progress_bar=progress_bar)
             else:
                 self.put_null_boundary_data(dst, len(boundary.indexes))
             offset += len(boundary.indexes)

@@ -4,7 +4,6 @@ import json
 import logging
 import pathlib
 
-from pyproj import CRS
 
 from pyschism.forcing.baroclinic import GOFS, RTOFS
 from pyschism.forcing.tides import Tides
@@ -43,7 +42,6 @@ def add_bctides_options_to_parser(parser):
     )
     parser.add_argument(
         '--hgrid-crs',
-        action=HgridCrsAction,
         help='Coordinate reference system string of hgrid.'
     )
     parser.add_argument(
@@ -118,13 +116,6 @@ class HgridAction(argparse.Action):
         if len(hgrid.boundaries.open) == 0:
             raise TypeError(f"Hgrid provided {values} contains no open boundaries.")
         setattr(namespace, self.dest, hgrid)
-
-
-class HgridCrsAction(argparse.Action):
-    def __call__(self, parser, namespace, values, option_string=None):
-        if values is not None:
-            namespace.hgrid.nodes._crs = CRS.from_user_input(values)
-        setattr(namespace, self.dest, values)
 
 
 class VgridAction(argparse.Action):

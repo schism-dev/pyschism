@@ -18,6 +18,7 @@ class UV3D:
             rnday,
             output_interval=timedelta(days=1),
             overwrite: bool = False,
+            progress_bar: bool = True,
     ):
         uv3d = pathlib.Path(uv3d)
         if uv3d.exists() and overwrite is not True:
@@ -66,7 +67,8 @@ class UV3D:
                         self.hgrid, self.vgrid, boundary, dst, start_date,
                         rnday, overwrite=overwrite, offset=offset,
                         output_interval=output_interval,
-                        pixel_buffer=10
+                        pixel_buffer=10,
+                        progress_bar=progress_bar
                     )
             else:
                 self.put_null_boundary_data(dst, len(boundary.indexes))

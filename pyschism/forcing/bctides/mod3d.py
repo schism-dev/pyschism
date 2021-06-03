@@ -18,6 +18,7 @@ class MOD_3D(ABC):
             rnday,
             output_interval=timedelta(days=1),
             overwrite: bool = False,
+            progress_bar: bool = True,
     ):  
         path = pathlib.Path(path)
         if path.exists() and overwrite is not True:
@@ -67,10 +68,17 @@ class MOD_3D(ABC):
                 bctype = getattr(obj, self.bctype)
                 if bctype == 4:
                     getattr(obj.data_source, self.name).put_ncdata(
-                        self.hgrid, self.vgrid, boundary, dst, start_date,
-                        rnday, overwrite=overwrite, offset=offset,
+                        self.hgrid,
+                        self.vgrid,
+                        boundary,
+                        dst,
+                        start_date,
+                        rnday,
+                        overwrite=overwrite,
+                        offset=offset,
                         output_interval=output_interval,
-                        pixel_buffer=10
+                        pixel_buffer=10,
+                        progress_bar=progress_bar
                     )
             else:
                 self.put_null_boundary_data(dst, len(boundary.indexes))

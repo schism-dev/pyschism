@@ -180,7 +180,7 @@ class GOFSElevation(GOFSBaroclinicComponent):
 
     def put_ncdata(self, boundary, dst, start_date, run_days, overwrite=False,
                    offset=0, output_interval=timedelta(hours=24),
-                   pixel_buffer=10):
+                   pixel_buffer=10, progress_bar=True):
         for i, (time, dataset) in enumerate(
             self.get_datasets(
                 start_date,
@@ -220,12 +220,18 @@ class GOFSElevation(GOFSBaroclinicComponent):
                     pixel_buffer
                 )
             zi = np.full((len(lat_idxs), len(lon_idxs)), np.nan)
-            items_iter = tqdm.tqdm(lat_idxs)
-            with tqdm_logging_wrapper.wrap_logging_for_tqdm(
-                    items_iter), items_iter:
-                for k, lat_idx in enumerate(items_iter):
+            if progress_bar is True:
+                items_iter = tqdm.tqdm(lat_idxs)
+                with tqdm_logging_wrapper.wrap_logging_for_tqdm(
+                        items_iter), items_iter:
+                    for k, lat_idx in enumerate(items_iter):
+                        zi[k, :] = dataset[self.ncvar][
+                                            time_idx, lat_idx, lon_idxs]
+            else:
+                for k, lat_idx in enumerate(lat_idxs):
                     zi[k, :] = dataset[self.ncvar][
                                         time_idx, lat_idx, lon_idxs]
+
             xi = dataset['lon'][lon_idxs]
             for idx in range(len(xi)):
                 if xi[idx] > 180:
@@ -272,7 +278,8 @@ class GOFSVelocity(GOFSBaroclinicComponent):
 
     def put_ncdata(self, hgrid, vgrid, boundary, dst, start_date, run_days,
                    overwrite=False, offset=0,
-                   output_interval=timedelta(hours=24), pixel_buffer=10):
+                   output_interval=timedelta(hours=24), pixel_buffer=10,
+                   progress_bar=True):
 
         for i, (time, dataset) in enumerate(
             self.get_datasets(
@@ -317,10 +324,15 @@ class GOFSVelocity(GOFSBaroclinicComponent):
             z_idxs = list(range(dataset['depth'].shape[0]))  # TODO: subset?
             ui = np.full((len(z_idxs), len(lat_idxs), len(lon_idxs)), np.nan)
             vi = np.full((len(z_idxs), len(lat_idxs), len(lon_idxs)), np.nan)
-            items_iter = tqdm.tqdm(lat_idxs)
-            with tqdm_logging_wrapper.wrap_logging_for_tqdm(
-                    items_iter), items_iter:
-                for k, lat_idx in enumerate(items_iter):
+            if progress_bar is True:
+                items_iter = tqdm.tqdm(lat_idxs)
+                with tqdm_logging_wrapper.wrap_logging_for_tqdm(
+                        items_iter), items_iter:
+                    for k, lat_idx in enumerate(items_iter):
+                        ui[:, k, :] = dataset[uvar][time_idx, z_idxs, lat_idx, lon_idxs]
+                        vi[:, k, :] = dataset[vvar][time_idx, z_idxs, lat_idx, lon_idxs]
+            else:
+                for k, lat_idx in enumerate(lat_idxs):
                     ui[:, k, :] = dataset[uvar][time_idx, z_idxs, lat_idx, lon_idxs]
                     vi[:, k, :] = dataset[vvar][time_idx, z_idxs, lat_idx, lon_idxs]
 
@@ -408,7 +420,8 @@ class GOFSTemperature(GOFSBaroclinicComponent):
 
     def put_ncdata(self, hgrid, vgrid, boundary, dst, start_date, run_days,
                    overwrite=False, offset=0,
-                   output_interval=timedelta(hours=24), pixel_buffer=10):
+                   output_interval=timedelta(hours=24), pixel_buffer=10,
+                   progress_bar=True):
 
         for i, (time, dataset) in enumerate(
             self.get_datasets(
@@ -451,10 +464,14 @@ class GOFSTemperature(GOFSBaroclinicComponent):
             # z_ui_idxs = list(range(dataset['depth'].shape[0]))
             z_idxs = list(range(dataset['depth'].shape[0]))  # TODO: subset?
             temp = np.full((len(z_idxs), len(lat_idxs), len(lon_idxs)), np.nan)
-            items_iter = tqdm.tqdm(lat_idxs)
-            with tqdm_logging_wrapper.wrap_logging_for_tqdm(
-                    items_iter), items_iter:
-                for k, lat_idx in enumerate(items_iter):
+            if progress_bar is True:
+                items_iter = tqdm.tqdm(lat_idxs)
+                with tqdm_logging_wrapper.wrap_logging_for_tqdm(
+                        items_iter), items_iter:
+                    for k, lat_idx in enumerate(items_iter):
+                        temp[:, k, :] = dataset[self.ncvar][time_idx, z_idxs, lat_idx, lon_idxs]
+            else:
+                for k, lat_idx in enumerate(lat_idxs):
                     temp[:, k, :] = dataset[self.ncvar][time_idx, z_idxs, lat_idx, lon_idxs]
 
             xi = dataset['lon'][lon_idxs]
@@ -534,7 +551,8 @@ class GOFSSalinity(GOFSBaroclinicComponent):
 
     def put_ncdata(self, hgrid, vgrid, boundary, dst, start_date, run_days,
                    overwrite=False, offset=0,
-                   output_interval=timedelta(hours=24), pixel_buffer=10):
+                   output_interval=timedelta(hours=24), pixel_buffer=10,
+                   progress_bar=True):
 
         for i, (time, dataset) in enumerate(
             self.get_datasets(
@@ -577,10 +595,14 @@ class GOFSSalinity(GOFSBaroclinicComponent):
             # z_ui_idxs = list(range(dataset['depth'].shape[0]))
             z_idxs = list(range(dataset['depth'].shape[0]))  # TODO: subset?
             salt = np.full((len(z_idxs), len(lat_idxs), len(lon_idxs)), np.nan)
-            items_iter = tqdm.tqdm(lat_idxs)
-            with tqdm_logging_wrapper.wrap_logging_for_tqdm(
-                    items_iter), items_iter:
-                for k, lat_idx in enumerate(items_iter):
+            if progress_bar is True:
+                items_iter = tqdm.tqdm(lat_idxs)
+                with tqdm_logging_wrapper.wrap_logging_for_tqdm(
+                        items_iter), items_iter:
+                    for k, lat_idx in enumerate(items_iter):
+                        salt[:, k, :] = dataset[self.ncvar][time_idx, z_idxs, lat_idx, lon_idxs]
+            else:
+                for k, lat_idx in enumerate(lat_idxs):
                     salt[:, k, :] = dataset[self.ncvar][time_idx, z_idxs, lat_idx, lon_idxs]
 
             xi = dataset['lon'][lon_idxs]

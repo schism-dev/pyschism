@@ -81,7 +81,9 @@ class Bctides:
             tem3D: Union[bool, str] = True,
             sal3D: Union[bool, str] = True,
             flux: Union[bool, str] = True,
-            overwrite: bool = False
+            overwrite: bool = False,
+            parallel=True,
+            progress_bar=True,
     ):
         # self.tidal_database.write(path, )
         output_directory = pathlib.Path(output_directory)
@@ -91,89 +93,75 @@ class Bctides:
             raise IOError('path exists and overwrite is False')
         with open(bctides, 'w') as f:
             f.write(str(self))
-        # write elev2D.th.nc
-        elev2D = output_directory / 'elev2D.th.nc' if elev2D \
-            is True else elev2D
-        self.hgrid.boundaries.elev2d().write(
-                    elev2D,
-                    self.start_date,
-                    self.rnday,
-                    timedelta(days=1),
-                    overwrite
-                )
-        # write uv3D.th.nc
-        uv3D = output_directory / 'uv3D.th.nc' if uv3D \
-            is True else uv3D
-        self.hgrid.boundaries.uv3d(self.vgrid).write(
-                    uv3D,
-                    self.start_date,
-                    self.rnday,
-                    timedelta(days=1),
-                    overwrite
-                )
-        # write TEM_3D.th.nc
-        tem3D = output_directory / 'TEM_3D.th.nc' if tem3D \
-            is True else tem3D
-        self.hgrid.boundaries.tem3d(self.vgrid).write(
-                    tem3D,
-                    self.start_date,
-                    self.rnday,
-                    timedelta(days=1),
-                    overwrite
-                )
-        sal3D = output_directory / 'SAL_3D.th.nc' if sal3D \
-            is True else sal3D
-        self.hgrid.boundaries.sal3d(self.vgrid).write(
-                    sal3D,
-                    self.start_date,
-                    self.rnday,
-                    timedelta(days=1),
-                    overwrite
-                )
 
-        # for boundary in self.hgrid.boundaries.open.itertuples():
-        #     if boundary.iettype is not None:
-        #         if hasattr(boundary.iettype, 'write'):
-        #             elev2D = output_directory / 'elev2D.th.nc' if elev2D \
-        #                 is True else elev2D
-        #             boundary.iettype.write(
-        #                 elev2D,
-        #                 self.hgrid,
-        #                 self.start_date,
-        #                 self.rnday,
-        #                 overwrite
-        #             )
+        def write_elev2D():
+            _elev2D = output_directory / 'elev2D.th.nc' if elev2D \
+                is True else elev2D
+            self.hgrid.boundaries.elev2d().write(
+                        _elev2D,
+                        self.start_date,
+                        self.rnday,
+                        timedelta(days=1),
+                        overwrite,
+                        progress_bar=progress_bar
+                    )
 
-        #             boundary.iettype.write()
+        def write_uv3D():
+            # write uv3D.th.nc
+            _uv3D = output_directory / 'uv3D.th.nc' if uv3D \
+                is True else uv3D
+            self.hgrid.boundaries.uv3d(self.vgrid).write(
+                        _uv3D,
+                        self.start_date,
+                        self.rnday,
+                        timedelta(days=1),
+                        overwrite,
+                        progress_bar=progress_bar
+                    )
 
-        # if self.elevation is not None:
-        #     if self.elevation.iettype in [4, 5]:
-        #         elev2D = output_directory / 'elev2D.th.nc' if elev2D is True \
-        #             else elev2D
-        #         self.elevation.write(
-        #             elev2D,
-        #             self.hgrid,
-        #             self.start_date,
-        #             self.rnday,
-        #             overwrite
-        #         )
+        def write_tem3D():
+            # write TEM_3D.th.nc
+            _tem3D = output_directory / 'TEM_3D.th.nc' if tem3D \
+                is True else tem3D
+            self.hgrid.boundaries.tem3d(self.vgrid).write(
+                        _tem3D,
+                        self.start_date,
+                        self.rnday,
+                        timedelta(days=1),
+                        overwrite,
+                        progress_bar=progress_bar
+                    )
 
-        # if self.velocity is not None:
-        #     if self.velocity.ifltype in [4, 5, -4, -5]:
-        #         uv3D = output_directory / 'uv3D.th.nc' if uv3D is True \
-        #             else uv3D
-        #         self.velocity.write(
-        #             uv3D,
-        #             self.hgrid,
-        #             self.vgrid,
-        #             self.start_date,
-        #             self.rnday,
-        #             overwrite
-        #         )
-        #     elif self.velocity.ifltype == 1:
-        #         flux = output_directory / 'flux.th' if flux is True \
-        #             else flux
-        #         self.velocity.write(flux, overwrite)
+        def write_sal3D():
+            _sal3D = output_directory / 'SAL_3D.th.nc' if sal3D \
+                is True else sal3D
+            self.hgrid.boundaries.sal3d(self.vgrid).write(
+                        _sal3D,
+                        self.start_date,
+                        self.rnday,
+                        timedelta(days=1),
+                        overwrite,
+                        progress_bar=progress_bar
+                    )
+        if parallel is True:
+            from multiprocessing import Process
+            p1 = Process(target=write_elev2D)
+            p2 = Process(target=write_uv3D)
+            p3 = Process(target=write_tem3D)
+            p4 = Process(target=write_sal3D)
+            p1.start()
+            p2.start()
+            p3.start()
+            p4.start()
+            p1.join()
+            p2.join()
+            p3.join()
+            p4.join()
+        else:
+            write_elev2D()
+            write_uv3D()
+            write_tem3D()
+            write_sal3D()
 
         # def write_tracer(tracer):
         #     tracer.write()
