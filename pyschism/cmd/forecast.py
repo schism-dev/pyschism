@@ -33,7 +33,7 @@ class GridGr3Type(Enum):
     SHAPIRO = gridgr3.Shapiro
     WINDROT = gridgr3.Windrot
     ELEV_IC = gridgr3.ElevIc
-    NUDGE = gridgr3.Nudge
+    # NUDGE = gridgr3.Nudge
 
 
 class PropType(Enum):
@@ -147,6 +147,10 @@ class ForecastCli(metaclass=ForecastCliMeta):
 
     def get_hotstart_driver(self):
         pass
+
+    @staticmethod
+    def add_subparser_action(subparsers):
+        add_forecast(subparsers.add_parser('forecast'))
 
     @property
     def args(self):
@@ -489,12 +493,11 @@ def add_forecast_update(actions):
     update.add_argument("project_directory")
 
 
-def add_forecast(subparsers):
-    forecast = subparsers.add_parser('forecast')
-    forecast.add_argument(
+def add_forecast(parser):
+    parser.add_argument(
         "--overwrite", action="store_true",
         help="Allow overwrite of output directory.")
-    actions = forecast.add_subparsers(dest="action")
+    actions = parser.add_subparsers(dest="action")
     add_forecast_init(actions)
     add_forecast_update(actions)
 

@@ -5,17 +5,18 @@ import logging
 
 from pytz import timezone
 
-from pyschism.cmd.forecast import ForecastCli, add_forecast
-from pyschism.cmd.bctides import BctidesCli, add_bctides
-from pyschism.cmd.stations import StationsCli, add_stations
-from pyschism.cmd.hgrid import HgridCli, add_hgrid
-from pyschism.cmd.sms2grd import Sms2grdCli, add_sms2grd
-from pyschism.cmd.grd2sms import Grd2SmsCli, add_grd2sms
-from pyschism.cmd.fgrid.entry import FgridCli, add_fgrid
-from pyschism.cmd.vgrid import VgridCli, add_vgrid
+from pyschism.cmd.forecast import ForecastCli
+from pyschism.cmd.bctides import BctidesCli
+from pyschism.cmd.stations import StationsCli
+from pyschism.cmd.hgrid import HgridCli
+from pyschism.cmd.sms2grd import Sms2grdCli
+from pyschism.cmd.grd2sms import Grd2SmsCli
+from pyschism.cmd.fgrid.entry import FgridCli
+from pyschism.cmd.vgrid import VgridCli
 
 
-def parse_args():
+def main():
+
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--log-level",
@@ -23,19 +24,16 @@ def parse_args():
         default='info'
     )
     subparsers = parser.add_subparsers(dest='mode')
-    add_forecast(subparsers)
-    add_bctides(subparsers)
-    add_stations(subparsers)
-    add_hgrid(subparsers)
-    add_fgrid(subparsers)
-    add_sms2grd(subparsers)
-    add_grd2sms(subparsers)
-    add_vgrid(subparsers)
-    return parser.parse_args()
+    ForecastCli.add_subparser_action(subparsers)
+    BctidesCli.add_subparser_action(subparsers)
+    StationsCli.add_subparser_action(subparsers)
+    HgridCli.add_subparser_action(subparsers)
+    Sms2grdCli.add_subparser_action(subparsers)
+    Grd2SmsCli.add_subparser_action(subparsers)
+    FgridCli.add_subparser_action(subparsers)
+    VgridCli.add_subparser_action(subparsers)
 
-
-def main():
-    args = parse_args()
+    args = parser.parse_args()
 
     logging.basicConfig(
         level={

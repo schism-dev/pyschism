@@ -220,9 +220,12 @@ class GOFSElevation(GOFSBaroclinicComponent):
                     pixel_buffer
                 )
             zi = np.full((len(lat_idxs), len(lon_idxs)), np.nan)
-            for k, lat_idx in enumerate(lat_idxs):
-                zi[k, :] = dataset[self.ncvar][
-                                    time_idx, lat_idx, lon_idxs]
+            items_iter = tqdm.tqdm(lat_idxs)
+            with tqdm_logging_wrapper.wrap_logging_for_tqdm(
+                    items_iter), items_iter:
+                for k, lat_idx in enumerate(items_iter):
+                    zi[k, :] = dataset[self.ncvar][
+                                        time_idx, lat_idx, lon_idxs]
             xi = dataset['lon'][lon_idxs]
             for idx in range(len(xi)):
                 if xi[idx] > 180:
@@ -521,6 +524,10 @@ class GOFSTemperature(GOFSBaroclinicComponent):
     @property
     def nowcast_varname(self):
         return 'temp'
+
+    @property
+    def name(self):
+        return 'temperature'
 
 
 class GOFSSalinity(GOFSBaroclinicComponent):

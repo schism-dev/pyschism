@@ -15,6 +15,10 @@ class Sms2grdCli:
         Gr3(**sms2dm_to_gr3(sms2dm.read(args.sms2dm))).write(
             args.output_path, args.overwrite)
 
+    @staticmethod
+    def add_subparser_action(subparsers):
+        add_sms2grd(subparsers.add_parser('sms2grd'))
+
 
 def sms2dm_to_gr3(sms2dm):
     nodes = {id: (coords, -value) for id, (coords, value)
@@ -37,9 +41,7 @@ def sms2dm_to_gr3(sms2dm):
     }
 
 
-def add_sms2grd(subparser):
-    # creating manning
-    sms2grd = subparser.add_parser('sms2grd')
-    sms2grd.add_argument('sms2dm', type=pathlib.Path)
-    sms2grd.add_argument('output_path', type=pathlib.Path)
-    sms2grd.add_argument('--overwrite', action='store_true')
+def add_sms2grd(parser):
+    parser.add_argument('sms2dm', type=pathlib.Path)
+    parser.add_argument('output_path', type=pathlib.Path)
+    parser.add_argument('--overwrite', action='store_true')

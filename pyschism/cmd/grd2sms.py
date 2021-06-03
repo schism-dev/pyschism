@@ -14,10 +14,13 @@ class Grd2SmsCli:
         Hgrid.open(args.hgrid, crs=args.hgrid_crs).write(
             args.output_path, args.overwrite, format='2dm')
 
+    @staticmethod
+    def add_subparser_action(subparser):
+        add_grd2sms(subparser.add_parser('grd2sms'))
 
-def add_grd2sms(subparser):
-    grd2sms = subparser.add_parser('grd2sms')
-    grd2sms.add_argument('hgrid', type=pathlib.Path)
-    grd2sms.add_argument('output_path', type=pathlib.Path)
-    grd2sms.add_argument('--overwrite', action='store_true')
-    grd2sms.add_argument('--hgrid-crs')
+
+def add_grd2sms(parser):
+    parser.add_argument('hgrid', type=pathlib.Path)
+    parser.add_argument('output_path', type=pathlib.Path)
+    parser.add_argument('--overwrite', action='store_true')
+    parser.add_argument('--hgrid-crs')
