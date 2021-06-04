@@ -11,6 +11,21 @@ class Coriolis(Enum):
     CORICOEFF = 0
     RLATITUDE = -1
 
+class IofWetdryVariables(Enum):
+    wetdry_node = "wetdry_node"
+    wetdry_elem = "wetdry_elem"
+    wetdry_side = "wetdry_side"
+
+    @classmethod
+    def _missing_(cls, name):
+        raise ValueError(f"{name} is not a valid WETDRY output variable.")
+
+class IofZcorVariables(Enum):
+    zcor = "zcor"
+
+    @classmethod
+    def _missing_(cls, name):
+        raise ValueError(f"{name} is not a valid ZCOR output variable.")
 
 class IofHydroVariables(Enum):
     elev = "elev"
