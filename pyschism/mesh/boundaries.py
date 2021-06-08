@@ -5,6 +5,7 @@ import geopandas as gpd
 from shapely.geometry import LineString
 
 from pyschism.forcing.bctides.mod3d import TEM_3D, SAL_3D
+from pyschism.forcing.bctides.nudge import TEM_Nudge, SAL_Nudge
 from pyschism.forcing.bctides.elev2d import Elev2D
 from pyschism.forcing.bctides.uv3d import UV3D
 from pyschism.forcing.bctides.iettype import Iettype
@@ -37,6 +38,8 @@ class HgridBoundaries:
                             'itetype': None,
                             'isatype': None,
                             'itrtype': {},
+                            # 'nudge_temperature': None,
+                            # 'nudge_salinity': None,
                             })
 
                 elif str(ibtype).endswith('1'):
@@ -76,9 +79,9 @@ class HgridBoundaries:
                             'geometry': LineString(hgrid.vertices[indexes])
                             })
 
-        self.open = gpd.GeoDataFrame(ocean_boundaries, crs=hgrid.crs)
-        self.land = gpd.GeoDataFrame(land_boundaries, crs=hgrid.crs)
-        self.interior = gpd.GeoDataFrame(interior_boundaries, crs=hgrid.crs)
+        self.open = gpd.GeoDataFrame(ocean_boundaries, crs=hgrid.crs if len(ocean_boundaries) > 0 else None)
+        self.land = gpd.GeoDataFrame(land_boundaries, crs=hgrid.crs if len(land_boundaries) > 0 else None)
+        self.interior = gpd.GeoDataFrame(interior_boundaries, crs=hgrid.crs if len(interior_boundaries) > 0 else None)
         self.hgrid = hgrid
         self.data = boundaries
 
@@ -93,6 +96,16 @@ class HgridBoundaries:
 
     def sal3d(self, vgrid):
         return SAL_3D(self.hgrid, vgrid)
+
+    def TEM_nudge(self, vgrid, data_source, rlmax=1.5, rnu_day=0.25,
+                  parallel: bool = False):
+        return TEM_Nudge(self.hgrid, vgrid, data_source, rlmax, rnu_day,
+                         parallel)
+
+    def SAL_nudge(self, vgrid, data_source, rlmax=1.5, rnu_day=0.25,
+                  parallel: bool = False):
+        return SAL_Nudge(self.hgrid, vgrid, data_source, rlmax, rnu_day,
+                         parallel)
 
     def set_forcing(
             self,
@@ -122,56 +135,6 @@ class HgridBoundaries:
         modify_dataframe('itetype', itetype, Itetype)
         modify_dataframe('isatype', isatype, Isatype)
         modify_dataframe('itrtype', itrtype, Itrtype)
-
-    # def get_tides_collection(self):
-    #     tides_collection = {}
-    #     for boundary in self.hgrid.boundaries.open.itertuples():
-    #         if boundary.iettype is not None:
-    #             if boundary.iettype.iettype in [3, 5]:
-    #                 tides_collection.update({boundary.id: boundary.iettype})
-
-    #         if boundary.ifltype is not None:
-    #             if boundary.iettype.iettype in [3, 5]:
-    #                 tides_collection.update({boundary.id: boundary.iettype})
-
-    #     return tides_collection
-
-    # def concatenate_tides(self):
-    #     tidal_set = set()
-    #     for tides in self.get_tides_collection().items():
-    #         tidal_set.add(tides)
-    #     if tidal_set > 1:
-    #         raise ValueError(
-    #             'Multiple instances of Tides object are being used.')
-    #     # only returns if tidal_set is unique. Perhaps the Tides object should
-    #     # be a singleton.
-    #     return list(tidal_set)
-
-    # def get_global_active_potential_constituents(self):
-    #     # PySCHISM allows the user to input the tidal potentials and forcings
-    #     # individually at each boundary, however, SCHISM supports only a global
-    #     # specification. Here, we collect all the activated tidal potentials
-    #     # on each boundary and activate them all globally
-    #     # set active tidal potential constituents
-    #     const = dict()
-    #     for boundary in self.open.itertuples():
-    #         # forcing = data['forcing']
-    #         # if isinstance(forcing, Tides):
-    #         #     for active in forcing.get_active_potential_constituents():
-    #         #         const[active] = True
-    #     # return tuple(const.keys())
-
-    # def get_global_active_forcing_constituents(self):
-    #     # set active tidal forcing constituents
-    #     const = dict()
-    #     for id, data in self._model_domain.open_boundaries:
-    #         forcing = data['forcing']
-    #         if isinstance(forcing, Tides):
-    #             for active in forcing.get_active_forcing_constituents():
-    #                 const[active] = True
-    #     return tuple(const.keys())
-
-
 
 
 #     def auto_generate(
@@ -283,119 +246,3 @@ class HgridBoundaries:
 #                 kwargs.update({'axes': axes})
 #         return kwargs['axes']
 
-
-
-# class ModelBoundaries:
-#     pass
-
-
-# class OpenBoundaries(ModelBoundaries):
-    
-
-# class HgridBoundaries:
-
-#     def __init__(self, hgrid: "Hgrid", boundaries: Union[dict, None]):
-
-#         ocean_boundaries = []
-#         land_boundaries = []
-#         interior_boundaries = []
-#         if boundaries is not None:
-#             for ibtype, bnds in boundaries.items():
-#                 if ibtype is None:
-#                     for id, data in bnds.items():
-#                         indexes = list(map(hgrid.nodes.get_index_by_id,
-#                                        data['indexes']))
-#                         ocean_boundaries.append({
-#                             'id': id,
-#                             "index_id": data['indexes'],
-#                             "indexes": indexes,
-#                             'geometry': LineString(hgrid.vertices[indexes])
-#                             })
-
-#                 elif str(ibtype).endswith('1'):
-#                     for id, data in bnds.items():
-#                         indexes = list(map(hgrid.nodes.get_index_by_id,
-#                                        data['indexes']))
-#                         interior_boundaries.append({
-#                             'id': id,
-#                             'ibtype': ibtype,
-#                             "index_id": data['indexes'],
-#                             "indexes": indexes,
-#                             'geometry': LineString(hgrid.vertices[indexes])
-#                             })
-#                 else:
-#                     for id, data in bnds.items():
-#                         _indexes = np.array(data['indexes'])
-#                         if _indexes.ndim > 1:
-#                             # ndim > 1 implies we're dealing with an ADCIRC
-#                             # mesh that includes boundary pairs, such as weir
-#                             new_indexes = []
-#                             for i, line in enumerate(_indexes.T):
-#                                 if i % 2 != 0:
-#                                     new_indexes.extend(np.flip(line))
-#                                 else:
-#                                     new_indexes.extend(line)
-#                             _indexes = np.array(new_indexes).flatten()
-#                         else:
-#                             _indexes = _indexes.flatten()
-#                         indexes = list(map(hgrid.nodes.get_index_by_id,
-#                                        _indexes))
-
-#                         land_boundaries.append({
-#                             'id': id,
-#                             'ibtype': ibtype,
-#                             "index_id": data['indexes'],
-#                             "indexes": indexes,
-#                             'geometry': LineString(hgrid.vertices[indexes])
-#                             })
-
-#         self._ocean = gpd.GeoDataFrame(ocean_boundaries, crs=hgrid.crs)
-#         self._land = gpd.GeoDataFrame(land_boundaries, crs=hgrid.crs)
-#         self._interior = gpd.GeoDataFrame(interior_boundaries, crs=hgrid.crs)
-#         self._hgrid = hgrid
-#         self._data = boundaries
-
-#     # def ocean(self):
-#     #     return self._ocean
-
-#     # def land(self):
-#     #     return self._land
-
-#     # def interior(self):
-#     #     return self._interior
-
-#     # @property
-#     # def data(self):
-#     #     return self._data
-
-#     # @lru_cache(maxsize=1)
-#     # def __call__(self):
-#     #     data = []
-#     #     for bnd in self.ocean().itertuples():
-#     #         data.append({
-#     #             'id': bnd.id,
-#     #             'ibtype': None,
-#     #             "index_id": bnd.index_id,
-#     #             "indexes": bnd.indexes,
-#     #             'geometry': bnd.geometry})
-
-#     #     for bnd in self.land().itertuples():
-#     #         data.append({
-#     #             'id': bnd.id,
-#     #             'ibtype': bnd.ibtype,
-#     #             "index_id": bnd.index_id,
-#     #             "indexes": bnd.indexes,
-#     #             'geometry': bnd.geometry})
-
-#     #     for bnd in self.interior().itertuples():
-#     #         data.append({
-#     #             'id': bnd.id,
-#     #             'ibtype': bnd.ibtype,
-#     #             "index_id": bnd.index_id,
-#     #             "indexes": bnd.indexes,
-#     #             'geometry': bnd.geometry})
-
-#     #     return gpd.GeoDataFrame(data, crs=self._hgrid.crs)
-
-#     # def __len__(self):
-#     #     return len(self())

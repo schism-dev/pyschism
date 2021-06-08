@@ -1,7 +1,9 @@
 from abc import abstractmethod
-from typing import List
+from typing import Union
 
 from pyschism.forcing.bctides.bctypes import Bctype
+from pyschism.forcing.bctides.nudge import TempNudge
+from pyschism.mesh.base import Gr3
 
 
 class Itetype(Bctype):
@@ -46,13 +48,24 @@ class TemperatureInitialConditions(Itetype):
 
 class SpatiallyVaryingTimeHistoryTemperature(Itetype):
 
-    def __init__(self, data_source, tobc: List[float] = None):
-        self.data_source = data_source
-        self.tobc = tobc
+    def __init__(
+        self,
+        data_source,
+        nudge: bool = True,
+        rlmax=1.5,
+        rnu_day=0.25,
+    ):
+        self.data_source = data_source.temperature
+        self.nudge = bool(nudge)
+        self.rlmax = rlmax
+        self.rnu_day = rnu_day
 
     def get_boundary_string(self, hgrid, boundary):
-        if self.tobc is None:
-            return '1.'
+        return '1.'
+
+    # def write(self, *args, **kwargs):
+    #     if self.nudge is not None:
+    #         self.nudge.write(*args, **kwargs)
 
     @property
     def itetype(self):

@@ -31,8 +31,8 @@ class MOD_3D(ABC):
             if obj is not None:
                 bctype = getattr(obj, self.bctype)
                 if bctype == 4:
-                    ds = getattr(obj.data_source, self.name)
-                    datasets = ds.get_datasets(
+                    # ds = getattr(obj.data_source, self.name)
+                    datasets = obj.data_source.get_datasets(
                                 start_date,
                                 rnday,
                                 output_interval
@@ -67,7 +67,7 @@ class MOD_3D(ABC):
             if obj is not None:
                 bctype = getattr(obj, self.bctype)
                 if bctype == 4:
-                    getattr(obj.data_source, self.name).put_ncdata(
+                    obj.data_source.put_ncdata(
                         self.hgrid,
                         self.vgrid,
                         boundary,
@@ -97,10 +97,10 @@ class MOD_3D(ABC):
     def bctype(self):
         pass
 
-    @property
-    @abstractmethod
-    def name(self):
-        pass
+    # @property
+    # @abstractmethod
+    # def name(self):
+    #     pass
 
 
 class TEM_3D(MOD_3D):
@@ -113,9 +113,9 @@ class TEM_3D(MOD_3D):
     def bctype(self):
         return 'itetype'
 
-    @property
-    def name(self):
-        return 'temperature'
+    # @property
+    # def name(self):
+    #     return 'temperature'
 
 
 class SAL_3D(MOD_3D):
@@ -128,6 +128,6 @@ class SAL_3D(MOD_3D):
     def bctype(self):
         return 'isatype'
 
-    @property
-    def name(self):
-        return 'salinity'
+    # @property
+    # def name(self):
+    #     return 'salinity'

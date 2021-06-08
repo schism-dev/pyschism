@@ -1,3 +1,4 @@
+from abc import abstractmethod
 import logging
 
 from numba import prange, jit
@@ -11,9 +12,10 @@ logger = logging.getLogger(__name__)
 
 class Nudge(Gr3Field):
 
-    def __init__(self, hgrid, rlmax=1.5, rnu_day=0.25):
+    def __init__(self, hgrid, vgrid, data_source, rlmax=1.5, rnu_day=0.25,
+                 parallel: bool = False):
 
-        @jit(nopython=True, parallel=True)
+        @jit(nopython=True, parallel=parallel)
         def compute_nudge(lon, lat, opbd, out):
 
             nnode = lon.shape[0]
@@ -37,18 +39,20 @@ class Nudge(Gr3Field):
                 if distmin <= rlmax:
                     rnu = (1-distmin/rlmax)*rnu_max
                 out[idn] = rnu
-
-        opbd = []
-        for row in hgrid.boundaries.open.itertuples():
-            opbd.extend(row.indexes)
-        opbd = np.array(opbd)
         out = np.zeros(hgrid.values.shape)
         xy = hgrid.get_xy(crs='epsg:4326')
-        logger.info('Begin compute_nudge')
-        from time import time
-        start = time()
-        compute_nudge(xy[:, 0], xy[:, 1], opbd, out)
-        logger.info(f'compute_nudge took {time()-start} seconds.')
+        opbd = []
+        for boundary in hgrid.boundaries.open.itertuples():
+            forcing = getattr(boundary, self.bctype)
+            if forcing.nudge is True:
+                opbd.extend(list(boundary.indexes))
+        opbd = np.array(opbd)
+        if len(opbd) > 0:
+            logger.info(f'Begin compute_nudge for {self.name}.')
+            from time import time
+            start = time()
+            compute_nudge(xy[:, 0], xy[:, 1], opbd, out)
+            logger.info(f'compute_nudge took {time()-start} seconds.')
         super().__init__(
             nodes={i: (coord, out[i]) for i, coord in enumerate(hgrid.coords)},
             elements=hgrid.elements.elements,
@@ -56,22 +60,38 @@ class Nudge(Gr3Field):
             crs=hgrid.crs,
         )
 
-    def __call__(self, data_source, vgrid):
-        if data_source.name == 'temperature':
-            return TempNudge(self, data_source, vgrid)
+    @property
+    @abstractmethod
+    def name(self):
+        ''''''
 
-    @classmethod
-    def default(cls, hgrid):
-        return cls(hgrid)
+    @property
+    @abstractmethod
+    def bctype(self):
+        ''''''
 
 
-class TempNudge(Nudge):
+class TEM_Nudge(Nudge):
 
-    def __init__(self, nudge, data_source, vgrid):
-        super().__init__(
-            nudge.nodes.to_dict(),
-            nudge.elements.elements,
-            nudge.description,
-            nudge.crs
-        )
-        self.vgrid = vgrid
+    @property
+    def name(self):
+        return 'temperature'
+
+    @property
+    def bctype(self):
+        return 'itetype'
+
+
+class SAL_Nudge(Nudge):
+
+    @property
+    def name(self):
+        return 'salinity'
+
+    @property
+    def bctype(self):
+        return 'isatype'
+
+
+TempNudge = TEM_Nudge
+SaltNudge = SAL_Nudge

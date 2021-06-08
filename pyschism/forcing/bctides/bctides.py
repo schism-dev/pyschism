@@ -1,22 +1,23 @@
 from datetime import datetime, timedelta
 import pathlib
-from typing import Any, Dict, Union, List, TYPE_CHECKING
+from typing import Any, Dict, Union, List  # , TYPE_CHECKING
 
 # import pytz
 # from pyschism import dates
 # from pyschism.driver import raise_type_error
 from pyschism.forcing.bctides import (
-    iettype, ifltype, itetype, isatype,
+    # iettype, ifltype, itetype, isatype,
     itrtype
 )
-from pyschism.forcing.tides.tides import Tides, TidalDatabase
+from pyschism.forcing.bctides.nudge import TEM_Nudge, SAL_Nudge
+# from pyschism.forcing.tides.tides import Tides, TidalDatabase
 # from pyschism.mesh import (
-#     Hgrid,
+# #     Hgrid,
 #     Vgrid
 # )
 
-if TYPE_CHECKING:
-    from pyschism.driver import ModelDriver
+# if TYPE_CHECKING:
+#     from pyschism.driver import ModelDriver
 
 
 def raise_type_error(argname, obj, cls):
@@ -38,7 +39,8 @@ class Bctides:
         self.hgrid = hgrid
         self.start_date = start_date
         self.rnday = rnday
-        self.vgrid = vgrid
+        from pyschism.mesh import Vgrid
+        self.vgrid = Vgrid.default() if vgrid is None else vgrid
         self.cutoff_depth = cutoff_depth
 
     def __str__(self):
@@ -84,6 +86,8 @@ class Bctides:
             overwrite: bool = False,
             parallel=True,
             progress_bar=True,
+            # rlmax=1.5,
+            # rnu_day=0.25
     ):
         # self.tidal_database.write(path, )
         output_directory = pathlib.Path(output_directory)
@@ -93,6 +97,15 @@ class Bctides:
             raise IOError('path exists and overwrite is False')
         with open(bctides, 'w') as f:
             f.write(str(self))
+        # write nudge
+        for bctype, tracer in {'itetype': 'TEM', 'isatype': 'SAL'}.items():
+            for boundary in self.hgrid.boundaries.open.itertuples():
+                data_source = getattr(boundary, bctype)
+                if data_source is not None:
+                    exec(f'self.hgrid.boundaries.{tracer}_nudge('
+                         'self.vgrid, data_source, rlmax=data_source.rlmax, '
+                         'rnu_day=data_source.rnu_day, parallel=parallel)')
+                    break
 
         def write_elev2D():
             _elev2D = output_directory / 'elev2D.th.nc' if elev2D \
@@ -143,20 +156,15 @@ class Bctides:
                         overwrite,
                         progress_bar=progress_bar
                     )
+
         if parallel is True:
             from multiprocessing import Process
-            p1 = Process(target=write_elev2D)
-            p2 = Process(target=write_uv3D)
-            p3 = Process(target=write_tem3D)
-            p4 = Process(target=write_sal3D)
-            p1.start()
-            p2.start()
-            p3.start()
-            p4.start()
-            p1.join()
-            p2.join()
-            p3.join()
-            p4.join()
+            jobs = [Process(target=f) for f in (write_elev2D, write_uv3D,
+                                                write_tem3D, write_sal3D)]
+            for job in jobs:
+                job.start()
+            for job in jobs:
+                job.join()
         else:
             write_elev2D()
             write_uv3D()

@@ -42,7 +42,6 @@ class GofsForecastDatasets:
                         )
                     )
                 logger.info('Success!')
-                # break
             except OSError as e:
                 logger.info('Not available.')
                 if e.errno == -70:
@@ -163,7 +162,7 @@ class GOFSBaroclinicComponent(BaroclinicComponent):
             lat_idxs.append(lat_idxs[-1] + 1)
         return lon_idxs, lat_idxs
 
-
+# import dask
 class GOFSElevation(GOFSBaroclinicComponent):
 
     @property
@@ -178,6 +177,7 @@ class GOFSElevation(GOFSBaroclinicComponent):
     def sampling_interval(self):
         return timedelta(hours=3.)
 
+    # @dask.delayed
     def put_ncdata(self, boundary, dst, start_date, run_days, overwrite=False,
                    offset=0, output_interval=timedelta(hours=24),
                    pixel_buffer=10, progress_bar=True):
@@ -652,7 +652,7 @@ class GOFSSalinity(GOFSBaroclinicComponent):
             if np.any(np.isnan(salt_interp)):
                 raise ValueError('No boundary  salt data for GOFS. '
                                  'Try increasing pixel_buffer argument.')
-            dst['time_series'][i, offset:offset+bz.shape[0], :, :] = salt_interp.reshape(bz.shape)
+            dst['time_series'][i, offset:offset + bz.shape[0], :, :] = salt_interp.reshape(bz.shape)
 
     @property
     def product(self) -> str:

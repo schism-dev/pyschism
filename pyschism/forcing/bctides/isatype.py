@@ -46,13 +46,25 @@ class SalinityInitialConditions(Isatype):
 
 class SpatiallyVaryingTimeHistorySalinity(Isatype):
 
-    def __init__(self, data_source, tobc: List[float] = None):
-        self.data_source = data_source
-        self.tobc = tobc
+    def __init__(
+        self,
+        data_source,
+        nudge: bool = True,
+        rlmax=1.5,
+        rnu_day=0.25,
+    ):
+        self.data_source = data_source.salinity
+        self.nudge = nudge
+        self.rlmax = rlmax
+        self.rnu_day = rnu_day
 
     def get_boundary_string(self, hgrid, boundary):
-        if self.tobc is None:
-            return '1.'
+        # if self.tobc is None:
+        return '1.'
+
+    # def write(self, *args, **kwargs):
+    #     if self.nudge is not None:
+    #         self.nudge.write(*args, **kwargs)
 
     @property
     def isatype(self):
