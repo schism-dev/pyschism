@@ -17,9 +17,8 @@ from pyschism.mesh import Hgrid, Vgrid
 
 logger = logging.getLogger(__name__)
 
-msg = [100*'*', ]
-print(msg)
-
+# msg = [100*'*', ]
+# print(msg)
 
 
 def add_log_level_to_parser(parser):
@@ -49,9 +48,6 @@ def init_logger():
         tz=timezone('UTC')).timetuple()
 
     logging.captureWarnings(True)
-
-
-init_logger()
 
 
 class HgridAction(argparse.Action):
@@ -91,9 +87,6 @@ def init_hgrid():
     return tmp_args.hgrid
 
 
-hgrid = init_hgrid()
-
-
 class VgridAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
         if self.const is None:  # This is the init
@@ -123,9 +116,6 @@ def init_vgrid():
         logger.info('Init default vgrid...')
         return Vgrid.default()
     return tmp_args.vgrid
-
-
-vgrid = init_vgrid()
 
 
 class BctidesCli:
@@ -408,28 +398,36 @@ def add_bctypes_to_parser(parser):
 
 class NudgeAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
-        if vgrid.is2D():
-            value = False
-        else:
-            value = True
-        if 'disable' in option_string:
-            value = False
-        setattr(namespace, self.dest, value)
+        
+        if len(values) == 0:
+            values = None
+
+        if values is None:
+            if vgrid.is2D():
+                values = False
+            else:
+                values = True
+            if 'disable' in option_string:
+                values = False
+
+        setattr(namespace, self.dest, values)
 
 
 def add_nudge_to_parser(parser):
     parser.add_argument(
         '--nudge-temp',
         '--nudge-temperature',
+        '--nudge-t',
         dest='nudge_temp',
-        nargs='?',
+        nargs='*',
         action=NudgeAction,
     )
     parser.add_argument(
         '--disable-nudge-temp',
         '--disable-nudge-temperature',
+        '--disable-nudge-t',
         dest='nudge_temp',
-        nargs='?',
+        nargs=0,
         action=NudgeAction,
     )
     parser.set_defaults(nudge_temp=None)
@@ -438,6 +436,7 @@ def add_nudge_to_parser(parser):
     parser.add_argument(
         '--nudge-salt',
         '--nudge-salinity',
+        '--nudge-s',
         dest='nudge_salt',
         nargs='?',
         action=NudgeAction,
@@ -445,6 +444,7 @@ def add_nudge_to_parser(parser):
     parser.add_argument(
         '--disable-nudge-salt',
         '--disable-nudge-salinity',
+        '--disable-nudge-s',
         dest='nudge_salt',
         nargs='?',
         action=NudgeAction,
@@ -452,12 +452,6 @@ def add_nudge_to_parser(parser):
     parser.set_defaults(nudge_salt=None)
     parser.add_argument('--rlmax-salt', default=1.5, type=float)
     parser.add_argument('--rnu_day-salt', default=0.25, type=float)
-
-
-baroclinic_databases = {
-    'gofs': GOFS,
-    'rtofs': RTOFS,
-}
 
 
 def get_tides(args: argparse.Namespace):
@@ -555,7 +549,6 @@ class Ifltype4Action(argparse.Action):
 
 
 class Ifltype5Action(argparse.Action):
-
     def __call__(self, parser, namespace, values, option_string=None):
         for boundary in hgrid.boundaries.open.itertuples():
             hgrid.boundaries.set_forcing(
@@ -569,51 +562,77 @@ class Ifltype5Action(argparse.Action):
 
 
 class Itetype4Action(argparse.Action):
-
     def __call__(self, parser, namespace, values, option_string=None):
         tmp_parser = argparse.ArgumentParser(add_help=False)
         add_nudge_to_parser(tmp_parser)
-        # add_vgrid_to_parser(tmp_parser)
         tmp_args, _ = tmp_parser.parse_known_args()
+        bnd_ids = hgrid.boundaries.open['id'].tolist()
         if tmp_args.nudge_temp is None:
             if vgrid.is2D():
-                tmp_args.nudge_temp = False
+                tmp_args.nudge_temp = []
             else:
-                tmp_args.nudge_temp = True
+                tmp_args.nudge_temp = bnd_ids
+        elif tmp_args.nudge_temp is True:
+            tmp_args.nudge_temp = bnd_ids
+        elif tmp_args.nudge_temp is False:
+            tmp_args.nudge_temp = []
+        remaining_bounds = list(set(tmp_args.nudge_temp) - set(bnd_ids))
+        if len(remaining_bounds) > 0:
+            raise ValueError(f"No boundary with id's {remaining_bounds}.")
         for boundary in hgrid.boundaries.open.itertuples():
             hgrid.boundaries.set_forcing(
                 boundary.id,
                 itetype=self.const(
                     baroclinic_databases[namespace.baroclinic_database](),
-                    nudge=tmp_args.nudge_temp,
-                    # nudge=tmp_args.nudge_temp,
-                    # nudge=,
-                    rlmax=tmp_args.rlmax_temp,
-                    rnu_day=tmp_args.rnu_day_temp,
                     ))
+            if boundary.id in tmp_args.nudge_temp:
+                hgrid.boundaries.open.loc[boundary.Index].itetype.nudge = True
+                hgrid.boundaries.open.loc[boundary.Index].itetype.rlmax = tmp_args.rlmax_temp               
+                hgrid.boundaries.open.loc[boundary.Index].itetype.rnu_day = tmp_args.rnu_day_temp
+            else:
+                hgrid.boundaries.open.loc[boundary.Index].itetype.nudge = False
+
         setattr(namespace, self.dest, self.const)
 
 
 class Isatype4Action(argparse.Action):
-
     def __call__(self, parser, namespace, values, option_string=None):
+        # logger.debug('Init isatype-4')
         tmp_parser = argparse.ArgumentParser(add_help=False)
         add_nudge_to_parser(tmp_parser)
-        # add_vgrid_to_parser(tmp_parser)
         tmp_args, _ = tmp_parser.parse_known_args()
+        bnd_ids = hgrid.boundaries.open['id'].tolist()
         if tmp_args.nudge_salt is None:
             if vgrid.is2D():
-                tmp_args.nudge_salt = False
+                tmp_args.nudge_salt = []
             else:
-                tmp_args.nudge_salt = True
+                tmp_args.nudge_salt = bnd_ids
+        elif tmp_args.nudge_salt is True:
+            tmp_args.nudge_salt = bnd_ids
+        elif tmp_args.nudge_salt is False:
+            tmp_args.nudge_salt = []
+        # logger.debug('Init isatype-4')
+        remaining_bounds = list(set(tmp_args.nudge_salt) - set(bnd_ids))
+        if len(remaining_bounds) > 0:
+            raise ValueError(f"No boundary with id's {remaining_bounds}.")
         for boundary in hgrid.boundaries.open.itertuples():
             hgrid.boundaries.set_forcing(
                 boundary.id,
                 isatype=self.const(baroclinic_databases[
-                    namespace.baroclinic_database](),
-                    # nudge=hgrid if tmp_args.nudge_salt is True else None
-                    nudge=tmp_args.nudge_salt,
-                    rlmax=tmp_args.rlmax_salt,
-                    rnu_day=tmp_args.rnu_day_salt,
-                    ))
+                    namespace.baroclinic_database]()))
+            if boundary.id in tmp_args.nudge_salt:
+                hgrid.boundaries.open.loc[boundary.Index].isatype.nudge = True
+                hgrid.boundaries.open.loc[boundary.Index].isatype.rlmax = tmp_args.rlmax_salt               
+                hgrid.boundaries.open.loc[boundary.Index].isatype.rnu_day = tmp_args.rnu_day_salt
+            else:
+                hgrid.boundaries.open.loc[boundary.Index].isatype.nudge = False
         setattr(namespace, self.dest, self.const)
+
+
+init_logger()
+baroclinic_databases = {
+    'gofs': GOFS,
+    'rtofs': RTOFS,
+}
+hgrid = init_hgrid()
+vgrid = init_vgrid()

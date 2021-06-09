@@ -91,8 +91,9 @@ class Vgrid(ABC):
 
     @lru_cache(maxsize=1)
     def is2D(self):
-        if str(self) == str(SZ.default()):
-            return True
+        if isinstance(self, SZ):
+            if str(self) == str(SZ.default()):
+                return True
         return False
 
     def is3D(self):
