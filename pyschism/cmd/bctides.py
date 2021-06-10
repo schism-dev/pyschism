@@ -17,8 +17,10 @@ from pyschism.mesh import Hgrid, Vgrid
 
 logger = logging.getLogger(__name__)
 
-# msg = [100*'*', ]
-# print(msg)
+baroclinic_databases = {
+    'gofs': GOFS,
+    'rtofs': RTOFS,
+}
 
 
 def add_log_level_to_parser(parser):
@@ -136,10 +138,14 @@ class BctidesCli:
 
     @staticmethod
     def add_subparser_action(subparsers):
-        add_bctides_options_to_parser(subparsers.add_parser('bctides'))
+        init_logger()
+        hgrid = init_hgrid()
+        vgrid = init_vgrid()
+        add_bctides_options_to_parser(
+            subparsers.add_parser('bctides'), hgrid, vgrid)
 
 
-def add_bctides_options_to_parser(parser):
+def add_bctides_options_to_parser(parser, hgrid, vgrid):
     add_hgrid_to_parser(parser, const=hgrid)
     parser.add_argument(
         "--overwrite",
@@ -461,7 +467,7 @@ def get_tides(args: argparse.Namespace):
     def get_velocity():
         return (
             True
-            if args.include_velocity is True or vgrid.is3D() is True
+            if args.include_velocity is True or args.vgrid.is3D() is True
             else False
         )
 
@@ -483,7 +489,7 @@ class CustomBoundaryAction(argparse.Action):
                             'Boundary type must be an integer, not type '
                             f'{type(tval)}.')
                     if tval == 3:
-                        hgrid.boundaries.set_forcing(
+                        namespace.hgrid.boundaries.set_forcing(
                             bnd_id,
                             iettype=iettype.Iettype3(get_tides(namespace))
                             )
@@ -495,8 +501,8 @@ class CustomBoundaryAction(argparse.Action):
 class Iettype3Action(argparse.Action):
 
     def __call__(self, parser, namespace, values, option_string=None):
-        for boundary in hgrid.boundaries.open.itertuples():
-            hgrid.boundaries.set_forcing(
+        for boundary in namespace.hgrid.boundaries.open.itertuples():
+            namespace.hgrid.boundaries.set_forcing(
                 boundary.id,
                 iettype=self.const(get_tides(namespace)))
         setattr(namespace, self.dest, self.const)
@@ -505,8 +511,8 @@ class Iettype3Action(argparse.Action):
 class Iettype4Action(argparse.Action):
 
     def __call__(self, parser, namespace, values, option_string=None):
-        for boundary in hgrid.boundaries.open.itertuples():
-            hgrid.boundaries.set_forcing(
+        for boundary in namespace.hgrid.boundaries.open.itertuples():
+            namespace.hgrid.boundaries.set_forcing(
                 boundary.id,
                 iettype=self.const(baroclinic_databases[
                     namespace.baroclinic_database]()))
@@ -516,8 +522,8 @@ class Iettype4Action(argparse.Action):
 class Iettype5Action(argparse.Action):
 
     def __call__(self, parser, namespace, values, option_string=None):
-        for boundary in hgrid.boundaries.open.itertuples():
-            hgrid.boundaries.set_forcing(
+        for boundary in namespace.hgrid.boundaries.open.itertuples():
+            namespace.hgrid.boundaries.set_forcing(
                 boundary.id,
                 iettype=self.const(
                     get_tides(namespace),
@@ -530,8 +536,8 @@ class Iettype5Action(argparse.Action):
 class Ifltype3Action(argparse.Action):
 
     def __call__(self, parser, namespace, values, option_string=None):
-        for boundary in hgrid.boundaries.open.itertuples():
-            hgrid.boundaries.set_forcing(
+        for boundary in namespace.hgrid.boundaries.open.itertuples():
+            namespace.hgrid.boundaries.set_forcing(
                 boundary.id,
                 ifltype=values(get_tides(namespace)))
         setattr(namespace, self.dest, values)
@@ -540,8 +546,8 @@ class Ifltype3Action(argparse.Action):
 class Ifltype4Action(argparse.Action):
 
     def __call__(self, parser, namespace, values, option_string=None):
-        for boundary in hgrid.boundaries.open.itertuples():
-            hgrid.boundaries.set_forcing(
+        for boundary in namespace.hgrid.boundaries.open.itertuples():
+            namespace.hgrid.boundaries.set_forcing(
                 boundary.id,
                 ifltype=self.const(baroclinic_databases[
                     namespace.baroclinic_database]()))
@@ -550,8 +556,8 @@ class Ifltype4Action(argparse.Action):
 
 class Ifltype5Action(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
-        for boundary in hgrid.boundaries.open.itertuples():
-            hgrid.boundaries.set_forcing(
+        for boundary in namespace.hgrid.boundaries.open.itertuples():
+            namespace.hgrid.boundaries.set_forcing(
                 boundary.id,
                 ifltype=self.const(
                     get_tides(namespace),
@@ -566,9 +572,9 @@ class Itetype4Action(argparse.Action):
         tmp_parser = argparse.ArgumentParser(add_help=False)
         add_nudge_to_parser(tmp_parser)
         tmp_args, _ = tmp_parser.parse_known_args()
-        bnd_ids = hgrid.boundaries.open['id'].tolist()
+        bnd_ids = namespace.hgrid.boundaries.open['id'].tolist()
         if tmp_args.nudge_temp is None:
-            if vgrid.is2D():
+            if namespace.vgrid.is2D():
                 tmp_args.nudge_temp = []
             else:
                 tmp_args.nudge_temp = bnd_ids
@@ -579,18 +585,18 @@ class Itetype4Action(argparse.Action):
         remaining_bounds = list(set(tmp_args.nudge_temp) - set(bnd_ids))
         if len(remaining_bounds) > 0:
             raise ValueError(f"No boundary with id's {remaining_bounds}.")
-        for boundary in hgrid.boundaries.open.itertuples():
-            hgrid.boundaries.set_forcing(
+        for boundary in namespace.hgrid.boundaries.open.itertuples():
+            namespace.hgrid.boundaries.set_forcing(
                 boundary.id,
                 itetype=self.const(
                     baroclinic_databases[namespace.baroclinic_database](),
                     ))
             if boundary.id in tmp_args.nudge_temp:
-                hgrid.boundaries.open.loc[boundary.Index].itetype.nudge = True
-                hgrid.boundaries.open.loc[boundary.Index].itetype.rlmax = tmp_args.rlmax_temp               
-                hgrid.boundaries.open.loc[boundary.Index].itetype.rnu_day = tmp_args.rnu_day_temp
+                namespace.hgrid.boundaries.open.loc[boundary.Index].itetype.nudge = True
+                namespace.hgrid.boundaries.open.loc[boundary.Index].itetype.rlmax = tmp_args.rlmax_temp               
+                namespace.hgrid.boundaries.open.loc[boundary.Index].itetype.rnu_day = tmp_args.rnu_day_temp
             else:
-                hgrid.boundaries.open.loc[boundary.Index].itetype.nudge = False
+                namespace.hgrid.boundaries.open.loc[boundary.Index].itetype.nudge = False
 
         setattr(namespace, self.dest, self.const)
 
@@ -601,9 +607,9 @@ class Isatype4Action(argparse.Action):
         tmp_parser = argparse.ArgumentParser(add_help=False)
         add_nudge_to_parser(tmp_parser)
         tmp_args, _ = tmp_parser.parse_known_args()
-        bnd_ids = hgrid.boundaries.open['id'].tolist()
+        bnd_ids = namespace.hgrid.boundaries.open['id'].tolist()
         if tmp_args.nudge_salt is None:
-            if vgrid.is2D():
+            if namespace.vgrid.is2D():
                 tmp_args.nudge_salt = []
             else:
                 tmp_args.nudge_salt = bnd_ids
@@ -615,24 +621,15 @@ class Isatype4Action(argparse.Action):
         remaining_bounds = list(set(tmp_args.nudge_salt) - set(bnd_ids))
         if len(remaining_bounds) > 0:
             raise ValueError(f"No boundary with id's {remaining_bounds}.")
-        for boundary in hgrid.boundaries.open.itertuples():
-            hgrid.boundaries.set_forcing(
+        for boundary in namespace.hgrid.boundaries.open.itertuples():
+            namespace.hgrid.boundaries.set_forcing(
                 boundary.id,
                 isatype=self.const(baroclinic_databases[
                     namespace.baroclinic_database]()))
             if boundary.id in tmp_args.nudge_salt:
-                hgrid.boundaries.open.loc[boundary.Index].isatype.nudge = True
-                hgrid.boundaries.open.loc[boundary.Index].isatype.rlmax = tmp_args.rlmax_salt               
-                hgrid.boundaries.open.loc[boundary.Index].isatype.rnu_day = tmp_args.rnu_day_salt
+                namespace.hgrid.boundaries.open.loc[boundary.Index].isatype.nudge = True
+                namespace.hgrid.boundaries.open.loc[boundary.Index].isatype.rlmax = tmp_args.rlmax_salt               
+                namespace.hgrid.boundaries.open.loc[boundary.Index].isatype.rnu_day = tmp_args.rnu_day_salt
             else:
-                hgrid.boundaries.open.loc[boundary.Index].isatype.nudge = False
+                namespace.hgrid.boundaries.open.loc[boundary.Index].isatype.nudge = False
         setattr(namespace, self.dest, self.const)
-
-
-init_logger()
-baroclinic_databases = {
-    'gofs': GOFS,
-    'rtofs': RTOFS,
-}
-hgrid = init_hgrid()
-vgrid = init_vgrid()
