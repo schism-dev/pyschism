@@ -409,7 +409,7 @@ class NudgeAction(argparse.Action):
             values = None
 
         if values is None:
-            if vgrid.is2D():
+            if namespace.vgrid.is2D():
                 values = False
             else:
                 values = True
