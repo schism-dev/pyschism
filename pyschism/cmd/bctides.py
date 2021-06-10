@@ -83,10 +83,13 @@ def add_hgrid_to_parser(parser, const=None):
 
 
 def init_hgrid():
-    tmp_parser = argparse.ArgumentParser(add_help=False)
-    add_hgrid_to_parser(tmp_parser)
-    tmp_args, _ = tmp_parser.parse_known_args(sys.argv[2:])
-    return tmp_args.hgrid
+    if 'bctides' in sys.argv:
+        if not bool(set(sys.argv).intersection(['-h', '--help'])):
+            tmp_parser = argparse.ArgumentParser(add_help=False)
+            add_hgrid_to_parser(tmp_parser)
+            tmp_args, _ = tmp_parser.parse_known_args(sys.argv[2:])
+            return tmp_args.hgrid
+    return False
 
 
 class VgridAction(argparse.Action):
