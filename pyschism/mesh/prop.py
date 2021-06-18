@@ -1,10 +1,12 @@
 import pathlib
 from typing import Union
 
+from matplotlib.collections import PolyCollection
 import numpy as np
 from shapely.geometry import Polygon, MultiPolygon
 
 from pyschism.mesh.base import Gr3
+from pyschism.figures import figure
 
 
 class Prop:
@@ -21,7 +23,7 @@ class Prop:
             raise ValueError(
                 'Shape mismatch between element_values and hgrid.')
 
-        self.elements = gr3.elements
+        self.gr3 = gr3
         self.values = values
 
     def __str__(self):
@@ -40,6 +42,37 @@ class Prop:
             raise IOError('path exists and overwrite is False')
         with open(path, 'w') as f:
             f.write(str(self))
+
+    @figure
+    def make_plot(
+        self,
+        axes=None,
+        show=False,
+        figsize=None,
+        **kwargs
+    ):
+
+        tria = PolyCollection(self.gr3.coords[self.gr3.elements.triangles], **kwargs)
+        quad = PolyCollection(self.gr3.coords[self.gr3.elements.quads], **kwargs)
+            # print(element)
+        # exit()
+        # pc = PolyCollection(self.gr3.coords[self.gr3.elements.array], **kwargs)
+        # tria_values = np.where(np.any())
+        tria.set_array(self.values[self.gr3.elements.tri_idxs])
+        quad.set_array(self.values[self.gr3.elements.qua_idxs])
+        axes.add_collection(tria)
+        axes.add_collection(quad)
+        # egdf = self.gr3.elements.gdf.assign(values=self.values)
+        # egdf.plot("values", ax=axes)
+        return axes
+        # if len(self.quads) > 0:
+        #     pc = PolyCollection(
+        #         self.coords[self.quads],
+        #         **kwargs
+        #     )
+        #     quad_value = np.mean(self.values[self.quads], axis=1)
+        #     pc.set_array(quad_value)
+        #     axes.add_collection(pc)
 
     @classmethod
     def from_geometry(
@@ -94,17 +127,15 @@ class Tvdflag(Prop):
        where upwind or TVD/TVD^2 is used based on the element property values
        (0: upwind; 1: TVD/TVD^2).
     """
+
     @classmethod
     def default(cls, hgrid):
         return cls.constant(hgrid, 1)
 
     @classmethod
-    def from_geometry(cls, gr3: Gr3, region: Union[Polygon, MultiPolygon],
-                      value: int = 1):
-        if value not in [1, -1]:
-            raise ValueError('Argument value must be 1 or -1.')
+    def from_geometry(cls, gr3: Gr3, region: Union[Polygon, MultiPolygon]):
         return super(Tvdflag, cls).from_geometry(
-            gr3, region, inner_value=value, outer_value=-value)
+            gr3, region, inner_value=1, outer_value=0)
 
 
 def reg2multipoly(file):

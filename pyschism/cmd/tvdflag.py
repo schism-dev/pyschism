@@ -15,6 +15,7 @@ class TvdflagCli:
     def __init__(self, args: argparse.Namespace):
 
         # these are mutually exclusive:
+
         if args.default is not None:
             tvdflag = Tvdflag.default(args.hgrid)
 
@@ -29,6 +30,7 @@ class TvdflagCli:
                 args.hgrid,
                 MultiPolygon(polygon_collection)
             )
+
         elif args.geometry is not None:
             raise NotImplementedError('parse geometry')
             tvdflag = Tvdflag.from_geometry(
@@ -36,7 +38,18 @@ class TvdflagCli:
                 MultiPolygon(polygon_collection)
             )
 
-        tvdflag.write(args.output_path, overwrite=args.overwrite)
+        elif args.propfile is not None:
+            element_values = []
+            with open(args.propfile) as f:
+                for i in range(len(args.hgrid.elements)):
+                    element_values.append(int(f.readline().split()[-1]))
+            tvdflag = Tvdflag(args.hgrid, element_values)
+
+        if args.plot is True:
+            tvdflag.make_plot(show=True)
+
+        if args.output_path is not None:
+            tvdflag.write(args.output_path, overwrite=args.overwrite)
 
     @staticmethod
     def add_subparser_action(subparsers):
@@ -46,8 +59,9 @@ class TvdflagCli:
 def add_prop_options_to_parser(parser):
     common.add_hgrid_to_parser(parser)
     common.add_log_level_to_parser(parser)
-    parser.add_argument('--output-path', '-o', required=True)
+    parser.add_argument('--output-path', '-o')
     parser.add_argument('--overwrite', action='store_true')
+    parser.add_argument('--plot', action='store_true')
     options = parser.add_mutually_exclusive_group(required=True)
     options.add_argument(
         '--default',
@@ -59,6 +73,13 @@ def add_prop_options_to_parser(parser):
         '--reg',
         '-r',
         nargs='+',
+        help='Uses ACE/gredit reg files.'
+    )
+    options.add_argument(
+        '--propfile',
+        '--prop',
+        '-p',
+        # nargs=1,
         help='Uses ACE/gredit reg files.'
     )
     options.add_argument(
