@@ -12,10 +12,9 @@ logger = logging.getLogger(__name__)
 
 class Nudge(Gr3Field):
 
-    def __init__(self, hgrid, vgrid, data_source, rlmax=1.5, rnu_day=0.25,
-                 parallel: bool = False):
+    def __init__(self, hgrid, vgrid, data_source, rlmax=1.5, rnu_day=0.25):
 
-        @jit(nopython=True, parallel=parallel)
+        @jit(nopython=True, parallel=True)
         def compute_nudge(lon, lat, opbd, out):
 
             nnode = lon.shape[0]

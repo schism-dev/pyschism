@@ -1,4 +1,4 @@
-from argparse import Namespace
+import argparse
 from datetime import timedelta
 from enum import Enum
 import json
@@ -7,15 +7,17 @@ import os
 import pathlib
 import shutil
 
+import geopandas as gpd
 from psutil import cpu_count
 
 from pyschism import dates
 from pyschism.driver import ModelConfig
 from pyschism.enums import ForecastProduct
-from pyschism.forcing.atmosphere import NWS2, GFS, HRRR
-from pyschism.forcing.hydrology import NWM
-from pyschism.forcing.tides import Tides
-from pyschism.mesh import Hgrid, Vgrid, Fgrid, gridgr3, ManningsN, prop
+from pyschism.forcing.nws import NWS2, GFS, HRRR
+from pyschism.forcing.source_sink import NWM
+from pyschism.forcing.bctides import Tides
+from pyschism.mesh import Hgrid, Vgrid, gridgr3, prop
+from pyschism.mesh.fgrid import Fgrid, ManningsN, DragCoefficient
 from pyschism.param.schout import SurfaceOutputVars
 
 logger = logging.getLogger(__name__)
@@ -33,7 +35,6 @@ class GridGr3Type(Enum):
     SHAPIRO = gridgr3.Shapiro
     WINDROT = gridgr3.Windrot
     ELEV_IC = gridgr3.ElevIc
-    # NUDGE = gridgr3.Nudge
 
 
 class PropType(Enum):
@@ -71,8 +72,7 @@ class ForecastCliMeta(type):
 
 class ForecastCli(metaclass=ForecastCliMeta):
 
-    def __init__(self, args: Namespace):
-
+    def __init__(self, args: argparse.Namespace):
         self.args = args
         coldstart, hotstart = self.get_drivers()
         if self.args.skip_run is True:
@@ -106,23 +106,26 @@ class ForecastCli(metaclass=ForecastCliMeta):
     def get_coldstart(self):
         # print(self.start_date)
         # exit()
-        return self.config.coldstart(
-            timestep=self.args.timestep,
-            start_date=self.start_date - self.spinup_time,
-            end_date=self.start_date,
-            dramp=self.spinup_time,
-            drampbc=self.spinup_time,
-            dramp_ss=self.spinup_time,
-            drampwafo=self.spinup_time,
-            drampwind=self.spinup_time,
-            nspool=None,
-            ihfskip=None,
-            nhot_write=None,
-            stations=None,
-            server_config=None,
-            use_param_template=self.args.use_param_template,
-            # **surface_outputs()
-        )
+        if self.vgrid.is2D():
+            return self.config.coldstart(
+                timestep=self.args.timestep,
+                start_date=self.start_date - self.spinup_time,
+                end_date=self.start_date,
+                dramp=self.spinup_time,
+                drampbc=self.spinup_time,
+                dramp_ss=self.spinup_time,
+                drampwafo=self.spinup_time,
+                drampwind=self.spinup_time,
+                nspool=None,
+                ihfskip=None,
+                nhot_write=None,
+                stations=None,
+                server_config=None,
+                use_param_template=self.args.use_param_template,
+                # **self.user_requested_surface_outputs,
+            )
+        else:
+            raise NotImplementedError('Model is 3D.')
 
     def get_hotstart(self):
 
@@ -150,20 +153,20 @@ class ForecastCli(metaclass=ForecastCliMeta):
 
     @staticmethod
     def add_subparser_action(subparsers):
-        add_forecast(subparsers.add_parser('forecast'))
+        add_forecast_options_to_parser(subparsers.add_parser('forecast'))
 
     @property
     def args(self):
         return self._args
 
     @args.setter
-    def args(self, args: Namespace):
+    def args(self, args: argparse.Namespace):
 
-        if args.vgrid is not None:
-            self.vgrid = Vgrid.open(args.vgrid)
+        # if args.vgrid is not None:
+        #     self.vgrid = Vgrid.open(args.vgrid)
 
-        if args.fgrid is not None:
-            self.fgrid = Fgrid.open(args.fgrid, crs=args.fgrid_crs)
+        # if args.fgrid is not None:
+        #     self.fgrid = Fgrid.open(args.fgrid, crs=args.fgrid_crs)
 
         self._args = args
 
@@ -181,12 +184,11 @@ class ForecastCli(metaclass=ForecastCliMeta):
                 fluxflag=self.fluxflag,
                 tvdflag=self.tvdflag,
                 elev_ic=self.elev_ic,
-                windrot=self.windrot,
-                tides=self.tides,
-                atmosphere=self.atmosphere,
-                hydrology=self.hydrology,
-                baroclinic=self.baroclinic,
-                waves=self.waves,
+                # windrot=self.windrot,
+                bctides=self.bctides,
+                nws=self.nws,
+                source_sink=self.source_sink,
+                # waves=self.waves,
             )
         return self._config
 
@@ -228,75 +230,115 @@ class ForecastCli(metaclass=ForecastCliMeta):
     @property
     def hgrid_path(self):
         if not hasattr(self, '_hgrid_path'):
-            self._hgrid_path = self.static_directory / 'hgrid.gr3'
-            if not self._hgrid_path.exists() or self.args.overwrite is True:
+            hgrid_path = self.static_directory / 'hgrid.gr3'
+            if not hgrid_path.exists() or self.args.overwrite is True:
                 logger.info(
-                    f'Writing initial hgrid file to {self._hgrid_path}.')
+                    f'Copying hgrid file from {self.args.hgrid} to '
+                    f'{hgrid_path}.'
+                    )
                 if self.args.overwrite is True:
-                    if self._hgrid_path.is_file():
-                        os.remove(self._hgrid_path)
-                shutil.copy2(self.args.hgrid, self._hgrid_path,
+                    if hgrid_path.is_file():
+                        os.remove(hgrid_path)
+                shutil.copy2(self.args.hgrid, hgrid_path,
                              follow_symlinks=True)
+            self._hgrid_path = hgrid_path
         return self._hgrid_path
 
     @property
     def vgrid_path(self):
         if not hasattr(self, '_vgrid_path'):
-            self._vgrid_path = self.static_directory / 'vgrid.in'
-            if not self._vgrid_path.exists() or self.args.overwrite is True:
-                logger.info(
-                    f'Writing initial vgrid file to {self._vgrid_path}.')
+            vgrid_path = self.static_directory / 'vgrid.in'
+            if not vgrid_path.exists() or self.args.overwrite is True:
                 if self.args.vgrid_bin is not None:
+                    logger.info(
+                        f'Calling vgrid binary from {self.args.vgrid_bin}.')
                     Vgrid.from_binary(
                         self.hgrid,
                         binary=self.args.vgrid_bin
                     ).write(
-                        self._vgrid_path,
+                        vgrid_path,
                         overwrite=self.args.overwrite
                     )
                 else:
                     if self.args.vgrid is None:
+                        logger.info(
+                            f'Writing default vgrid file to {vgrid_path}.')
                         Vgrid.default().write(
-                            self._vgrid_path,
+                            vgrid_path,
                             overwrite=self.args.overwrite)
                     else:
+                        logger.info(
+                            f'Copying vgrid file from {self.args.vgrid} to '
+                            f'path {vgrid_path}.')
                         if self.args.overwrite is True:
-                            if self._vgrid_path.is_file():
-                                os.remove(self._vgrid_path)
-                        shutil.copy2(self.args.vgrid, self._vgrid_path,
+                            if vgrid_path.is_file():
+                                os.remove(vgrid_path)
+                        shutil.copy2(self.args.vgrid, vgrid_path,
                                      follow_symlinks=True)
+            self._vgrid_path = vgrid_path
         return self._vgrid_path
 
     @property
     def fgrid_path(self):
         if not hasattr(self, '_fgrid_path'):
 
+            # user did not specify an fgrid
             if self.args.fgrid is None:
+
                 if self.vgrid.is2D():
-                    self._fgrid_path = self.static_directory / 'manning.gr3'
+                    fgrid_path = self.static_directory / 'manning.gr3'
+                    logger.info(
+                        'Initializing default mannings file for 2D model to '
+                        f'{fgrid_path}.')
                     ManningsN.linear_with_depth(
-                        self.hgrid).write(self._fgrid_path,
+                        self.hgrid).write(fgrid_path,
                                           overwrite=self.args.overwrite)
                 else:
-                    raise NotImplementedError(
-                        'User must pass an fgrid for 3D model.')
+                    fgrid_path = self.static_directory / 'drag.gr3'
+                    logger.info(
+                        'Initializing default drag file for 3D model to '
+                        f'{fgrid_path}')
+                    DragCoefficient.linear_with_depth(
+                        self.hgrid).write(fgrid_path,
+                                          overwrite=self.args.overwrite)
+
             else:
-
+                # user can override fgrid_type for files with arbitrary names
+                # auto means that we derive the type of fgrid from the filename
                 if self.args.fgrid_type == 'auto':
-                    # fgrid = pathlib.Path(self.args.fgrid)
+                    # just opens the Fgrid to make sure it's valid
                     fgrid = Fgrid.open(
-                        self.args.fgrid, crs=self.args.fgrid_crs)
-                    self._fgrid_path = self.static_directory / fgrid.name
+                        self.args.fgrid,
+                        crs=self.args.fgrid_crs
+                    )
+                    fgrid_path = self.static_directory / fgrid.name
+                    if len(fgrid.nodes) != len(self.hgrid.nodes):
+                        raise Exception(
+                            'Nodes array mismatch between fgrid '
+                            f'{self.args.fgrid} and hgrid {self.args.hgrid}.')
 
+                    if len(fgrid.elements) != len(self.hgrid.elements):
+                        raise Exception(
+                            'Elements array mismatch between fgrid '
+                            f'{self.args.fgrid} and hgrid {self.args.hgrid}.')
+
+                # user specified an fgrid_type
                 else:
-                    self._fgrid_path = self.static_directory / \
+                    fgrid_path = self.static_directory / \
                         (self.args.fgrid_type + '.gr3')
 
                 if self.args.overwrite is True:
-                    if self._fgrid_path.is_file():
-                        os.remove(self._fgrid_path)
-                shutil.copy2(self.args.fgrid, self._fgrid_path,
+                    if fgrid_path.is_file():
+                        os.remove(fgrid_path)
+
+                logger.info(
+                    f'Copying friction file {self.args.fgrid} to '
+                    f'{fgrid_path}.')
+
+                shutil.copy2(self.args.fgrid, fgrid_path,
                              follow_symlinks=True)
+
+            self._fgrid_path = fgrid_path
         return self._fgrid_path
 
     @property
@@ -320,108 +362,120 @@ class ForecastCli(metaclass=ForecastCliMeta):
     @property
     def fluxflag(self):
         if not hasattr(self, '_fluxflag'):
-            # TODO
-            fluxflag = None
+            if self.args.fluxflag is None:
+                if self.vgrid.is3D():
+                    fluxflag = prop.Fluxflag.default()
+                else:
+                    fluxflag = None
+            else:
+                fluxflag = self.args.fluxflag
             self._fluxflag = fluxflag
         return self._fluxflag
 
     @property
-    def tides(self):
-        if not hasattr(self, '_tides'):
-            if not self.args.all_constituents \
-                    and not self.args.major_constituents \
-                    and not self.args.constituents:
-                return
+    def tvdflag(self):
+        if not hasattr(self, '_tvdflag'):
+            if self.args.tvdflag is None:
+                if self.vgrid.is3D():
+                    tvdflag = prop.Tvdflag.default()
+                else:
+                    tvdflag = None
             else:
-                self._tides = Tides(
-                    tidal_database=self.args.tidal_database,
-                    velocity=self.args.bnd_vel
-                )
-                if self.args.all_constituents:
-                    self._tides.use_all()
-                if self.args.major_constituents:
-                    self._tides.use_major()
-                if self.args.constituents:
-                    for constituent in self.args.constituents:
-                        self._tides.use_constituent(constituent)
-                if self.args.Z0 is not None:
-                    self._tides.add_Z0(self.args.Z0)
-        return self._tides
+                tvdflag = self.args.tvdflag
+            self._tvdflag = tvdflag
+        return self._tvdflag
 
-    @property
-    def atmosphere(self):
+    # @property
+    # def tides(self):
+    #     if not hasattr(self, '_tides'):
+    #         if not self.args.all_constituents \
+    #                 and not self.args.major_constituents \
+    #                 and not self.args.constituents:
+    #             return
+    #         else:
+    #             self._tides = Tides(
+    #                 tidal_database=self.args.tidal_database,
+    #                 velocity=self.args.bnd_vel
+    #             )
+    #             if self.args.all_constituents:
+    #                 self._tides.use_all()
+    #             if self.args.major_constituents:
+    #                 self._tides.use_major()
+    #             if self.args.constituents:
+    #                 for constituent in self.args.constituents:
+    #                     self._tides.use_constituent(constituent)
+    #             if self.args.Z0 is not None:
+    #                 self._tides.add_Z0(self.args.Z0)
+    #     return self._tides
 
-        def sflux_1():
-            for arg, value in self.args.__dict__.items():
-                if 'gdas' in arg:
-                    if value is True:
-                        raise NotImplementedError(
-                            'GDAS product not implemented.')
-                elif 'gfs' in arg:
-                    if value is True:
-                        if arg == 'gfs':
-                            return GFS()
-                        else:
-                            return GFS(product=arg)
+    # @property
+    # def atmosphere(self):
 
-        def sflux_2():
-            for arg, value in self.args.__dict__.items():
-                if 'hrrr' in arg:
-                    if value is True:
-                        return HRRR()
+    #     def sflux_1():
+    #         for arg, value in self.args.__dict__.items():
+    #             if 'gdas' in arg:
+    #                 if value is True:
+    #                     raise NotImplementedError(
+    #                         'GDAS product not implemented.')
+    #             elif 'gfs' in arg:
+    #                 if value is True:
+    #                     if arg == 'gfs':
+    #                         return GFS()
+    #                     else:
+    #                         return GFS(product=arg)
 
-        if not hasattr(self, '_atmosphere'):
-            _sflux_1 = sflux_1()
-            if _sflux_1 is not None:
-                self._atmosphere = NWS2(
-                    _sflux_1,
-                    sflux_2()
-                    )
-            else:
-                self._atmosphere = None
+    #     def sflux_2():
+    #         for arg, value in self.args.__dict__.items():
+    #             if 'hrrr' in arg:
+    #                 if value is True:
+    #                     return HRRR()
 
-        return self._atmosphere
+    #     if not hasattr(self, '_atmosphere'):
+    #         _sflux_1 = sflux_1()
+    #         if _sflux_1 is not None:
+    #             self._atmosphere = NWS2(
+    #                 _sflux_1,
+    #                 sflux_2()
+    #                 )
+    #         else:
+    #             self._atmosphere = None
 
-    @property
-    def hydrology(self):
+    #     return self._atmosphere
 
-        if self.args.hydrology is None:
-            return
+    # @property
+    # def hydrology(self):
 
-        if not hasattr(self, '_hydrology'):
-            self._hydrology = []
-            for hydro in self.args.hydrology:
-                if hydro.upper() == "NWM":
-                    # obj.logger.debug('Append NWM object.')
-                    self._hydrology.append(NWM())
+    #     if self.args.hydrology is None:
+    #         return
 
-        return self._hydrology
+    #     if not hasattr(self, '_hydrology'):
+    #         self._hydrology = []
+    #         for hydro in self.args.hydrology:
+    #             if hydro.upper() == "NWM":
+    #                 # obj.logger.debug('Append NWM object.')
+    #                 self._hydrology.append(NWM())
 
-    @property
-    def baroclinic(self):
-        # TODO: Add baroclinic forcing init
-        return
+    #     return self._hydrology
 
-    @property
-    def waves(self):
-        # TODO: Add waves forcing init
-        return
+    # @property
+    # def baroclinic(self):
+    #     # TODO: Add baroclinic forcing init
+    #     return
 
-    @property
-    def start_date(self):
-        if not hasattr(self, '_start_date'):
-            self._start_date = dates.nearest_cycle()
-        return self._start_date
+    # @property
+    # def waves(self):
+    #     # TODO: Add waves forcing init
+    #     return
 
-    @property
-    def spinup_time(self):
-        if not hasattr(self, '_spinup_time'):
-            if self.args.spinup_days is None:
-                self._spinup_time = timedelta(days=0.)
-            else:
-                self._spinup_time = timedelta(
-                    days=float(self.args.spinup_days))
-        return self._spinup_time
+    # @property
+    # def start_date(self):
+    #     if not hasattr(self, '_start_date'):
+    #         self._start_date = dates.nearest_cycle()
+    #     return self._start_date
+
+    # @property
+    # def spinup_time(self):
+    #     return self.args.spinup_time
 
 
 def add_forecast_init(actions):
@@ -447,12 +501,22 @@ def add_forecast_init(actions):
         "--spinup-days",
         help="Number of days used for model initialization. "
         "Defaults to 15 days spinup.",
-        type=float, default=15.)
+        type=lambda x: timedelta(days=float(x)),
+    )
+    add_prop_options_to_parser(init)
     init.add_argument(
         "--skip-run", action="store_true",
         help="Skips running the model.")
     init.add_argument('--nproc', type=int, default=cpu_count(logical=False))
     init.add_argument('--use-param-template', action='store_true')
+    init.add_argument(
+        "--log-level",
+        choices=['info', 'warning', 'debug'],
+        default='warning'
+    )
+    init.add_argument(
+        "--overwrite", action="store_true",
+        help="Allow overwrite of output directory.")
     _add_tidal_constituents(init)
     _add_atmospheric_forcing(init)
     _add_hydrologic_forcing(init)
@@ -493,13 +557,49 @@ def add_forecast_update(actions):
     update.add_argument("project_directory")
 
 
-def add_forecast(parser):
-    parser.add_argument(
-        "--overwrite", action="store_true",
-        help="Allow overwrite of output directory.")
+def add_forecast_options_to_parser(parser):
     actions = parser.add_subparsers(dest="action")
     add_forecast_init(actions)
     add_forecast_update(actions)
+
+
+class PropAction(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        if 'geometry' in option_string:
+            values = gpd.read_file(values)
+        else:
+            raise NotImplementedError('lol1')
+        setattr(namespace, self.dest, values)
+
+
+def add_prop_parser_option(parser, name, const):
+    prop = parser.add_mutually_exclusive_group()
+    prop.add_argument(
+        f'--{name}',
+        dest=name,
+        action=PropAction,
+        const=const,
+        nargs=1,
+    )
+    prop.add_argument(
+        f'--{name}-gpd',
+        dest=name,
+        action=PropAction,
+        const=const,
+    )
+    prop.add_argument(
+        f'--{name}-geometry',
+        dest=name,
+        action=PropAction,
+        const=const,
+    )
+    # prop.add_argument(f'--{name}-file')
+
+
+def add_prop_options_to_parser(parser):
+    add_prop_parser_option(parser, 'fluxflag', prop.Fluxflag)
+    add_prop_parser_option(parser, 'tvdflag', prop.Tvdflag)
+    # exit()
 
 
 def add_forecastd(subparsers):

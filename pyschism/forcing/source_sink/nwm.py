@@ -25,7 +25,7 @@ import wget
 
 from pyschism import dates
 from pyschism.mesh import Hgrid, Gr3
-from pyschism.forcing.hydrology.base import Hydrology
+from pyschism.forcing.source_sink.base import Hydrology
 
 
 DATADIR = pathlib.Path(user_data_dir('nwm'))

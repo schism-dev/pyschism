@@ -62,7 +62,7 @@ class Elev2D:
         for boundary in self.hgrid.boundaries.open.itertuples():
             if boundary.iettype is not None:
                 if boundary.iettype.iettype in [4, 5]:
-                    boundary.iettype.data_source.put_ncdata(
+                    boundary.iettype.data_source.put_boundary_ncdata(
                         boundary, dst, start_date, rnday, overwrite=overwrite,
                         offset=offset, output_interval=output_interval,
                         pixel_buffer=10, progress_bar=progress_bar)

@@ -166,11 +166,11 @@ class SZ(Vgrid):
 
     def __init__(self, h_s, ztot, h_c, theta_b, theta_f, sigma):
         self.h_s = h_s
-        self.ztot = ztot
+        self.ztot = np.array(ztot)
         self.h_c = h_c
         self.theta_b = theta_b
         self.theta_f = theta_f
-        self.sigma = sigma
+        self.sigma = np.array(sigma)
 
     def __str__(self):
         f = [
@@ -180,17 +180,16 @@ class SZ(Vgrid):
             ' (transition depth between S and Z)',
             'Z levels',
         ]
-        for row in enumerate(self.ztot):
-            for i, x in enumerate(row):
-                f.append(f'{i+1:d} {x:G}')
+        for i, row in enumerate(self.ztot):
+            f.append(f'{i+1:d} {row:G}')
+
         f.extend([
             'S levels',
             f'{self.h_c:G} {self.theta_b:G} {self.theta_f:G} '
             ' !h_c, theta_b, theta_f',
             ])
-        for row in enumerate(self.sigma):
-            for i, x in enumerate(row):
-                f.append(f'{i+1:d} {x:G}')
+        for i, row in enumerate(self.sigma):
+            f.append(f'{i+1:d} {row:G}')
         return '\n'.join(f)
 
     def get_xyz(self, gr3, crs=None):
@@ -235,9 +234,8 @@ class SZ(Vgrid):
 
     @classmethod
     def default(cls):
-        ztot = np.array([-1.e6])
-        sigma = np.array([-1, 0.])
-        return cls(1.e6, ztot, 40., 1., 1.e-4, sigma)
+        # h_s, ztot, h_c, theta_b, theta_f, sigma
+        return cls(1.e6, [-1.e6], 40., 1., 1.e-4, [-1, 0.])
 
     @property
     def kz(self):

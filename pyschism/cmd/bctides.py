@@ -4,15 +4,14 @@ import json
 import logging
 import pathlib
 import sys
-from time import time
 
-from pytz import timezone
-
-
-from pyschism.forcing.baroclinic import GOFS, RTOFS
-from pyschism.forcing.tides import Tides
+from pyschism.cmd.common import (
+    add_hgrid_to_parser, add_vgrid_to_parser, add_log_level_to_parser,
+)
+from pyschism.forcing.hycom import GOFS, RTOFS
+from pyschism.forcing.bctides import Tides
 from pyschism.forcing.bctides import Bctides, iettype, ifltype, itetype, isatype
-from pyschism.mesh import Hgrid, Vgrid
+from pyschism.mesh import Vgrid
 
 
 logger = logging.getLogger(__name__)
@@ -23,94 +22,12 @@ baroclinic_databases = {
 }
 
 
-def add_log_level_to_parser(parser):
-    parser.add_argument(
-        "--log-level",
-        choices=[name.lower() for name in logging._nameToLevel],
-        default="warning",
-    )
-
-
-def init_logger():
-    tmp_parser = argparse.ArgumentParser(add_help=False)
-    add_log_level_to_parser(tmp_parser)
-    tmp_args, _ = tmp_parser.parse_known_args()
-
-    logging.basicConfig(
-        level={
-            'warning': logging.WARNING,
-            'info': logging.INFO,
-            'debug': logging.DEBUG,
-        }[tmp_args.log_level],
-        format='[%(asctime)s] %(name)s %(levelname)s: %(message)s',
-        force=True,
-    )
-
-    logging.Formatter.converter = lambda *args: datetime.now(
-        tz=timezone('UTC')).timetuple()
-
-    logging.captureWarnings(True)
-
-
-class HgridAction(argparse.Action):
-    def __call__(self, parser, namespace, values, option_string=None):
-        if self.const is None:
-            tmp_parser = argparse.ArgumentParser(add_help=False)
-            tmp_parser.add_argument('--hgrid-crs')
-            tmp_args, _ = tmp_parser.parse_known_args()
-            logger.info(f'Opening hgrid from {values}...')
-            start = time()
-            hgrid = Hgrid.open(values, crs=tmp_args.hgrid_crs)
-            logger.info(f'Reading hgrid took {time()-start}...')
-            if len(hgrid.boundaries.open) == 0:
-                raise TypeError(f"Hgrid provided {values} contains no open boundaries.")
-            setattr(namespace, self.dest, hgrid)
-        else:
-            setattr(namespace, self.dest, self.const)
-
-
-def add_hgrid_to_parser(parser, const=None):
-    parser.add_argument(
-        "hgrid",
-        action=HgridAction,
-        const=const,
-        help='Path to the SCHISM hgrid file.'
-    )
-    parser.add_argument(
-        '--hgrid-crs',
-        help='Coordinate reference system string of hgrid.'
-    )
-
-
 def init_hgrid():
-    if 'bctides' in sys.argv:
-        if not bool(set(sys.argv).intersection(['-h', '--help'])):
-            tmp_parser = argparse.ArgumentParser(add_help=False)
-            add_hgrid_to_parser(tmp_parser)
-            tmp_args, _ = tmp_parser.parse_known_args(sys.argv[2:])
-            return tmp_args.hgrid
-    return False
-
-
-class VgridAction(argparse.Action):
-    def __call__(self, parser, namespace, values, option_string=None):
-        if self.const is None:  # This is the init
-            logger.info(f'Opening vgrid from {values}')
-            start = time()
-            vgrid = Vgrid.open(values)
-            logger.info(f'Opening vgrid took {time()-start}')
-            setattr(namespace, self.dest, vgrid)
-        else:
-            setattr(namespace, self.dest, self.const)
-
-
-def add_vgrid_to_parser(parser, default=None, const=None):
-    parser.add_argument(
-        "--vgrid",
-        action=VgridAction,
-        default=default,
-        const=const,
-    )
+    if not bool(set(sys.argv).intersection(['-h', '--help'])):
+        tmp_parser = argparse.ArgumentParser(add_help=False)
+        add_hgrid_to_parser(tmp_parser)
+        tmp_args, _ = tmp_parser.parse_known_args(sys.argv[2:])
+        return tmp_args.hgrid
 
 
 def init_vgrid():
@@ -125,25 +42,27 @@ def init_vgrid():
 
 class BctidesCli:
     def __init__(self, args: argparse.Namespace):
-        logger.info('Init Bctides...')
         bctides = Bctides(
                 args.hgrid,
                 args.start_date,
                 args.run_days,
                 vgrid=args.vgrid,
             )
-
         if args.Z0 is not None:
             bctides.Z0 = args.Z0
-
-        logger.info('Writing bctides configuration to disk...')
-        bctides.write(args.output_directory, overwrite=args.overwrite)
+        bctides.write(
+            args.output_directory,
+            overwrite=args.overwrite,
+            parallel_download=args.parallel_download
+        )
 
     @staticmethod
     def add_subparser_action(subparsers):
-        init_logger()
-        hgrid = init_hgrid()
-        vgrid = init_vgrid()
+        if 'bctides' in sys.argv:
+            hgrid = init_hgrid()
+            vgrid = init_vgrid()
+        else:
+            hgrid, vgrid = None, None
         add_bctides_options_to_parser(
             subparsers.add_parser('bctides'), hgrid, vgrid)
 
@@ -202,6 +121,7 @@ def add_bctides_options_to_parser(parser, hgrid, vgrid):
     )
     parser.add_argument('--Z0', type=float)
     parser.add_argument("--cutoff-depth", type=float, default=50.0)
+    parser.add_argument("--parallel-download", action='store_true')
     add_bctypes_to_parser(parser)
 
 

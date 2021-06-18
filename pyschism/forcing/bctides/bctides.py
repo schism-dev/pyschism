@@ -9,7 +9,7 @@ from pyschism.forcing.bctides import (
     # iettype, ifltype, itetype, isatype,
     itrtype
 )
-from pyschism.forcing.bctides.nudge import TEM_Nudge, SAL_Nudge
+# from pyschism.forcing.bctides.nudge import TEM_Nudge, SAL_Nudge
 # from pyschism.forcing.tides.tides import Tides, TidalDatabase
 # from pyschism.mesh import (
 # #     Hgrid,
@@ -84,7 +84,7 @@ class Bctides:
             sal3D: Union[bool, str] = True,
             flux: Union[bool, str] = True,
             overwrite: bool = False,
-            parallel=True,
+            parallel_download=False,
             progress_bar=True,
             # rlmax=1.5,
             # rnu_day=0.25
@@ -104,7 +104,7 @@ class Bctides:
                 if data_source is not None:
                     exec(f'self.hgrid.boundaries.{tracer}_nudge('
                          'self.vgrid, data_source, rlmax=data_source.rlmax, '
-                         'rnu_day=data_source.rnu_day, parallel=parallel)')
+                         'rnu_day=data_source.rnu_day)')
                     break
 
         def write_elev2D():
@@ -157,7 +157,7 @@ class Bctides:
                         progress_bar=progress_bar
                     )
 
-        if parallel is True:
+        if parallel_download is True:
             from multiprocessing import Process
             jobs = [Process(target=f) for f in (write_elev2D, write_uv3D,
                                                 write_tem3D, write_sal3D)]

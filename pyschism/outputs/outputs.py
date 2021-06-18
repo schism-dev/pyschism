@@ -1,3 +1,4 @@
+from abc import ABC
 from datetime import datetime, timedelta
 import os
 import pathlib
@@ -7,6 +8,7 @@ from typing import Dict, Union
 # import cf
 from netCDF4 import Dataset
 import numpy as np
+import xarray
 
 from pyschism.enums import (
     IofHydroVariables,
@@ -66,7 +68,7 @@ def aggregate_by_datetime(shape, filenames, n_local_to_global, hgrid, name, dt, 
     return values
 
 
-class OutputVariable:
+class OutputVariableCombiner(ABC):
 
     def __init__(self, name, parent, rank, nvrt, start_step=0):
         self.name = name
@@ -295,7 +297,7 @@ class OutputVariable:
         return self._shape
 
 
-class OutputCollection:
+class OutputsCollector:
 
     surface_output_vars = [
         IofHydroVariables,
@@ -396,7 +398,7 @@ class OutputCollection:
                     setattr(
                         self,
                         vartype.name,
-                        OutputVariable(
+                        OutputVariableCombiner(
                             vartype.name,
                             self,
                             rank,
@@ -458,3 +460,11 @@ class OutputCollection:
                 (start_hour*3600) % 60)
             self._start_date -= timedelta(hours=float(self.utc_start))
         return self._start_date
+
+
+class CombinedOutputs:
+
+    def __init__(self, resource):
+        self.dataset = xarray.open_mfdataset(resource)
+
+

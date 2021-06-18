@@ -5,9 +5,9 @@ from typing import Union
 import f90nml  # type: ignore[import]
 
 from pyschism.enums import NWSType
-from pyschism.forcing.atmosphere.nws.nws import NWS
-from pyschism.forcing.atmosphere.nws.nws2.sflux import SfluxDataset
-from pyschism.mesh import Gr3, gridgr3
+from pyschism.forcing.nws.base import NWS
+from pyschism.forcing.nws.nws2.sflux import SfluxDataset
+from pyschism.mesh import gridgr3
 
 
 SFLUX_DEFAULTS = f90nml.read(

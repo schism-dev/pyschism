@@ -5,24 +5,21 @@ import numpy as np
 import pytz
 
 
-# def singleton(class_):
-#     instances = {}
-
-#     def getinstance(*args, **kwargs):
-#         if class_ not in instances:
-#             instances[class_] = class_(*args, **kwargs)
-#         return instances[class_]
-#     return getinstance
-
-
-# @singleton
 class StartDate:
 
     def __init__(self):
         self.start_date = None
 
-    def __set__(self, obj, val: datetime):
-        self.start_date = localize_datetime(val).astimezone(pytz.utc)
+    def __set__(self, obj, start_date: datetime):
+        start_date = nearest_cycle() if start_date is None else \
+                     nearest_cycle(localize_datetime(start_date))
+
+        if obj.end_date is not None:
+            if start_date > obj.end_date:
+                raise ValueError(
+                    'start_date is greater than end_date. '
+                    'Try clearing end_date first.')
+        self.start_date = start_date
 
     def __get__(self, obj, val) -> datetime:
         return self.start_date
@@ -31,7 +28,31 @@ class StartDate:
         self.start_date = None
 
 
-# @singleton
+class RunDays:
+
+    def __init__(self):
+        self.run_days = None
+
+    def __set__(self, obj, run_days: Union[timedelta, float]):
+
+        if isinstance(run_days, (int, float)):
+            run_days = timedelta(days=float(run_days))
+        elif not isinstance(run_days, timedelta):
+            raise TypeError(
+                f'Argument run_days must be {timedelta} or float.')
+        
+        if obj.start_date is not None:
+            obj.end_date = obj.start_date + run_days
+
+        self.run_days = run_days
+
+    def __get__(self, obj, val) -> Union[timedelta, None]:
+        return self.run_days
+
+    def __delete__(self, obj):
+        self.run_days = None
+
+
 class EndDate:
 
     def __init__(self):
@@ -88,14 +109,17 @@ def nearest_zulu(input_datetime=None, method='floor'):
 
 
 def nearest_cycle(input_datetime=None, period=6, method='floor'):
+
+    if input_datetime is None:
+        input_datetime = localize_datetime(datetime.utcnow())
     assert method in ['floor', 'ceil']
     if method == 'floor':
         method = np.floor
     if method == 'ceil':
         method = np.ceil
-    if input_datetime is None:
-        input_datetime = localize_datetime(datetime.utcnow())
-    current_cycle = int(period * method(input_datetime.hour / period))
+
+    current_cycle = int(period * method(input_datetime.hour / period)) % 24
+
     return pytz.timezone('UTC').localize(
         datetime(input_datetime.year, input_datetime.month,
                  input_datetime.day, current_cycle))

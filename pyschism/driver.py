@@ -4,20 +4,22 @@ import os
 import pathlib
 import subprocess
 import tempfile
-from typing import Union, List, Iterable
+from typing import Union  # , List, Iterable
 
-import numpy as np
+# import numpy as np
 
 from pyschism import dates
 from pyschism.enums import Stratification
 from pyschism.hotstart import Hotstart
-from pyschism.forcing import Tides, Hydrology
-from pyschism.forcing.atmosphere.nws.nws import NWS
-from pyschism.forcing.atmosphere.nws.nws2 import NWS2
-from pyschism.forcing.baroclinic import BaroclinicForcing
+# from pyschism.forcing import Tides, Hydrology
+from pyschism.forcing.source_sink import SourceSink
+from pyschism.forcing.nws.base import NWS
+from pyschism.forcing.nws.nws2 import NWS2
+# from pyschism.forcing.baroclinic import BaroclinicForcing
 from pyschism.forcing.bctides.bctides import Bctides
 from pyschism.makefile import MakefileDriver
-from pyschism.mesh import Hgrid, Vgrid, Fgrid, ManningsN, gridgr3, prop
+from pyschism.mesh import Hgrid, Vgrid, Fgrid, gridgr3, prop
+from pyschism.mesh.fgrid import ManningsN, DragCoefficient
 from pyschism.param import Param
 from pyschism.server.base import ServerConfig
 from pyschism.stations import Stations
@@ -29,121 +31,121 @@ def raise_type_error(argname, obj, cls):
         f'type {type(obj)}.')
 
 
-class ModelForcings:
+# class ModelForcings:
 
-    def fetch_data(self, driver: 'ModelDriver'):
-        if not isinstance(driver, ModelDriver):
-            raise_type_error('driver', driver, ModelDriver)
+#     def fetch_data(self, driver: 'ModelDriver'):
+#         if not isinstance(driver, ModelDriver):
+#             raise_type_error('driver', driver, ModelDriver)
 
-        # if self.tides is not None:
-        #     self.tides.fetch_data(hgrid, start_date, rnday)
+#         # if self.tides is not None:
+#         #     self.tides.fetch_data(hgrid, start_date, rnday)
 
-        if self.atmosphere is not None:
-            self.atmosphere.fetch_data(
-                start_date=driver.param.opt.start_date,
-                rnday=driver.param.core.rnday,
-                bbox=driver.config.hgrid.get_bbox(
-                    'EPSG:4326', output_type='bbox'),
-                prc=False if driver.config.vgrid.is2D() else True,
-                rad=False if driver.config.vgrid.is2D() else True,
-            )
+#         if self.atmosphere is not None:
+#             self.atmosphere.fetch_data(
+#                 start_date=driver.param.opt.start_date,
+#                 rnday=driver.param.core.rnday,
+#                 bbox=driver.config.hgrid.get_bbox(
+#                     'EPSG:4326', output_type='bbox'),
+#                 prc=False if driver.config.vgrid.is2D() else True,
+#                 rad=False if driver.config.vgrid.is2D() else True,
+#             )
 
-        if self.hydrology is not None:
-            for forcing in self.hydrology:
-                forcing.fetch_data(
-                    driver.config.hgrid,
-                    driver.param.opt.start_date,
-                    driver.param.core.rnday
-                )
+#         if self.hydrology is not None:
+#             for forcing in self.hydrology:
+#                 forcing.fetch_data(
+#                     driver.config.hgrid,
+#                     driver.param.opt.start_date,
+#                     driver.param.core.rnday
+#                 )
 
-        if self.baroclinic is not None:
-            if driver.param.opt.ihot == 1:
-                self.baroclinic.fetch_data(
-                    driver.config.hgrid,
-                    driver.param.opt.start_date,
-                    driver.param.core.rnday
-                )
+#         if self.baroclinic is not None:
+#             if driver.param.opt.ihot == 1:
+#                 self.baroclinic.fetch_data(
+#                     driver.config.hgrid,
+#                     driver.param.opt.start_date,
+#                     driver.param.core.rnday
+#                 )
 
-        if self.waves is not None:
-            self.waves.fetch_data(
-                driver.config.hgrid,
-                driver.param.opt.start_date,
-                driver.param.core.rnday
-            )
+#         if self.waves is not None:
+#             self.waves.fetch_data(
+#                 driver.config.hgrid,
+#                 driver.param.opt.start_date,
+#                 driver.param.core.rnday
+#             )
 
-    def max_end_date(self):
-        end_date = dates.nearest_cycle()
-        if self.atmosphere is not None:
-            end_date = np.max([end_date, np.max(self.atmosphere.timevector)])
-        if self.hydrology is not None:
-            for forcing in self.hydrology:
-                end_date = np.max([end_date, np.max(forcing.timevector)])
-        if self.baroclinic is not None:
-            end_date = np.max([end_date, np.max(self.baroclinic.timevector)])
-        if self.waves is not None:
-            end_date = np.max([end_date, np.max(self.waves.timevector)])
+#     def max_end_date(self):
+#         end_date = dates.nearest_cycle()
+#         if self.atmosphere is not None:
+#             end_date = np.max([end_date, np.max(self.atmosphere.timevector)])
+#         if self.hydrology is not None:
+#             for forcing in self.hydrology:
+#                 end_date = np.max([end_date, np.max(forcing.timevector)])
+#         if self.baroclinic is not None:
+#             end_date = np.max([end_date, np.max(self.baroclinic.timevector)])
+#         if self.waves is not None:
+#             end_date = np.max([end_date, np.max(self.waves.timevector)])
 
-        if end_date == dates.nearest_cycle():
-            return None
-        return end_date
+#         if end_date == dates.nearest_cycle():
+#             return None
+#         return end_date
 
-    @property
-    def tides(self):
-        return self._tides
+#     @property
+#     def tides(self):
+#         return self._tides
 
-    @tides.setter
-    def tides(self, tides: Union[Tides, None]):
-        if tides is not None:
-            if not isinstance(tides, Tides):
-                raise_type_error('tides', tides, Tides)
-        self._tides = tides
+#     @tides.setter
+#     def tides(self, tides: Union[Tides, None]):
+#         if tides is not None:
+#             if not isinstance(tides, Tides):
+#                 raise_type_error('tides', tides, Tides)
+#         self._tides = tides
 
-    @property
-    def atmosphere(self):
-        return self._atmosphere
+#     @property
+#     def atmosphere(self):
+#         return self._atmosphere
 
-    @atmosphere.setter
-    def atmosphere(self, atmosphere: Union[NWS, None]):
-        if atmosphere is not None:
-            if not isinstance(atmosphere, NWS):
-                raise_type_error('atmosphere', atmosphere, NWS)
-        self._atmosphere = atmosphere
+#     @atmosphere.setter
+#     def atmosphere(self, atmosphere: Union[NWS, None]):
+#         if atmosphere is not None:
+#             if not isinstance(atmosphere, NWS):
+#                 raise_type_error('atmosphere', atmosphere, NWS)
+#         self._atmosphere = atmosphere
 
-    @property
-    def hydrology(self):
-        return self._hydrology
+#     @property
+#     def hydrology(self):
+#         return self._hydrology
 
-    @hydrology.setter
-    def hydrology(self, hydrology: Union[Hydrology, List[Hydrology], None]):
-        if hydrology is not None:
-            if not isinstance(hydrology, Iterable):
-                hydrology = [hydrology]
-            for forcing in hydrology:
-                if not isinstance(forcing, Hydrology):
-                    raise_type_error('hydrology', forcing, Hydrology)
-        self._hydrology = hydrology
+#     @hydrology.setter
+#     def hydrology(self, hydrology: Union[Hydrology, List[Hydrology], None]):
+#         if hydrology is not None:
+#             if not isinstance(hydrology, Iterable):
+#                 hydrology = [hydrology]
+#             for forcing in hydrology:
+#                 if not isinstance(forcing, Hydrology):
+#                     raise_type_error('hydrology', forcing, Hydrology)
+#         self._hydrology = hydrology
 
-    @property
-    def baroclinic(self):
-        return self._baroclinic
+#     @property
+#     def baroclinic(self):
+#         return self._baroclinic
 
-    @baroclinic.setter
-    def baroclinic(self, baroclinic: Union[BaroclinicForcing, None]):
-        if baroclinic is not None:
-            if not isinstance(baroclinic, BaroclinicForcing):
-                raise_type_error('baroclinic', baroclinic, BaroclinicForcing)
-        self._baroclinic = baroclinic
+#     @baroclinic.setter
+#     def baroclinic(self, baroclinic: Union[BaroclinicForcing, None]):
+#         if baroclinic is not None:
+#             if not isinstance(baroclinic, BaroclinicForcing):
+#                 raise_type_error('baroclinic', baroclinic, BaroclinicForcing)
+#         self._baroclinic = baroclinic
 
-    @property
-    def waves(self):
-        return self._waves
+#     @property
+#     def waves(self):
+#         return self._waves
 
-    @waves.setter
-    def waves(self, waves: None):
-        if waves is not None:
-            raise NotImplementedError(
-                'waves forcing not yet implemented.')
-        self._waves = waves
+#     @waves.setter
+#     def waves(self, waves: None):
+#         if waves is not None:
+#             raise NotImplementedError(
+#                 'waves forcing not yet implemented.')
+#         self._waves = waves
 
 
 class Gr3FieldTypes(Enum):
@@ -159,7 +161,7 @@ class Gr3FieldTypes(Enum):
         raise ValueError(f'{name} is not a valid {gridgr3.Gr3Field} type.')
 
 
-class PropFieldType(Enum):
+class PropTypes(Enum):
     FLUXFLAG = prop.Fluxflag
     TVDFLAG = prop.Tvdflag
 
@@ -322,23 +324,6 @@ class ModelDriver:
                 raise_type_error('stations', stations, Stations)
         self._stations = stations
 
-    @property
-    def bctides(self):
-        if self.config.forcings.tides is not None:
-            self._bctides = Bctides.from_driver(
-                    self,
-                    # cutoff_depth=50.,
-                    # elevation=True,
-                    # velocity=True,
-                    # temperature=True if self.config.forcings.baroclinic is not None else False,
-                    # salinity=True if self.config.forcings.baroclinic is not None else False,
-
-                    # tracers=self.config.forcings.tracers,
-                    # tidal_database=self.config.forcings.tides.tidal_database,
-                    # ts_database=self.config.forcings.baroclinic,
-                )
-            return self._bctides
-
     def write(
             self,
             output_directory,
@@ -500,16 +485,36 @@ class Gridgr3Descriptor:
         return self.gr3field
 
 
+class PropTypeDescriptor:
+    def __init__(self, prop_type: PropTypes):
+        self.name = prop_type.name
+        self.type = prop_type.value
+        self.prop = None
+
+    def __set__(self, obj, val: Union[prop.Prop, None]):
+        if not isinstance(val, self.type) and val is not None:
+            raise ValueError(
+                f'Argument {self.name.lower()} must be of type {self.type} '
+                f'not type {type(val)}.')
+        self.prop = val
+
+    def __get__(self, obj, val):
+        return self.prop
+
+
 class ModelConfigMeta(type):
 
     def __new__(meta, name, bases, attrs):
-        attrs['forcings'] = ModelForcings()
+        # attrs['forcings'] = ModelForcings()
         attrs['start_date'] = dates.StartDate()
         attrs['end_date'] = dates.EndDate()
         attrs['spinup_time'] = dates.SpinupTime()
         for gr3field_type in Gr3FieldTypes:
             name = gr3field_type.name.lower()
             attrs[name] = Gridgr3Descriptor(gr3field_type)
+        for prop_type in PropTypes:
+            name = prop_type.name.lower()
+            attrs[name] = PropTypeDescriptor(prop_type)
         return type(name, bases, attrs)
 
 
@@ -543,20 +548,13 @@ class ModelConfig(metaclass=ModelConfigMeta):
             shapiro: gridgr3.Shapiro = None,
             fluxflag: prop.Fluxflag = None,
             tvdflag: prop.Tvdflag = None,
-            tides: Tides = None,
-            atmosphere: NWS = None,
-            hydrology: Union[Hydrology, List[Hydrology]] = None,
-            baroclinic: BaroclinicForcing = None,
-            waves=None,
+            bctides: Bctides = None,
+            nws: NWS = None,
+            source_sink: SourceSink = None,
     ):
         self.hgrid = hgrid
         self.vgrid = vgrid
         self.fgrid = fgrid
-        self.forcings.tides = tides
-        self.forcings.atmosphere = atmosphere
-        self.forcings.hydrology = hydrology
-        self.forcings.baroclinic = baroclinic
-        self.forcings.waves = waves
         self.albedo = albedo
         self.diffmin = diffmin
         self.diffmax = diffmax
@@ -569,6 +567,9 @@ class ModelConfig(metaclass=ModelConfigMeta):
         self.salt_ic = salt_ic
         self.windrot = windrot
         self.estuary = estuary
+        self.bctides = bctides
+        self.nws = nws
+        self.source_sink = source_sink
 
     def coldstart(
             self,
@@ -726,12 +727,15 @@ class ModelConfig(metaclass=ModelConfigMeta):
             if self.vgrid.is2D():
                 fgrid = ManningsN.linear_with_depth(self.hgrid)
             else:
-                raise NotImplementedError('Must provide fgrid for 3D runs.')
+                fgrid = DragCoefficient.linear_with_depth(self.hgrid)
+
         if not isinstance(fgrid, Fgrid):
             raise_type_error('fgrid', fgrid, Fgrid)
+
         if self.vgrid.is2D() is True and not isinstance(fgrid, ManningsN):
             raise TypeError(
                 f'2D model must use {ManningsN} but got {type(fgrid)}.')
+
         self._fgrid = fgrid
 
     @property

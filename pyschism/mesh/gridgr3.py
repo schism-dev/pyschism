@@ -5,11 +5,10 @@ import tempfile
 from typing import Union
 
 import geopandas as gpd
-from numba import jit, prange
 import numpy as np
 from shapely.geometry import Polygon, MultiPolygon, Point
 
-from pyschism.forcing.baroclinic import BaroclinicForcing
+from pyschism.forcing.hycom import Hycom
 from pyschism.mesh.base import Gr3
 
 
@@ -114,18 +113,18 @@ class ElevIc(Gr3Field):
 class TempIc(Gr3Field):
 
     @classmethod
-    def from_forcing(cls, gr3: Gr3, forcing: BaroclinicForcing, date):
+    def from_hycom(cls, gr3: Gr3, hycom: Hycom, date):
         obj = cls.constant(gr3, np.nan)
-        obj.values[:] = forcing.temperature.interpolate(obj, date)
+        obj.values[:] = hycom.temperature.interpolate(obj, date)
         return obj
 
 
 class SaltIc(Gr3Field):
 
     @classmethod
-    def from_forcing(cls, gr3: Gr3, forcing: BaroclinicForcing, date):
+    def from_hycom(cls, gr3: Gr3, hycom: Hycom, date):
         obj = cls.constant(gr3, np.nan)
-        obj.values[:] = forcing.salinity.interpolate(obj, date)
+        obj.values[:] = hycom.salinity.interpolate(obj, date)
         return obj
 
 

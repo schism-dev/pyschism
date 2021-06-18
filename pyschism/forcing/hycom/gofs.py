@@ -1,186 +1,188 @@
+from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 from functools import lru_cache
 import logging
 from typing import Dict, Union
-
 
 from matplotlib.transforms import Bbox
 from metpy.units import units
 from metpy.calc import potential_temperature, height_to_pressure_std
 from netCDF4 import Dataset
 import numpy as np
+import requests
 from scipy.interpolate import griddata, RegularGridInterpolator, NearestNDInterpolator
 import tqdm
 import tqdm_logging_wrapper
-
+import xmltodict
 
 from pyschism import dates
-from pyschism.forcing.baroclinic.base import (
-    BaroclinicForcing, BaroclinicComponent)
+from pyschism.forcing.hycom.base import Hycom, HycomComponent
 
 logger = logging.getLogger(__name__)
 
 
-class GofsForecastDatasets:
+class GofsDatasetCollection(ABC):
 
-    def __init__(self):
-        base_url = 'https://tds.hycom.org/thredds/dodsC/GLBy0.08/' +\
-                   'expt_93.0/FMRC/runs/GLBy0.08_930_FMRC_RUN_'
+    start_date = dates.StartDate()
+    end_date = dates.EndDate()
+
+    def __init__(
+            self,
+            start_date: datetime = None,
+            end_date: Union[datetime, timedelta] = None,
+            output_interval: timedelta = None
+    ):
+        self.start_date = start_date
+        self.end_date = self.maximum_end_date - self.sampling_interval if \
+            end_date is None else end_date 
+        self.output_interval = self.sampling_interval if output_interval is None \
+            else output_interval
+        if (self.output_interval % self.sampling_interval).total_seconds() != 0:
+            raise ValueError(
+                'Argument output_interval must be modulus of '
+                f'{self.sampling_interval} hours.')
+
+    @property
+    @abstractmethod
+    def datasets(self):
+        '''Get the datasets based on the set start_date and end_date dates.'''
+
+    @property
+    def sampling_frequency(self):
+        return 1./self.sampling_interval.total_seconds()
+
+    @property
+    def sampling_interval(self):
+        return timedelta(hours=3)
+
+    @property
+    def required_datevector(self):
+        required_start_date = dates.nearest_cycle(self.start_date)
+        required_end_date = dates.nearest_cycle(
+            self.end_date + self.output_interval,
+            period=int(self.output_interval/timedelta(hours=1))
+        )
+        return np.arange(
+            required_start_date,
+            required_end_date + self.output_interval,
+            self.output_interval
+        ).astype(datetime)
+
+
+class GofsForecastDatasets(GofsDatasetCollection):
+
+    catalog_url = 'https://tds.hycom.org/thredds/catalog/GLBy0.08/expt_93.0/FMRC/runs/catalog.xml'
+    base_url = 'https://tds.hycom.org/thredds/dodsC/'
+
+    @property
+    def datasets(self):
         datasets = {}
-        for pivot_date in [dates.nearest_zulu() - timedelta(days=i)
-                           for i in range(8)]:
-            pivot_date += timedelta(hours=12)
-            logger.info(
-                'Checking for available GOFS data for pivot date: '
-                f'{pivot_date}.')
-            try:
-                datasets.setdefault(
-                    pivot_date,
-                    Dataset(
-                        f'{base_url}' +
-                        f'{pivot_date.strftime("%Y-%m-%dT%H:%M:%SZ")}'
-                        )
+        for required_date in self.required_datevector:
+            for i, datevector in enumerate(self.datevectors):
+                if required_date in datevector:
+                    opendap_url = self.base_url + self.xmlcatalog[
+                        'catalog']['dataset']['dataset'][i]['@urlPath']
+                    datasets.setdefault(
+                        required_date,
+                        Dataset(opendap_url)
                     )
-                logger.info('Success!')
-            except OSError as e:
-                logger.info('Not available.')
-                if e.errno == -70:
-                    print()
-                    continue
-        self.datasets = datasets
-
+                    break
+        return datasets
+        
+    @property
     def datevectors(self):
-        for ds in self.values:
-            base_date = datetime.strptime(
-                ''.join(ds['time'].units.split()[2:4]), '%Y-%m-%d%H:%M:%S.%f')
-            yield [base_date+timedelta(hours=x) for x in ds['time'][:]]
+        for file in self.xmlcatalog['catalog']['dataset']['dataset']:
+            start = datetime.strptime(
+                file['timeCoverage']['start'], '%Y-%m-%dT%H:%M:%SZ')
+            end = datetime.strptime(
+                file['timeCoverage']['end'], '%Y-%m-%dT%H:%M:%SZ')
+            steps = int(
+                (end - start).total_seconds() * self.sampling_frequency) + 1
+            datevec = [start + x*timedelta(
+                seconds=1/self.sampling_frequency) for x in range(steps)]
+            yield datevec
 
     @property
-    def values(self):
-        return list(self.datasets.values())
+    def xmlcatalog(self):
+        return xmltodict.parse(requests.get(self.catalog_url).content)
 
     @property
-    def start_dates(self):
-        return list(self.datasets.keys())
+    def minimum_datetime(self):
+        start_dates = []
+        for rec in self.xmlcatalog['catalog']['dataset']['dataset']:
+            start_dates.append(dates.localize_datetime(datetime.strptime(
+                rec['timeCoverage']['start'], '%Y-%m-%dT%H:%M:%SZ')))
+        return np.min(start_dates)
+
+    @property
+    def maximum_datetime(self):
+        end_dates = []
+        for rec in self.xmlcatalog['catalog']['dataset']['dataset']:
+            end_dates.append(dates.localize_datetime(datetime.strptime(
+                rec['timeCoverage']['end'], '%Y-%m-%dT%H:%M:%SZ')))
+        return np.max(end_dates)
+
+    @property
+    def maximum_time_range(self):
+        return self.maximum_datetime - self.minimum_datetime
 
 
-class GOFSBaroclinicComponent(BaroclinicComponent):
+class GofsHindcastDatasets(GofsDatasetCollection):
 
-    forecast_datasets = GofsForecastDatasets()
-    # hindcast_datasets = GofsHindcastDatasets()
+    @property
+    def datasets(self):
+        raise NotImplementedError('Need to return the datasets.')
+
+    def pad_datasets(self, datasets):
+        for dataset in datasets.values():
+            if dataset is None:
+                raise NotImplementedError(
+                    'Hindcast data fetching is unavailable.')
+
+
+class GofsDatasets:
+
+    def __init__(self, start_date, run_days, output_interval):
+        self.forecast = GofsForecastDatasets(start_date, run_days, output_interval)
+        self.hindcast = GofsHindcastDatasets(start_date, run_days, output_interval)
+
+    @property
+    def datasets(self):
+        datasets = self.forecast.datasets
+        self.hindcast.pad_datasets(datasets)
+        return datasets
+
+
+class GOFSComponent(HycomComponent):
 
     @lru_cache(maxsize=None)
     def get_datasets(
             self,
             start_date: datetime,
             run_days: Union[float, timedelta],
-            output_interval=None
+            output_interval=timedelta(days=1)
     ) -> Dict[datetime, Dataset]:
+        return GofsDatasets(start_date, run_days, output_interval).datasets
 
-        if not isinstance(start_date, datetime):
-            raise TypeError(
-                f'Argument start_date must be of type {datetime}, '
-                f'not type {type(start_date)}.')
 
-        if not isinstance(run_days, timedelta):
-            run_days = timedelta(days=float(run_days))
-
-        sampling_interval = output_interval if output_interval is not None else self.sampling_interval
-
-        required_start_date = dates.nearest_zulu(start_date) + timedelta(hours=12.)
-        required_end_date = dates.nearest_cycle(
-            start_date + run_days + sampling_interval,
-            period=int(sampling_interval/timedelta(hours=1))
-        )
-        required_datevector = np.arange(
-            required_start_date,
-            required_end_date + sampling_interval,
-            sampling_interval
-        ).astype(datetime)
-        datasets = {required_date: None for required_date in required_datevector}
-        for required_date in required_datevector:
-            for i, datevector in enumerate(self.forecast_datasets.datevectors()):
-                if required_date in datevector:
-                    datasets[required_date] = self.forecast_datasets.values[i]
-                    break
-
-        missing_dates = []
-        for date, ds in datasets.items():
-            if ds is None:
-                missing_dates.append(date)
-        if len(missing_dates) > 0:
-            raise ValueError(f'No data for dates {missing_dates}\n, got {datasets.keys()}.')
-
-        return datasets
-
-    @property
-    def output_interval(self):
-        return timedelta(hours=3)
-
-    def _modified_bbox(self, dataset, bbox=None):
-        # dataset = list(self.datasets.values())[-1]
-        if bbox is None:
-            return Bbox.from_extents(
-                dataset['lon'][:].min(),
-                dataset['lat'][:].min(),
-                dataset['lon'][:].max(),
-                dataset['lat'][:].max()
-            )
-        else:
-            xmin = bbox.xmin + 360. if not (
-                bbox.xmin >= dataset['lon'][:].min()
-                and bbox.xmin < 180.) else bbox.xmin
-
-            xmax = bbox.xmax + 360. if not (
-                bbox.xmax >= dataset['lon'][:].min()
-                and bbox.xmax < 180.) else bbox.xmax
-
-            return Bbox.from_extents(
-                np.min([xmin, xmax]),
-                bbox.ymin,
-                np.max([xmin, xmax]),
-                bbox.ymax
-            )
-
-    def _modified_bbox_indexes(
-            self,
-            bbox,
-            dataset,
-            pixel_buffer=0
-    ):
-        # dataset = list(self.datasets.values())[-1]
-        lat_idxs = np.where((dataset['lat'][:] >= bbox.ymin)
-                            & (dataset['lat'][:] <= bbox.ymax))[0]
-        lon_idxs = np.where((dataset['lon'][:] >= bbox.xmin)
-                            & (dataset['lon'][:] <= bbox.xmax))[0]
-        lon_idxs = lon_idxs.tolist()
-        lat_idxs = lat_idxs.tolist()
-        for i in range(pixel_buffer):
-            lon_idxs.insert(0, lon_idxs[0] - 1)
-            lon_idxs.append(lon_idxs[-1] + 1)
-            lat_idxs.insert(0, lat_idxs[0] - 1)
-            lat_idxs.append(lat_idxs[-1] + 1)
-        return lon_idxs, lat_idxs
-
-# import dask
-class GOFSElevation(GOFSBaroclinicComponent):
-
-    @property
-    def product(self) -> str:
-        return 'rtofs_glo_2ds_forecast_3hrly_diag'
+class GOFSElevation(GOFSComponent):
 
     @property
     def ncvar(self):
         return 'surf_el'
 
-    @property
-    def sampling_interval(self):
-        return timedelta(hours=3.)
-
-    # @dask.delayed
-    def put_ncdata(self, boundary, dst, start_date, run_days, overwrite=False,
-                   offset=0, output_interval=timedelta(hours=24),
-                   pixel_buffer=10, progress_bar=True):
+    def put_boundary_ncdata(
+            self,
+            boundary,
+            dst,
+            start_date,
+            run_days,
+            overwrite=False,
+            offset=0,
+            output_interval=timedelta(hours=24),
+            pixel_buffer=10,
+            progress_bar=True
+    ):
         for i, (time, dataset) in enumerate(
             self.get_datasets(
                 start_date,
@@ -262,24 +264,26 @@ class GOFSElevation(GOFSBaroclinicComponent):
             dst['time_series'][time_idx, offset:len(zq)] = zq
 
 
-class GOFSVelocity(GOFSBaroclinicComponent):
-
-    @property
-    def product(self) -> str:
-        return 'rtofs_glo_2ds_forecast_3hrly_diag'
+class GOFSVelocity(GOFSComponent):
 
     @property
     def ncvar(self):
         return 'water_u', 'water_v'
 
-    @property
-    def sampling_interval(self):
-        return timedelta(hours=3.)
-
-    def put_ncdata(self, hgrid, vgrid, boundary, dst, start_date, run_days,
-                   overwrite=False, offset=0,
-                   output_interval=timedelta(hours=24), pixel_buffer=10,
-                   progress_bar=True):
+    def put_boundary_ncdata(
+            self,
+            hgrid,
+            vgrid,
+            boundary,
+            dst,
+            start_date,
+            run_days,
+            overwrite=False,
+            offset=0,
+            output_interval=timedelta(hours=24),
+            pixel_buffer=10,
+            progress_bar=True
+    ):
 
         for i, (time, dataset) in enumerate(
             self.get_datasets(
@@ -416,12 +420,26 @@ class GOFSVelocity(GOFSBaroclinicComponent):
             dst['time_series'][i, offset:offset+bz.shape[0], :, 1] = v_interp.reshape(bz.shape)
 
 
-class GOFSTemperature(GOFSBaroclinicComponent):
+class GOFSTemperature(GOFSComponent):
 
-    def put_ncdata(self, hgrid, vgrid, boundary, dst, start_date, run_days,
-                   overwrite=False, offset=0,
-                   output_interval=timedelta(hours=24), pixel_buffer=10,
-                   progress_bar=True):
+    @property
+    def ncvar(self):
+        return 'water_temp'
+
+    def put_boundary_ncdata(
+            self,
+            hgrid,
+            vgrid,
+            boundary,
+            dst,
+            start_date,
+            run_days,
+            overwrite=False,
+            offset=0,
+            output_interval=timedelta(hours=24),
+            pixel_buffer=10,
+            progress_bar=True
+    ):
 
         for i, (time, dataset) in enumerate(
             self.get_datasets(
@@ -526,33 +544,27 @@ class GOFSTemperature(GOFSBaroclinicComponent):
             temp_interp = potential_temperature(pressure, temp_interp).to('degC')
             dst['time_series'][i, offset:offset+bz.shape[0], :, :] = temp_interp.reshape(bz.shape)
 
-    @property
-    def product(self) -> str:
-        return 'rtofs_glo_3dz_forecast_daily_temp'
+
+class GOFSSalinity(GOFSComponent):
 
     @property
     def ncvar(self):
-        return 'water_temp'
+        return 'salinity'
 
-    @property
-    def fill_value(self):
-        return np.nan
-
-    @property
-    def nowcast_varname(self):
-        return 'temp'
-
-    @property
-    def name(self):
-        return 'temperature'
-
-
-class GOFSSalinity(GOFSBaroclinicComponent):
-
-    def put_ncdata(self, hgrid, vgrid, boundary, dst, start_date, run_days,
-                   overwrite=False, offset=0,
-                   output_interval=timedelta(hours=24), pixel_buffer=10,
-                   progress_bar=True):
+    def put_boundary_ncdata(
+            self,
+            hgrid,
+            vgrid,
+            boundary,
+            dst,
+            start_date,
+            run_days,
+            overwrite=False,
+            offset=0,
+            output_interval=timedelta(hours=24),
+            pixel_buffer=10,
+            progress_bar=True
+    ):
 
         for i, (time, dataset) in enumerate(
             self.get_datasets(
@@ -654,27 +666,28 @@ class GOFSSalinity(GOFSBaroclinicComponent):
                                  'Try increasing pixel_buffer argument.')
             dst['time_series'][i, offset:offset + bz.shape[0], :, :] = salt_interp.reshape(bz.shape)
 
-    @property
-    def product(self) -> str:
-        return 'rtofs_glo_3dz_forecast_daily_salt'
 
-    @property
-    def ncvar(self):
-        return 'salinity'
-
-    @property
-    def fill_value(self):
-        return 0.
-
-    @property
-    def nowcast_varname(self):
-        return 'salt'
-
-
-class GOFS(BaroclinicForcing):
+class GOFS(Hycom):
+    '''Public interface for GOFS model forcings.'''
 
     def __init__(self):
-        self.elevation = GOFSElevation()
-        self.velocity = GOFSVelocity()
-        self.temperature = GOFSTemperature()
-        self.salinity = GOFSSalinity()
+        self._elevation = GOFSElevation()
+        self._velocity = GOFSVelocity()
+        self._temperature = GOFSTemperature()
+        self._salinity = GOFSSalinity()
+
+    @property
+    def elevation(self) -> GOFSElevation:
+        return self._elevation
+
+    @property
+    def velocity(self) -> GOFSVelocity:
+        return self._velocity
+
+    @property
+    def temperature(self) -> GOFSTemperature:
+        return self._temperature
+
+    @property
+    def salinity(self) -> GOFSSalinity:
+        return self._salinity

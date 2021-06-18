@@ -2,7 +2,7 @@ from abc import abstractmethod
 from typing import List
 
 from pyschism.forcing.bctides.bctypes import Bctype
-from pyschism.forcing.tides import Tides
+from pyschism.forcing.bctides.tides import Tides
 
 
 class Iettype(Bctype):

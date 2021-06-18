@@ -27,7 +27,7 @@ from shapely.geometry import (
 from pyschism.mesh.parsers import grd, sms2dm
 from pyschism.figures import figure
 
-_logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class Nodes:
@@ -153,6 +153,9 @@ class Elements:
                            "coordinate id's.")
         self.nodes = nodes
         self.elements = elements
+
+    def __len__(self):
+        return len(self.elements)
 
     @property
     def id(self):
@@ -339,6 +342,9 @@ class Elements:
     @property
     def gdf(self):
         if not hasattr(self, '_gdf'):
+            logger.info('Generating elements geodataframe.')
+            from time import time
+            start = time()
             data = []
             for id, element in self.elements.items():
                 data.append({
@@ -347,6 +353,8 @@ class Elements:
                             map(self.get_index_by_id, element))]),
                     'id': id})
             self._gdf = gpd.GeoDataFrame(data, crs=self.nodes.crs)
+            logger.info('Generating elements geodataframe took '
+                        f'{time()-start} seconds.')
         return self._gdf
 
 

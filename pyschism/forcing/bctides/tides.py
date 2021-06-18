@@ -8,8 +8,8 @@ from typing import Callable, List, Union
 import numpy as np
 
 # from pyschism.forcing.tides import bctypes
-from pyschism.forcing.tides.tpxo import TPXO
-from pyschism.forcing.tides.hamtide import HAMTIDE
+from pyschism.forcing.bctides.tpxo import TPXO
+from pyschism.forcing.bctides.hamtide import HAMTIDE
 # from pyschism.forcing.baroclinic.gofs import GOFS
 # from pyschism.forcing.baroclinic.rtofs import RTOFS
 
@@ -41,18 +41,20 @@ class ActiveConstituents:
         return obj.__dict__['active_constituents']
 
 
-class Singleton(type):
-    def __init__(cls, name, bases, dict):
-        super(Singleton, cls).__init__(name, bases, dict)
-        cls.instance = None
+# class Singleton(type):
+#     def __init__(cls, name, bases, dict):
+#         super(Singleton, cls).__init__(name, bases, dict)
+#         cls.instance = None
 
-    def __call__(cls, *args, **kw):
-        if cls.instance is None:
-            cls.instance = super(Singleton, cls).__call__(*args, **kw)
-        return cls.instance
+#     def __call__(cls, *args, **kw):
+#         if cls.instance is None:
+#             cls.instance = super(Singleton, cls).__call__(*args, **kw)
+#         return cls.instance
 
 
-class Tides(metaclass=Singleton):
+class Tides(
+    # metaclass=Singleton
+):
 
     _active_constituents = ActiveConstituents()
 
@@ -62,9 +64,6 @@ class Tides(metaclass=Singleton):
             velocity: bool = True,
             tidal_database: Union[str, TidalDatabase] = TidalDatabase.TPXO,
             constituents='all',
-            # subtidal_elevation: bool = False,
-            # subtidal_velocity: bool = False,
-            # subtidal_database: Union[str, SubTidalDatabase] = None,
     ):
         """Main class for requesting tidal boundary forcing for a SCHISM run.
 

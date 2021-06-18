@@ -8,8 +8,8 @@ import pytz
 
 from pyschism import dates
 from pyschism.enums import Coriolis
-from pyschism.forcing.atmosphere.nws import NWS
-from pyschism.forcing.atmosphere.nws.nws2 import NWS2
+from pyschism.forcing.nws.base import NWS
+from pyschism.forcing.nws.nws2 import NWS2
 from pyschism.mesh.fgrid import NchiType
 
 PARAM_TEMPLATE = pathlib.Path(__file__).parent / 'param.nml.template'

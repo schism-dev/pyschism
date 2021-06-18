@@ -67,7 +67,7 @@ class MOD_3D(ABC):
             if obj is not None:
                 bctype = getattr(obj, self.bctype)
                 if bctype == 4:
-                    obj.data_source.put_ncdata(
+                    obj.data_source.put_boundary_ncdata(
                         self.hgrid,
                         self.vgrid,
                         boundary,

@@ -18,7 +18,7 @@ from shapely.geometry import Point
 from pyschism.dates import localize_datetime
 
 
-_logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class SourceSinkDataset:

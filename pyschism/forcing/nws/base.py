@@ -1,8 +1,9 @@
-from abc import ABC, abstractmethod
+from pyschism.forcing.base import ModelForcing
+from abc import abstractmethod
 # from datetime import datetime
 
 
-class NWS(ABC):
+class NWS(ModelForcing):
 
     def __str__(self):
         """Returns string used in param.nml"""

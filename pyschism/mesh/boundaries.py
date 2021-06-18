@@ -15,7 +15,7 @@ from pyschism.forcing.bctides.isatype import Isatype
 from pyschism.forcing.bctides.itrtype import Itrtype
 
 
-class HgridBoundaries:
+class Boundaries:
 
     def __init__(self, hgrid, boundaries: Union[dict, None]):
 
@@ -97,15 +97,11 @@ class HgridBoundaries:
     def sal3d(self, vgrid):
         return SAL_3D(self.hgrid, vgrid)
 
-    def TEM_nudge(self, vgrid, data_source, rlmax=1.5, rnu_day=0.25,
-                  parallel: bool = False):
-        return TEM_Nudge(self.hgrid, vgrid, data_source, rlmax, rnu_day,
-                         parallel)
+    def TEM_nudge(self, vgrid, data_source, rlmax=1.5, rnu_day=0.25):
+        return TEM_Nudge(self.hgrid, vgrid, data_source, rlmax, rnu_day)
 
-    def SAL_nudge(self, vgrid, data_source, rlmax=1.5, rnu_day=0.25,
-                  parallel: bool = False):
-        return SAL_Nudge(self.hgrid, vgrid, data_source, rlmax, rnu_day,
-                         parallel)
+    def SAL_nudge(self, vgrid, data_source, rlmax=1.5, rnu_day=0.25):
+        return SAL_Nudge(self.hgrid, vgrid, data_source, rlmax, rnu_day)
 
     def set_forcing(
             self,

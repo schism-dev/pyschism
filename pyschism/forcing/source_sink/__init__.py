@@ -1,4 +1,4 @@
-from pyschism.forcing.hydrology.base import (
+from pyschism.forcing.source_sink.base import (
     Hydrology,
     # Sources,
     # Sinks,
@@ -7,7 +7,7 @@ from pyschism.forcing.hydrology.base import (
     Vsink,
     SourceSink,
 )
-from pyschism.forcing.hydrology.nwm import NationalWaterModel
+from pyschism.forcing.source_sink.nwm import NationalWaterModel
 
 NWM = NationalWaterModel
 

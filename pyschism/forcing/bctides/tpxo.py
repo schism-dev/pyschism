@@ -7,7 +7,7 @@ from netCDF4 import Dataset
 import numpy as np
 from scipy.interpolate import griddata
 
-from pyschism.forcing.tides.base import TidalDataProvider
+from pyschism.forcing.bctides.base import TidalDataProvider
 
 
 logger = logging.getLogger(__name__)

@@ -1,8 +1,13 @@
-from abc import ABC, abstractmethod
+from abc import abstractmethod
+
+from pyschism.forcing.base import ModelForcing
 
 
-class Bctype(ABC):
+class BoundaryForcing(ModelForcing):
 
     @abstractmethod
     def get_boundary_string(self, boundary) -> str:
         pass
+
+
+Bctype = BoundaryForcing

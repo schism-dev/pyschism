@@ -5,7 +5,7 @@ from netCDF4 import Dataset
 import numpy as np
 from scipy.interpolate import griddata
 
-from pyschism.forcing.tides.base import TidalDataProvider
+from pyschism.forcing.bctides.base import TidalDataProvider
 
 # https://icdc.cen.uni-hamburg.de/en/hamtide.html
 base_url = 'https://icdc.cen.uni-hamburg.de/thredds/dodsC/ftpthredds/hamtide/'

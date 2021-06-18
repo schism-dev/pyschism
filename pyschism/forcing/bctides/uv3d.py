@@ -63,7 +63,7 @@ class UV3D:
         for boundary in self.hgrid.boundaries.open.itertuples():
             if boundary.ifltype is not None:
                 if boundary.ifltype.ifltype in [4, 5]:
-                    boundary.ifltype.data_source.put_ncdata(
+                    boundary.ifltype.data_source.put_boundary_ncdata(
                         self.hgrid, self.vgrid, boundary, dst, start_date,
                         rnday, overwrite=overwrite, offset=offset,
                         output_interval=output_interval,

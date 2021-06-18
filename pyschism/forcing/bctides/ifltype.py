@@ -1,7 +1,7 @@
 from abc import abstractmethod
 
 from pyschism.forcing.bctides.bctypes import Bctype
-from pyschism.forcing.tides import Tides
+from pyschism.forcing.bctides.tides import Tides
 
 
 class Ifltype(Bctype):
