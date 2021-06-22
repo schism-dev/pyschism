@@ -1,10 +1,10 @@
 from importlib import util
 
-from pyschism.param import Param
+# from pyschism.param.param import Param
 from pyschism.stations import Stations
 from pyschism.driver import ModelDriver, ModelConfig
 
-__all__ = ["Param", 'ModelConfig', 'ModelDriver', 'Stations']
+__all__ = ['ModelConfig', 'ModelDriver', 'Stations']
 
 
 if util.find_spec("colored_traceback") is not None:

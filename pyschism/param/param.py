@@ -12,7 +12,8 @@ from pyschism.param.opt import OPT
 from pyschism.param.schout import SCHOUT
 # from pyschism.stations import Stations
 
-PARAM_TEMPLATE = pathlib.Path(__file__).parent / 'param.nml.template'
+# PARAM_TEMPLATE = pathlib.Path(__file__).parent / 'param.nml.template'
+from .schism_init import ParamTemplate
 
 logger = logging.getLogger(__name__)
 

@@ -5,9 +5,11 @@ import logging
 
 from pytz import timezone
 
+from pyschism.cmd import common
 from pyschism.cmd.bctides import BctidesCli
 from pyschism.cmd.bootstrap import BootstrapCli
 from pyschism.cmd.fgrid.entry import FgridCli
+from pyschism.cmd.fluxflag import FluxflagCli
 from pyschism.cmd.forecast import ForecastCli
 from pyschism.cmd.grd2sms import Grd2SmsCli
 from pyschism.cmd.hgrid import HgridCli
@@ -20,11 +22,7 @@ from pyschism.cmd.vgrid import VgridCli
 
 def init_logger():
     tmp_parser = argparse.ArgumentParser(add_help=False)
-    tmp_parser.add_argument(
-        "--log-level",
-        choices=['info', 'warning', 'debug'],
-        default='warning'
-    )
+    common.add_log_level_to_parser(tmp_parser)
     tmp_args, _ = tmp_parser.parse_known_args()
     logging.basicConfig(
         level={
@@ -51,6 +49,7 @@ def main():
         BctidesCli,
         BootstrapCli,
         FgridCli,
+        FluxflagCli,
         ForecastCli,
         Grd2SmsCli,
         HgridCli,

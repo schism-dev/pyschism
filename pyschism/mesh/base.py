@@ -157,6 +157,9 @@ class Elements:
     def __len__(self):
         return len(self.elements)
 
+    def to_dict(self):
+        return self.elements
+
     @property
     def id(self):
         if not hasattr(self, '_id'):

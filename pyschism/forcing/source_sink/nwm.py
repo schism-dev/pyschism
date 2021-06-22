@@ -24,7 +24,8 @@ from shapely.geometry import LinearRing, Point, MultiPoint, LineString, box
 import wget
 
 from pyschism import dates
-from pyschism.mesh import Hgrid, Gr3
+from pyschism.mesh.hgrid import Hgrid
+from pyschism.mesh.base import Gr3
 from pyschism.forcing.source_sink.base import Hydrology
 
 

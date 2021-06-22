@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 def add_log_level_to_parser(parser):
     parser.add_argument(
         "--log-level",
-        choices=[name.lower() for name in logging._nameToLevel],
+        choices=['warning', 'info', 'debug'],
         default="warning",
     )
 

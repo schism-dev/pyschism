@@ -7,9 +7,7 @@ import f90nml
 
 from pyschism.enums import Stratification
 
-
-PARAM_TEMPLATE = pathlib.Path(__file__).parent / 'param.nml.template'
-PARAM_DEFAULTS = f90nml.read(PARAM_TEMPLATE)['core']
+from pyschism.param.schism_init import ParamTemplate
 
 
 class IbcType(Enum):
@@ -22,17 +20,7 @@ class IbcType(Enum):
                          'Valid integers are 0 or 1.')
 
 
-class CoreMeta(type):
-
-    def __new__(meta, name, bases, attrs):
-        for key, value in PARAM_DEFAULTS.items():
-            attrs[key] = value
-        return type(name, bases, attrs)
-
-
-class CORE(
-    # metaclass=CoreMeta
-):
+class CORE:
     """ Provides error checking implementation for CORE group """
 
     mandatory = ['ipre', 'ibc', 'ibtp', 'rnday', 'dt', 'nspool', 'ihfskip']
@@ -45,7 +33,8 @@ class CORE(
             rnday: Union[float, timedelta] = 0.,
             dt: Union[float, timedelta] = 150.,
             nspool: Union[int, float, timedelta] = None,
-            ihfskip: Union[int, timedelta] = None
+            ihfskip: Union[int, timedelta] = None,
+            template: Union[str, ParamTemplate] = None,
     ):
         self.ipre = ipre
         self.ibc = ibc
@@ -54,6 +43,7 @@ class CORE(
         self.dt = dt
         self.nspool = nspool
         self.ihfskip = ihfskip
+        self.template = template
 
     def __str__(self):
         data = []
@@ -199,6 +189,20 @@ class CORE(
                 if not (ihfskip / self.nspool).is_integer():
                     raise ValueError(
                         'ihfskip/nspool must be an integer but got '
+                        'ihfskip/nspool='
                         f'{ihfskip}/{self.nspool}={ihfskip/self.nspool}')
 
         self._ihfskip = ihfskip
+
+    @property
+    def template(self):
+        return self._template
+
+    @template.setter
+    def template(self, template: Union[ParamTemplate, None]):
+        if template is not None:
+            if template is True:
+                template = ParamTemplate().opt
+            elif isinstance(template, ParamTemplate):
+                template = template.opt
+        self._template = template

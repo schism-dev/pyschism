@@ -1,9 +1,9 @@
 import pathlib
-from typing import Union
+from typing import List, Tuple, Union
 
 from matplotlib.collections import PolyCollection
 import numpy as np
-from shapely.geometry import Polygon, MultiPolygon
+from shapely.geometry import Polygon, MultiPolygon, LinearRing
 
 from pyschism.mesh.base import Gr3
 from pyschism.figures import figure
@@ -28,7 +28,7 @@ class Prop:
 
     def __str__(self):
         f = []
-        for i, (iele, element) in enumerate(self.elements.elements.items()):
+        for i, (iele, element) in enumerate(self.gr3.elements.to_dict().items()):
             f.append(f'{iele} {self.values[i]:G}')
         return '\n'.join(f)
 
@@ -52,36 +52,66 @@ class Prop:
         **kwargs
     ):
 
-        tria = PolyCollection(self.gr3.coords[self.gr3.elements.triangles], **kwargs)
-        quad = PolyCollection(self.gr3.coords[self.gr3.elements.quads], **kwargs)
-            # print(element)
-        # exit()
-        # pc = PolyCollection(self.gr3.coords[self.gr3.elements.array], **kwargs)
-        # tria_values = np.where(np.any())
+        tria = PolyCollection(self.gr3.coords[self.gr3.elements.triangles])
+        quad = PolyCollection(self.gr3.coords[self.gr3.elements.quads])
         tria.set_array(self.values[self.gr3.elements.tri_idxs])
         quad.set_array(self.values[self.gr3.elements.qua_idxs])
         axes.add_collection(tria)
         axes.add_collection(quad)
-        # egdf = self.gr3.elements.gdf.assign(values=self.values)
-        # egdf.plot("values", ax=axes)
         return axes
-        # if len(self.quads) > 0:
-        #     pc = PolyCollection(
-        #         self.coords[self.quads],
-        #         **kwargs
-        #     )
-        #     quad_value = np.mean(self.values[self.quads], axis=1)
-        #     pc.set_array(quad_value)
-        #     axes.add_collection(pc)
+
+
+class Fluxflag(Prop):
+    """ Class for writing fluxflag.prop file, which is parameter for
+        checking volume and salt conservation.
+    """
+    @classmethod
+    def default(cls, hgrid):
+        return cls.constant(hgrid, -1)
+
+    def add_region(self, upstream: LinearRing, downstream: LinearRing):
+
+        def get_next_value_pair():
+            next_value = np.max(self.values) + 1
+            return next_value + 1, next_value
+        upstream_val, downstream_val = get_next_value_pair()
+
+        upstream_node_mask = self.gr3.nodes.gdf.within(Polygon(upstream)).to_numpy()
+        upstream_elem_idxs = np.where(np.any(upstream_node_mask[self.gr3.elements.array], axis=1))
+        self.values[upstream_elem_idxs] = upstream_val
+
+        downstream_node_mask = self.gr3.nodes.gdf.within(Polygon(downstream)).to_numpy()
+        downstream_elem_idxs = np.where(np.any(downstream_node_mask[self.gr3.elements.array], axis=1))
+        self.values[downstream_elem_idxs] = downstream_val
+
+    @classmethod
+    def from_prop_table(cls, hgrid, prop_table):
+        obj = cls.default(hgrid)
+        for regions in prop_table_to_list_of_tuples(prop_table):
+            obj.add_region(*regions)
+        return obj
+
+
+class Tvdflag(Prop):
+    """Class for writing tvd.prop file, which specify horizontal regions 
+       where upwind or TVD/TVD^2 is used based on the element property values
+       (0: upwind; 1: TVD/TVD^2).
+    """
+
+    @classmethod
+    def default(cls, hgrid):
+        return cls.constant(hgrid, 1)
 
     @classmethod
     def from_geometry(
             cls,
             gr3: Gr3,
             region: Union[Polygon, MultiPolygon],
-            inner_value: float,
-            outer_value: float,
+            inner_value: float = 0,
+            outer_value: float = 1,
     ):
+        '''inner_value == 0 implies the use of updwind, TVD is the default
+        everywhere'''
 
         if not isinstance(gr3, Gr3):
             raise TypeError(
@@ -103,39 +133,6 @@ class Prop:
         outer_indexes = np.setdiff1d(elements_gdf.index, np.where(gdf_in))
         obj.values[outer_indexes] = outer_value
         return obj
-
-
-class Fluxflag(Prop):
-    """ Class for writing fluxflag.prop file, which is parameter for
-        checking volume and salt conservation.
-    """
-    @classmethod
-    def default(cls, hgrid):
-        return cls.constant(hgrid, -1)
-
-    @classmethod
-    def from_geometry(cls, gr3: Gr3, region: Union[Polygon, MultiPolygon],
-                      value: int):
-        if value not in [1, -1]:
-            raise ValueError('Argument value must be 1 or -1.')
-        return super(Fluxflag, cls).from_geometry(
-            gr3, region, inner_value=value, outer_value=-value)
-
-
-class Tvdflag(Prop):
-    """Class for writing tvd.prop file, which specify horizontal regions 
-       where upwind or TVD/TVD^2 is used based on the element property values
-       (0: upwind; 1: TVD/TVD^2).
-    """
-
-    @classmethod
-    def default(cls, hgrid):
-        return cls.constant(hgrid, 1)
-
-    @classmethod
-    def from_geometry(cls, gr3: Gr3, region: Union[Polygon, MultiPolygon]):
-        return super(Tvdflag, cls).from_geometry(
-            gr3, region, inner_value=1, outer_value=0)
 
 
 def reg2multipoly(file):
@@ -164,3 +161,22 @@ def reg2multipoly(file):
                     interiors.append(interior)
             polygons.append(Polygon(exterior, interiors))
     return MultiPolygon(polygons)
+
+
+def prop_table_to_list_of_tuples(file) -> List[Tuple[Polygon, Polygon]]:
+    output = []
+    file = pathlib.Path(file)
+    with open(file) as f:
+        lines = f.read()
+    for line in lines.split('\n'):
+        if ';' not in line:
+            break
+        reg_upstream, reg_downstream = line.split(';')
+        reg_downstream_file = reg_downstream.split(':')[0]
+        reg_upstream_file = reg_upstream.split(':')[0]
+        reg_upstream_file = reg_upstream_file.strip()
+        reg_downstream_file = reg_downstream_file.strip()
+        downstream = reg2multipoly(file.parent / reg_downstream_file).geoms[0].exterior
+        upstream = reg2multipoly(file.parent / reg_upstream_file).geoms[0].exterior
+        output.append((upstream, downstream))
+    return output

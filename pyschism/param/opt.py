@@ -1,22 +1,18 @@
 from datetime import datetime, timedelta
 import logging
-import pathlib
+# import pathlib
 from typing import Union
 
 import f90nml
-import pytz
+# import pytz
 
 from pyschism import dates
-from pyschism.enums import Coriolis
-from pyschism.forcing.nws.base import NWS
-from pyschism.forcing.nws.nws2 import NWS2
 from pyschism.mesh.fgrid import NchiType
+from pyschism.param.schism_init import ParamTemplate
 
-PARAM_TEMPLATE = pathlib.Path(__file__).parent / 'param.nml.template'
-PARAM_DEFAULTS = f90nml.read(PARAM_TEMPLATE)['opt']
+PARAM_DEFAULTS = f90nml.read(ParamTemplate().path)['opt']
 
 _logger = logging.getLogger(__name__)
-
 
 
 class OptMeta(type):

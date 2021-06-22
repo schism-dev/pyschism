@@ -79,8 +79,7 @@ def add_prop_options_to_parser(parser):
         '--propfile',
         '--prop',
         '-p',
-        # nargs=1,
-        help='Uses ACE/gredit reg files.'
+        help='Loads a SCHISM prop file.'
     )
     options.add_argument(
         '--geometry',
