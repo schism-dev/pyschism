@@ -1,8 +1,12 @@
 import argparse
+from enum import Enum
 import logging
+import sys
 from time import time
 
 from pyschism.mesh import Hgrid, Vgrid
+from pyschism.forcing import nws, bctides, hycom
+
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +21,7 @@ def add_log_level_to_parser(parser):
 
 class HgridAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
-        if self.const is None:
+        if self.const is None and not bool(set(sys.argv).intersection(['-h', '--help'])):
             tmp_parser = argparse.ArgumentParser(add_help=False)
             tmp_parser.add_argument('--hgrid-crs')
             tmp_args, _ = tmp_parser.parse_known_args()
@@ -25,21 +29,20 @@ class HgridAction(argparse.Action):
             start = time()
             hgrid = Hgrid.open(values, crs=tmp_args.hgrid_crs)
             logger.info(f'Reading hgrid took {time()-start}...')
-            if len(hgrid.boundaries.open) == 0:
-                raise TypeError(f"Hgrid provided {values} contains no open boundaries.")
             setattr(namespace, self.dest, hgrid)
         else:
             setattr(namespace, self.dest, self.const)
 
 
 def add_hgrid_to_parser(parser, const=None):
-    parser.add_argument(
+    hgrid = parser.add_argument_group('Horizontal grid options')
+    hgrid.add_argument(
         "hgrid",
-        action=HgridAction,
+        action=HgridAction,  # ,
         const=const,
         help='Path to the SCHISM hgrid file.'
     )
-    parser.add_argument(
+    hgrid.add_argument(
         '--hgrid-crs',
         help='Coordinate reference system string of hgrid.'
     )
@@ -47,7 +50,7 @@ def add_hgrid_to_parser(parser, const=None):
 
 class VgridAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
-        if self.const is None:  # This is the init
+        if self.const is None and not bool(set(sys.argv).intersection(['-h', '--help'])):  # This is the init
             logger.info(f'Opening vgrid from {values}')
             start = time()
             vgrid = Vgrid.open(values)
@@ -57,10 +60,939 @@ class VgridAction(argparse.Action):
             setattr(namespace, self.dest, self.const)
 
 
+class VgridBinAction(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        setattr(namespace, self.dest,
+                Vgrid.from_binary(namespace.hgrid, values))
+
+
 def add_vgrid_to_parser(parser, const=None):
-    parser.add_argument(
+    vgrid_group = parser.add_argument_group('Vertical grid options')
+    vgrid = vgrid_group.add_mutually_exclusive_group()
+    vgrid.add_argument(
         "--vgrid",
-        action=VgridAction,
+        action=VgridAction,  # if not bool(set(sys.argv).intersection(['-h', '--help'])) else None,
         default=Vgrid.default(),
         const=const,
+        help='Path to vgrid.in file to use in model.'
     )
+    vgrid.add_argument(
+        "--vgrid-bin",
+        action=VgridBinAction,
+        nargs='?',
+        help='Path to the vgrid generation binary (must exist in PATH). '
+             'Defaults to gen_vqs.'
+    )
+
+
+def add_fgrid_to_parser(parser):
+    fgrid_group = parser.add_argument_group('Friction grid options.')
+    fgrid_group.add_argument(
+        '--fgrid',
+        help='Friction grid file.'
+    )
+    fgrid_group.add_argument('--fgrid-crs')
+    fgrid_group.add_argument(
+        '--fgrid-type',
+        choices=['auto', 'manning', 'drag', 'rough'],
+        default='auto',
+        help='Can be used to specify which friction type the file is.'
+    )
+
+
+def add_albedo_to_parser(parser):
+    parser.add_argument('--albedo')
+
+
+def add_diffmin_to_parser(parser):
+    parser.add_argument('--diffmin')
+
+
+def add_diffmax_to_parser(parser):
+    parser.add_argument('--diffmax')
+
+
+def add_watertype_to_parser(parser):
+    parser.add_argument('--watertype')
+
+
+def add_gridgr3_to_parser(parser):
+    gridgr3_group = parser.add_argument_group('Auxiliary fields.')
+    add_albedo_to_parser(gridgr3_group)
+    add_diffmin_to_parser(gridgr3_group)
+    add_diffmax_to_parser(gridgr3_group)
+    add_watertype_to_parser(gridgr3_group)
+
+
+def add_tvdflag_to_parser(parser):
+    parser.add_argument('--tvdflag')
+
+
+def add_fluxflag_to_parser(parser):
+    parser.add_argument('--fluxflag')
+
+
+def add_prop_to_parser(parser):
+    prop_group = parser.add_argument_group('Prop fields.')
+    add_tvdflag_to_parser(prop_group)
+    add_fluxflag_to_parser(prop_group)
+
+
+def add_tidal_constituents_to_parser(parser):
+    tide_group = parser.add_argument_group(
+        'Tidal constituent options'
+        ).add_mutually_exclusive_group()
+    # options.required = True
+    tide_group.add_argument(
+        "--all-constituents",
+        action="store_true",
+        help='Enables the use of all available tidal constituents. (default)'
+    )
+    tide_group.add_argument(
+        "--major-constituents",
+        action="store_true",
+        help='Enables the use of major group  of constituents only.'
+    )
+    tide_group.add_argument(
+        "-c", "--constituents",
+        action='append',
+        # TODO: Get list directly from object
+        choices=["K1", "O1", "P1", "Q1", "MM", "Mf", "M4", "MN4", "MS4",
+                 "2N2", "S1"],
+        dest='constituents',
+        default=False,
+        help="Enables specific tidal constituent to be forced in the model. "
+             "(case-insensitive)")
+
+
+def add_tidal_database_to_parser(parser):
+    tidal_db_group = parser.add_argument_group(
+        'Tidal harmonics database options'
+    )
+    tidal_db_group.add_argument(
+        "--tidal-database",
+        choices=['tpxo', 'hamtide'],
+        default='tpxo',
+        help='Selects which tidal harmonics database to use. (default=tpxo)'
+    )
+
+
+def add_baroclinic_database_to_parser(parser):
+
+    class BaroclinicDatabases(Enum):
+        RTOFS = hycom.RTOFS
+        GOFS = hycom.GOFS
+
+    class BaroclinicDatabaseAction(argparse.Action):
+        def __call__(self, parser, namespace, values, option_string=None):
+
+            setattr(namespace, self.dest, values)
+    hycom_group = parser.add_argument_group('HYCOM options')
+    hycom_group.add_argument(
+        '--baroclinic-database',
+        '--hycom',
+        choices=[x.name.lower() for x in BaroclinicDatabases],
+        dest='baroclinic_database',
+        default='gofs',
+        action=BaroclinicDatabaseAction,
+        help='Options for obtaining HYCOM data. Defaults to GOFS.'
+    )
+
+# class CustomBoundaryAction(argparse.Action):
+#     def __call__(self, parser, namespace, values, option_string=None):
+#         if isinstance(values, str):
+#             if "iettype" in option_string:
+#                 values = json.loads(values)
+#                 for bnd_id, tval in values.items():
+#                     if not isinstance(tval, int):
+#                         raise TypeError(
+#                             'Boundary type must be an integer, not type '
+#                             f'{type(tval)}.')
+#                     if tval == 3:
+#                         namespace.hgrid.boundaries.set_forcing(
+#                             bnd_id,
+#                             iettype=iettype.Iettype3(get_tides(namespace))
+#                             )
+#                     else:
+#                         raise ValueError
+#         setattr(namespace, self.dest, values)
+
+
+def get_per_boundary_help_message(varname, ibctype):
+    return (
+        f'Per-boundary specification option for {varname} variable. '
+        'The format required is a json-style string. For example: '
+        f'--{ibctype}=' + '\'{"1": 3}\' '
+        f' would apply --{ibctype}-3 to boundary '
+        'with id equal to "1".')
+
+
+def add_iettype_to_parser(parser):
+
+    class Iettype3Action(argparse.Action):
+        def __call__(self, parser, namespace, values, option_string=None):
+            setattr(namespace, self.dest, values)
+
+    class Iettype4Action(argparse.Action):
+        def __call__(self, parser, namespace, values, option_string=None):
+            tmp_parser = argparse.ArgumentParser(add_help=False)
+            add_baroclinic_database_to_parser(tmp_parser)
+            tmp_args = tmp_parser.parse_known_args()[0]
+            setattr(
+                namespace,
+                self.dest,
+                self.const(tmp_args.baroclinic_database())
+                )
+
+    class Iettype5Action(argparse.Action):
+        def __call__(self, parser, namespace, values, option_string=None):
+            setattr(namespace, self.dest, values)
+
+    iettype_group = parser.add_argument_group(
+        'Elevation boundary condition options'
+        ).add_mutually_exclusive_group()
+    iettype_group.add_argument(
+        "--iettype",
+        "--per-boundary-elevation",
+        dest="iettype",
+        metavar='JSON_STYLE_STRING',
+        # action=CustomBoundaryAction,
+        # const=bctides.iettype.Iettype,
+        help=get_per_boundary_help_message('elevation', 'iettype')
+    )
+    iettype_group.add_argument(
+        "--iettype-1",
+        "--elevation-time-history",
+        dest="iettype",
+        metavar='ELEVATION_TIME_HISTORY',
+        type=bctides.iettype.Iettype1,
+        help='Global elevation options for time history.  (Not implemented)',
+    )
+    iettype_group.add_argument(
+        '--iettype-2',
+        '--constant-elevation-value',
+        dest='iettype',
+        metavar='VALUE',
+        type=bctides.iettype.Iettype2,
+        help='Global constant elevation option.',
+    )
+
+    iettype_group.add_argument(
+        "--iettype-3",
+        "--harmonic-tidal-elevation",
+        dest="iettype",
+        nargs=0,
+        const=bctides.iettype.Iettype3,
+        action=Iettype3Action,
+        help='Enables tidal harmonic forcing.'
+    )
+
+    iettype_group.add_argument(
+        '--iettype-4',
+        '--subtidal-elevation',
+        '--elev-2d',
+        dest='iettype',
+        nargs=0,
+        const=bctides.iettype.Iettype4,
+        action=Iettype4Action,
+        help='Enables subtidal elevation forcing.'
+    )
+
+    iettype_group.add_argument(
+        '--iettype-5',
+        '--subtidal-elevation-and-tidal-elevation',
+        dest='iettype',
+        nargs=0,
+        const=bctides.iettype.Iettype5,
+        action=Iettype5Action,
+        help='Enables the combined elevation tidal harmonic forcing and '
+             'subtidal elevation forcing.'
+    )
+
+    iettype_group.add_argument(
+        '--iettype--1',
+        '--zero-elevation',
+        dest='iettype',
+        const=bctides.iettype.Iettype_1,
+        action='store_const',
+        help='Zero elevation at boundaries. (Not implemented)',
+
+    )
+
+
+def add_ifltype_to_parser(parser):
+    ifltype_group = parser.add_argument_group(
+        'Velocity boundary condition options'
+        ).add_mutually_exclusive_group()
+    ifltype_group.add_argument(
+        "--ifltype",
+        '--per-boundary-velocity',
+        dest="ifltype",
+        metavar='JSON_STYLE_STRING',
+        # nargs=1,  # 0 or more
+        # const={},
+        # action=CustomBoundaryAction,
+        help=get_per_boundary_help_message('velocity', 'ifltype')
+    )
+    ifltype_group.add_argument(
+        '--ifltype-1',
+        '--flux-time-history',
+        metavar='VELOCITY_TIME_HISTORY',
+        dest='ifltype',
+        # type=ifltype.Ifltype1
+        help='Global boundary velocity time history file. (Not implemented)'
+    )
+    ifltype_group.add_argument(
+        '--ifltype-2',
+        '--constant-flux-value',
+        dest='ifltype',
+        metavar='VALUE',
+        # type=ifltype.Ifltype2,
+        help='Global constant flow option.'
+    )
+    ifltype_group.add_argument(
+        '--ifltype-3',
+        '--tidal-velocity',
+        # action=Ifltype3Action,
+        dest='ifltype',
+        # const=ifltype.Ifltype3,
+    )
+
+    ifltype_group.add_argument(
+        '--uv-subtides',
+        '--uv-3d',
+        '--uv3D',
+        '--ifltype-4',
+        # action=Ifltype4Action,
+        dest='ifltype',
+        # nargs=0,
+        # const=ifltype.Ifltype4,
+    )
+
+    ifltype_group.add_argument(
+        '--uv-tides-subtides',
+        '--uv-3d-tides',
+        '--uv3d-tides',
+        '--uv3D-tides',
+        '--uv3D-tides',
+        '--ifltype-5',
+        # action=Ifltype5Action,
+        # nargs=0,
+        dest='ifltype',
+        # const=ifltype.Ifltype5,
+    )
+
+    ifltype_group.add_argument(
+        '--uv-zero',
+        '--flather',
+        # action='store_const',
+        dest='ifltype',
+        # const=ifltype.Ifltype_1,
+    )
+
+
+def add_itetype_to_parser(parser):
+    itetype_group = parser.add_argument_group(
+        'Temperature boundary condition options'
+        ).add_mutually_exclusive_group()
+    itetype_group.add_argument(
+        "--itetype",
+        dest="itetype",
+        # nargs=1,  # 0 or more
+        # const={},
+        # action=CustomBoundaryAction,
+    )
+    itetype_group.add_argument(
+        '--temp-th',
+        '--itetype-1',
+        dest='itetype',
+        # type=itetype.Itetype1
+    )
+    itetype_group.add_argument(
+        '--temp-val',
+        '--itetype-2',
+        dest='itetype',
+        # type=itetype.Itetype2
+    )
+
+    itetype_group.add_argument(
+        '--temp-ic',
+        '--itetype-3',
+        dest='itetype',
+        # type=itetype.Itetype3,
+    )
+
+    itetype_group.add_argument(
+        '--temp-3d',
+        '--itetype-4',
+        # action=Itetype4Action,
+        dest='itetype',
+        # nargs=0,
+        # const=itetype.Itetype4,
+    )
+
+
+def add_isatype_to_parser(parser):
+    isatype_gorup = parser.add_argument_group(
+        'Salinity boundary condition options'
+        ).add_mutually_exclusive_group()
+    isatype_gorup.add_argument(
+        "--isatype",
+        dest="isatype",
+        # nargs=1,  # 0 or more
+        # const={},
+        # action=CustomBoundaryAction,
+    )
+    isatype_gorup.add_argument(
+        '--salt-th',
+        '--isatype-1',
+        dest='isatype',
+        # type=isatype.Isatype1
+    )
+    isatype_gorup.add_argument(
+        '--salt-val',
+        '--isatype-2',
+        dest='isatype',
+        # type=isatype.Isatype2
+    )
+
+    isatype_gorup.add_argument(
+        '--salt-ic',
+        '--isatype-3',
+        dest='isatype',
+        # type=isatype.Isatype3,
+    )
+
+    isatype_gorup.add_argument(
+        '--salt-3d',
+        '--isatype-4',
+        # action=Isatype4Action,
+        dest='isatype',
+        # nargs=0,
+        # const=isatype.Isatype4,
+    )
+
+
+class NudgeAction(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        
+        if len(values) == 0:
+            values = None
+
+        if values is None:
+            if namespace.vgrid.is2D():
+                values = False
+            else:
+                values = True
+            if 'disable' in option_string:
+                values = False
+
+        setattr(namespace, self.dest, values)
+
+
+def add_temperature_nudge_to_parser(parser):
+    temp_group = parser.add_argument_group('Nudge options for temperature')
+    temp_group.add_argument(
+        '--nudge-temp',
+        '--nudge-temperature',
+        '--nudge-t',
+        dest='nudge_temp',
+        nargs='*',
+        action=NudgeAction,
+    )
+    temp_group.add_argument(
+        '--disable-nudge-temp',
+        '--disable-nudge-temperature',
+        '--disable-nudge-t',
+        dest='nudge_temp',
+        nargs=0,
+        action=NudgeAction,
+    )
+    temp_group.set_defaults(nudge_temp=None)
+    temp_group.add_argument('--rlmax-temp', default=1.5, type=float)
+    temp_group.add_argument('--rnu_day-temp', default=0.25, type=float)
+
+
+def add_salinity_nudge_to_parser(parser):
+    salt_group = parser.add_argument_group('Nudge options for salinity')
+    salt_group.add_argument(
+        '--nudge-salt',
+        '--nudge-salinity',
+        '--nudge-s',
+        dest='nudge_salt',
+        nargs='?',
+        action=NudgeAction,
+    )
+    salt_group.add_argument(
+        '--disable-nudge-salt',
+        '--disable-nudge-salinity',
+        '--disable-nudge-s',
+        dest='nudge_salt',
+        nargs='?',
+        action=NudgeAction,
+    )
+    salt_group.set_defaults(nudge_salt=None)
+    salt_group.add_argument('--rlmax-salt', default=1.5, type=float)
+    salt_group.add_argument('--rnu_day-salt', default=0.25, type=float)
+
+
+def add_nudge_to_parser(parser):
+    add_temperature_nudge_to_parser(parser)
+    add_salinity_nudge_to_parser(parser)
+
+
+def add_ibctype_to_parser(parser):
+    add_iettype_to_parser(parser)
+    add_ifltype_to_parser(parser)
+    add_itetype_to_parser(parser)
+    add_isatype_to_parser(parser)
+    # add_itrtype_to_parser(parser)
+    add_nudge_to_parser(parser)
+
+
+class NWS2Action(argparse.Action):
+
+    class Sflux1Types(Enum):
+        # GDAS = GDAS
+        # GDAS_0P25 = GDAS
+        GFS = nws.GFS
+        GFS_0P25 = nws.GFS
+        GFS_0P25_1HR = nws.GFS
+        GFS_0P50 = nws.GFS
+        GFS_1P00 = nws.GFS
+
+        @classmethod
+        def _missing_(cls, name):
+            f = [
+                f'{name} is not a valid sflux_1 type. Valid values are: ',
+            ]
+            for sflux_type in cls:
+                f.append(sflux_type.name.lower())
+            f.append('.')
+            raise ValueError(''.join(f))
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        if len(values) > 2:
+            raise ValueError(
+                'pyschism forecast init: error: argument --nws-2/--sflux: '
+                'expected at most two arguments.')
+        if len(values) == 1:
+            values.append(None)
+        sflux_1 = self.Sflux1Types[values[0].upper()].value(
+            product='gfs_0p25_1hr' if values[0].lower() == 'gfs'
+                    else values[0].lower())
+        if len(values) == 2:
+            sflux_2 = values[1]
+        else:
+            sflux_2 = None
+        setattr(namespace, self.dest, nws.NWS2(sflux_1, sflux_2))
+
+
+def add_nws_to_parser(parser):
+    nws_group = parser.add_argument_group('Atmospheric forcing options')
+    nws_parser = nws_group.add_mutually_exclusive_group()
+    nws_parser.add_argument(
+        '--nws-1',
+        dest='nws',
+    )
+    nws_parser.add_argument(
+        '--nws-2',
+        '--sflux',
+        dest='nws',
+        nargs='+',
+        action=NWS2Action,
+        metavar='sflux_level',
+    )
+    nws_parser.add_argument(
+        '--nws-3',
+        dest='nws',
+    )
+    nws_parser.add_argument(
+        '--nws-4',
+        dest='nws',
+    )
+
+
+def add_source_sink_to_parser(parser):
+    # source_sink=self.args.source_sink,
+    pass
+
+
+def add_waves_to_parser(parser):
+    raise NotImplementedError('Waves not implemented.')
+
+
+def add_surface_outputs_to_parser(parser):
+
+    def hydro():
+        """
+        hydro output options
+        """
+        return {
+            1: ("elev", "0: off; 1: on - elev. [m]"),
+            2: ("air_pressure", "air pressure [Pa]"),
+            3: ("air_temperature", "air temperature [C]"),
+            4: ("specific_humidity", "Specific humidity [-]"),
+            5: ("solar_radiation", "solar (shortwave) radiation [W/m/m]"),
+            6: ("sensible_flux", "sensible flux (positive upward) [W/m/m]"),
+            7: ("latent_heat", "latent heat flux (positive upward) [W/m/m]"),
+            8: ("upward_longwave",
+                "upward longwave radiation (positive upward) [W/m/m]"),
+            9: ("downward_longwave",
+                "downward longwave radiation (positive downward) [W/m/m]"),
+            10: ("total_heat_flux", "total flux=-flsu-fllu-(radu-radd) [W/m/m]"),
+            11: ("evaporation", "evaporation rate [kg/m/m/s]"),
+            12: ("precipitation", "precipitation rate [kg/m/m/s]"),
+            13: ("bottom_stress", "Bottom stress vector [kg/m/s^2(Pa)]"),
+            14: ("wind_speed", "wind velocity vector [m/s]"),
+            15: ("wind_stress", "wind stress vector [m^2/s/s]"),
+            16: ("dahv", "depth-averaged vel vector [m/s]"),
+            17: ("vertical_velocity", "vertical velocity [m/s]"),
+            18: ("temp", "water temperature [C]"),
+            19: ("salt", "water salinity [PSU]"),
+            20: ("water_density", "water density [kg/m^3]"),
+            21: ("diffusivity", "eddy diffusivity [m^2/s]"),
+            22: ("viscosity", "eddy viscosity [m^2/s]"),
+            23: ("TKE", "turbulent kinetic energy"),
+            24: ("mixing-lenght", "turbulent mixing length [m]"),
+            25: ("hvel", "horizontal vel vector [m/s]"),
+            26: ("hvel_side", "horizontal vel vector defined @side [m/s]"),
+            27: ("wvel_elem", "vertical vel. @elem [m/s]"),
+            28: ("temp_elem", "T @prism centers [C]"),
+            29: ("salt_elem", "S @prism centers [PSU]"),
+            30: ("pressure_gradient",
+                 "Barotropic pressure gradient force vector (m.s-2) @side "
+                 "centers"),
+
+        }
+
+    def wwm():
+        """
+        WWM output options
+        """
+        return {
+            1: ("WWM_1", "sig. height (m)"),
+            2: ("WWM_2", "Mean average period (sec) - TM01"),
+            3: ("WWM_3",
+                "Zero down crossing period for comparison with buoy (s) - TM02"),
+            4: ("WWM_4", "Average period of wave runup/overtopping - TM10"),
+            5: ("WWM_5", "Mean wave number (1/m)"),
+            6: ("WWM_6", "Mean wave length (m)"),
+            7: ("WWM_9",
+                "Mean average energy transport direction (degr) - MWD in NDBC?"),
+            8: ("WWM_10", "Mean directional spreading (degr)"),
+            9: ("WWM_11", "Discrete peak period (sec) - Tp"),
+            10: ("WWM_12",
+                 "Continuous peak period based on higher order moments (sec)"),
+            11: ("WWM_13", "Peak phase vel. (m/s)"),
+            12: ("WWM_14", "Peak n-factor."),
+            13: ("WWM_15", "Peak group vel. (m/s)"),
+            14: ("WWM_16", "Peak wave number"),
+            15: ("WWM_17", "Peak wave length"),
+            16: ("WWM_18", "Peak (dominant) direction (degr)"),
+            17: ("WWM_19", "Peak directional spreading"),
+            18: ("WWM_20", "Discrete peak direction (radian?) "),
+            19: ("WWM_21", "Orbital vel. (m/s) "),
+            20: ("WWM_22", "RMS Orbital vel. (m/s) "),
+            21: ("WWM_23", "Bottom excursion period (sec?) "),
+            22: ("WWM_24", "Bottom wave period (sec) "),
+            23: ("WWM_25", "Uresell number based on peak period "),
+            24: ("WWM_26", "Friction velocity (m/s?) "),
+            25: ("WWM_27", "Charnock coefficient "),
+            26: ("WWM_28", "Rougness length "),
+            27: ("WWM_energy_dir", "WWM_energy vector"),
+            28: ("wave-force",
+                 "Wave force vector (m.s-2) computed by wwm @side centers and "
+                 "whole levels"),
+        }
+
+    def gen():
+        """
+        gen output options
+        """
+        return {
+            1: ("GEN_1", "1st tracer"),
+            2: ("GEN_2", "2nd tracer"),
+        }
+
+    def age():
+        """
+        age output options
+        """
+        return {
+            1: ("AGE_1", "Indices from \"1\" to \"ntracer_age/2\"; [days]"),
+            2: ("AGE_2", "Indices from \"1\" to \"ntracer_age/2\"; [days]"),
+        }
+
+    def sed():
+        """
+        sed output options
+        """
+        return {
+            1: ("SED_depth_change",
+                "bottom depth _change_ from init. condition (m)"),
+            2: ("SED_D50", " Bed median grain size in the active layer (mm)"),
+            3: ("SED_bed_stress", " Bottom shear stress (Pa)"),
+            4: ("SED_bed_roughness", " Bottom roughness lenghth (mm)"),
+            5: ("SED_TSC", "total suspended concentration (g/L)"),
+            6: ("bed_thickness", " total bed thickness @elem (m)"),
+            7: ("bed_age", " total bed age over all layers @elem (sec)"),
+            8: ("z0st",
+                " Sediment transport roughness length @elem (m) (z0st_elem)"),
+            9: ("z0cr", "current-ripples roughness length @elem (m) (z0cr_elem)"),
+            10: ("z0sw", "sand-waves roughness length (m) @elem (z0sw_elem)"),
+            11: ("z0wr", "wave-ripples roughness length @elem (m) (z0wr_elem)"),
+            12: ("SED3D_1",
+                 "conc. of 1st class (one output need by each class) [g/L]"),
+            13: ("SED_bdld_1",
+                 "Bedload transport rate vector (kg.m-1.s-1) for 1st tracer (one "
+                 "output need by tracer)"),
+            14: ("SED_bedfrac_1",
+                 "Bed fraction 1st tracer (one output need by each class) [-]"),
+            15: ("SED3D_2", "conc. of 2nd class"),
+            16: ("SED_bdld_2", "Bedload transport of 2nd class"),
+            17: ("SED_bedfrac_3", "Bed fraction of 2nd class"),
+        }
+
+    def eco():
+        """
+        EcoSim output options
+        """
+        return {
+            1: ("ECO_1", "EcoSim outputs")
+        }
+
+    def icm():
+        """
+        ICM output options
+        """
+        return {
+            1: ("ICM_Chl", "Chlorophyll"),
+            2: ("ICM_pH", "PH values (ICM_PH on)"),
+            3: ("ICM_PrmPrdt", "ICM primary production @elem [gC/m^3/day]"),
+            4: ("ICM_DIN", "ICM totoal inorganic nitrogen (DIN) @elem [gN/m^3]"),
+            5: ("ICM_PON", "ICM paticulate organic nitrogen (PON) @elem [gN/m^3]"),
+            6: ("ICM_SED_BENDOC",
+                "ICM bed sediment flux arrays: SED_BENDOC (output "
+                "name:ICM_SED_BENDOC) @elem [gC/(m^2 day)]"),
+            7: ("ICM_SED_BENNH4",
+                "ICM bed sediment flux arrays: SED_BENNH4 (output "
+                "name:ICM_SED_BENNH4) @elem [gC/(m^2 day)]"),
+            8: ("ICM_SED_BENNO3",
+                "ICM bed sediment flux arrays: SED_BENNO3 (output "
+                "name:ICM_SED_BENNO3)@elem [gC/(m^2 day)]"),
+            9: ("ICM_SED_BENPO4",
+                "ICM bed sediment flux arrays: SED_BENPO4 (output "
+                "name:ICM_SED_BENPO4) @elem [gC/(m^2 day)]"),
+            10: ("ICM_SED_BENCOD",
+                 "ICM bed sediment flux arrays: SED_BENCOD (output "
+                 "name:ICM_SED_BENCOD) @elem [gC/(m^2 day)]"),
+            11: ("ICM_SED_BENDO",
+                 "ICM bed sediment flux arrays: SED_BENDO (output "
+                 "name:ICM_SED_BENDO) @elem [gC/(m^2 day)]"),
+            12: ("ICM_SED_BENSA",
+                 "ICM bed sediment flux arrays: SED_BENSA (output "
+                 "name:ICM_SED_BENSA) @elem [gC/(m^2 day)]"),
+            13: ("ICM_lfsav",
+                 "ICM SAV leaf biomass @elem [gC/m^3] (k=1 is surface)"),
+            14: ("ICM_stsav", "ICM SAV stem biomass @elem [gC/m^3]"),
+            15: ("ICM_rtsav", "ICM SAV root biomass @elem [gC/m^3]"),
+            16: ("ICM_tlfsav", "ICM SAV total leaf biomass @elem [gC/m^2]"),
+            17: ("ICM_tstsav", "ICM SAV total stem biomass @elem [gC/m^2]"),
+            18: ("ICM_trtsav", "ICM SAV total root biomass @elem [gC/m^2]"),
+            19: ("ICM_hcansav", "ICM SAV canopy height @elem [m]"),
+            20: ("ICM_CNH4", "bottom NH4 conc"),
+            21: ("ICM_CNH3", "bottom NO3 conc"),
+            22: ("ICM_CPIP", "bottom P conc"),
+            23: ("ICM_CPOS", "bottom Si conc"),
+            24: ("ICM_CCH4", "bottom CH4 conc"),
+            25: ("ICM_CSO4", "bottom SO4 conc"),
+            26: ("ICM_CH2S", "bottom H2S conc"),
+            27: ("ICM_SEDPON1", "bottom PON g1 conc"),
+            28: ("ICM_SEDPON2", "bottom PON g2 conc"),
+            29: ("ICM_SEDPON3", "bottom PON g3 conc"),
+            30: ("ICM_SEDPOP1", "bottom POP g1 conc"),
+            31: ("ICM_SEDPOP2", "bottom POP g2 conc"),
+            32: ("ICM_SEDPOP3", "bottom POP g3 conc"),
+            33: ("ICM_SEDPOC1", "bottom POC g1 conc"),
+            34: ("ICM_SEDPOC2", "bottom POC g2 conc"),
+            35: ("ICM_SEDPOC3", "bottom POC g3 conc"),
+            36: ("ICM_EROH2S", "erosion flux H2S"),
+            37: ("ICM_EROLPOC", "erosion flux LPOC"),
+            38: ("ICM_ERORPOC", "erosion flux RPOC"),
+            39: ("ICM_DO_consumption", "DO consumption"),
+            40: ("ICM_GP1", "PB growth #1"),
+            41: ("ICM_GP2", "PB growth #2"),
+            42: ("ICM_GP3", "PB growth #3"),
+            43: ("ICM_1", "Zoo. #1"),
+            44: ("ICM_2", "Zoo. #2"),
+            45: ("ICM_3", "phyto #1"),
+            46: ("ICM_4", "phyto #2"),
+            47: ("ICM_5", "phyto #3"),
+            48: ("ICM_6", "RPOC"),
+            49: ("ICM_7", "LPOC"),
+            50: ("ICM_8", "DOC"),
+            51: ("ICM_9", "RPON"),
+            52: ("ICM_10", "LPON"),
+            53: ("ICM_11", "DON"),
+            54: ("ICM_12", "NH4"),
+            55: ("ICM_13", "NO3"),
+            56: ("ICM_14", "RPOP"),
+            57: ("ICM_15", "LPOP"),
+            58: ("ICM_16", "DOP"),
+            59: ("ICM_17", "PO4t"),
+            60: ("ICM_18", "Si- biogenic"),
+            61: ("ICM_19", "available Si"),
+            62: ("ICM_20", "COD: Chemical oxygen demand"),
+            63: ("ICM_21", "DO"),
+            64: ("ICM_22", "TIC"),
+            65: ("ICM_23", "ALK"),
+            66: ("ICM_24", "CA"),
+            67: ("ICM_25", "CACO3"),
+        }
+
+    def cos():
+        """
+        CoSINE output options
+        """
+        return {
+            1: ("COS_1", "COS_1"),
+            2: ("COS_2", "COS_2"),
+            3: ("COS_3", "COS_3"),
+            4: ("COS_4", "COS_4"),
+            5: ("COS_5", "COS_5"),
+            6: ("COS_6", "COS_6"),
+            7: ("COS_7", "COS_7"),
+            8: ("COS_8", "COS_8"),
+            9: ("COS_9", "COS_9"),
+            10: ("COS_10", "COS_10"),
+            11: ("COS_11", "COS_11"),
+            12: ("COS_12", "COS_12"),
+            13: ("COS_13", "COS_13"),
+        }
+
+    def fib():
+        """
+        Fecal indicating bacteria output options
+        """
+        return {
+            1: ("FIB_1", "FIB_1")
+        }
+
+    def sed2d():
+        """
+        SED2D output options
+        """
+        return {
+            1: ("SED2D_depth_change",
+                "bottom depth _change_ from init. condition (m)"),
+            2: ("SED2D_Cd", "drag coefficient used in transport formulae"),
+            3: ("SED2D_cflsed", "Courant number (b.qtot.dt / h.dx)"),
+            4: ("SED2D_d50", "Top layer d50 (m)"),
+            5: ("SED2D_total_transport", "total transport rate vector (kg/m/s)"),
+            6: ("SED2D_susp_load", "suspended tranport rate vector (kg/m/s)"),
+            7: ("SED2D_bed_load", "bedload transport rate vector (kg/m/s)"),
+            8: ("SED2D_average_transport",
+                "time averaged total transport rate vector (kg/m/s)"),
+            9: ("SED2D_bottom_slope",
+                "bottom slope vector (m/m); negative uphill"),
+            10: ("z0eq2d", "Total roughness length @elem (m) (z0eq)"),
+            11: ("z0cr2d", "current-ripples roughness length @elem (m) (z0cr)"),
+            12: ("z0sw2d", "sand-waves roughness length @elem (m) (z0sw)"),
+            13: ("z0wr2d", "wave-ripples roughness length @elem (m) (z0wr)"),
+        }
+
+    def mar():
+        """
+        marsh output options
+        """
+        return {
+            1: ("marsh_flag", "marsh_flag"),
+        }
+
+    def ice():
+        """
+        ice output options
+        """
+        return {
+            1: ("ICE_velocity", "ice advective velcoity vector [m/s]"),
+            2: ("ICE_strain_rate", "strain rate @ elem [1/sec]"),
+            3: ("ICE_net_heat_flux",
+                "net heat flux to ocean (>0 warm up SST) [W/m/m]"),
+            4: ("ICE_fresh_water_flux",
+                "net fresh water flux to ocean (>0 freshens up SSS) [kg/s/m/m]"),
+            5: ("ICE_top_T", "ice temperature [C] at air-ice interface"),
+            6: ("ICE_tracer_1", "ice volume [m]"),
+            7: ("ICE_tracer_2", "ice concentration [-]"),
+            8: ("ICE_tracer_3", "snow volume [m]"),
+        }
+
+    def ana():
+        return {
+            1: ("ANA_air_pres_grad_x", "x-component of 𝛁air_pres/ρ0 [m/s/s]"),
+            2: ("ANA_air_pres_grad_y", "y-component of 𝛁air_pres/ρ0 [m/s/s]"),
+            3: ("ANA_tide_pot_grad_x",
+                "α*g*𝛁Ψ [m/s/s] (gradient of tidal potential)"),
+            4: ("ANA_tide_pot_grad_y", "α*g*𝛁Ψ [m/s/s]"),
+            5: ("ANA_hor_viscosity_x", "𝛁·(μ𝛁u) [m/s/s] (horizontal viscosity)"),
+            6: ("ANA_hor_viscosity_y", "𝛁·(μ𝛁u) [m/s/s]"),
+            7: ("ANA_bclinic_force_x",
+                "-g/rho0* ∫_z^η dr_dx dz  [m/s/s] (b-clinic gradient)"),
+            8: ("ANA_bclinic_force_y", "-g/rho0* ∫_z^η dr_dy dz  [m/s/s]"),
+            9: ("ANA_vert_viscosity_x",
+                "d (ν du/dz)/dz [m/s/s] - no vegetation effects (vertical "
+                "viscosity)"),
+            10: ("ANA_vert_viscosity_y",
+                 "d (ν dv/dz)/dz [m/s/s] - no vegetation effects"),
+            11: ("ANA_mom_advection_x", "(u·𝛁) u [m/s/s] (momentum advection)"),
+            12: ("ANA_mom_advection_y", "(u·𝛁) u [m/s/s]"),
+            13: ("ANA_Richardson", "gradient Richardson number [-]"),
+            14: ("ANA_transport_min_dt_elem",
+                 "min time step at each element over all subcycles in horizontal "
+                 "transport solver [s]  "),
+        }
+    surface_outputs_group = parser.add_argument_group('Surface output options')
+    surface_outputs_group.add_argument(
+        '--nspool',
+        help='If passing an integer, it is interpreted as timestep, '
+             'if passing a float, it is interpreted as hours.')
+
+    outputs = {
+        'hyd': hydro(),
+        'wwm': wwm(),
+        'gen': gen(),
+        'age': age(),
+        'sed': sed(),
+        'eco': eco(),
+        'icm': icm(),
+        'cos': cos(),
+        'fib': fib(),
+        'sed2d': sed2d(),
+        'mar': mar(),
+        'ice': ice(),
+        'ana': ana(),
+    }
+    for short_name, output in outputs.items():
+        for id, (long_name, help_msg) in output.items():
+            surface_outputs_group.add_argument(
+                f"--{long_name.lower().replace('_', '-')}",
+                f"-{short_name}{id}",
+                help=help_msg,
+                action='store_true'
+            )
+
+
+def add_stations_outputs_to_parser(parser):
+    stations_output_group = parser.add_argument_group('Stations output options')
+    stations_output_group.add_argument('--stations-file')
+    stations_output_group.add_argument('--stations-file-crs')
+    stations_output_group.add_argument('--nspool-sta')
+    stations_output_group.add_argument('--stations-elev', action='store_true')
+    stations_output_group.add_argument('--stations-prmsl', action='store_true')
+    stations_output_group.add_argument('--stations-uwind', action='store_true')
+    stations_output_group.add_argument('--stations-vwind', action='store_true')
+    stations_output_group.add_argument('--stations-temp', action='store_true')
+    stations_output_group.add_argument('--stations-sal', action='store_true')
+    stations_output_group.add_argument('--stations-uvel', action='store_true')
+    stations_output_group.add_argument('--stations-vvel', action='store_true')
+    stations_output_group.add_argument('--stations-wvel', action='store_true')

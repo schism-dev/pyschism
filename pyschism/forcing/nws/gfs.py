@@ -66,7 +66,7 @@ class GFSInventory:
 
     def __init__(self, product='gfs_0p25_1hr', start_date=None, rnday=4,
                  bbox=None):
-        self.product = GFSProduct(product) if not \
+        self.product = GFSProduct(product.upper()) if not \
             isinstance(product, GFSProduct) else product
         self.start_date = nearest_cycle() if start_date is None else \
             localize_datetime(start_date).astimezone(pytz.utc)

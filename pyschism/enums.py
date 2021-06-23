@@ -354,19 +354,19 @@ class NWSType(Enum):
         raise ValueError(f"{name} is not a valid NWS type.")
 
 
-class ForecastProduct(Enum):
-    GDAS = 'gdas_0p25'
-    GDAS_0P25 = 'gdas_0p25'
-    GFS = 'gfs_0p25_1hr'
-    GFS_0P25 = 'gfs_0p25'
-    GFS_0P25_1HR = 'gfs_0p25_1hr'
-    GFS_0P50 = 'gfs_0p50'
-    GFS_1P00 = 'gfs_1p00'
+# class ForecastProduct(Enum):
+#     GDAS = 'gdas_0p25'
+#     GDAS_0P25 = 'gdas_0p25'
+#     GFS = 'gfs_0p25_1hr'
+#     GFS_0P25 = 'gfs_0p25'
+#     GFS_0P25_1HR = 'gfs_0p25_1hr'
+#     GFS_0P50 = 'gfs_0p50'
+#     GFS_1P00 = 'gfs_1p00'
 
-    @classmethod
-    def _missing_(self, name):
-        ValueError(f'{name} is not a known atmospheric forecast product for '
-                   'air.')
+#     @classmethod
+#     def _missing_(self, name):
+#         ValueError(f'{name} is not a known atmospheric forecast product for '
+#                    'air.')
 
 
 class GFSProduct(Enum):
@@ -374,37 +374,6 @@ class GFSProduct(Enum):
     GFS_0P25_1HR = 'gfs_0p25_1hr'
     GFS_0P50 = 'gfs_0p50'
     GFS_1P00 = 'gfs_1p00'
-
-
-class ForecastCycle(Enum):
-    z00 = '00z'
-    z01 = '01z'
-    z02 = '02z'
-    z03 = '03z'
-    z04 = '04z'
-    z05 = '05z'
-    z06 = '06z'
-    z07 = '07z'
-    z08 = '08z'
-    z09 = '09z'
-    z10 = '10z'
-    z11 = '11z'
-    z12 = '12z'
-    z13 = '13z'
-    z14 = '14z'
-    z15 = '15z'
-    z16 = '16z'
-    z17 = '17z'
-    z18 = '18z'
-    z19 = '19z'
-    z20 = '20z'
-    z21 = '21z'
-    z22 = '22z'
-    z23 = '23z'
-
-    @classmethod
-    def _missing_(self, name):
-        raise ValueError(f"{name} is not a valid cycle.")
 
 
 class iof_hydro(Enum):

@@ -1,7 +1,7 @@
 import argparse
 import logging
 
-from pyschism.cmd.bctides import add_bctypes_to_parser
+from pyschism.cmd import common
 
 
 class BootstrapCli:
@@ -65,4 +65,4 @@ def add_bootstrap_options_to_parser(parser):
     )
     parser.add_argument('--Z0', type=float)
     parser.add_argument("--cutoff-depth", type=float, default=50.0)
-    add_bctypes_to_parser(parser)
+    common.add_ibctype_to_parser(parser)
