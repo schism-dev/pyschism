@@ -7,9 +7,8 @@ from netCDF4 import Dataset
 
 class UV3D:
 
-    def __init__(self, hgrid, vgrid):
-        self.hgrid = hgrid
-        self.vgrid = vgrid
+    def __init__(self, bctides):
+        self.bctides = bctides
 
     def write(
             self,
@@ -26,10 +25,10 @@ class UV3D:
 
         # file_is_not_needed = True
         timevec = None
-        for boundary in self.hgrid.boundaries.open.itertuples():
+        for boundary in self.bctides.gdf.itertuples():
             if boundary.ifltype is not None:
                 if boundary.ifltype.ifltype in [4, 5]:
-                    ds = boundary.ifltype.data_source
+                    ds = boundary.ifltype.data_component
                     datasets = ds.get_datasets(
                                 start_date,
                                 rnday,
@@ -41,7 +40,7 @@ class UV3D:
             return
 
         nOpenBndNodes = 0
-        for boundary in self.hgrid.boundaries.open.itertuples():
+        for boundary in self.bctides.gdf.itertuples():
             nOpenBndNodes += len(boundary.indexes)
 
         dst = Dataset(uv3d, 'w', format='NETCDF4')
@@ -49,7 +48,7 @@ class UV3D:
         dst.createDimension('nOpenBndNodes', nOpenBndNodes)
         dst.createDimension('one', 1)
         dst.createDimension('time', None)
-        dst.createDimension('nLevels', self.vgrid.nvrt)
+        dst.createDimension('nLevels', self.bctides.vgrid.nvrt)
         dst.createDimension('nComponents', 2)
 
         # variables
@@ -60,12 +59,18 @@ class UV3D:
         dst.createVariable('time_series', 'f',
                            ('time', 'nOpenBndNodes', 'nLevels', 'nComponents'))
         offset = 0
-        for boundary in self.hgrid.boundaries.open.itertuples():
+        for boundary in self.bctides.gdf.itertuples():
             if boundary.ifltype is not None:
                 if boundary.ifltype.ifltype in [4, 5]:
-                    boundary.ifltype.data_source.put_boundary_ncdata(
-                        self.hgrid, self.vgrid, boundary, dst, start_date,
-                        rnday, overwrite=overwrite, offset=offset,
+                    boundary.ifltype.data_component.put_boundary_ncdata(
+                        self.bctides.hgrid,
+                        self.bctides.vgrid,
+                        boundary,
+                        dst,
+                        start_date,
+                        rnday,
+                        overwrite=overwrite,
+                        offset=offset,
                         output_interval=output_interval,
                         pixel_buffer=10,
                         progress_bar=progress_bar

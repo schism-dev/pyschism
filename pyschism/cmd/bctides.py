@@ -1,36 +1,29 @@
 import argparse
 from datetime import datetime, timedelta
-import json
 import logging
 import pathlib
-import sys
 
 from pyschism.cmd import common
-from pyschism.forcing.hycom import GOFS, RTOFS
-from pyschism.forcing.bctides import Tides
-from pyschism.forcing.bctides import Bctides, iettype, ifltype, itetype, isatype
-from pyschism.mesh import Vgrid
+from pyschism.forcing.bctides import Bctides
 
 
 logger = logging.getLogger(__name__)
 
-baroclinic_databases = {
-    'gofs': GOFS,
-    'rtofs': RTOFS,
-}
-
 
 class BctidesCli:
     def __init__(self, args: argparse.Namespace):
-        bctides = Bctides(
+        Bctides(
                 args.hgrid,
                 args.start_date,
                 args.run_days,
                 vgrid=args.vgrid,
-            )
-        if args.Z0 is not None:
-            bctides.Z0 = args.Z0
-        bctides.write(
+                iettype=args.iettype,
+                ifltype=args.ifltype,
+                isatype=args.isatype,
+                itetype=args.itetype,
+                # itrtype=args.itrtype,
+                cutoff_depth=args.cutoff_depth,
+            ).write(
             args.output_directory,
             overwrite=args.overwrite,
             parallel_download=args.parallel_download
@@ -78,208 +71,10 @@ def add_bctides_options_to_parser(parser):
     common.add_tidal_constituents_to_parser(parser)
     common.add_tidal_database_to_parser(parser)
     common.add_baroclinic_database_to_parser(parser)
-    parser.add_argument('--Z0', type=float)
-    parser.add_argument("--cutoff-depth", type=float, default=50.0)
-    parser.add_argument("--parallel-download", action='store_true')
+    common.add_bctides_options_to_parser(parser)
     common.add_ibctype_to_parser(parser)
+    parser.add_argument("--parallel-download", action='store_true')
 
-
-# def add_bctypes_to_parser(parser):
-#     _iettype = parser.add_mutually_exclusive_group()
-#     _iettype.add_argument(
-#         "--iettype",
-#         dest="iettype",
-#         # action=CustomBoundaryAction,
-#         const=iettype.Iettype,
-#         help='Per-boundary specification option for elevation variable. '
-#              'The format required is a json-style string. For example: '
-#              '--iettype=\'{"1": 3}\' would apply iettype-3 to boundary with '
-#              'id equal to "1".'
-#     )
-#     _iettype.add_argument(
-#         "--elev-th",
-#         "--iettype-1",
-#         dest="iettype",
-#         type=iettype.Iettype1,
-#         help='Global elevation options for time history.',
-#     )
-#     _iettype.add_argument(
-#         '--elev-val',
-#         '--iettype-2',
-#         dest='iettype',
-#         type=iettype.Iettype2,
-#         help='Global constant elevation option.',
-#     )
-
-#     _iettype.add_argument(
-#         "--elev-tides",
-#         "--iettype-3",
-#         dest="iettype",
-#         nargs=0,
-#         const=iettype.Iettype3,  # the option string is present but not followed by a command-line argument. In this case the value from const will be produced.
-#         # action=Iettype3Action,
-#     )
-
-#     _iettype.add_argument(
-#         '--elev-subtides',
-#         '--elev-2d',
-#         '--iettype-4',
-#         dest='iettype',
-#         nargs=0,
-#         const=iettype.Iettype4,
-#         # action=Iettype4Action,
-#     )
-
-#     _iettype.add_argument(
-#         '--elev-tides-subtides',
-#         '--tides-elev-2d',
-#         '--elev-2d-tides',
-#         '--iettype-5',
-#         dest='iettype',
-#         nargs=0,
-#         const=iettype.Iettype5,
-#         # action=Iettype5Action,
-#     )
-
-#     _iettype.add_argument(
-#         '--elev-zero',
-#         '--iettype-_1',
-#         dest='iettype',
-#         type=iettype.Iettype_1,
-#     )
-#     _ifltype = parser.add_mutually_exclusive_group()
-#     _ifltype.add_argument(
-#         "--ifltype",
-#         dest="ifltype",
-#         nargs=1,  # 0 or more
-#         const={},
-#         # action=CustomBoundaryAction,
-#     )
-#     _ifltype.add_argument(
-#         '--flux-th',
-#         '--ifltype-1',
-#         dest='ifltype',
-#         type=ifltype.Ifltype1
-#     )
-#     _ifltype.add_argument(
-#         '--flux-val',
-#         '--ifltype-2',
-#         dest='ifltype',
-#         type=ifltype.Ifltype2
-#     )
-
-#     _ifltype.add_argument(
-#         '--uv-tides',
-#         '--ifltype-3',
-#         nargs="?",  # 0 or more
-#         # action=Ifltype3Action,
-#         dest='ifltype',
-#         const=ifltype.Ifltype3,
-#     )
-
-#     _ifltype.add_argument(
-#         '--uv-subtides',
-#         '--uv-3d',
-#         '--uv3D',
-#         '--ifltype-4',
-#         # action=Ifltype4Action,
-#         dest='ifltype',
-#         nargs=0,
-#         const=ifltype.Ifltype4,
-#     )
-
-#     _ifltype.add_argument(
-#         '--uv-tides-subtides',
-#         '--uv-3d-tides',
-#         '--uv3d-tides',
-#         '--uv3D-tides',
-#         '--uv3D-tides',
-#         '--ifltype-5',
-#         # action=Ifltype5Action,
-#         nargs=0,
-#         dest='ifltype',
-#         const=ifltype.Ifltype5,
-#     )
-
-#     _ifltype.add_argument(
-#         '--uv-zero',
-#         '--flather',
-#         action='store_const',
-#         dest='ifltype',
-#         const=ifltype.Ifltype_1,
-#     )
-#     _itetype = parser.add_mutually_exclusive_group()
-#     _itetype.add_argument(
-#         "--itetype",
-#         dest="itetype",
-#         nargs=1,  # 0 or more
-#         const={},
-#         # action=CustomBoundaryAction,
-#     )
-#     _itetype.add_argument(
-#         '--temp-th',
-#         '--itetype-1',
-#         dest='itetype',
-#         type=itetype.Itetype1
-#     )
-#     _itetype.add_argument(
-#         '--temp-val',
-#         '--itetype-2',
-#         dest='itetype',
-#         type=itetype.Itetype2
-#     )
-
-#     _itetype.add_argument(
-#         '--temp-ic',
-#         '--itetype-3',
-#         dest='itetype',
-#         type=itetype.Itetype3,
-#     )
-
-#     _itetype.add_argument(
-#         '--temp-3d',
-#         '--itetype-4',
-#         # action=Itetype4Action,
-#         dest='itetype',
-#         nargs=0,
-#         const=itetype.Itetype4,
-#     )
-#     _isatype = parser.add_mutually_exclusive_group()
-#     _isatype.add_argument(
-#         "--isatype",
-#         dest="isatype",
-#         nargs=1,  # 0 or more
-#         const={},
-#         # action=CustomBoundaryAction,
-#     )
-#     _isatype.add_argument(
-#         '--salt-th',
-#         '--isatype-1',
-#         dest='isatype',
-#         type=isatype.Isatype1
-#     )
-#     _isatype.add_argument(
-#         '--salt-val',
-#         '--isatype-2',
-#         dest='isatype',
-#         type=isatype.Isatype2
-#     )
-
-#     _isatype.add_argument(
-#         '--salt-ic',
-#         '--isatype-3',
-#         dest='isatype',
-#         type=isatype.Isatype3,
-#     )
-
-#     _isatype.add_argument(
-#         '--salt-3d',
-#         '--isatype-4',
-#         # action=Isatype4Action,
-#         dest='isatype',
-#         nargs=0,
-#         const=isatype.Isatype4,
-#     )
 
 #     add_nudge_to_parser(parser)
 

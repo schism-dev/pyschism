@@ -4,19 +4,18 @@ import numpy as np
 import geopandas as gpd
 from shapely.geometry import LineString
 
-from pyschism.forcing.bctides.mod3d import TEM_3D, SAL_3D
-from pyschism.forcing.bctides.nudge import TEM_Nudge, SAL_Nudge
-from pyschism.forcing.bctides.elev2d import Elev2D
-from pyschism.forcing.bctides.uv3d import UV3D
-from pyschism.forcing.bctides.iettype import Iettype
-from pyschism.forcing.bctides.ifltype import Ifltype
-from pyschism.forcing.bctides.itetype import Itetype
-from pyschism.forcing.bctides.isatype import Isatype
-from pyschism.forcing.bctides.itrtype import Itrtype
+# from pyschism.forcing.bctides.mod3d import TEM_3D, SAL_3D
+# from pyschism.forcing.bctides.nudge import TEM_Nudge, SAL_Nudge
+# from pyschism.forcing.bctides.elev2d import Elev2D
+# from pyschism.forcing.bctides.uv3d import UV3D
+# from pyschism.forcing.bctides.iettype import Iettype
+# from pyschism.forcing.bctides.ifltype import Ifltype
+# from pyschism.forcing.bctides.itetype import Itetype
+# from pyschism.forcing.bctides.isatype import Isatype
+# from pyschism.forcing.bctides.itrtype import Itrtype
 
 
 class Boundaries:
-
     def __init__(self, hgrid, boundaries: Union[dict, None]):
 
         ocean_boundaries = []
@@ -26,36 +25,42 @@ class Boundaries:
             for ibtype, bnds in boundaries.items():
                 if ibtype is None:
                     for id, data in bnds.items():
-                        indexes = list(map(hgrid.nodes.get_index_by_id,
-                                       data['indexes']))
-                        ocean_boundaries.append({
-                            'id': str(id+1),  # hacking it
-                            "index_id": data['indexes'],
-                            "indexes": indexes,
-                            'geometry': LineString(hgrid.vertices[indexes]),
-                            'iettype': None,
-                            'ifltype': None,
-                            'itetype': None,
-                            'isatype': None,
-                            'itrtype': {},
-                            # 'nudge_temperature': None,
-                            # 'nudge_salinity': None,
-                            })
+                        indexes = list(
+                            map(hgrid.nodes.get_index_by_id, data["indexes"])
+                        )
+                        ocean_boundaries.append(
+                            {
+                                "id": str(id + 1),  # hacking it
+                                "index_id": data["indexes"],
+                                "indexes": indexes,
+                                "geometry": LineString(hgrid.vertices[indexes]),
+                                # "iettype": None,
+                                # "ifltype": None,
+                                # "itetype": None,
+                                # "isatype": None,
+                                # "itrtype": {},
+                                # 'nudge_temperature': None,
+                                # 'nudge_salinity': None,
+                            }
+                        )
 
-                elif str(ibtype).endswith('1'):
+                elif str(ibtype).endswith("1"):
                     for id, data in bnds.items():
-                        indexes = list(map(hgrid.nodes.get_index_by_id,
-                                       data['indexes']))
-                        interior_boundaries.append({
-                            'id': str(id+1),
-                            'ibtype': ibtype,
-                            "index_id": data['indexes'],
-                            "indexes": indexes,
-                            'geometry': LineString(hgrid.vertices[indexes])
-                            })
+                        indexes = list(
+                            map(hgrid.nodes.get_index_by_id, data["indexes"])
+                        )
+                        interior_boundaries.append(
+                            {
+                                "id": str(id + 1),
+                                "ibtype": ibtype,
+                                "index_id": data["indexes"],
+                                "indexes": indexes,
+                                "geometry": LineString(hgrid.vertices[indexes]),
+                            }
+                        )
                 else:
                     for id, data in bnds.items():
-                        _indexes = np.array(data['indexes'])
+                        _indexes = np.array(data["indexes"])
                         if _indexes.ndim > 1:
                             # ndim > 1 implies we're dealing with an ADCIRC
                             # mesh that includes boundary pairs, such as weir
@@ -68,69 +73,76 @@ class Boundaries:
                             _indexes = np.array(new_indexes).flatten()
                         else:
                             _indexes = _indexes.flatten()
-                        indexes = list(map(hgrid.nodes.get_index_by_id,
-                                       _indexes))
+                        indexes = list(map(hgrid.nodes.get_index_by_id, _indexes))
 
-                        land_boundaries.append({
-                            'id': str(id+1),
-                            'ibtype': ibtype,
-                            "index_id": data['indexes'],
-                            "indexes": indexes,
-                            'geometry': LineString(hgrid.vertices[indexes])
-                            })
+                        land_boundaries.append(
+                            {
+                                "id": str(id + 1),
+                                "ibtype": ibtype,
+                                "index_id": data["indexes"],
+                                "indexes": indexes,
+                                "geometry": LineString(hgrid.vertices[indexes]),
+                            }
+                        )
 
-        self.open = gpd.GeoDataFrame(ocean_boundaries, crs=hgrid.crs if len(ocean_boundaries) > 0 else None)
-        self.land = gpd.GeoDataFrame(land_boundaries, crs=hgrid.crs if len(land_boundaries) > 0 else None)
-        self.interior = gpd.GeoDataFrame(interior_boundaries, crs=hgrid.crs if len(interior_boundaries) > 0 else None)
+        self.open = gpd.GeoDataFrame(
+            ocean_boundaries, crs=hgrid.crs if len(ocean_boundaries) > 0 else None
+        )
+        self.land = gpd.GeoDataFrame(
+            land_boundaries, crs=hgrid.crs if len(land_boundaries) > 0 else None
+        )
+        self.interior = gpd.GeoDataFrame(
+            interior_boundaries, crs=hgrid.crs if len(interior_boundaries) > 0 else None
+        )
         self.hgrid = hgrid
         self.data = boundaries
 
-    def elev2d(self):
-        return Elev2D(self.hgrid)
+    # def elev2d(self):
+    #     return Elev2D(self.hgrid)
 
-    def uv3d(self, vgrid):
-        return UV3D(self.hgrid, vgrid)
+    # def uv3d(self, vgrid):
+    #     return UV3D(self.hgrid, vgrid)
 
-    def tem3d(self, vgrid):
-        return TEM_3D(self.hgrid, vgrid)
+    # def tem3d(self, vgrid):
+    #     return TEM_3D(self.hgrid, vgrid)
 
-    def sal3d(self, vgrid):
-        return SAL_3D(self.hgrid, vgrid)
+    # def sal3d(self, vgrid):
+    #     return SAL_3D(self.hgrid, vgrid)
 
-    def TEM_nudge(self, vgrid, data_source, rlmax=1.5, rnu_day=0.25):
-        return TEM_Nudge(self.hgrid, vgrid, data_source, rlmax, rnu_day)
+    # def TEM_nudge(self, vgrid, data_source, rlmax=1.5, rnu_day=0.25):
+    #     return TEM_Nudge(self.hgrid, vgrid, data_source, rlmax, rnu_day)
 
-    def SAL_nudge(self, vgrid, data_source, rlmax=1.5, rnu_day=0.25):
-        return SAL_Nudge(self.hgrid, vgrid, data_source, rlmax, rnu_day)
+    # def SAL_nudge(self, vgrid, data_source, rlmax=1.5, rnu_day=0.25):
+    #     return SAL_Nudge(self.hgrid, vgrid, data_source, rlmax, rnu_day)
 
-    def set_forcing(
-            self,
-            boundary_id: int,
-            iettype: Iettype = None,
-            ifltype: Ifltype = None,
-            itetype: Itetype = None,
-            isatype: Isatype = None,
-            itrtype: Union[Itrtype, List[Itrtype]] = None,
-    ):
+    # def set_forcing(
+    #         self,
+    #         boundary_id: int,
+    #         iettype: Iettype = None,
+    #         ifltype: Ifltype = None,
+    #         itetype: Itetype = None,
+    #         isatype: Isatype = None,
+    #         itrtype: Union[Itrtype, List[Itrtype]] = None,
+    # ):
 
-        def check_input_type(argname, obj, cls):
-            if not isinstance(obj, cls):
-                raise TypeError(
-                    f'Argument {argname} must be of type {cls}, not '
-                    f'type {type(obj)}.')
+    #     def check_input_type(argname, obj, cls):
+    #         if not isinstance(obj, cls):
+    #             raise TypeError(
+    #                 f'Argument {argname} must be of type {cls}, not '
+    #                 f'type {type(obj)}.')
 
-        def modify_dataframe(argname, obj, cls):
-            if obj is not None:
-                check_input_type(argname, obj, cls)
-                idxs = self.open[self.open['id'] == boundary_id].index.values
-                for idx in idxs:
-                    self.open.at[idx, argname] = obj
+    #     def modify_dataframe(argname, obj, cls):
+    #         if obj is not None:
+    #             check_input_type(argname, obj, cls)
+    #             idxs = self.open[self.open['id'] == boundary_id].index.values
+    #             for idx in idxs:
+    #                 self.open.at[idx, argname] = obj
 
-        modify_dataframe('iettype', iettype, Iettype)
-        modify_dataframe('ifltype', ifltype, Ifltype)
-        modify_dataframe('itetype', itetype, Itetype)
-        modify_dataframe('isatype', isatype, Isatype)
-        modify_dataframe('itrtype', itrtype, Itrtype)
+    #     modify_dataframe('iettype', iettype, Iettype)
+    #     modify_dataframe('ifltype', ifltype, Ifltype)
+    #     modify_dataframe('itetype', itetype, Itetype)
+    #     modify_dataframe('isatype', isatype, Isatype)
+    #     modify_dataframe('itrtype', itrtype, Itrtype)
 
 
 #     def auto_generate(
@@ -241,4 +253,3 @@ class Boundaries:
 #                 axes = self.plot(ibtype, id, **kwargs)
 #                 kwargs.update({'axes': axes})
 #         return kwargs['axes']
-

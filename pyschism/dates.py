@@ -12,7 +12,7 @@ class StartDate:
 
     def __set__(self, obj, start_date: datetime):
         start_date = nearest_cycle() if start_date is None else \
-                     nearest_cycle(localize_datetime(start_date))
+                     localize_datetime(start_date).astimezone(pytz.utc)
 
         if obj.end_date is not None:
             if start_date > obj.end_date:

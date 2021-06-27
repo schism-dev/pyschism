@@ -41,27 +41,12 @@ class ActiveConstituents:
         return obj.__dict__['active_constituents']
 
 
-class Singleton(type):
-    def __init__(cls, name, bases, dict):
-        super(Singleton, cls).__init__(name, bases, dict)
-        cls.instance = None
-
-    def __call__(cls, *args, **kw):
-        if cls.instance is None:
-            cls.instance = super(Singleton, cls).__call__(*args, **kw)
-        return cls.instance
-
-
-class Tides(
-    metaclass=Singleton
-):
+class Tides:
 
     _active_constituents = ActiveConstituents()
 
     def __init__(
             self,
-            elevation: bool = True,
-            velocity: bool = True,
             tidal_database: Union[str, TidalDatabase] = TidalDatabase.TPXO,
             constituents='all',
     ):
@@ -77,12 +62,7 @@ class Tides(
             database (optional): Tidal database to use in order to obtain
                 boundary initial conditions, defaults to TidalDatabase.TPXO
         """
-        self.elevation = elevation
-        self.velocity = velocity
         self.tidal_database = tidal_database
-        self._init_constituents(constituents)
-
-    def _init_constituents(self, constituents):
 
         if isinstance(constituents, str):
             constituents = [constituents]

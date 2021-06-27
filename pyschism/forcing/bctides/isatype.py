@@ -1,7 +1,8 @@
 from abc import abstractmethod
-from typing import List
+from enum import Enum
 
 from pyschism.forcing.bctides.bctypes import Bctype
+from pyschism.forcing import hycom
 
 
 class Isatype(Bctype):
@@ -46,25 +47,31 @@ class SalinityInitialConditions(Isatype):
 
 class SpatiallyVaryingTimeHistorySalinity(Isatype):
 
+    class BaroclinicDatabases(Enum):
+        RTOFS = hycom.RTOFS
+        GOFS = hycom.GOFS
+
     def __init__(
         self,
-        data_source,
+        data_source='gofs',
         nudge: bool = True,
         rlmax=1.5,
         rnu_day=0.25,
     ):
-        self.data_source = data_source.salinity
+        if isinstance(data_source, str):
+            data_source = self.BaroclinicDatabases[data_source.upper()].value()
+        if not isinstance(data_source, hycom.Hycom):
+            raise TypeError(
+                "Argument data_source must be of type str or type "
+                f"{type(hycom.Hycom)}, not type {type(data_source)}."
+            )
+        self.data_component = data_source.salinity
         self.nudge = nudge
         self.rlmax = rlmax
         self.rnu_day = rnu_day
 
-    def get_boundary_string(self, hgrid, boundary):
-        # if self.tobc is None:
+    def get_boundary_string(self, *args, **kwargs):
         return '1.'
-
-    # def write(self, *args, **kwargs):
-    #     if self.nudge is not None:
-    #         self.nudge.write(*args, **kwargs)
 
     @property
     def isatype(self):

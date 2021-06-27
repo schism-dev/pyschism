@@ -7,8 +7,8 @@ from netCDF4 import Dataset
 
 class Elev2D:
 
-    def __init__(self, hgrid):
-        self.hgrid = hgrid
+    def __init__(self, bctides):
+        self.bctides = bctides
 
     def write(
             self,
@@ -25,10 +25,10 @@ class Elev2D:
 
         # file_is_not_needed = True
         timevec = None
-        for boundary in self.hgrid.boundaries.open.itertuples():
+        for boundary in self.bctides.gdf.itertuples():
             if boundary.iettype is not None:
                 if boundary.iettype.iettype in [4, 5]:
-                    ds = boundary.iettype.data_source
+                    ds = boundary.iettype.data_component
                     datasets = ds.get_datasets(
                                 start_date,
                                 rnday,
@@ -40,7 +40,7 @@ class Elev2D:
             return
 
         nOpenBndNodes = 0
-        for boundary in self.hgrid.boundaries.open.itertuples():
+        for boundary in self.bctides.gdf.itertuples():
             nOpenBndNodes += len(boundary.indexes)
 
         dst = Dataset(elev2D, 'w', format='NETCDF4')
@@ -59,10 +59,10 @@ class Elev2D:
         dst.createVariable('time_series', 'f',
                            ('time', 'nOpenBndNodes', 'nLevels', 'nComponents'))
         offset = 0
-        for boundary in self.hgrid.boundaries.open.itertuples():
+        for boundary in self.bctides.gdf.itertuples():
             if boundary.iettype is not None:
                 if boundary.iettype.iettype in [4, 5]:
-                    boundary.iettype.data_source.put_boundary_ncdata(
+                    boundary.iettype.data_component.put_boundary_ncdata(
                         boundary, dst, start_date, rnday, overwrite=overwrite,
                         offset=offset, output_interval=output_interval,
                         pixel_buffer=10, progress_bar=progress_bar)

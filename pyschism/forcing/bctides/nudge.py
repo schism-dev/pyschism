@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 class Nudge(Gr3Field):
 
-    def __init__(self, hgrid, vgrid, data_source, rlmax=1.5, rnu_day=0.25):
+    def __init__(self, bctides, data_source, rlmax=1.5, rnu_day=0.25):
 
         @jit(nopython=True, parallel=True)
         def compute_nudge(lon, lat, opbd, out):
@@ -38,10 +38,10 @@ class Nudge(Gr3Field):
                 if distmin <= rlmax:
                     rnu = (1-distmin/rlmax)*rnu_max
                 out[idn] = rnu
-        out = np.zeros(hgrid.values.shape)
-        xy = hgrid.get_xy(crs='epsg:4326')
+        out = np.zeros(bctides.hgrid.values.shape)
+        xy = bctides.hgrid.get_xy(crs='epsg:4326')
         opbd = []
-        for boundary in hgrid.boundaries.open.itertuples():
+        for boundary in bctides.gdf.itertuples():
             forcing = getattr(boundary, self.bctype)
             if forcing.nudge is True:
                 opbd.extend(list(boundary.indexes))
@@ -53,10 +53,10 @@ class Nudge(Gr3Field):
             compute_nudge(xy[:, 0], xy[:, 1], opbd, out)
             logger.info(f'compute_nudge took {time()-start} seconds.')
         super().__init__(
-            nodes={i: (coord, out[i]) for i, coord in enumerate(hgrid.coords)},
-            elements=hgrid.elements.elements,
+            nodes={i: (coord, out[i]) for i, coord in enumerate(bctides.hgrid.coords)},
+            elements=bctides.hgrid.elements.elements,
             description=f"{rlmax}, {rnu_day}",
-            crs=hgrid.crs,
+            crs=bctides.hgrid.crs,
         )
 
     @property

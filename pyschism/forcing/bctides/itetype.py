@@ -1,9 +1,11 @@
 from abc import abstractmethod
-from typing import Union
+from enum import Enum
+# from typing import Union
 
 from pyschism.forcing.bctides.bctypes import Bctype
-from pyschism.forcing.bctides.nudge import TempNudge
-from pyschism.mesh.base import Gr3
+from pyschism.forcing import hycom
+# from pyschism.forcing.bctides.nudge import TempNudge
+# from pyschism.mesh.base import Gr3
 
 
 class Itetype(Bctype):
@@ -48,19 +50,30 @@ class TemperatureInitialConditions(Itetype):
 
 class SpatiallyVaryingTimeHistoryTemperature(Itetype):
 
+    class BaroclinicDatabases(Enum):
+        RTOFS = hycom.RTOFS
+        GOFS = hycom.GOFS
+
     def __init__(
         self,
-        data_source,
+        data_source="gofs",
         nudge: bool = True,
         rlmax=1.5,
         rnu_day=0.25,
     ):
-        self.data_source = data_source.temperature
+        if isinstance(data_source, str):
+            data_source = self.BaroclinicDatabases[data_source.upper()].value()
+        if not isinstance(data_source, hycom.Hycom):
+            raise TypeError(
+                "Argument data_source must be of type str or type "
+                f"{type(hycom.Hycom)}, not type {type(data_source)}."
+            )
+        self.data_component = data_source.temperature
         self.nudge = bool(nudge)
         self.rlmax = rlmax
         self.rnu_day = rnu_day
 
-    def get_boundary_string(self, hgrid, boundary):
+    def get_boundary_string(self, *args, **kwargs):
         return '1.'
 
     # def write(self, *args, **kwargs):

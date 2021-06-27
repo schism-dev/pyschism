@@ -309,16 +309,17 @@ class IofAnaVariables(Enum):
 
 
 class StationOutputVariables(Enum):
-    """Enumeration for stations output variables """
-    ELEVATION = 'elev'
-    AIR_PRESSURE = 'air_pressure'
-    WINDX = 'windx'
-    WINDY = 'windy'
-    TEMPERATURE = 'T'
-    SALINITY = 'S'
-    U = 'u'
-    V = 'v'
-    W = 'w'
+    """Enumeration for stations output variables"""
+
+    ELEVATION = "elev"
+    AIR_PRESSURE = "air_pressure"
+    WINDX = "windx"
+    WINDY = "windy"
+    TEMPERATURE = "T"
+    SALINITY = "S"
+    U = "u"
+    V = "v"
+    W = "w"
 
     @classmethod
     def _missing_(cls, name):
@@ -326,7 +327,8 @@ class StationOutputVariables(Enum):
 
 
 class StationOutputIndex(Enum):
-    """Indexing for stations output variables """
+    """Indexing for stations output variables"""
+
     ELEVATION = 0
     AIR_PRESSURE = 1
     WINDX = 2
@@ -339,11 +341,12 @@ class StationOutputIndex(Enum):
 
 
 class OutputVariableUnit(Enum):
-    ELEVATION = 'meters'
+    ELEVATION = "meters"
 
 
 class NWSType(Enum):
     """Atmospheric forcing type required by param.nml"""
+
     TIME_HISTORY = 1
     CLIMATE_AND_FORECAST = 2
     HEAT_CONSERVATION = 3
@@ -370,10 +373,10 @@ class NWSType(Enum):
 
 
 class GFSProduct(Enum):
-    GFS_0P25 = 'gfs_0p25'
-    GFS_0P25_1HR = 'gfs_0p25_1hr'
-    GFS_0P50 = 'gfs_0p50'
-    GFS_1P00 = 'gfs_1p00'
+    GFS_0P25 = "gfs_0p25"
+    GFS_0P25_1HR = "gfs_0p25_1hr"
+    GFS_0P50 = "gfs_0p50"
+    GFS_1P00 = "gfs_1p00"
 
 
 class iof_hydro(Enum):
@@ -634,20 +637,20 @@ class SchoutType(Enum):
 
 
 class SchoutIofType(str, Enum):
-    iof_hydro = 'iof_hydro'
-    iof_dvd = 'iof_dvd'
-    iof_wwm = 'iof_wwm'
-    iof_gen = 'iof_gen'
-    iof_age = 'iof_age'
-    iof_sed = 'iof_sed'
-    iof_eco = 'iof_eco'
-    iof_icm = 'iof_icm'
-    iof_cos = 'iof_cos'
-    iof_fib = 'iof_fib'
-    iof_sed2d = 'iof_sed2d'
-    iof_marsh = 'iof_marsh'
-    iof_ice = 'iof_ice'
-    iof_ana = 'iof_ana'
+    iof_hydro = "iof_hydro"
+    iof_dvd = "iof_dvd"
+    iof_wwm = "iof_wwm"
+    iof_gen = "iof_gen"
+    iof_age = "iof_age"
+    iof_sed = "iof_sed"
+    iof_eco = "iof_eco"
+    iof_icm = "iof_icm"
+    iof_cos = "iof_cos"
+    iof_fib = "iof_fib"
+    iof_sed2d = "iof_sed2d"
+    iof_marsh = "iof_marsh"
+    iof_ice = "iof_ice"
+    iof_ana = "iof_ana"
 
     @classmethod
     def _missing_(self, name):
@@ -656,20 +659,18 @@ class SchoutIofType(str, Enum):
 
 class OutputVariableShortName(Enum):
 
-    ELEVATION = 'elev'
+    ELEVATION = "elev"
 
     @classmethod
     def _missing_(self, name):
-        raise ValueError(
-            f"{name} is not a valid SCHISM output variable short name")
+        raise ValueError(f"{name} is not a valid SCHISM output variable short name")
 
 
 class NationalWaterModelDataSource(Enum):
-    AWS = 'AWS'
-    FTP = 'FTP'
-    NOMADS = 'NOMADS'
+    AWS = "AWS"
+    FTP = "FTP"
+    NOMADS = "NOMADS"
 
     @classmethod
     def _missing_(self, name):
-        raise ValueError(
-            f"{name} is not a valid National Water Model data source.")
+        raise ValueError(f"{name} is not a valid National Water Model data source.")

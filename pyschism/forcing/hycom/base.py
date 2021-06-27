@@ -91,15 +91,15 @@ class Hycom(ModelForcing):
     def elevation(self) -> HycomComponent:
         '''Elevation component API of HYCOM dataset.'''
 
-    # @property
-    # @abstractmethod
-    # def velocity(self) -> HycomComponent:
-    #     '''Elevation component API of HYCOM dataset.'''
+    @property
+    @abstractmethod
+    def velocity(self) -> HycomComponent:
+        '''Elevation component API of HYCOM dataset.'''
 
-    # @property
-    # @abstractmethod
-    # def temperature(self) -> HycomComponent:
-    #     '''Temperature component API of HYCOM dataset.'''
+    @property
+    @abstractmethod
+    def temperature(self) -> HycomComponent:
+        '''Temperature component API of HYCOM dataset.'''
 
     @property
     @abstractmethod

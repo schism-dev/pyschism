@@ -7,9 +7,8 @@ from netCDF4 import Dataset
 
 class MOD_3D(ABC):
 
-    def __init__(self, hgrid, vgrid):
-        self.hgrid = hgrid
-        self.vgrid = vgrid
+    def __init__(self, bctides):
+        self.bctides = bctides
 
     def write(
             self,
@@ -24,15 +23,13 @@ class MOD_3D(ABC):
         if path.exists() and overwrite is not True:
             raise IOError(f'File {path} exists and overwrite is not True.')
 
-        # file_is_not_needed = True
         timevec = None
-        for boundary in self.hgrid.boundaries.open.itertuples():
+        for boundary in self.bctides.gdf.itertuples():
             obj = getattr(boundary, self.bctype)
             if obj is not None:
                 bctype = getattr(obj, self.bctype)
                 if bctype == 4:
-                    # ds = getattr(obj.data_source, self.name)
-                    datasets = obj.data_source.get_datasets(
+                    datasets = obj.data_component.get_datasets(
                                 start_date,
                                 rnday,
                                 output_interval
@@ -43,7 +40,7 @@ class MOD_3D(ABC):
             return
 
         nOpenBndNodes = 0
-        for boundary in self.hgrid.boundaries.open.itertuples():
+        for boundary in self.bctides.gdf.itertuples():
             nOpenBndNodes += len(boundary.indexes)
 
         dst = Dataset(path, 'w', format='NETCDF4')
@@ -51,7 +48,7 @@ class MOD_3D(ABC):
         dst.createDimension('nOpenBndNodes', nOpenBndNodes)
         dst.createDimension('one', 1)
         dst.createDimension('time', None)
-        dst.createDimension('nLevels', self.vgrid.nvrt)
+        dst.createDimension('nLevels', self.bctides.vgrid.nvrt)
         dst.createDimension('nComponents', self.nComponents)
 
         # variables
@@ -62,14 +59,14 @@ class MOD_3D(ABC):
         dst.createVariable('time_series', 'f',
                            ('time', 'nOpenBndNodes', 'nLevels', 'nComponents'))
         offset = 0
-        for boundary in self.hgrid.boundaries.open.itertuples():
+        for boundary in self.bctides.gdf.itertuples():
             obj = getattr(boundary, self.bctype)
             if obj is not None:
                 bctype = getattr(obj, self.bctype)
                 if bctype == 4:
-                    obj.data_source.put_boundary_ncdata(
-                        self.hgrid,
-                        self.vgrid,
+                    obj.data_component.put_boundary_ncdata(
+                        self.bctides.hgrid,
+                        self.bctides.vgrid,
                         boundary,
                         dst,
                         start_date,

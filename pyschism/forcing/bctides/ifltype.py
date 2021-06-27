@@ -1,21 +1,21 @@
 from abc import abstractmethod
+from enum import Enum
 
 from pyschism.forcing.bctides.bctypes import Bctype
 from pyschism.forcing.bctides.tides import Tides
+from pyschism.forcing import hycom
 
 
 class Ifltype(Bctype):
-
     @property
     @abstractmethod
     def ifltype(self) -> int:
-        '''Returns integer representig SCHISM ifltype code for bctides.in'''
+        """Returns integer representig SCHISM ifltype code for bctides.in"""
 
 
 class UniformTimeHistoryVelocity(Ifltype):
-
     def __init__(self, time_history):
-        raise NotImplementedError(f'{self.__class__.__name__}')
+        raise NotImplementedError(f"{self.__class__.__name__}")
         self.time_history = time_history
 
     @property
@@ -24,9 +24,8 @@ class UniformTimeHistoryVelocity(Ifltype):
 
 
 class ConstantVelocity(Ifltype):
-
     def __init__(self, value):
-        raise NotImplementedError(f'{self.__class__.__name__}')
+        raise NotImplementedError(f"{self.__class__.__name__}")
         self.value = value
 
     @property
@@ -34,31 +33,35 @@ class ConstantVelocity(Ifltype):
         return 2
 
 
-def get_boundary_string(self, hgrid, boundary):
-    f = []
-    for constituent in \
-            self.tides.get_active_forcing_constituents():
-        f.append(f'{constituent}')
-        vertices = hgrid.get_xy(crs='EPSG:4326')[boundary.indexes, :]
-        uamp, uphase, vamp, vphase = self.tides.get_velocity(
-            constituent, vertices)
-        for i in range(len(vertices)):
-            f.append(f'{uamp[i]:.8e} {uphase[i]:.8e} '
-                     f'{vamp[i]:.8e} {vphase[i]:.8e}')
-    return '\n'.join(f)
-
-
 class TidalVelocity(Ifltype):
+    def __init__(self, constituents="all", database="hamtide"):
+        self.tides = Tides(tidal_database=database, constituents=constituents)
 
-    def __init__(self, tides: Tides):
-        if not isinstance(tides, Tides):
-            raise TypeError(
-                f'Argument tides must be an isinstance of {Tides} not type'
-                f'{type(tides)}.')
-        self.tides = tides
+    def get_boundary_string(self, hgrid, boundary, global_constituents=None):
+        f = []
+        if global_constituents is None:
+            for constituent in self.tides.get_active_forcing_constituents():
+                f.append(f"{constituent}")
+                vertices = hgrid.get_xy(crs="EPSG:4326")[boundary.indexes, :]
+                uamp, uphase, vamp, vphase = self.tides.get_velocity(constituent, vertices)
+                for i in range(len(vertices)):
+                    f.append(
+                        f"{uamp[i]:.8e} {uphase[i]:.8e} {vamp[i]:.8e} {vphase[i]:.8e}"
+                    )
+        else:
+            required_constituent = self.tides.get_active_forcing_constituents()
+            for constituent in global_constituents:
+                f.append(f"{constituent}")
+                if constituent not in required_constituent:
+                    for i in range(len(boundary.indexes)):
+                        f.append(f"{0:.8e} {0:.8e} {0:.8e} {0:.8e}")
+                else:
+                    vertices = hgrid.get_xy(crs="EPSG:4326")[boundary.indexes, :]
+                    uamp, uphase, vamp, vphase = self.tides.get_velocity(constituent, vertices)
+                    for i in range(len(boundary.indexes)):
+                        f.append(f"{uamp[i]:.8e} {uphase[i]:.8e} {vamp[i]:.8e} {vphase[i]:.8e}")
 
-    def get_boundary_string(self, hgrid, boundary):
-        return get_boundary_string(self, hgrid, boundary)
+        return "\n".join(f)
 
     @property
     def ifltype(self):
@@ -66,30 +69,27 @@ class TidalVelocity(Ifltype):
 
 
 class SpatiallyVaryingTimeHistoryVelocity(Ifltype):
+    class BaroclinicDatabases(Enum):
+        RTOFS = hycom.RTOFS
+        GOFS = hycom.GOFS
 
-    def __init__(self, data_source):
-        self.data_source = data_source.velocity
+    def __init__(self, data_source="gofs"):
+        if isinstance(data_source, str):
+            data_source = self.BaroclinicDatabases[data_source.upper()].value()
 
-    def write(
-            self,
-            path,
-            hgrid,
-            vgrid,
-            start_date,
-            run_days,
-            overwrite: bool = False
-    ):
-        self.data_source.write(
-            path,
-            hgrid,
-            vgrid,
-            start_date,
-            run_days,
-            overwrite
-        )
+        if not isinstance(data_source, hycom.Hycom):
+            raise TypeError(
+                "Argument data_source must be of type str or type "
+                f"{type(hycom.Hycom)}, not type {type(data_source)}."
+            )
 
-    def get_boundary_string(self, hgrid, boundary):
-        return ''
+        self.data_component: hycom.HycomComponent = data_source.velocity
+
+    def write(self, path, hgrid, vgrid, start_date, run_days, overwrite: bool = False):
+        self.data_component.write(path, hgrid, vgrid, start_date, run_days, overwrite)
+
+    def get_boundary_string(self, *args, **kwargs):
+        return ""
 
     @property
     def ifltype(self):
@@ -97,45 +97,36 @@ class SpatiallyVaryingTimeHistoryVelocity(Ifltype):
 
 
 class TidalAndSpatiallyVaryingVelocityTimeHistory(Ifltype):
-
-    def __init__(self, tides, data_source):
-        if not isinstance(tides, Tides):
-            raise TypeError(
-                f'Argument tides must be an isinstance of {Tides} not type'
-                f'{type(tides)}.')
-        self.tides = tides
-        self.data_source = data_source.velocity
-
-    def write(
-            self,
-            path,
-            hgrid,
-            vgrid,
-            start_date,
-            run_days,
-            overwrite: bool = False
+    def __init__(
+        self,
+        ifltype3: TidalVelocity,
+        ifltype4: SpatiallyVaryingTimeHistoryVelocity,
     ):
-        self.data_source.write(
-            path,
-            hgrid,
-            vgrid,
-            start_date,
-            run_days,
-            overwrite
-        )
+        self.ifltype3 = ifltype3
+        self.ifltype4 = ifltype4
+
+    def write(self, path, hgrid, vgrid, start_date, run_days, overwrite: bool = False):
+        self.data_component.write(path, hgrid, vgrid, start_date, run_days, overwrite)
 
     @property
     def ifltype(self):
         return 5
 
-    def get_boundary_string(self, hgrid, boundary):
-        return get_boundary_string(self, hgrid, boundary)
+    def get_boundary_string(self, *args, **kwargs):
+        return self.ifltype3.get_boundary_string(*args, **kwargs)
+
+    @property
+    def tides(self):
+        return self.ifltype3.tides
+
+    @property
+    def data_component(self):
+        return self.ifltype4.data_component
 
 
 class ZeroVelocity(Ifltype):
-
     def __init__(self):
-        raise NotImplementedError(f'{self.__class__.__name__}')
+        raise NotImplementedError(f"{self.__class__.__name__}")
 
     @property
     def ifltype(self):
@@ -143,9 +134,8 @@ class ZeroVelocity(Ifltype):
 
 
 class InflowVelocity(Ifltype):
-
     def __init__(self):
-        raise NotImplementedError(f'{self.__class__.__name__}')
+        raise NotImplementedError(f"{self.__class__.__name__}")
 
     @property
     def ifltype(self):
@@ -153,9 +143,8 @@ class InflowVelocity(Ifltype):
 
 
 class OutflowVelocity(Ifltype):
-
     def __init__(self):
-        raise NotImplementedError(f'{self.__class__.__name__}')
+        raise NotImplementedError(f"{self.__class__.__name__}")
 
     @property
     def ifltype(self):
