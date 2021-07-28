@@ -28,7 +28,6 @@ from pyschism.enums import (
 )
 from pyschism.mesh.base import Gr3
 
-
 def get_stack_id_by_datetime(dt: datetime, flattened_timevector, stacks) -> str:
     output_stack = None
     for stack_id, stack_data in stacks.items():
@@ -187,6 +186,43 @@ class OutputVariable:
             plt.show()
 
         return anim
+
+    def get_zcor_interp_coefficient(self, z0, zcor, level):
+        '''
+        z0: water elevation (elev)
+        zcor: schout outputs zcor[np,nvrt] for each time record.
+        level: fixed depth (< 0, e.g., 4.5 m below the surface, level=[-4.5]) where values is interplated at.
+        '''
+        NP=zcor.shape[0]
+        nvrt=zcor.shape[1]
+        k1=np.full((NP), np.nan)
+        coeff=np.full((NP), np.nan)
+        zinter=np.ones(NP)*level+z0
+
+        #calculate kbp
+        
+
+        #surface 
+        idxs=zinter>=zcor[:,-1]
+        k1[idxs]=nvrt-2
+        coeff[idxs]=1.0
+        
+        #bottom
+        idxs=zinter<zcor[:,0]
+        k1[idxs]=kbp[idxs]
+        coeff[idxs]=0.0
+
+        for k in np.arange(nvrt-1):
+            idxs=(zinter>=zcor[:,k])*(zinter<zcor[:,k+1])
+            k1[idxs]=k
+            coeff[idxs]=(zinter[idxs]-zcor[idxs,k])/(zcor[idxs,k+1]-zcor[idxs,k])
+        if sum(np.isnan(np.r_[k1,coeff])) != 0:
+            sys.exit('Check vertical interpolation')
+        return np.array(k1).astype('int'), np.array(coeff)
+
+    def interpolate_to_levels(self):
+        pass
+
 
     def aggregate(self, dt: Union[datetime, timedelta, int]):
         if isinstance(dt, datetime):

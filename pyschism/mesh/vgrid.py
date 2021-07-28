@@ -14,7 +14,7 @@ class Vgrid:
 
     def __init__(self):
         """Represents a SCHISM vertical grid."""
-        #self._vgrid = self._get_2D_string()
+        self._vgrid = self._get_2D_string()
         pass
 
     @classmethod
@@ -63,7 +63,7 @@ class Vgrid:
             lines=lines[2:]
             kbp=np.array([int(i.split()[1])-1 for i in lines])
             NP=len(kbp)
-            print(NP)
+            #print(NP)
             sigma=-np.ones([NP,nvrt])
             for i, line in enumerate(lines):
                 sigma[i,kbp[i]:]=np.array(line.strip().split()[2:]).astype('float')

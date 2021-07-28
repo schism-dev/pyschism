@@ -130,7 +130,7 @@ class PlotOutputCombined:
         if save:
             anim.save(
                 pathlib.Path(save),
-                writer='imagemagick',
+                writer='ffmpeg',
                 fps=fps
             )
 
