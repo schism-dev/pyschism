@@ -297,6 +297,7 @@ class ERA5(SfluxDataset):
         prc: bool = True,
         rad: bool = True,
         bbox = None,
+        outdir = None,
         nprocs=32,
     ):
         self.start_date=start_date
@@ -311,8 +312,8 @@ class ERA5(SfluxDataset):
         nx_grid, ny_grid = self.inventory.xy_grid()
         lon_idxs, lat_idxs = self.inventory._modified_bbox_indexes()
 
-        outdir=pathlib.Path('./ERA5')
-        print(outdir)
+        #outdir=pathlib.Path('./ERA5')
+        #print(outdir)
         with Pool(processes=nprocs) as pool:
             pool.starmap(put_sflux_fields, [(iday, file, nx_grid, ny_grid, lon_idxs, lat_idxs, outdir)
                 #for requested_date,file in self.inventory._files.items()])
