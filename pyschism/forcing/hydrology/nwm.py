@@ -424,132 +424,132 @@ class AWSDataInventory:
         }[self.product]
 
 
-class AWSHindcastInventory:
-
-    def __init__(
-            self,
-            start_date: datetime = None,
-            rnday: Union[int, float, timedelta] = timedelta(days=5.),
-            product='CHRTOUT_DOMAIN1.comp',
-            verbose=False,
-            fallback=True,
-    ):
-        """This will download the National Water Model retro data.
-        A 26-year (January 1993 through December 2018) retrospective 
-        simulation using version 2.0 of the NWM. 
-
-        NetCDF files are saved to the system's temporary directory.
-        """
-        self.start_date = dates.nearest_cycle() if start_date is None \
-            else dates.nearest_cycle(dates.localize_datetime(start_date))
-        # self.start_date = self.start_date.replace(tzinfo=None)
-        self.rnday = rnday if isinstance(rnday, timedelta) \
-            else timedelta(days=rnday)
-        self.product = product
-        self.fallback = fallback
-        self._files = {_: None for _ in np.arange(
-            self.start_date,
-            self.start_date + self.rnday + self.output_interval,
-            self.output_interval
-        ).astype(datetime)}
-
-        paginator=self.s3.get_paginator('list_objects_v2')
-        pages=paginator.paginate(Bucket=self.bucket,
-                Prefix=f'full_physics/{self.start_date.year}')
-
-        self.data=[]
-        for page in pages:
-            for obj in page['Contents']:
-                self.data.append(obj)
-
-        self.file_metadata = list(sorted([
-            _['Key'] for _ in self.data if 'CHRTOUT_DOMAIN1.comp' in _['Key']
-        ]))
-
-        timevector=np.arange(datetime(self.start_date.year, 1, 1),
-            datetime(self.start_date.year+1,1, 1),
-            np.timedelta64(1, 'h'),
-            dtype='datetime64')
-
-        timefile= {pd.to_datetime(str(timevector[i])): self.file_metadata[i] 
-            for i in range(len(timevector))}
-
-        for requested_time, _ in self._files.items():
-            #print(f'Requesting NWM data for time {requested_time}')
-            key=timefile.get(requested_time)
-            print(f'Requesting NWM data for time {requested_time}, {key}')
-            logger.info(f'Requesting NWM data for time {requested_time}')
-            self._files[requested_time] = self.request_data(key, requested_time)
-
-    def request_data(self, key, request_time):
-
-        #print(key)
-        filename = pathlib.Path(self.tmpdir.name) / key
-        filename.parent.mkdir(parents=True, exist_ok=True)
- 
-        with open(filename, 'wb') as f:
-            #logger.info(f'Downloading file {key}, ')
-            print(f'Downloading file {key}, ')
-            self.s3.download_fileobj(self.bucket, key, f)
-        return filename
-
-    def get_nc_pairing_indexes(self, pairings: NWMElementPairings):
-        nc_feature_id = Dataset(self.files[0])['feature_id'][:]
-
-        def get_aggregated_features(features):
-            aggregated_features = []
-            for source_feats in features:
-                aggregated_features.extend(list(source_feats))
-            in_file = np.where(
-                np.in1d(nc_feature_id, aggregated_features,
-                assume_unique=True))[0]
-            in_file_2 = []
-            sidx = 0
-            for source_feats in features:
-                eidx = sidx + len(source_feats)
-                in_file_2.append(in_file[sidx:eidx].tolist())
-                sidx = eidx
-            return in_file_2
-
-        sources = get_aggregated_features(pairings.sources.values())
-        sinks = get_aggregated_features(pairings.sinks.values())
-        return sources, sinks
-
-    @property
-    def bucket(self):
-        return 'noaa-nwm-retro-v2.0-pds'
-
-    @property
-    def nearest_cycle(self) -> datetime:
-        return dates.nearest_cycle(self.start_date)
-
-    @property
-    def output_interval(self) -> timedelta:
-        return {
-            'CHRTOUT_DOMAIN1.comp': timedelta(hours=1)
-        }[self.product]
-
-    @property
-    def s3(self):
-        try:
-            return self._s3
-        except AttributeError:
-            self._s3 = boto3.client(
-                's3', config=Config(signature_version=UNSIGNED))
-            return self._s3
-
-    @property
-    def tmpdir(self):
-        try:
-            return self._tmpdir
-        except AttributeError:
-            self._tmpdir = tempfile.TemporaryDirectory()
-            return self._tmpdir
-
-    @property
-    def files(self):
-        return sorted(list(pathlib.Path(self.tmpdir.name).glob('**/*.comp'))) 
-
+#class AWSHindcastInventory:
+#
+#    def __init__(
+#            self,
+#            start_date: datetime = None,
+#            rnday: Union[int, float, timedelta] = timedelta(days=5.),
+#            product='CHRTOUT_DOMAIN1.comp',
+#            verbose=False,
+#            fallback=True,
+#    ):
+#        """This will download the National Water Model retro data.
+#        A 26-year (January 1993 through December 2018) retrospective 
+#        simulation using version 2.0 of the NWM. 
+#
+#        NetCDF files are saved to the system's temporary directory.
+#        """
+#        self.start_date = dates.nearest_cycle() if start_date is None \
+#            else dates.nearest_cycle(dates.localize_datetime(start_date))
+#        # self.start_date = self.start_date.replace(tzinfo=None)
+#        self.rnday = rnday if isinstance(rnday, timedelta) \
+#            else timedelta(days=rnday)
+#        self.product = product
+#        self.fallback = fallback
+#        self._files = {_: None for _ in np.arange(
+#            self.start_date,
+#            self.start_date + self.rnday + self.output_interval,
+#            self.output_interval
+#        ).astype(datetime)}
+#
+#        paginator=self.s3.get_paginator('list_objects_v2')
+#        pages=paginator.paginate(Bucket=self.bucket,
+#                Prefix=f'full_physics/{self.start_date.year}')
+#
+#        self.data=[]
+#        for page in pages:
+#            for obj in page['Contents']:
+#                self.data.append(obj)
+#
+#        self.file_metadata = list(sorted([
+#            _['Key'] for _ in self.data if 'CHRTOUT_DOMAIN1.comp' in _['Key']
+#        ]))
+#
+#        timevector=np.arange(datetime(self.start_date.year, 1, 1),
+#            datetime(self.start_date.year+1,1, 1),
+#            np.timedelta64(1, 'h'),
+#            dtype='datetime64')
+#
+#        timefile= {pd.to_datetime(str(timevector[i])): self.file_metadata[i] 
+#            for i in range(len(timevector))}
+#
+#        for requested_time, _ in self._files.items():
+#            #print(f'Requesting NWM data for time {requested_time}')
+#            key=timefile.get(requested_time)
+#            print(f'Requesting NWM data for time {requested_time}, {key}')
+#            logger.info(f'Requesting NWM data for time {requested_time}')
+#            self._files[requested_time] = self.request_data(key, requested_time)
+#
+#    def request_data(self, key, request_time):
+#
+#        #print(key)
+#        filename = pathlib.Path(self.tmpdir.name) / key
+#        filename.parent.mkdir(parents=True, exist_ok=True)
+# 
+#        with open(filename, 'wb') as f:
+#            #logger.info(f'Downloading file {key}, ')
+#            print(f'Downloading file {key}, ')
+#            self.s3.download_fileobj(self.bucket, key, f)
+#        return filename
+#
+#    def get_nc_pairing_indexes(self, pairings: NWMElementPairings):
+#        nc_feature_id = Dataset(self.files[0])['feature_id'][:]
+#
+#        def get_aggregated_features(features):
+#            aggregated_features = []
+#            for source_feats in features:
+#                aggregated_features.extend(list(source_feats))
+#            in_file = np.where(
+#                np.in1d(nc_feature_id, aggregated_features,
+#                assume_unique=True))[0]
+#            in_file_2 = []
+#            sidx = 0
+#            for source_feats in features:
+#                eidx = sidx + len(source_feats)
+#                in_file_2.append(in_file[sidx:eidx].tolist())
+#                sidx = eidx
+#            return in_file_2
+#
+#        sources = get_aggregated_features(pairings.sources.values())
+#        sinks = get_aggregated_features(pairings.sinks.values())
+#        return sources, sinks 
+#
+#    @property
+#    def bucket(self):
+#        return 'noaa-nwm-retro-v2.0-pds'
+#
+#    @property
+#    def nearest_cycle(self) -> datetime:
+#        return dates.nearest_cycle(self.start_date)
+#
+#    @property
+#    def output_interval(self) -> timedelta:
+#        return {
+#            'CHRTOUT_DOMAIN1.comp': timedelta(hours=1)
+#        }[self.product]
+#
+#    @property
+#    def s3(self):
+#        try:
+#            return self._s3
+#        except AttributeError:
+#            self._s3 = boto3.client(
+#                's3', config=Config(signature_version=UNSIGNED))
+#            return self._s3
+#
+#    @property
+#    def tmpdir(self):
+#        try:
+#            return self._tmpdir
+#        except AttributeError:
+#            self._tmpdir = tempfile.TemporaryDirectory()
+#            return self._tmpdir
+#
+#    @property
+#    def files(self):
+#        return sorted(list(pathlib.Path(self.tmpdir.name).glob('**/*.comp'))) 
+#
 
 class NationalWaterModel(Hydrology):
 

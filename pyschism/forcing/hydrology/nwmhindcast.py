@@ -31,7 +31,7 @@ from pyschism.forcing.hydrology.base import Hydrology
 
 DATADIR = pathlib.Path(user_data_dir('nwm'))
 DATADIR.mkdir(exist_ok=True, parents=True)
-NWM_FILE = DATADIR / 'NWM_channel_hydrofabric.tar.gz'
+NWM_FILE = DATADIR / 'NWM_v2.0_channel_hydrofabric.tar.gz'
 
 logger = logging.getLogger(__name__)
 
@@ -282,7 +282,7 @@ def streamflow_lookup(file, indexes):
     return data
 
 
-class AWSDataInventory:
+class AWSHindcastInventory:
 
     def __init__(
             self,
@@ -292,11 +292,11 @@ class AWSDataInventory:
             verbose=False,
             fallback=True,
     ):
-        """This will download the latest National Water Model data.
+        """This will download the National Water Model retro data.
+        A 26-year (January 1993 through December 2018) retrospective 
+        simulation using version 2.0 of the NWM. 
 
         NetCDF files are saved to the system's temporary directory.
-        The AWS data goes back 30 days. For requesting hindcast data from
-        before we need a different data source
         """
         self.start_date = dates.nearest_cycle() if start_date is None \
             else dates.nearest_cycle(dates.localize_datetime(start_date))
@@ -315,16 +315,11 @@ class AWSDataInventory:
         paginator=self.s3.get_paginator('list_objects_v2')
         pages=paginator.paginate(Bucket=self.bucket,
                 Prefix=f'full_physics/{self.start_date.year}')
-                       #f'/{requested_time.strftime("%Y%m%d%H%M")}.{self.product}/')
 
         self.data=[]
         for page in pages:
-            #print(page)
             for obj in page['Contents']:
-                #print(obj)
                 self.data.append(obj)
-        #print(self.data[])
-        #print(len(pages))
 
         self.file_metadata = list(sorted([
             _['Key'] for _ in self.data if 'CHRTOUT_DOMAIN1.comp' in _['Key']
@@ -346,37 +341,13 @@ class AWSDataInventory:
             print(f'Requesting NWM data for time {requested_time}, {key}')
             logger.info(f'Requesting NWM data for time {requested_time}')
 
-            #paginator=self.s3.get_paginator('list_objects_v2')
-            #pages=paginator.paginate(Bucket=self.bucket,
-            #        Prefix=f'full_physics/{requested_time.year}')
-                           #f'/{requested_time.strftime("%Y%m%d%H%M")}.{self.product}/')
-
-            #self.data=[]
-            #for page in pages:
-            #    print(page)
-            #    for obj in page['Contents']:
-            #        self.data.append(obj)
-
-            #print(self.data)
             self._files[requested_time] = self.request_data(key, requested_time)
         #print(self._files)
 
     def request_data(self, key, request_time):
 
-        #file_metadata = list(sorted([
-        #    _['Key'] for _ in self.data if 'CHRTOUT_DOMAIN1.comp' in _['Key']
-        #]))
-        #print(len(file_metadata))
-
-        #key=timefile.get(requested_time)
-        #for key in self.file_metadata:
         print(key)
-        #    if request_time != self.key2date(key):
-        #        continue
-            #print(self.key2date(key))
-            #print(request_time)
         filename = pathlib.Path(self.tmpdir.name) / key
-        #filename = pathlib.Path('./NWM_retro/') / key
         filename.parent.mkdir(parents=True, exist_ok=True)
 
         with open(filename, 'wb') as f:
@@ -385,15 +356,6 @@ class AWSDataInventory:
             self.s3.download_fileobj(self.bucket, key, f)
         return filename
 
-
-    #def key2date(self, key):
-    #    base_date_str = f'{key.split("/")[0].split(".")[-1]}'
-    #    timedelta_str = key.split(
-    #        'channel_rt_1.')[-1].split('.')[0].strip('f')
-    #    return datetime.strptime(base_date_str, '%Y%m%d') \
-    #        + timedelta(hours=float(timedelta_str))
-            #+ timedelta(hours=int(key.split('.')[2].strip('tz'))) #\
-            #+ timedelta(hours=float(timedelta_str))
 
     def get_nc_pairing_indexes(self, pairings: NWMElementPairings):
         nc_feature_id = Dataset(self.files[0])['feature_id'][:]
@@ -419,7 +381,6 @@ class AWSDataInventory:
 
     @property
     def bucket(self):
-        #s3://noaa-nwm-retro-v2.0-pds/full_physics/2019/
         return 'noaa-nwm-retro-v2.0-pds'
 
     @property
@@ -450,22 +411,8 @@ class AWSDataInventory:
             return self._tmpdir
 
     @property
-    def timevector(self):
-        return np.arange(
-            self.start_date,
-            self.start_date + self.rnday + self.output_interval,
-            self.output_interval
-        ).astype(datetime)
-
-    @property
     def files(self):
         return sorted(list(pathlib.Path(self.tmpdir.name).glob('**/*.comp')))
-
-    @property
-    def requested_product(self):
-        return {
-            'medium_range_mem1': 'medium_range.channel_rt_1'
-        }[self.product]
 
 
 class NationalWaterModel(Hydrology):
@@ -479,11 +426,11 @@ class NationalWaterModel(Hydrology):
             try:
                 wget.download(
                     'https://www.nohrsc.noaa.gov/pub/staff/keicher/NWM_live/'
-                    'web/data_tools/NWM_channel_hydrofabric.tar.gz',
+                    'web/data_tools/NWM_v2.0_channel_hydrofabric.tar.gz',
                     out=str(self._nwm_file))
             except urllib.error.HTTPError as e:
                 logger.fatal(
-                    'Could not download NWM_channel_hydrofabric.tar.gz')
+                    'Could not download NWM_v2.0_channel_hydrofabric.tar.gz')
                 raise e
         self.aggregation_radius = aggregation_radius
         self.pairings = {}
@@ -493,7 +440,7 @@ class NationalWaterModel(Hydrology):
             gr3: Gr3,
             start_date: datetime = None,
             end_date: Union[datetime, timedelta] = None,
-            nprocs=1,
+            nprocs=32,
     ):
 
         if not isinstance(end_date, datetime):
@@ -503,10 +450,10 @@ class NationalWaterModel(Hydrology):
                 end_date = start_date + timedelta(days=end_date)
 
         pairings = self.get_pairings(gr3)
-        self._inventory = AWSDataInventory(
+        self._inventory = AWSHindcastInventory(
                 start_date=start_date,
                 rnday=end_date - start_date,
-                product='medium_range_mem1',
+                product='CHRTOUT_DOMAIN1.comp',
             )
 
         self._timevector = [dates.localize_datetime(d)
