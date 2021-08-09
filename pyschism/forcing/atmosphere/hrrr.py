@@ -25,70 +25,70 @@ logger = logging.getLogger(__name__)
 
 class HRRRInventory:
 
-    def __init__(self, start_date=None, rnday=2, bbox=None):
+    def __init__(self, start_date=None, bbox=None):
         self.start_date = nearest_cycle() if start_date is None else \
             localize_datetime(start_date).astimezone(pytz.utc)
-        self.rnday = rnday if isinstance(rnday, timedelta) else \
-            timedelta(days=rnday)
-        if self.rnday > timedelta(days=2) - timedelta(hours=1):
-            raise ValueError(
-                'Maximum run days for HRRR is '
-                f'{timedelta(days=2) - timedelta(hours=1)} but got {rnday}.')
+        #self.rnday = rnday if isinstance(rnday, timedelta) else \
+        #    timedelta(days=rnday)
+        #if self.rnday > timedelta(days=2) - timedelta(hours=1):
+        #    raise ValueError(
+        #        'Maximum run days for HRRR is '
+        #        f'{timedelta(days=2) - timedelta(hours=1)} but got {rnday}.')
 
         if self.start_date != nearest_cycle(self.start_date):
             raise NotImplementedError(
                 'Argment start_date is does not align with any HRRR cycle '
                 'times.')
-        self._files = {_: None for _ in np.arange(
-            self.start_date,
-            self.start_date + self.rnday + self.output_interval,
-            self.output_interval
-        ).astype(datetime)}
+        #self._files = {_: None for _ in np.arange(
+        #    self.start_date,
+        #    self.start_date + self.rnday + self.output_interval,
+        #    self.output_interval
+        #).astype(datetime)}
 
-        for dt in self.nearest_zulus:
-            if None not in list(self._files.values()):
-                break
-            base_url = BASE_URL + f'/{self.product}' + \
-                f'/hrrr{nearest_zulu(dt).strftime("%Y%m%d")}'
+        #for dt in self.nearest_zulus:
+        #    if None not in list(self._files.values()):
+        #        break
+        base_url = BASE_URL + f'/{self.product}' + \
+            f'/hrrr{start_date.strftime("%Y%m%d")}'
             # cycle
-            for cycle in reversed(range(0, 24, int(self.output_interval.total_seconds() / 3600))):
-                test_url = f'{base_url}/' + \
-                           f'hrrr_sfc.t{cycle:02d}z'
-                try:
-                    logger.info(f'Checking url: {test_url}')
-                    nc = Dataset(test_url)
-                    logger.info('Success!')
-                except OSError as e:
-                    if e.errno == -70:
-                        print()
-                        continue
-                    elif e.errno == -73:
-                        nc = False
+            #for cycle in reversed(range(0, 24, int(self.output_interval.total_seconds() / 3600))):
+        test_url = f'{base_url}/hrrr_sfc.t00z'
+        try:
+            logger.info(f'Checking url: {test_url}')
+            nc = Dataset(test_url)
+            logger.info('Success!')
+        except OSError as e:
+            if e.errno == -70:
+                print()
+                #continue
+            elif e.errno == -73:
+                nc = False
 
-                        def retry():
-                            try:
-                                return Dataset(test_url)
-                            except Exception:
-                                return False
+                def retry():
+                    try:
+                        return Dataset(test_url)
+                    except Exception:
+                        return False
 
-                        while not isinstance(nc, Dataset):
-                            nc = retry()
-                    else:
-                        raise e
-                file_dates = self.get_nc_datevector(nc)
-                for _datetime in reversed(list(self._files.keys())):
-                    if _datetime in file_dates:
-                        if self._files[_datetime] is None:
-                            self._files[_datetime] = nc
-                    else:
-                        logger.debug(f'No data for time {str(_datetime)} in '
-                                     f'{test_url}.')
-                if not any(nc is None for nc in self._files.values()):
-                    break
+                while not isinstance(nc, Dataset):
+                    nc = retry()
+            else:
+                raise e
+        self.nc = nc
+        #file_dates = self.get_nc_datevector(nc)
+        #for _datetime in reversed(list(self._files.keys())):
+        #            if _datetime in file_dates:
+        #                if self._files[_datetime] is None:
+        #                    self._files[_datetime] = nc
+        #            else:
+        #                logger.debug(f'No data for time {str(_datetime)} in '
+        #                             f'{test_url}.')
+        #        if not any(nc is None for nc in self._files.values()):
+        #            break
 
-        missing_records = [dt for dt, nc in self._files.items() if nc is None]
-        if len(missing_records) > 0:
-            raise ValueError(f'No HRRR data for dates: {missing_records}.')
+        #missing_records = [dt for dt, nc in self._files.items() if nc is None]
+        #if len(missing_records) > 0:
+        #    raise ValueError(f'No HRRR data for dates: {missing_records}.')
 
         self._bbox = self._modified_bbox(bbox)
 
@@ -96,25 +96,25 @@ class HRRRInventory:
                         sflux_varname: str):
 
         lon_idxs, lat_idxs = self._bbox_indexes(self._bbox)
-        for i, (dt, nc) in enumerate(self._files.items()):
-            logger.info(
-                f'Putting HRRR field {hrrr_varname} for time {dt} as '
-                f'{sflux_varname} from file '
-                f'{nc.filepath().replace(f"{BASE_URL}/", "")}.')
+        #for i, (dt, nc) in enumerate(self._files.items()):
+        logger.info(
+            f'Putting HRRR field {hrrr_varname} for as '
+            f'{sflux_varname} from file '
+            f'{self.nc.filepath().replace(f"{BASE_URL}/", "")}.')
 
-            def put_nc_field():
-                try:
-                    dst[sflux_varname][i, :, :] = nc.variables[hrrr_varname][
-                            self.get_nc_time_index(nc, dt), lat_idxs, lon_idxs]
-                    return True
-                except RuntimeError:
-                    logger.info('Failed! retrying...')
-                    return False
+        def put_nc_field():
+            try:
+                dst[sflux_varname][:, :, :] = self.nc.variables[hrrr_varname][
+                        :, lat_idxs, lon_idxs]
+                return True
+            except RuntimeError:
+                logger.info('Failed! retrying...')
+                return False
 
-            success = False
-            while success is False:
-                success = put_nc_field()
-            dst.sync()
+        success = False
+        while success is False:
+            success = put_nc_field()
+        dst.sync()
 
     def get_nc_time_index(self, nc, dt):
         return np.where(np.in1d(self.get_nc_datevector(nc), [dt]))[0][0]
@@ -135,7 +135,8 @@ class HRRRInventory:
             return self.get_nc_datevector(nc)
 
     def get_sflux_timevector(self):
-        timevec = list(self._files.keys())
+        #timevec = list(self._files.keys())
+        timevec = list(self.get_nc_datevector(self.nc))
         _nearest_zulu = nearest_zulu(np.min(timevec))
         return [(localize_datetime(x) - _nearest_zulu) / timedelta(days=1)
                 for x in timevec]
@@ -169,19 +170,19 @@ class HRRRInventory:
     @property
     def lon(self):
         if not hasattr(self, '_lon'):
-            nc = self._files[list(self._files.keys())[0]]
-            self._lon = nc.variables['lon'][:]
+            #nc = self._files[list(self._files.keys())[0]]
+            self._lon = self.nc.variables['lon'][:]
             if not hasattr(self, '_lat'):
-                self._lat = nc.variables['lat'][:]
+                self._lat = self.nc.variables['lat'][:]
         return self._lon
 
     @property
     def lat(self):
         if not hasattr(self, '_lat'):
-            nc = self._files[list(self._files.keys())[0]]
-            self._lat = nc.variables['lat'][:]
+            #nc = self._files[list(self._files.keys())[0]]
+            self._lat = self.nc.variables['lat'][:]
             if not hasattr(self, '_lon'):
-                self._lon = nc.variables['lon'][:]
+                self._lon = self.nc.variables['lon'][:]
         return self._lat
 
     def _modified_bbox(self, bbox=None):
@@ -220,7 +221,7 @@ class HRRR(SfluxDataset):
     def fetch_data(
             self,
             start_date: datetime = None,
-            rnday: Union[float, timedelta] = 4,
+            rnday: Union[float, timedelta] = 1,
             air: bool = True,
             prc: bool = True,
             rad: bool = True,
@@ -234,7 +235,7 @@ class HRRR(SfluxDataset):
             timedelta(days=rnday)
         inventory = HRRRInventory(
             self.start_date,
-            self.rnday + self.output_interval,
+            #self.rnday + self.output_interval,
             bbox
         )
         nx_grid, ny_grid = inventory.xy_grid()

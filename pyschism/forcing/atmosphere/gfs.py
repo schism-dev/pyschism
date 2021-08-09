@@ -139,7 +139,8 @@ class GFSInventory:
 
         def put_nc_field():
             try:
-                ntimes=self.rnday*24
+                #make sure sflux1 covers simulation period
+                ntimes=(self.rnday+timedelta(days=1))*24
                 dst[sflux_varname][:, :, :] = self.nc.variables[gfs_varname][
                     :-1:, lat_idxs, lon_idxs]
                 return True
