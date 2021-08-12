@@ -6,6 +6,7 @@ import logging
 from itertools import permutations
 import os
 import pathlib
+import tempfile
 from typing import Union, Sequence, Hashable, List, Dict
 
 import geopandas as gpd
@@ -15,6 +16,7 @@ from matplotlib.tri import Triangulation
 from matplotlib.transforms import Bbox
 import numpy as np
 from pyproj import Transformer, CRS
+import requests
 from shapely.geometry import (
     box,
     LinearRing,
@@ -564,7 +566,18 @@ class Gr3(ABC):
     @classmethod
     def open(cls, file: Union[str, os.PathLike],
              crs: Union[str, CRS] = None):
-        return cls(**grd.read(pathlib.Path(file), boundaries=False))
+        if str(file).endswith('.ll') and crs is None:
+            crs = 'epsg:4326'
+        try:
+            response = requests.get(file)
+            response.raise_for_status()
+            tmpfile = tempfile.NamedTemporaryFile()
+            with open(tmpfile.name, "w") as fh:
+                fh.write(response.text)
+            return cls(**grd.read(pathlib.Path(tmpfile.name), crs=crs), boundaries=False)
+        except Exception:
+            pass
+        return cls(**grd.read(pathlib.Path(file), boundaries=False, crs=crs))
 
     @figure
     def tricontourf(self, axes=None, show=True, figsize=None, **kwargs):
