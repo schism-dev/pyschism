@@ -1,48 +1,76 @@
 from datetime import datetime, timedelta
 import logging
+
 # import pathlib
 from typing import Union
 
 import f90nml
+
 # import pytz
 
 from pyschism import dates
 from pyschism.mesh.fgrid import NchiType
-from pyschism.param.schism_init import ParamTemplate
+from pyschism.param.schism_init import GitParamTemplate
 
-PARAM_DEFAULTS = f90nml.read(ParamTemplate().path)['opt']
+PARAM_DEFAULTS = f90nml.read(GitParamTemplate().path)["opt"]
 
-_logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
+
+
+# class FlagIcDescriptor:
+
+#     ic_types = [
+#         # (name, type, index)
+#         ("ic_temp", gridgr3.TempIc, 0),
+# ]
+
+#     def __init__(self, name, ic_type, index):
+#         self.type = ic_type
+#         self.name = name
+#         self.index = index
+
+#     def __get__(self, obj, val):
+#         return bool(obj.flag_ic[self.index])
+
+#     def __set__(self, obj, val: bool):
+#         if not isinstance(val, bool):
+#             raise TypeError(
+#                 f"Argument to {self.name} must be boolean, not " f"type {type(val)}."
+#             )
+#         obj.flag_ic[self.index] = int(val)
 
 
 class OptMeta(type):
-
     def __new__(meta, name, bases, attrs):
         for key, value in PARAM_DEFAULTS.items():
             if key not in attrs:
                 if isinstance(value, list):
-                    attrs[key] = len(value)*[0]
+                    attrs[key] = len(value) * [0]
                 else:
                     attrs[key] = None
+        # for ic_type in FlagIcDescriptor.ic_types:
+        #     attrs[ic_type] = FlagIcDescriptor()
         return type(name, bases, attrs)
 
 
 class OPT(metaclass=OptMeta):
-    """ Provides error checking implementation for OPT group """
+    """Provides error checking implementation for OPT group"""
 
     def __init__(
-            self,
-            start_date: datetime = None,
-            dramp: Union[int, float, timedelta] = None,
-            drampbc: Union[int, float, timedelta] = None,
-            dramp_ss: Union[float, timedelta] = None,
-            drampwafo: Union[float, timedelta] = None,
-            drampwind: Union[float, timedelta] = None,
-            ics=None,
-            nchi: Union[int, NchiType] = None,
-            hmin_man=None,
-            dbz_min=None,
-            dbz_decay=None,
+        self,
+        start_date: datetime = None,
+        dramp: Union[int, float, timedelta] = None,
+        drampbc: Union[int, float, timedelta] = None,
+        dramp_ss: Union[float, timedelta] = None,
+        drampwafo: Union[float, timedelta] = None,
+        drampwind: Union[float, timedelta] = None,
+        ics=None,
+        nws=None,
+        nchi: Union[int, NchiType] = None,
+        hmin_man=None,
+        dbz_min=None,
+        dbz_decay=None,
+        ic_elev=None,
     ):
         self.start_date = start_date
         self.dramp = dramp
@@ -55,6 +83,8 @@ class OPT(metaclass=OptMeta):
         self.hmin_man = hmin_man
         self.dbz_min = dbz_min
         self.dbz_decay = dbz_decay
+        self.ic_elev = ic_elev
+        self.nws = nws
 
     def __str__(self):
         data = []
@@ -62,12 +92,12 @@ class OPT(metaclass=OptMeta):
             current = getattr(self, key)
             if current is not None:
                 if not isinstance(current, list):
-                    data.append(f'  {key}={current}')
+                    data.append(f"  {key}={current}")
                 else:
                     for i, state in enumerate(current):
                         if state:
-                            current.append(f'  {current}({i+1}) = 1')
-        data = '\n'.join(data)
+                            current.append(f"  {current}({i+1}) = 1")
+        data = "\n".join(data)
         return f"&OPT\n{data}\n/"
 
     def to_dict(self):
@@ -96,8 +126,8 @@ class OPT(metaclass=OptMeta):
             self.start_month = start_date.month
             self.start_day = start_date.day
             self.start_hour = start_date.hour
-            self.start_hour += start_date.minute / 60.
-            self.utc_start = -start_date.utcoffset().total_seconds() / 3600.  # type: ignore[union-attr]  # noqa: E501
+            self.start_hour += start_date.minute / 60.0
+            self.utc_start = -start_date.utcoffset().total_seconds() / 3600.0  # type: ignore[union-attr]  # noqa: E501
         else:
             self.start_year = None
             self.start_month = None
@@ -171,20 +201,20 @@ class OPT(metaclass=OptMeta):
 
     @property
     def nramp(self) -> Union[int, None]:
-        if not hasattr(self, '_nramp') and self.dramp is not None:
+        if not hasattr(self, "_nramp") and self.dramp is not None:
             return 1
-        elif hasattr(self, '_nramp'):
+        elif hasattr(self, "_nramp"):
             return self._nramp
 
     @nramp.setter
     def nramp(self, nramp: Union[int, None]):
         if nramp not in [0, 1]:
-            raise ValueError('Argument nramp must be 0, 1.')
+            raise ValueError("Argument nramp must be 0, 1.")
         self._nramp = nramp
 
     @nramp.deleter
     def nramp(self):
-        if hasattr(self, '_nramp'):
+        if hasattr(self, "_nramp"):
             del self._nramp
 
     @property
@@ -202,20 +232,20 @@ class OPT(metaclass=OptMeta):
 
     @property
     def nrampbc(self) -> Union[int, None]:
-        if not hasattr(self, '_nrampbc') and self.drampbc is not None:
+        if not hasattr(self, "_nrampbc") and self.drampbc is not None:
             return 1
-        elif hasattr(self, '_nrampbc'):
+        elif hasattr(self, "_nrampbc"):
             return self._nrampbc
 
     @nrampbc.setter
     def nrampbc(self, nrampbc: Union[int, None]):
         if nrampbc not in [0, 1]:
-            raise ValueError('Argument nrampbc must be 0, 1.')
+            raise ValueError("Argument nrampbc must be 0, 1.")
         self._nrampbc = nrampbc
 
     @nrampbc.deleter
     def nrampbc(self):
-        if hasattr(self, '_nrampbc'):
+        if hasattr(self, "_nrampbc"):
             del self._nrampbc
 
     @property
@@ -233,20 +263,20 @@ class OPT(metaclass=OptMeta):
 
     @property
     def nramp_ss(self) -> Union[int, None]:
-        if not hasattr(self, '_nramp_ss') and self.dramp_ss is not None:
+        if not hasattr(self, "_nramp_ss") and self.dramp_ss is not None:
             return 1
-        elif hasattr(self, '_nramp_ss'):
+        elif hasattr(self, "_nramp_ss"):
             return self._nramp_ss
 
     @nramp_ss.setter
     def nramp_ss(self, nramp_ss: Union[int, None]):
         if nramp_ss not in [0, 1]:
-            raise ValueError('Argument nramp_ss must be 0, 1.')
+            raise ValueError("Argument nramp_ss must be 0, 1.")
         self._nramp_ss = nramp_ss
 
     @nramp_ss.deleter
     def nramp_ss(self):
-        if hasattr(self, '_nramp_ss'):
+        if hasattr(self, "_nramp_ss"):
             del self._nramp_ss
 
     @property
@@ -264,20 +294,20 @@ class OPT(metaclass=OptMeta):
 
     @property
     def nrampwafo(self) -> Union[int, None]:
-        if not hasattr(self, '_nrampwafo') and self.drampwafo is not None:
+        if not hasattr(self, "_nrampwafo") and self.drampwafo is not None:
             return 1
-        elif hasattr(self, '_nrampwafo'):
+        elif hasattr(self, "_nrampwafo"):
             return self._nrampwafo
 
     @nrampwafo.setter
     def nrampwafo(self, nrampwafo: Union[int, None]):
         if nrampwafo not in [0, 1]:
-            raise ValueError('Argument nrampwafo must be 0, 1.')
+            raise ValueError("Argument nrampwafo must be 0, 1.")
         self._nrampwafo = nrampwafo
 
     @nrampwafo.deleter
     def nrampwafo(self):
-        if hasattr(self, '_nrampwafo'):
+        if hasattr(self, "_nrampwafo"):
             del self._nrampwafo
 
     @property
@@ -295,20 +325,20 @@ class OPT(metaclass=OptMeta):
 
     @property
     def nrampwind(self) -> Union[int, None]:
-        if not hasattr(self, '_nrampwind') and self.drampwind is not None:
+        if not hasattr(self, "_nrampwind") and self.drampwind is not None:
             return 1
-        elif hasattr(self, '_nrampwind'):
+        elif hasattr(self, "_nrampwind"):
             return self._nrampwind
 
     @nrampwind.setter
     def nrampwind(self, nrampwind: Union[int, None]):
         if nrampwind not in [0, 1]:
-            raise ValueError('Argument nrampwind must be 0, 1.')
+            raise ValueError("Argument nrampwind must be 0, 1.")
         self._nrampwind = nrampwind
 
     @nrampwind.deleter
     def nrampwind(self):
-        if hasattr(self, '_nrampwind'):
+        if hasattr(self, "_nrampwind"):
             del self._nrampwind
 
     @property
@@ -329,6 +359,12 @@ class OPT(metaclass=OptMeta):
     def ic_elev(self, ic_elev: Union[int, None]):
         assert ic_elev in [0, 1, None]
         self._ic_elev = ic_elev
+
+    # @property
+    # def flag_ic(self) -> List[int]:
+    #     if not hasattr(self, "_flag_ic"):
+    #         self._flag_ic = len(FlagIcDescriptor.ic_types) * [0]
+    #     return self._flag_ic
 
 
 # --- I think none of this is needed anymore but kept for here just in case.

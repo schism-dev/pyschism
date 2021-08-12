@@ -8,19 +8,19 @@ import f90nml
 
 def typecast_value(value: str):
     if "real(" in value:
-        value, exponent = value.split('(')[-1].split(',')[0].lower().split('d')
-        return float(f'{value}e{exponent}')
+        value, exponent = value.split("(")[-1].split(",")[0].lower().split("d")
+        return float(f"{value}e{exponent}")
     elif "_rkind" in value:
-        return float(value.split('_rkind')[0])
+        return float(value.split("_rkind")[0])
     elif "'" in value or '"' in value:
         return value[1:-1]
-    elif re.match('^[0-9].[0-9]*[de][+-]*[0-9]*', value):
-        value, exponent = value.split('d')
-        return float(f'{value}e{exponent}')
-    elif 'pi' in value:
+    elif re.match("^[0-9].[0-9]*[de][+-]*[0-9]*", value):
+        value, exponent = value.split("d")
+        return float(f"{value}e{exponent}")
+    elif "pi" in value:
         return value
-    elif re.match('[+-]?([0-9]*[.])?[0-9]+', value):
-        if '.' in value:
+    elif re.match("[+-]?([0-9]*[.])?[0-9]+", value):
+        if "." in value:
             return float(value)
         else:
             return int(value)
@@ -55,14 +55,22 @@ class NamelistParser:
             i += 1
         defaults = {var: None for var in declared_variables}
         for var in declared_variables:
-            for line in schism_init_f90[i+1:]:
-                if '!' in line:
+            for line in schism_init_f90[i + 1 :]:
+                if "!" in line:
                     continue
-                for source_var in line.split(';'):
+                for source_var in line.split(";"):
                     source_var = source_var.strip()
-                    if re.match(rf'^{var}[ ]*=[ ]*[-_A-Za-z0-9 .\(\),]*[;]*', source_var) is not None:
-                        value = [x for x in line.replace(' ', '').split(';')
-                                 if var in x].pop().split('=')[-1]
+                    if (
+                        re.match(
+                            rf"^{var}[ ]*=[ ]*[-_A-Za-z0-9 .\(\),]*[;]*", source_var
+                        )
+                        is not None
+                    ):
+                        value = (
+                            [x for x in line.replace(" ", "").split(";") if var in x]
+                            .pop()
+                            .split("=")[-1]
+                        )
                         defaults.update({var: typecast_value(value)})
                         break
 
@@ -71,17 +79,17 @@ class NamelistParser:
 
 class CoreParser(NamelistParser):
     def __new__(cls, schism_init_f90):
-        return super().__new__(cls, schism_init_f90, 'core')
+        return super().__new__(cls, schism_init_f90, "core")
 
 
 class OptParser(NamelistParser):
     def __new__(cls, schism_init_f90):
-        return super().__new__(cls, schism_init_f90, 'opt')
-    
+        return super().__new__(cls, schism_init_f90, "opt")
+
 
 class SchoutParser(NamelistParser):
     def __new__(cls, schism_init_f90):
-        return super().__new__(cls, schism_init_f90, 'schout')
+        return super().__new__(cls, schism_init_f90, "schout")
 
 
 class SchismInitParser:
@@ -104,29 +112,25 @@ class SchismInitParser:
 
 
 def patch_sample_param_to_avoid_f90nml_bug(schism_param_sample):
-    pattern = r'^[! _A-Za-z0-9]+\([*\d]*(\d+)[^\d]*\)[ ]*='
+    pattern = r"^[! _A-Za-z0-9]+\([*\d]*(\d+)[^\d]*\)[ ]*="
     var_collection = []
     for i, line in enumerate(schism_param_sample):
         if re.match(pattern, line):
-            if line[0] != '!':
-                schism_param_sample[i] = line = '!' + line
-            varname = line.strip().split('=')[0].strip()[1:].strip().split('(')[0]
+            if line[0] != "!":
+                schism_param_sample[i] = line = "!" + line
+            varname = line.strip().split("=")[0].strip()[1:].strip().split("(")[0]
             var_collection.append(varname)
     declared_vars = list(set(var_collection))
     for var in declared_vars:
         varcount = var_collection.count(var)
         for i, line in enumerate(list(schism_param_sample)):
-            if f'{var}({varcount})' in line:
+            if f"{var}({varcount})" in line:
                 if varcount > 1:
                     schism_param_sample.insert(
-                        i+1,
-                        f'{var}(1:{varcount}) = ' + ', '.join(varcount*['0'])
+                        i + 1, f"{var}(1:{varcount}) = " + ", ".join(varcount * ["0"])
                     )
                 else:
-                    schism_param_sample.insert(
-                        i+1,
-                        f'{var}({varcount}) = 0'
-                    )
+                    schism_param_sample.insert(i + 1, f"{var}({varcount}) = 0")
                 break
 
 
@@ -141,16 +145,15 @@ class Singleton(type):
         return cls.instance
 
 
-class ParamTemplate(metaclass=Singleton):
-
+class GitParamTemplate(metaclass=Singleton):
     def __init__(self, branch="master"):
         url = f"https://raw.githubusercontent.com/schism-dev/schism/{branch}/sample_inputs/param.nml"
         response = urllib.request.urlopen(url)
         schism_param_sample = response.read().decode("utf-8").split("\n")
         patch_sample_param_to_avoid_f90nml_bug(schism_param_sample)
         tmpfile1 = tempfile.NamedTemporaryFile()
-        with open(tmpfile1.name, 'w') as f:
-            f.write('\n'.join(schism_param_sample))
+        with open(tmpfile1.name, "w") as f:
+            f.write("\n".join(schism_param_sample))
         base_param = f90nml.read(tmpfile1.name)
 
         def update_param_component(name, component):
@@ -160,18 +163,36 @@ class ParamTemplate(metaclass=Singleton):
                         continue
                     if source_code_value != base_param[name][source_code_var]:
                         base_param[name][source_code_var] = source_code_value
-        schism_init_f90 = SchismInitParser()      
-        update_param_component('core', schism_init_f90.core)
-        update_param_component('opt', schism_init_f90.opt)
-        update_param_component('schout', schism_init_f90.schout)
+
+        schism_init_f90 = SchismInitParser()
+        update_param_component("core", schism_init_f90.core)
+        update_param_component("opt", schism_init_f90.opt)
+        update_param_component("schout", schism_init_f90.schout)
         tmpfile2 = tempfile.NamedTemporaryFile()
         f90nml.patch(tmpfile1.name, base_param, tmpfile2.name)
         with open(tmpfile2.name) as f:
-            self.schism_param_sample = ''.join(f.readlines())
+            self.schism_param_sample = "".join(f.readlines())
         self.tmpfile = tmpfile2
+        self.schism_init_f90 = schism_init_f90
 
     def __str__(self):
         return self.schism_param_sample
+
+    def write(self, path):
+        pathlib.Path(path).touch()
+        f90nml.patch(self.path, str(self), path)
+
+    @property
+    def core(self):
+        return self.schism_init_f90.core
+
+    @property
+    def opt(self):
+        return self.schism_init_f90.opt
+
+    @property
+    def schout(self):
+        return self.schism_init_f90.schout
 
     @property
     def path(self):

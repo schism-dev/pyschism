@@ -384,25 +384,38 @@ class SfluxDataset:
         self.rad = RadComponent(self.fields, dlwrf_name=dlwrf_name,
                                 dswrf_name=dswrf_name)
 
-    def write(self, outdir: Union[str, os.PathLike], level: int,
-              overwrite: bool = False, start_date: datetime = None,
-              rnday: Union[float, int, timedelta] = None):
+    def write(
+            self,
+            outdir: Union[str, os.PathLike],
+            level: int,
+            overwrite: bool = False,
+            start_date: datetime = None,
+            rnday: Union[float, int, timedelta] = None,
+            air=True,
+            rad=True,
+            prc=True,
+            bbox=None,
+    ):
         outdir = pathlib.Path(outdir)
         if outdir.name != 'sflux':
             outdir /= 'sflux'
         outdir.mkdir(exist_ok=True)
-
+        if hasattr(self, 'fetch_data'):
+            self.fetch_data(start_date=start_date, rnday=rnday, air=air, rad=rad, prc=prc, bbox=bbox)
         if hasattr(self, 'air'):
             if self.air is not None:
-                self.air.write(outdir, level, overwrite, start_date, rnday)
+                if air is True:
+                    self.air.write(outdir, level, overwrite, start_date, rnday)
 
         if hasattr(self, 'prc'):
             if self.prc is not None:
-                self.prc.write(outdir, level, overwrite, start_date, rnday)
+                if rad is True:
+                    self.prc.write(outdir, level, overwrite, start_date, rnday)
 
         if hasattr(self, 'rad'):
             if self.rad is not None:
-                self.rad.write(outdir, level, overwrite, start_date, rnday)
+                if rad is True:
+                    self.rad.write(outdir, level, overwrite, start_date, rnday)
 
     @property
     def timevector(self):

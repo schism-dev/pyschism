@@ -1,31 +1,37 @@
 import argparse
 from datetime import timedelta
 from enum import Enum
+
 # import json
 import logging
+
 # import os
 import pathlib
+
 # import shutil
 
 # import geopandas as gpd
 from psutil import cpu_count
 
-# from pyschism import dates
+from pyschism import dates
 from pyschism.driver import ModelConfig
+
 # from pyschism.enums import ForecastProduct
 # from pyschism.forcing.nws import NWS2, GFS, HRRR
 # from pyschism.forcing.source_sink import NWM
 # from pyschism.forcing.bctides import Tides
 from pyschism.cmd import common
+from pyschism.forcing.bctides import Bctides
 from pyschism.mesh import gridgr3, prop
+
 # from pyschism.mesh.fgrid import Fgrid, ManningsN, DragCoefficient
 from pyschism.param.schout import SurfaceOutputVars
 
 logger = logging.getLogger(__name__)
 
-CONFIG_FILE_NAME = 'config.json'
-STATIC_DIRECTORY = 'static'
-FORECAST_DIRECTORY = 'forecast'
+CONFIG_FILE_NAME = "config.json"
+STATIC_DIRECTORY = "static"
+FORECAST_DIRECTORY = "forecast"
 
 
 class GridGr3Type(Enum):
@@ -44,7 +50,6 @@ class PropType(Enum):
 
 
 class GridGr3Descriptor:
-
     def __init__(self, gridgr3_type):
         self.type = gridgr3_type
 
@@ -54,17 +59,16 @@ class GridGr3Descriptor:
         self.gridgr3 = val
 
     def __get__(self, obj, val):
-        if not hasattr(self, 'gridgr3'):
-            if obj.vgrid.is3D():
-                return self.type.default(obj.hgrid)
+        if not hasattr(self, "gridgr3"):
+            if obj.args.vgrid.is3D():
+                return self.type.default(obj.args.hgrid)
         else:
             return self.gridgr3
 
 
 class ForecastCliMeta(type):
-
     def __new__(meta, name, bases, attrs):
-        attrs['surface_output_vars'] = SurfaceOutputVars()
+        attrs["surface_output_vars"] = SurfaceOutputVars()
         for gr3type in GridGr3Type:
             attrs[gr3type.name.lower()] = GridGr3Descriptor(gr3type.value)
 
@@ -73,99 +77,126 @@ class ForecastCliMeta(type):
 
 class ForecastCli(metaclass=ForecastCliMeta):
 
+    start_date = dates.StartDate()
+    end_date = dates.EndDate()
+
     def __init__(self, args: argparse.Namespace):
+        self.start_date = dates.nearest_cycle()
         self.args = args
-        coldstart, hotstart = self.get_drivers()
+
         if self.args.skip_run is True:
-            if coldstart is not None:
-                coldstart.write(self.coldstart_directory,
-                                overwrite=self.args.overwrite)
-    #         hotstart.write(self.hotstart_directory,
-    #                        overwrite=self.args.overwrite)
-    #     else:
-    #         if coldstart is not None:
-    #             coldstart.run(self.coldstart_directory,
-    #                           overwrite=self.args.overwrite)
+            if self.coldstart is not None:
+                if self.args.spinup_days is not None:
+                    self.coldstart.write(
+                        self.coldstart_directory,
+                        overwrite=self.args.overwrite,
+
+                    )
+                else:
+                    self.coldstart.write(
+                        self.hotstart_directory,
+                        overwrite=self.args.overwrite
+
+                    )
+        else:
+            if self.coldstart is not None:
+                if self.args.spinup_days is not None:
+                    self.coldstart.run(
+                        self.coldstart_directory,
+                        overwrite=self.args.overwrite
+                    )
+                else:
+                    self.coldstart.run(
+                        self.hotstart_directory,
+                        overwrite=self.args.overwrite
+                    )
+
+
+
+        #         hotstart.write(self.hotstart_directory,
+        #                        overwrite=self.args.overwrite)
+
     #         hotstart.run(self.hotstart_directory,
     #                      overwrite=self.args.overwrite)
 
     # def load_user_arguments(self):
     #     raise NotImplementedError
 
-    def get_drivers(self):
-        coldstart = self.get_coldstart()
-        hotstart = self.get_hotstart()
-        hotstart = None
-        return coldstart, hotstart
-
-    def get_coldstart(self):
-        # print(self.start_date)
-        # exit()
-        if self.args.vgrid.is2D() is True:
-            return self.config.coldstart(
-                timestep=self.args.timestep,
-                start_date=self.start_date - self.spinup_time,
-                end_date=self.start_date,
-                dramp=self.spinup_time,
-                drampbc=self.spinup_time,
-                dramp_ss=self.spinup_time,
-                drampwafo=self.spinup_time,
-                drampwind=self.spinup_time,
-                nspool=None,
-                ihfskip=None,
-                nhot_write=None,
-                stations=None,
-                server_config=None,
-                use_param_template=self.args.use_param_template,
-                # **self.user_requested_surface_outputs,
-            )
-        else:
-            raise NotImplementedError('Model is 3D.')
-
-    # def get_hotstart(self):
-
-    #     def get_surface_outputs():
-    #         surface_outputs = {}
-    #         outvars = []
-    #         for vardata in self.surface_output_vars.values():
-    #             for varname, _ in vardata:
-    #                 outvars.append(varname)
-    #         for key, val in self.args.__dict__.items():
-    #             if key in outvars and val is True:
-    #                 surface_outputs[key] = val
-    #         return surface_outputs
-
-    #     return self.config.hotstart(
-    #         self.get_hotstart_driver(),
-    #         timestep=self.args.timestep,
-    #         end_date=timedelta(days=2) - timedelta(hours=2),
-    #         nspool=self.args.nspool,
-    #         **get_surface_outputs()
-    #     )
-
-    # def get_hotstart_driver(self):
-    #     pass
+    # def get_drivers(self):
+    #     return self.get_coldstart(), self.get_hotstart()
 
     @property
-    def args(self):
-        return self._args
+    def coldstart(self):
 
-    @args.setter
-    def args(self, args: argparse.Namespace):
-        # self._config_file = args.project_directory / CONFIG_FILE_NAME
-        # skipping write config file because not objects are serializable
-        # logger.info(f"Writing configuration file to path {self.config_file}")
-        # with open(self.config_file, 'w') as fp:
-        #     json.dump(args.__dict__, fp, indent=4)
-        self._args = args
+        if self.args.vgrid.is2D() is True:
+            if self.args.spinup_days is not None:
+                return self.config.coldstart(
+                    timestep=self.args.timestep,
+                    start_date=self.start_date - self.args.run_days,
+                    end_date=self.start_date,
+                    dramp=self.args.spinup_days,
+                    drampbc=self.args.spinup_days,
+                    dramp_ss=self.args.spinup_days,
+                    drampwafo=self.args.spinup_days,
+                    drampwind=self.args.spinup_days,
+                    elev_ic=self.args.elev_ic,
+                    temp_ic=self.args.temp_ic,
+                    salt_ic=self.args.salt_ic,
+                    nspool=None,
+                    ihfskip=None,
+                    nhot_write=None,
+                    stations=None,
+                    server_config=None,
+                    param_template=self.args.use_param_template,
+                    # **self.user_requested_surface_outputs,
+                )
+            else:
+                return self.config.coldstart(
+                    timestep=self.args.timestep,
+                    start_date=self.start_date,
+                    end_date=self.args.run_days,
+                    elev_ic=self.args.elev_ic,
+                    temp_ic=self.args.temp_ic,
+                    salt_ic=self.args.salt_ic,
+                    nspool=None,
+                    ihfskip=None,
+                    nhot_write=None,
+                    stations=None,
+                    server_config=None,
+                    param_template=self.args.use_param_template,
+                    # **self.user_requested_surface_outputs, 
+                )
 
-    # @property
-    # def config_file(self):
-    #     return self._config_file
+        else:
+            raise NotImplementedError("Model is 3D.")
+
+    @property
+    def hotstart(self):
+
+        raise NotImplementedError("hotstart")
+
+        def get_surface_outputs():
+            surface_outputs = {}
+            outvars = []
+            for vardata in self.surface_output_vars.values():
+                for varname, _ in vardata:
+                    outvars.append(varname)
+            for key, val in self.args.__dict__.items():
+                if key in outvars and val is True:
+                    surface_outputs[key] = val
+            return surface_outputs
+
+        return self.config.hotstart(
+            self.get_hotstart_driver(),
+            timestep=self.args.timestep,
+            end_date=timedelta(days=2) - timedelta(hours=2),
+            nspool=self.args.nspool,
+            **get_surface_outputs(),
+        )
 
     @property
     def config(self):
-        if not hasattr(self, '_config'):
+        if not hasattr(self, "_config"):
             self._config = ModelConfig(
                 self.args.hgrid,
                 vgrid=self.args.vgrid,
@@ -176,17 +207,27 @@ class ForecastCli(metaclass=ForecastCliMeta):
                 watertype=self.args.watertype,
                 fluxflag=self.args.fluxflag,
                 tvdflag=self.args.tvdflag,
-                iettype=self.args.iettype,
-                ifltype=self.args.ifltype,
-                itetype=self.args.itetype,
-                isatype=self.args.isatype,
-                # itrtype=self.args.itrtype,
+                bctides=self.bctides,
                 nws=self.args.nws,
                 source_sink=self.args.source_sink,
                 # waves=self.args.waves,
             )
         return self._config
 
+    @property
+    def bctides(self):
+        if not hasattr(self, "_bctides"):
+            self._bctides = Bctides(
+                self.args.hgrid,
+                vgrid=self.args.vgrid,
+                iettype=self.args.iettype,
+                ifltype=self.args.ifltype,
+                isatype=self.args.isatype,
+                itetype=self.args.itetype,
+                # itrtype=self.args.itrtype,
+                cutoff_depth=self.args.cutoff_depth,
+            )
+        return self._bctides
 
     # @property
     # def static_directory(self):
@@ -195,22 +236,22 @@ class ForecastCli(metaclass=ForecastCliMeta):
     #         self._static_directory.mkdir(exist_ok=self.args.overwrite)
     #     return self._static_directory
 
-    # @property
-    # def forecasts_directory(self):
-    #     return self.project_directory / FORECAST_DIRECTORY
+    @property
+    def forecasts_directory(self):
+        return self.args.project_directory / FORECAST_DIRECTORY
 
-    # @property
-    # def coldstart_directory(self):
-    #     return self.hotstart_directory / 'coldstart'
+    @property
+    def coldstart_directory(self):
+        return self.hotstart_directory / "coldstart"
 
-    # @property
-    # def hotstart_directory(self):
-    #     if not hasattr(self, '_hotstart_directory'):
-    #         timestamp = str(self.start_date).replace(' ', 'T')
-    #         self._hotstart_directory = self.forecasts_directory / f'{timestamp}'
-    #         self._hotstart_directory.parent.mkdir(exist_ok=True)
-    #         self._hotstart_directory.mkdir(exist_ok=True)
-    #     return self._hotstart_directory
+    @property
+    def hotstart_directory(self):
+        if not hasattr(self, "_hotstart_directory"):
+            timestamp = str(self.start_date).replace(" ", "T")
+            self._hotstart_directory = self.forecasts_directory / f"{timestamp}"
+            self._hotstart_directory.parent.mkdir(exist_ok=True)
+            self._hotstart_directory.mkdir(exist_ok=True)
+        return self._hotstart_directory
 
     # @property
     # def hgrid_path(self):
@@ -372,27 +413,31 @@ class ForecastCli(metaclass=ForecastCliMeta):
 
     @staticmethod
     def add_subparser_action(subparsers):
-        add_forecast_options_to_parser(subparsers.add_parser('forecast'))
+        add_forecast_options_to_parser(subparsers.add_parser("forecast"))
 
 
 def add_forecast_options_to_parser(parser):
     actions = parser.add_subparsers(dest="action")
-    add_forecast_init_to_parser(actions.add_parser(
-        "init",
-        help='Initializes a directory for a sequential SCHISM forecast model '
-             'deployment.'
-    ))
-    add_forecast_update_to_parser(actions.add_parser(
-        "update",
-        help='Updates a directory  that has been previously initialized for '
-             'SCHISM forecast model deployment.'
-    ))
+    add_forecast_init_to_parser(
+        actions.add_parser(
+            "init",
+            help="Initializes a directory for a sequential SCHISM forecast model "
+            "deployment.",
+        )
+    )
+    add_forecast_update_to_parser(
+        actions.add_parser(
+            "update",
+            help="Updates a directory  that has been previously initialized for "
+            "SCHISM forecast model deployment.",
+        )
+    )
 
 
 class ProjectDirectoryAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
         tmp_parser = argparse.ArgumentParser(add_help=False)
-        tmp_parser.add_argument('--overwrite', action='store_true')
+        tmp_parser.add_argument("--overwrite", action="store_true")
         tmp_args = tmp_parser.parse_known_args()[0]
         project_directory = pathlib.Path(values)
         project_directory.mkdir(exist_ok=tmp_args.overwrite)
@@ -403,41 +448,39 @@ def add_forecast_init_to_parser(parser):
     parser.add_argument(
         "project_directory",
         action=ProjectDirectoryAction,
-        help='System path where the project will be staged.'
+        help="System path where the project will be staged.",
     )
     common.add_hgrid_to_parser(parser)
     common.add_vgrid_to_parser(parser)
     common.add_fgrid_to_parser(parser)
-    parser.add_argument(
-        "--timestep",
-        type=float,
-        required=True
-    )
+    common.add_stratification_to_parser(parser)
+    parser.add_argument("--timestep", type=float, required=True)
     parser.add_argument(
         "--forecast-days",
-        type=float,
-        required=True
+        type=lambda x: timedelta(days=float(x)),
+        required=True,
+        dest="run_days",
     )
     parser.add_argument(
         "--spinup-days",
         help="Number of days used for model initialization. "
-             "Defaults to 15 days spinup.",
+        "Defaults to 15 days spinup.",
         type=lambda x: timedelta(days=float(x)),
     )
     parser.add_argument(
-        "--skip-run",
-        action="store_true",
-        help="Skips running the model."
+        "--skip-run", action="store_true", help="Skips running the model."
     )
+    parser.add_argument("--nproc", type=int, default=cpu_count(logical=False))
     parser.add_argument(
-        '--nproc',
-        type=int,
-        default=cpu_count(logical=False)
+        "--use-param-template",
+        # TODO: We need to optionally take a user-provided template
+        action="store_true",
     )
-    parser.add_argument('--use-param-template', action='store_true')
     common.add_gridgr3_to_parser(parser)
+    common.add_ic_to_parser(parser)
     common.add_prop_to_parser(parser)
     common.add_ibctype_to_parser(parser)
+    common.add_bctides_options_to_parser(parser)
     common.add_nws_to_parser(parser)
     common.add_source_sink_to_parser(parser)
     # common.add_waves_to_parser(parser)
@@ -445,17 +488,50 @@ def add_forecast_init_to_parser(parser):
     common.add_stations_outputs_to_parser(parser)
     common.add_log_level_to_parser(parser)
     parser.add_argument(
-        "--overwrite",
-        action="store_true",
-        help="Allow overwrite of output directory."
+        "--overwrite", action="store_true", help="Allow overwrite of output directory."
     )
 
 
 def add_forecast_update_to_parser(parser):
     parser.add_argument(
-        "project_directory",
-        help='System path of the staged directory to update.'
+        "project_directory", help="System path of the staged directory to update."
     )
+
+
+# ------ drafts ----------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 #     init.add_argument('hgrid', help='Horizontal grid file.')
 #     init.add_argument('--fgrid', help='Friction grid file.')

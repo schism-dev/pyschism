@@ -1,5 +1,5 @@
 from pyschism.forcing.source_sink.base import (
-    Hydrology,
+    # Hydrology,
     # Sources,
     # Sinks,
     Msource,
@@ -12,7 +12,7 @@ from pyschism.forcing.source_sink.nwm import NationalWaterModel
 NWM = NationalWaterModel
 
 __all__ = [
-    "Hydrology",
+    # "Hydrology",
     "NationalWaterModel",
     # "Sources",
     # "Sinks",

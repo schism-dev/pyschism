@@ -28,16 +28,26 @@ class NWS2(NWS):
         self.sflux_2 = sflux_2
         self.windrot = windrot
 
-    def fetch_data(self, start_date=None, rnday=None, bbox=None, **kwargs):
+    def fetch_data(self, start_date=None, rnday=None, bbox=None, air=True, rad=True, prc=True):
+        
         if hasattr(self.sflux_1, 'fetch_data'):
-            self.sflux_1.fetch_data(start_date, rnday, bbox=bbox, **kwargs)
+            self.sflux_1.fetch_data(
+                start_date,
+                rnday,
+                bbox=bbox,
+                air=air,
+                rad=rad,
+                prc=prc,
+            )
         if self.sflux_2 is not None:
             if hasattr(self.sflux_2, 'fetch_data'):
                 self.sflux_2.fetch_data(
                     start_date,
                     rnday,
                     bbox=bbox,
-                    **kwargs
+                    air=air,
+                    rad=rad,
+                    prc=prc,
                     )
 
     def __str__(self):
@@ -45,8 +55,18 @@ class NWS2(NWS):
         data = '\n'.join(data)
         return f'&sflux_inputs\n{data}/\n'
 
-    def write(self, path: Union[str, os.PathLike], overwrite: bool = False,
-              windrot: bool = True):
+    def write(
+            self,
+            path: Union[str, os.PathLike],
+            start_date=None,
+            end_date=None,
+            bbox=None,
+            overwrite: bool = False,
+            windrot: bool = True,
+            air=True,
+            rad=True,
+            prc=True,
+    ):
         # write sflux namelist
         path = pathlib.Path(path)
         if path.name != 'sflux':
@@ -56,15 +76,25 @@ class NWS2(NWS):
             f.write(str(self))
         # write sflux data
         self.sflux_1.write(
-            path, 1, overwrite,
-            # start_date=self.start_date,
-            # rnday=self._rnday
+            path,
+            1,
+            overwrite,
+            start_date=start_date,
+            rnday=end_date,
+            air=air,
+            rad=rad,
+            prc=prc,
         )
         if self.sflux_2 is not None:
             self.sflux_2.write(
-                path, 2, overwrite,
-                # start_date=self.start_date,
-                # rnday=self._rnday
+                path,
+                2,
+                overwrite,
+                start_date=start_date,
+                rnday=end_date,
+                air=air,
+                rad=rad,
+                prc=prc,
                 )
         # # write windrot data
         if windrot is not False and self.windrot is not None:

@@ -7,8 +7,9 @@ from time import time
 
 import numpy as np
 
-from pyschism.mesh import Hgrid, Vgrid
-from pyschism.forcing import nws, bctides, hycom
+from pyschism.enums import Stratification
+from pyschism.mesh import Hgrid, Vgrid, gridgr3
+from pyschism.forcing import nws, bctides, hycom, source_sink
 
 
 logger = logging.getLogger(__name__)
@@ -102,6 +103,33 @@ def add_fgrid_to_parser(parser):
         default="auto",
         help="Can be used to specify which friction type the file is.",
     )
+
+
+def add_stratification_to_parser(parser):
+
+    stratification_group = parser.add_argument_group(
+        "Stratification options."
+    ).add_mutually_exclusive_group()
+    stratification_group.add_argument(
+        "--baroclinic",
+        dest="stratification",
+        action="store_const",
+        const=Stratification.BAROCLINIC,
+    )
+    stratification_group.add_argument(
+        "--barotropic",
+        dest="stratification",
+        action="store_const",
+        const=Stratification.BAROTROPIC,
+    )
+
+    # args = parser.parse_known_args()[0]
+    # stratification = (
+    #     Stratification.BAROTROPIC
+    #     if args.vgrid.is2D() is True
+    #     else Stratification.BAROCLINIC
+    # )
+    # stratification_group.set_default(stratification=None)
 
 
 def add_albedo_to_parser(parser):
@@ -239,9 +267,10 @@ def add_baroclinic_database_to_parser(parser):
             setattr(namespace, self.dest, values)
 
     hycom_group = parser.add_argument_group("HYCOM options")
+    # *************************************************************************************************
     hycom_group.add_argument(
-        "--baroclinic-database",
         "--hycom",
+        # "--baroclinic-database",
         choices=[x.name.lower() for x in BaroclinicDatabases],
         dest="baroclinic_database",
         default="gofs",
@@ -313,6 +342,8 @@ def add_iettype_to_parser(parser):
 
     class Iettype4Action(argparse.Action):
         def __call__(self, parser, namespace, values, option_string=None):
+            if namespace.vgrid.is2D() is True:
+                raise NotImplementedError('--iettype-4 not available for 2D model.')
             tmp_parser = argparse.ArgumentParser(add_help=False)
             add_baroclinic_database_to_parser(tmp_parser)
             tmp_args = tmp_parser.parse_known_args()[0]
@@ -320,6 +351,8 @@ def add_iettype_to_parser(parser):
 
     class Iettype5Action(argparse.Action):
         def __call__(self, parser, namespace, values, option_string=None):
+            if namespace.vgrid.is2D() is True:
+                raise NotImplementedError('--iettype-5 not available for 2D model.')
             tmp_parser = argparse.ArgumentParser(add_help=False)
             add_tidal_database_to_parser(tmp_parser)
             add_baroclinic_database_to_parser(tmp_parser)
@@ -333,15 +366,15 @@ def add_iettype_to_parser(parser):
     iettype_group = parser.add_argument_group(
         "Elevation boundary condition options"
     ).add_mutually_exclusive_group()
-    # iettype_group.add_argument(
-    #     "--iettype",
-    #     "--per-boundary-elevation",
-    #     dest="iettype",
-    #     metavar='JSON_STYLE_STRING',
-    #     action=IettypeAction,
-    #     # const=bctides.iettype.Iettype,
-    #     help=get_per_boundary_help_message('elevation', 'iettype')
-    # )
+    iettype_group.add_argument(
+        "--iettype",
+        "--per-boundary-elevation",
+        dest="iettype",
+        metavar="JSON_STYLE_STRING",
+        action=IettypeAction,
+        # const=bctides.iettype.Iettype,
+        help=get_per_boundary_help_message("elevation", "iettype"),
+    )
     iettype_group.add_argument(
         "--iettype-1",
         "--elevation-time-history",
@@ -435,6 +468,8 @@ def add_ifltype_to_parser(parser):
 
     class Ifltype4Action(argparse.Action):
         def __call__(self, parser, namespace, values, option_string=None):
+            if namespace.vgrid.is2D() is True:
+                raise NotImplementedError('--ifltype-4 not available for 2D model.')
             tmp_parser = argparse.ArgumentParser(add_help=False)
             add_baroclinic_database_to_parser(tmp_parser)
             tmp_args = tmp_parser.parse_known_args()[0]
@@ -442,6 +477,8 @@ def add_ifltype_to_parser(parser):
 
     class Ifltype5Action(argparse.Action):
         def __call__(self, parser, namespace, values, option_string=None):
+            if namespace.vgrid.is2D() is True:
+                raise NotImplementedError('--ifltype-5 not available for 2D model.')
             tmp_parser = argparse.ArgumentParser(add_help=False)
             add_tidal_database_to_parser(tmp_parser)
             add_baroclinic_database_to_parser(tmp_parser)
@@ -511,6 +548,7 @@ def add_ifltype_to_parser(parser):
     )
 
     ifltype_group.add_argument(
+        "--ifltype--1",
         "--uv-zero",
         "--flather",
         # action='store_const',
@@ -520,7 +558,6 @@ def add_ifltype_to_parser(parser):
 
 
 def add_itetype_to_parser(parser):
-
     def get_nudge_bnds(namespace):
         tmp_parser = argparse.ArgumentParser(add_help=False)
         add_baroclinic_database_to_parser(tmp_parser)
@@ -555,18 +592,18 @@ def add_itetype_to_parser(parser):
         return tmp_args.nudge_temp
 
     class Itetype4Action(argparse.Action):
-
         def __call__(self, parser, namespace, values, option_string=None):
             tmp_parser = argparse.ArgumentParser(add_help=False)
             add_nudge_to_parser(tmp_parser)
             tmp_args = tmp_parser.parse_known_args()[0]
-            nudge_bounds = get_nudge_bnds(namespace)
-            itetype4 = bctides.itetype.Itetype4(
-                nudge=nudge_bounds["1"],
-                rlmax=tmp_args.rlmax_temp,
-                rnu_day=tmp_args.rnu_day_temp,
+            if namespace.hgrid is not None:
+                nudge_bounds = get_nudge_bnds(namespace)
+                itetype4 = bctides.itetype.Itetype4(
+                    nudge=nudge_bounds["1"],
+                    rlmax=tmp_args.rlmax_temp,
+                    rnu_day=tmp_args.rnu_day_temp,
                 )
-            setattr(namespace, self.dest, itetype4)
+                setattr(namespace, self.dest, itetype4)
 
     itetype_group = parser.add_argument_group(
         "Temperature boundary condition options"
@@ -609,7 +646,6 @@ def add_itetype_to_parser(parser):
 
 
 def add_isatype_to_parser(parser):
-
     def get_nudge_bnds(namespace):
         tmp_parser = argparse.ArgumentParser(add_help=False)
         add_baroclinic_database_to_parser(tmp_parser)
@@ -644,18 +680,18 @@ def add_isatype_to_parser(parser):
         return tmp_args.nudge_salt
 
     class Isatype4Action(argparse.Action):
-
         def __call__(self, parser, namespace, values, option_string=None):
             tmp_parser = argparse.ArgumentParser(add_help=False)
             add_nudge_to_parser(tmp_parser)
             tmp_args = tmp_parser.parse_known_args()[0]
-            nudge_bounds = get_nudge_bnds(namespace)
-            isatype4 = bctides.isatype.Isatype4(
-                nudge=nudge_bounds["1"],
-                rlmax=tmp_args.rlmax_salt,
-                rnu_day=tmp_args.rnu_day_salt,
+            if namespace.hgrid is not None:
+                nudge_bounds = get_nudge_bnds(namespace)
+                isatype4 = bctides.isatype.Isatype4(
+                    nudge=nudge_bounds["1"],
+                    rlmax=tmp_args.rlmax_salt,
+                    rnu_day=tmp_args.rnu_day_salt,
                 )
-            setattr(namespace, self.dest, isatype4)
+                setattr(namespace, self.dest, isatype4)
 
     isatype_group = parser.add_argument_group(
         "Salinity boundary condition options"
@@ -668,21 +704,21 @@ def add_isatype_to_parser(parser):
     #     # action=CustomBoundaryAction,
     # )
     isatype_group.add_argument(
-        "--salt-th",
         "--isatype-1",
+        "--salt-th",
         dest="isatype",
         # type=isatype.Isatype1
     )
     isatype_group.add_argument(
-        "--salt-val",
         "--isatype-2",
+        "--salt-val",
         dest="isatype",
         # type=isatype.Isatype2
     )
 
     isatype_group.add_argument(
-        "--salt-ic",
         "--isatype-3",
+        # "--salt-ic",
         dest="isatype",
         # type=isatype.Isatype3,
     )
@@ -715,21 +751,36 @@ class NudgeAction(argparse.Action):
 
 def add_temperature_nudge_to_parser(parser):
     temp_group = parser.add_argument_group("Nudge options for temperature")
-    temp_group.add_argument(
+    nudge_parser = temp_group.add_mutually_exclusive_group()
+    nudge_parser.add_argument(
         "--nudge-temp",
         "--nudge-temperature",
         "--nudge-t",
         dest="nudge_temp",
         nargs="*",
         action=NudgeAction,
+        help="Enables temperature nudging. If no arguments are given, the nudging "
+        "is enabled for all the boundaries. If a per-boundary nudging is desired, "
+        "you can pass the boundary id's of the boundaries where nudging should "
+        "be enabled, for example passing --nudge-temp 1 2 4 will enable nudging "
+        "for boundaries with id's 1, 2 and 4, and will disable the nudging "
+        "for the remaining boundaries. Note: This option is mutually exclusive "
+        "to --disable-nudge-temperature.",
     )
-    temp_group.add_argument(
+    nudge_parser.add_argument(
         "--disable-nudge-temp",
         "--disable-nudge-temperature",
         "--disable-nudge-t",
         dest="nudge_temp",
         nargs="*",
         action=NudgeAction,
+        help="Disables temperature nudging. If no arguments are given, the nudging "
+        "is disabled for all the boundaries. If per-boundary nudging disabling is desired, "
+        "you can pass the boundary id's of the boundaries where nudging should "
+        "be disabled, for example passing --disable-nudge-temp 1 2 4 will disable nudging "
+        "for boundaries with id's 1, 2 and 4, and will enable the nudging "
+        "for the remaining boundaries. Note: This option is mutually exclusive "
+        "to --nudge-temperature.",
     )
     temp_group.set_defaults(nudge_temp=None)
     temp_group.add_argument("--rlmax-temp", default=1.5, type=float)
@@ -773,45 +824,80 @@ def add_ibctype_to_parser(parser):
     add_nudge_to_parser(parser)
 
 
-class NWS2Action(argparse.Action):
-    class Sflux1Types(Enum):
-        # GDAS = GDAS
-        # GDAS_0P25 = GDAS
-        GFS = nws.GFS
-        GFS_0P25 = nws.GFS
-        GFS_0P25_1HR = nws.GFS
-        GFS_0P50 = nws.GFS
-        GFS_1P00 = nws.GFS
-
-        @classmethod
-        def _missing_(cls, name):
-            f = [
-                f"{name} is not a valid sflux_1 type. Valid values are: ",
-            ]
-            for sflux_type in cls:
-                f.append(sflux_type.name.lower())
-            f.append(".")
-            raise ValueError("".join(f))
-
-    def __call__(self, parser, namespace, values, option_string=None):
-        if len(values) > 2:
-            raise ValueError(
-                "pyschism forecast init: error: argument --nws-2/--sflux: "
-                "expected at most two arguments."
-            )
-        if len(values) == 1:
-            values.append(None)
-        sflux_1 = self.Sflux1Types[values[0].upper()].value(
-            product="gfs_0p25_1hr" if values[0].lower() == "gfs" else values[0].lower()
-        )
-        if len(values) == 2:
-            sflux_2 = values[1]
-        else:
-            sflux_2 = None
-        setattr(namespace, self.dest, nws.NWS2(sflux_1, sflux_2))
-
-
 def add_nws_to_parser(parser):
+
+    def add_windrot_to_parser(parser):
+        parser.add_argument(
+            '--windrot',
+            # action=WindrotAction,
+        )
+
+    class NWS2Action(argparse.Action):
+        class Sflux1Types(Enum):
+            # GDAS = GDAS
+            # GDAS_0P25 = GDAS
+            GFS = nws.GFS
+            GFS_0P25 = nws.GFS
+            GFS_0P25_1HR = nws.GFS
+            GFS_0P50 = nws.GFS
+            GFS_1P00 = nws.GFS
+
+            @classmethod
+            def _missing_(cls, name):
+                f = [
+                    f"{name} is not a valid sflux_1 type. Valid values are: ",
+                ]
+                for sflux_type in cls:
+                    f.append(sflux_type.name.lower())
+                f.append(".")
+                raise ValueError("".join(f))
+
+        class Sflux2Types(Enum):
+            HRRR = nws.HRRR
+
+            @classmethod
+            def _missing_(cls, name):
+                f = [
+                    f"{name} is not a valid sflux_2 type. Valid values are: ",
+                ]
+                for sflux_type in cls:
+                    f.append(sflux_type.name.lower())
+                f.append(".")
+                raise ValueError("".join(f))
+
+        def __call__(self, parser, namespace, values, option_string=None):
+            if len(values) > 2:
+                raise ValueError(
+                    "pyschism forecast init: error: argument --nws-2/--sflux: "
+                    "expected at most two arguments."
+                )
+            if len(values) == 1:
+                values.append(None)
+            sflux_1 = self.Sflux1Types[values[0].upper()].value(
+                product="gfs_0p25_1hr" if values[0].lower() == "gfs" else values[0].lower()
+            )
+            if len(values) == 2:
+                sflux_2 = self.Sflux2Types[values[1].upper()].value()
+            else:
+                sflux_2 = None
+
+            tmp_parser = argparse.ArgumentParser(add_help=False)
+            if not bool(set(sys.argv).intersection(['-h', '--help'])):
+                add_windrot_to_parser(tmp_parser)
+                tmp_args = tmp_parser.parse_known_args()[0]
+                windrot = gridgr3.Windrot.default(namespace.hgrid) if tmp_args.windrot is None else tmp_args.windrot
+            else:
+                windrot = None
+            setattr(
+                namespace,
+                self.dest,
+                nws.NWS2(
+                    sflux_1,
+                    sflux_2,
+                    windrot=windrot
+                )
+            )
+
     nws_group = parser.add_argument_group("Atmospheric forcing options")
     nws_parser = nws_group.add_mutually_exclusive_group()
     nws_parser.add_argument(
@@ -826,6 +912,7 @@ def add_nws_to_parser(parser):
         action=NWS2Action,
         metavar="sflux_level",
     )
+    add_windrot_to_parser(nws_parser)
     nws_parser.add_argument(
         "--nws-3",
         dest="nws",
@@ -834,15 +921,155 @@ def add_nws_to_parser(parser):
         "--nws-4",
         dest="nws",
     )
+    # nws_group.add_argument('--air')
+    # nws_group.add_argument('--prc')
+    # nws_group.add_argument('--rad')
 
 
 def add_source_sink_to_parser(parser):
-    # source_sink=self.args.source_sink,
-    pass
+
+    class SourceSinkAction(argparse.Action):
+
+        class SourceSinkTypes(Enum):
+            NWM = source_sink.NWM
+
+            @classmethod
+            def _missing_(cls, name):
+                f = [
+                    f"{name} is not a valid source_sink type. Valid values are: ",
+                ]
+                for enum_type in cls:
+                    f.append(enum_type.name.lower())
+                f.append(".")
+                raise ValueError("".join(f))
+
+        # def __init__(self, option_strings, dest, nargs=None, **kwargs):
+        #     if nargs is not None:
+        #         raise ValueError("nargs not allowed")
+        #     super().__init__(option_strings, dest, **kwargs)
+
+        def __call__(self, parser, namespace, values, option_string=None):
+            ss = source_sink.SourceSink()
+
+            for source_sink_request in values:
+                ss.add_forcing(self.SourceSinkTypes[source_sink_request.upper()].value())
+
+            setattr(namespace, self.dest, ss)
+
+    ss_parser = parser.add_argument_group("Source/Sink forcing options").add_mutually_exclusive_group()
+    ss_parser.add_argument(
+        '--source-sink',
+        dest='source_sink',
+        nargs='+',
+        action=SourceSinkAction,
+        help="Add source/sink terms to model."
+    )
 
 
 def add_waves_to_parser(parser):
-    raise NotImplementedError("Waves not implemented.")
+    raise NotImplementedError("add_waves_to_parser")
+
+
+def add_generic_ic_to_parser(parser, name):
+
+    # class GenericIcAction(argparse.Action):
+    #     def __call__(self, parser, namespace, values, option_string=None):
+    #         raise NotImplementedError(f'{option_string} is not implemented')
+    #         setattr(namespace, self.dest, values)
+
+    ic = parser.add_argument_group(f"{name.capitalize()} initial condition options.")
+
+    # tmp_parser = argparse.ArgumentParser(add_help=False)
+    # tmp_parser.add_argument(f'--{name}_ic')
+    # add_source_sink_to_parser(tmp_parser)
+    # tmp_args = tmp_parser.parse_known_args()[0]
+    # if tmp_args.args.elev_ic is None and tmp_parser.source_sink is not None:
+    #     default = gridgr3.ElevIc.default(self.hgrid)
+
+    # if self.args.temp_ic is None and self.bctides.itetype is not None:
+    #     self.args.temp_ic = gridgr3.TempIc.from_hycom(
+    #         self.hgrid,
+    #         # self.bctides.itetype.data_source,
+    #         self.start_date,
+    #     )
+
+    # if self.args.salt_ic is None and self.bctides.isatype is not None:
+    #     self.args.salt_ic = gridgr3.SaltIc.from_hycom(
+    #         self.hgrid,
+    #         # self.bctides.isatype.data_source,
+    #         self.start_date,
+    #     )
+
+    ic.add_argument(
+        f"--{name}-ic",
+        # type=gr3type.open,
+        # action=GenericIcAction,
+        help=f"{name.capitalize()} initial condition file.",
+        # default=default,
+    )
+    ic.add_argument(f"--{name}-ic-crs")
+
+
+def add_elev_ic_to_parser(parser):
+    class ElevIcAction(argparse.Action):
+        def __call__(self, parser, namespace, values, option_string=None):
+
+            if 'no' in option_string:
+                setattr(namespace, self.dest, False)
+                return
+            # if user passes argument, it will be opened.
+            elif values is not None:
+                tmp_parser = argparse.ArgumentParser(add_help=False)
+                tmp_parser.add_argument("--elev-ic-crs")
+                tmp_parser.add_argument("--hgrid-crs")
+                tmp_args = tmp_parser.parse_known_args()[0]
+                tmp_args.elev_ic_crs = (
+                    tmp_args.hgrid_crs
+                    if tmp_args.elev_ic_crs is None and tmp_args.hgrid_crs is not None
+                    else tmp_args.elev_ic_crs
+                )
+                elev_ic = gridgr3.ElevIc.open(values, crs=tmp_args.elev_ic_crs)
+            else:
+                elev_ic = gridgr3.ElevIc.default(namespace.hgrid)
+            setattr(namespace, self.dest, elev_ic)
+
+    elev_group = parser.add_argument_group("Elevation initial condition options.")
+    elev_ic = elev_group.add_mutually_exclusive_group()
+    elev_ic.add_argument(
+        "--elev-ic",
+        # type=Elev,
+        action=ElevIcAction,
+        help="Elevation initial condition file. If omitted, one will be created.",
+        nargs='?',
+        dest='elev_ic',
+    )
+    elev_ic.add_argument(
+        "--no-elev-ic",
+        # type=Elev,
+        action=ElevIcAction,
+        help="Elevation initial condition file. If omitted, one will be created.",
+        nargs=0,
+        dest='elev_ic',
+    )
+    elev_group.add_argument(
+        "--elev-ic-crs",
+        help="Elevation initial condition CRS for grid file. If omitted, it will be assumed that this file "
+        "is in the same CRS as the hgrid.",
+    )
+
+
+def add_temp_ic_to_parser(parser):
+    add_generic_ic_to_parser(parser, "temp")
+
+
+def add_salt_ic_to_parser(parser):
+    add_generic_ic_to_parser(parser, "salt")
+
+
+def add_ic_to_parser(parser):
+    add_elev_ic_to_parser(parser)
+    add_temp_ic_to_parser(parser)
+    add_salt_ic_to_parser(parser)
 
 
 def add_surface_outputs_to_parser(parser):
@@ -1238,15 +1465,60 @@ def add_surface_outputs_to_parser(parser):
 
 def add_stations_outputs_to_parser(parser):
     stations_output_group = parser.add_argument_group("Stations output options")
-    stations_output_group.add_argument("--stations-file")
+    stations_output_group.add_argument(
+        "--stations-file",
+        metavar="PATH",
+    )
     stations_output_group.add_argument("--stations-file-crs")
-    stations_output_group.add_argument("--nspool-sta")
-    stations_output_group.add_argument("--stations-elev", action="store_true")
-    stations_output_group.add_argument("--stations-prmsl", action="store_true")
-    stations_output_group.add_argument("--stations-uwind", action="store_true")
-    stations_output_group.add_argument("--stations-vwind", action="store_true")
-    stations_output_group.add_argument("--stations-temp", action="store_true")
-    stations_output_group.add_argument("--stations-sal", action="store_true")
-    stations_output_group.add_argument("--stations-uvel", action="store_true")
-    stations_output_group.add_argument("--stations-vvel", action="store_true")
-    stations_output_group.add_argument("--stations-wvel", action="store_true")
+    stations_output_group.add_argument(
+        "--nspool-sta",
+        help="Output interval for stations. If a station file is provided, "
+        "and this option is omitted, the stations outputs will be at a six-minute "
+        "iterval. If this parameter is provided as a float, the float will be interpreted in minutes, "
+        "if an integer is provided, it will be interpreted as iteration step interval.",
+    )
+    stations_output_group.add_argument(
+        "--stations-elev",
+        action="store_true",
+        help="Include water level output for stations.",
+    )
+    stations_output_group.add_argument(
+        "--stations-prmsl",
+        action="store_true",
+        help="Include pressure at mean sea level output for stations.",
+    )
+    stations_output_group.add_argument(
+        "--stations-uwind",
+        action="store_true",
+        help="Include wind u-component output for stations.",
+    )
+    stations_output_group.add_argument(
+        "--stations-vwind",
+        action="store_true",
+        help="Include wind v-component output for stations.",
+    )
+    stations_output_group.add_argument(
+        "--stations-temp",
+        action="store_true",
+        help="Include water temperature output for stations.",
+    )
+    stations_output_group.add_argument(
+        "--stations-sal",
+        action="store_true",
+        help="Include water salinity output for stations.",
+    )
+    stations_output_group.add_argument(
+        "--stations-uvel",
+        action="store_true",
+        help="Include water u-component output for stations.",
+    )
+    stations_output_group.add_argument(
+        "--stations-vvel",
+        action="store_true",
+        help="Include water v-component output for stations.",
+    )
+    stations_output_group.add_argument(
+        "--stations-wvel",
+        action="store_true",
+        help="Include water level output for stations.",
+    )

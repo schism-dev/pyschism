@@ -92,8 +92,9 @@ default: symlinks
     eval 'tail -f outputs/mirror.out  outputs/fatal.error &';\
     tail_pid=$${!};\
     ${MPI_LAUNCHER} ${NPROC} ${SCHISM_BINARY};\
+    err_code=$${?};\
     kill "$${tail_pid}";\
-    exit $${?}
+    exit $${err_code}
 """
 
 

@@ -1,9 +1,20 @@
 from enum import Enum
 
 
-class Stratification(Enum):
-    BAROCLINIC = 0
-    BAROTROPIC = 1
+class Stratification(Enum):                                                                                                                                                                                                          
+    BAROCLINIC = 0                                                                                                                                                                                                                   
+    BAROTROPIC = 1                                                                                                                                                                                                                   
+                                                                                                                                                                                                                                     
+    @staticmethod                                                                                                                                                                                                                    
+    def keys():                                                                                                                                                                                                                      
+        return list(map(lambda c: c.name, Stratification))                                                                                                                                                                           
+                                                                                                                                                                                                                                     
+    @classmethod                                                                                                                                                                                                                     
+    def _missing_(cls, name):                                                                                                                                                                                                        
+        if isinstance(name, str):
+            if name.upper() in cls.keys():
+                return cls[name.upper()]
+        raise ValueError(f'Argument {name} is not a valid Stratification type.')
 
 
 class Coriolis(Enum):

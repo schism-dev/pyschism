@@ -10,23 +10,24 @@ from pyschism.enums import Stratification
 from pyschism.param.core import CORE
 from pyschism.param.opt import OPT
 from pyschism.param.schout import SCHOUT
+
 # from pyschism.stations import Stations
 
 # PARAM_TEMPLATE = pathlib.Path(__file__).parent / 'param.nml.template'
-from .schism_init import ParamTemplate
+from pyschism.param.schism_init import GitParamTemplate
 
 logger = logging.getLogger(__name__)
 
 
 class Param:
-
     def __init__(
-            self,
-            dt: Union[int, float, timedelta] = None,
-            rnday: Union[int, float, timedelta] = None,
-            ibc: Union[Stratification, int, str] = Stratification.BAROTROPIC,
-            nspool: Union[int, float, timedelta] = None,
-            ihfskip: Union[int, timedelta] = None,
+        self,
+        dt: Union[int, float, timedelta] = None,
+        rnday: Union[int, float, timedelta] = None,
+        ibc: Union[Stratification, int, str] = Stratification.BAROTROPIC,
+        nspool: Union[int, float, timedelta] = None,
+        ihfskip: Union[int, timedelta] = None,
+        template=None,
     ):
 
         self.core = CORE()
@@ -35,10 +36,9 @@ class Param:
         self.core.dt = dt
         self.core.nspool = nspool
         self.core.ihfskip = ihfskip
-
         self.opt = OPT()
-
         self.schout = SCHOUT()
+        self.template = template
 
     def __str__(self):
         return f"{str(self.core)}\n\n{str(self.opt)}\n\n{str(self.schout)}\n"
@@ -50,14 +50,14 @@ class Param:
         if use_template:
             f90nml.patch(PARAM_TEMPLATE, self.to_dict(), path)
         else:
-            with open(path, 'w') as f:
+            with open(path, "w") as f:
                 f.write(str(self))
 
     def to_dict(self):
         return {
-            'CORE': self.core.to_dict(),
-            'OPT': self.opt.to_dict(),
-            'SCHOUT': self.schout.to_dict()
+            "CORE": self.core.to_dict(),
+            "OPT": self.opt.to_dict(),
+            "SCHOUT": self.schout.to_dict(),
         }
 
     # @property

@@ -6,8 +6,7 @@ import logging
 from pyschism import dates
 
 from pyschism.mesh.vgrid import Vgrid
-from pyschism.forcing.bctides import (
-    iettype, ifltype, isatype, itetype, itrtype, Tides)
+from pyschism.forcing.bctides import iettype, ifltype, isatype, itetype, itrtype, Tides
 from pyschism.forcing.bctides.elev2d import Elev2D
 from pyschism.forcing.bctides.uv3d import UV3D
 from pyschism.forcing.bctides.mod3d import TEM_3D, SAL_3D
@@ -21,7 +20,7 @@ class IbctypeDescriptor:
         self.bctype = bctype
 
     def __get__(self, obj, val):
-        return self.ibctype
+        return obj.gdf[self.name]
 
     def __set__(self, obj, val):
         if val is not None:
@@ -70,8 +69,6 @@ class Bctides(metaclass=BctidesMeta):
     def __init__(
         self,
         hgrid,
-        start_date: datetime,
-        rnday: timedelta,
         vgrid=None,
         iettype: Union[Dict, iettype.Iettype] = None,
         ifltype: Union[Dict, ifltype.Ifltype] = None,
@@ -81,8 +78,8 @@ class Bctides(metaclass=BctidesMeta):
         cutoff_depth: float = 50.0,
     ):
         self.hgrid = hgrid
-        self.start_date = start_date
-        self.end_date = rnday
+        # self.start_date = start_date
+        # self.end_date = rnday
         self.vgrid = Vgrid.default() if vgrid is None else vgrid
         self.cutoff_depth = cutoff_depth
         self.iettype = iettype
@@ -134,6 +131,8 @@ class Bctides(metaclass=BctidesMeta):
     def write(
         self,
         output_directory,
+        start_date: datetime = None,
+        end_date: Union[datetime, timedelta] = None,
         bctides: Union[bool, str] = True,
         elev2D: Union[bool, str] = True,
         uv3D: Union[bool, str] = True,
@@ -143,6 +142,10 @@ class Bctides(metaclass=BctidesMeta):
         parallel_download=False,
         progress_bar=True,
     ):
+        if start_date is not None:
+            self.start_date = start_date
+        if end_date is not None:
+            self.end_date = end_date
         # self.tidal_database.write(path, )
         output_directory = pathlib.Path(output_directory)
         bctides = output_directory / "bctides.in" if bctides is True else bctides
@@ -155,11 +158,19 @@ class Bctides(metaclass=BctidesMeta):
             for boundary in self.gdf.itertuples():
                 data_source = getattr(boundary, bctype)
                 if data_source is not None:
-                    exec(f"from pyschism.forcing.bctides.nudge import {tracer}_Nudge;"
-                         f"_tracer = output_directory / f'{tracer}_nudge.gr3' if {tracer.lower()}3D is True else {tracer};"
-                         f"_tr={tracer}_Nudge(self, data_source, rlmax=data_source.rlmax, rnu_day=data_source.rnu_day);"
-                         f'logger.info(f"Writing {tracer} nudge to file ' + r'{_tracer}");'
-                         "_tr.write(_tracer, overwrite=overwrite)")
+
+                    # I admit this exec is hacky.
+                    # pros: works well, it's simple, we don't need a return value
+                    # cons: might be confusing to read.
+                    # This generates all the nudges and writes the nudge files.
+                    exec(
+                        f"from pyschism.forcing.bctides.nudge import {tracer}_Nudge;"
+                        f"_tracer = output_directory / f'{tracer}_nudge.gr3' if {tracer.lower()}3D is True else {tracer};"
+                        f"_tr={tracer}_Nudge(self, data_source, rlmax=data_source.rlmax, rnu_day=data_source.rnu_day);"
+                        f'logger.info(f"Writing {tracer} nudge to file '
+                        + r'{_tracer}");'
+                        "_tr.write(_tracer, overwrite=overwrite)"
+                    )
                     break
 
         def write_elev2D():
@@ -257,7 +268,11 @@ class Bctides(metaclass=BctidesMeta):
         f = [" ".join(line)]
         for bctype in bctypes:
             if bctype is not None:
-                f.append(bctype.get_boundary_string(self.hgrid, boundary, global_constituents=global_constituents))
+                f.append(
+                    bctype.get_boundary_string(
+                        self.hgrid, boundary, global_constituents=global_constituents
+                    )
+                )
         return "\n".join(f)
 
     @property
@@ -295,10 +310,10 @@ class Bctides(metaclass=BctidesMeta):
                     apc = self.get_active_potential_constituents()
                     for constituent in set([*afc, *apc]):
                         self.use_constituent(
-                                constituent,
-                                forcing=True if constituent in afc else False,
-                                potential=True if constituent in apc else False,
-                            )
+                            constituent,
+                            forcing=True if constituent in afc else False,
+                            potential=True if constituent in apc else False,
+                        )
 
                 def get_active_forcing_constituents(self):
                     active_constituents = set()
@@ -338,12 +353,17 @@ class Bctides(metaclass=BctidesMeta):
 
                 @property
                 def constituents(self):
-                    if not hasattr(self, '_constituents'):
-                        self._constituents = sorted(list(set(
-                            [
-                                *self.get_active_potential_constituents(),
-                                *self.get_active_forcing_constituents()
-                            ])))
+                    if not hasattr(self, "_constituents"):
+                        self._constituents = sorted(
+                            list(
+                                set(
+                                    [
+                                        *self.get_active_potential_constituents(),
+                                        *self.get_active_forcing_constituents(),
+                                    ]
+                                )
+                            )
+                        )
                     return self._constituents
 
             self._tides = TidalConstituentCombiner(self.gdf)

@@ -1,40 +1,40 @@
 from datetime import timedelta
-from enum import Enum
+# from enum import Enum
 import pathlib
+import os
 from typing import Union
 
 import f90nml
 
 from pyschism.enums import Stratification
+from pyschism.param.schism_init import GitParamTemplate
 
-from pyschism.param.schism_init import ParamTemplate
 
+# class IbcType(Enum):
+#     BAROCLINIC = 0
+#     BAROTROPIC = 1
 
-class IbcType(Enum):
-    BAROCLINIC = 0
-    BAROTROPIC = 1
-
-    @classmethod
-    def _missing_(self, name):
-        raise ValueError(f'{name} is not a valid integer for ibc. '
-                         'Valid integers are 0 or 1.')
+#     @classmethod
+#     def _missing_(self, name):
+#         raise ValueError(f'{name} is not a valid integer for ibc. '
+#                          'Valid integers are 0 or 1.')
 
 
 class CORE:
-    """ Provides error checking implementation for CORE group """
+    """Provides error checking implementation for CORE group"""
 
-    mandatory = ['ipre', 'ibc', 'ibtp', 'rnday', 'dt', 'nspool', 'ihfskip']
+    mandatory = ["ipre", "ibc", "ibtp", "rnday", "dt", "nspool", "ihfskip"]
 
     def __init__(
-            self,
-            ipre: int = 0,
-            ibc: int = 0,
-            ibtp: int = 0,
-            rnday: Union[float, timedelta] = 0.,
-            dt: Union[float, timedelta] = 150.,
-            nspool: Union[int, float, timedelta] = None,
-            ihfskip: Union[int, timedelta] = None,
-            template: Union[str, ParamTemplate] = None,
+        self,
+        ipre: int = 0,
+        ibc: int = 0,
+        ibtp: int = 0,
+        rnday: Union[float, timedelta] = 0.0,
+        dt: Union[float, timedelta] = 150.0,
+        nspool: Union[int, float, timedelta] = None,
+        ihfskip: Union[int, timedelta] = None,
+        template: Union[str, os.PathLike, bool] = None,
     ):
         self.ipre = ipre
         self.ibc = ibc
@@ -47,7 +47,7 @@ class CORE:
 
     def __str__(self):
         data = []
-        for key, default in PARAM_DEFAULTS.items():
+        for key, default in self.defaults.items():
             if hasattr(self, key):
                 current = getattr(self, key)
             else:
@@ -56,14 +56,14 @@ class CORE:
                 data.append(f"  {key}={str(current)}")
             elif default != current:
                 data.append(f"  {key}={str(current)}")
-        data = '\n'.join(data)
+        data = "\n".join(data)
         return f"&CORE\n{data}\n/"
 
     def to_dict(self):
         output = {}
-        for key, default in PARAM_DEFAULTS.items():
-            if hasattr(self, f'{key}'):
-                current = getattr(self, f'{key}')
+        for key, default in self.template.items():
+            if hasattr(self, f"{key}"):
+                current = getattr(self, f"{key}")
             else:
                 current = None
             if key in self.mandatory:
@@ -90,7 +90,7 @@ class CORE:
     def ibc(self, ibc: Union[Stratification, int, str]):
 
         if isinstance(ibc, str):
-            ibc = IbcType[ibc.upper()].value
+            ibc = Stratification[ibc.upper()].value
 
         if isinstance(ibc, Stratification):
             ibc = ibc.value
@@ -98,10 +98,11 @@ class CORE:
         if isinstance(ibc, int):
             if ibc not in [0, 1]:
                 raise ValueError(
-                    'Argument to attribute ibc must be of type '
+                    "Argument to attribute ibc must be of type "
                     f"{Stratification} or an 0, 1 integer or a string "
                     "'barotropic', 'baroclinic', not type "
-                    f"{type(ibc)}.")
+                    f"{type(ibc)}."
+                )
 
         self._ibc = ibc
 
@@ -113,11 +114,11 @@ class CORE:
     def ibtp(self, ibtp: int):
 
         if ibtp not in [0, 1]:
-            raise TypeError('Argument to attribute ibtp must be 0 or 1, not '
-                            f"{ibtp}.")
+            raise TypeError(
+                "Argument to attribute ibtp must be 0 or 1, not " f"{ibtp}."
+            )
         if ibtp == 1 and self.ibc == 0:
-            raise ValueError("ibtp cannot be set to 1 because ibc is equal to "
-                             'zero.')
+            raise ValueError("ibtp cannot be set to 1 because ibc is equal to " "zero.")
         self._ibtp = ibtp
 
     @property
@@ -140,7 +141,7 @@ class CORE:
     @dt.setter
     def dt(self, dt: Union[float, timedelta, None]):
         if dt is None:
-            dt = timedelta(seconds=150.)
+            dt = timedelta(seconds=150.0)
 
         if not isinstance(dt, timedelta):
             dt = timedelta(seconds=float(dt))
@@ -158,8 +159,7 @@ class CORE:
         if isinstance(nspool, timedelta):
             nspool = int(round(nspool.total_seconds() / self.dt))
         if isinstance(nspool, float):
-            nspool = int(
-                round(timedelta(hours=nspool).total_seconds() / self.dt))
+            nspool = int(round(timedelta(hours=nspool).total_seconds() / self.dt))
         if isinstance(nspool, (int, float)):
             if nspool < 0:
                 raise ValueError("nspool must be positive.")
@@ -176,7 +176,7 @@ class CORE:
     def ihfskip(self, ihfskip: Union[int, timedelta, None]):
 
         if not isinstance(ihfskip, (int, timedelta, type(None))):
-            raise TypeError('Argument ihfskip must be int, timedelta or None.')
+            raise TypeError("Argument ihfskip must be int, timedelta or None.")
 
         if ihfskip is None and self.rnday is not None:
             ihfskip = int(round(timedelta(days=self.rnday).total_seconds() / self.dt))
@@ -188,9 +188,10 @@ class CORE:
             if self.nspool > 0:
                 if not (ihfskip / self.nspool).is_integer():
                     raise ValueError(
-                        'ihfskip/nspool must be an integer but got '
-                        'ihfskip/nspool='
-                        f'{ihfskip}/{self.nspool}={ihfskip/self.nspool}')
+                        "ihfskip/nspool must be an integer but got "
+                        "ihfskip/nspool="
+                        f"{ihfskip}/{self.nspool}={ihfskip/self.nspool}"
+                    )
 
         self._ihfskip = ihfskip
 
@@ -199,10 +200,17 @@ class CORE:
         return self._template
 
     @template.setter
-    def template(self, template: Union[ParamTemplate, None]):
-        if template is not None:
-            if template is True:
-                template = ParamTemplate().opt
-            elif isinstance(template, ParamTemplate):
-                template = template.opt
+    def template(self, template: Union[str, os.PathLike, None]):
+        if template is True:
+            template = GitParamTemplate().path
+        elif template is False or template is None:
+            template = None
+        else:
+            template = pathlib.Path(template)
         self._template = template
+
+    @property
+    def defaults(self):
+        if self.template is None:
+            return GitParamTemplate().core
+        return f90nml.read(self.template)['core']
