@@ -9,13 +9,12 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 import pyproj
-from pyproj import CRS
 import pytz
 from shapely import ops
 from shapely.geometry import Point
 
 
-from pyschism.dates import localize_datetime
+from pyschism import dates
 
 
 logger = logging.getLogger(__name__)
@@ -151,6 +150,10 @@ class SourceSinkWriter:
 
 class SourceSink:
 
+    # start_date = dates.StartDate()
+    # end_date = dates.EndDate()
+    # run_days = dates.RunDays()
+
     # TODO: This class is missing a time interpolator.
     _data = {}
 
@@ -170,7 +173,7 @@ class SourceSink:
         salinity: float = np.nan,
     ):
 
-        time = localize_datetime(time).astimezone(pytz.utc)
+        time = dates.localize_datetime(time).astimezone(pytz.utc)
         data_for_element = self._data.get(time, {}).get("element_id", {})
 
         # TODO: What happens if we have two different flows that both are
@@ -407,7 +410,7 @@ class SourceSink:
     def start_date(self, start_date):
         self._start_date = start_date
         if start_date is not None:
-            self._start_date = localize_datetime(start_date).astimezone(pytz.utc)
+            self._start_date = dates.localize_datetime(start_date).astimezone(pytz.utc)
         return self._start_date
 
     @property
@@ -462,7 +465,3 @@ def get_circle_of_radius(lon, lat, radius):
     point_transformed = ops.transform(wgs84_to_aeqd, center)
 
     return ops.transform(aeqd_to_wgs84, point_transformed.buffer(radius))
-
-
-class Hydrology:
-    pass

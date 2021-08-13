@@ -1,14 +1,23 @@
-from pyschism.forcing.nwm import NationalWaterModel, logger as nwm_logger
-from pyschism.forcing.base import logger as source_sink_base_logger
+import pathlib
+
+from pyschism.forcing.source_sink.nwm import NationalWaterModel, logger as nwm_logger, NWMElementPairings
+from pyschism.forcing.source_sink.base import logger as source_sink_base_logger
 from pyschism.mesh import Hgrid
 
 
 def test_nwm():
 
+    hgrid = Hgrid.open('https://raw.githubusercontent.com/geomesh/test-data/main/NWM/hgrid.ll')
     nwm = NationalWaterModel()
+    cached_pairings = pathlib.Path('pairings.txt')
     nwm.fetch_data(
-        Hgrid.open('https://raw.githubusercontent.com/geomesh/test-data/main/NWM/hgrid.ll')
+        hgrid,
+        end_date=5.,
+        pairings=None if cached_pairings.is_file() is False else NWMElementPairings.from_file(cached_pairings)
         )
+    nwm.pairings.make_plot()
+    if cached_pairings.is_file() is False:
+        nwm.pairings.save('pairings.txt')
 
 
 if __name__ == "__main__":

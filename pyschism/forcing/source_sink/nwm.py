@@ -4,22 +4,20 @@ import logging
 from multiprocessing import Pool
 import pathlib
 
-# import warnings
 import tarfile
 import tempfile
 from time import time
 from typing import Union
 import urllib
-
-from appdirs import user_data_dir
+import appdirs
 import boto3
 from botocore import UNSIGNED
 from botocore.config import Config
 import geopandas as gpd
+import matplotlib.pyplot as plt
 from netCDF4 import Dataset
 import numpy as np
-
-# import pytz
+import pandas as pd
 from scipy.spatial import cKDTree
 from shapely import ops
 from shapely.geometry import LinearRing, Point, MultiPoint, LineString, box
@@ -29,17 +27,18 @@ from pyschism import dates
 from pyschism.mesh.hgrid import Hgrid
 from pyschism.mesh.base import Gr3
 
-from pyschism.forcing.source_sink.base import Hydrology
+from pyschism.forcing.source_sink.base import SourceSink
 
-DATADIR = pathlib.Path(user_data_dir("nwm"))
+DATADIR = pathlib.Path(appdirs.user_data_dir("pyschism/nwm"))
 DATADIR.mkdir(exist_ok=True, parents=True)
-NWM_FILE = DATADIR / "NWM_channel_hydrofabric.tar.gz"
 
 logger = logging.getLogger(__name__)
 
 
 class NWMElementPairings:
-    def __init__(self, hgrid):
+    def __init__(self, hgrid, nwm_file=None):
+
+        self._nwm_file = nwm_file
 
         logger.info("Computing NWMElementPairings...")
         self._hgrid = hgrid
@@ -170,31 +169,33 @@ class NWMElementPairings:
 
         logger.info("Sorting features into sources and sinks took: " f"{time()-start}.")
 
-        # verification plot
-        # data = []
-        # for eid, features in sources.items():
-        #     # for feat in features:
-        #     eidx = self._hgrid.elements.get_index_by_id(eid)
-        #     data.append({
-        #             'geometry': elements.iloc[eidx].geometry
-        #         })
-        # src_gdf = gpd.GeoDataFrame(data)
-        # data = []
-        # for eid, features in sinks.items():
-        #     # for feat in features:
-        #     eidx = self._hgrid.elements.get_index_by_id(eid)
-        #     data.append({
-        #             'geometry': elements.iloc[eidx].geometry
-        #         })
-        # snk_gdf = gpd.GeoDataFrame(data)
-        # import matplotlib.pyplot as plt
-        # ax = elements.plot(facecolor="none",  edgecolor='black', lw=0.7)
-        # src_gdf.plot(color='red', ax=ax, alpha=0.5)
-        # snk_gdf.plot(color='blue', ax=ax, alpha=0.5)
-        # plt.show()
-
         self.sources = sources
         self.sinks = sinks
+
+    def make_plot(self):
+        # verification plot
+        data = []
+        egdf = self.hgrid.elements.geodataframe()
+        for eid, features in self.sources.items():
+            # for feat in features:
+            eidx = self.hgrid.elements.get_index_by_id(eid)
+            data.append({
+                    'geometry': egdf.iloc[eidx].geometry
+                })
+        src_gdf = gpd.GeoDataFrame(data)
+        data = []
+        for eid, features in self.sinks.items():
+            # for feat in features:
+            eidx = self._hgrid.elements.get_index_by_id(eid)
+            data.append({
+                    'geometry': egdf.iloc[eidx].geometry
+                })
+        snk_gdf = gpd.GeoDataFrame(data)
+
+        ax = egdf.plot(facecolor="none",  edgecolor='black', lw=0.7)
+        src_gdf.plot(color='red', ax=ax, alpha=0.5)
+        snk_gdf.plot(color='blue', ax=ax, alpha=0.5)
+        plt.show()
 
     @property
     def sources_gdf(self):
@@ -239,36 +240,99 @@ class NWMElementPairings:
     @_hgrid.setter
     def _hgrid(self, hgrid: Gr3):
         hgrid = Hgrid(**hgrid.to_dict())
-        hgrid.transform_to(gpd.read_file(self.nwm_file, rows=1, layer=0).crs)
+        hgrid.transform_to(
+            gpd.read_file(self.nwm_file, rows=1, layer=0).crs
+            # 'epsg:4269',
+            )
         self.__hgrid = hgrid
 
     @_hgrid.deleter
     def _hgrid(self):
         del self.__hgrid
 
-    @property
-    def nwm_file(self):
-        if not hasattr(self, "_nwm_file"):
-            self._tmpdir = tempfile.TemporaryDirectory()
-            with tarfile.open(NWM_FILE, "r:gz") as src:
-                src.extractall(self._tmpdir.name)
-            self._nwm_file = (
-                pathlib.Path(self._tmpdir.name)
-                / "NWM_v2.0_channel_hydrofabric/nwm_v2_0_hydrofabric.gdb"
-            )
-        return self._nwm_file
+    # @property
+    # def nwm_file(self):
+
+    #     # NOTE: There's a tradeoff between time spent decompressing the file vs. the memory it takes to store it.
+
+    #     if not hasattr(self, "_nwm_file"):
+    #         self._tmpdir = tempfile.TemporaryDirectory()
+    #         with tarfile.open(NWM_FILE, "r:gz") as src:
+    #             src.extractall(self._tmpdir.name)
+    #         self._nwm_file = (
+    #             list(pathlib.Path(self._tmpdir.name).glob('**/*.gdb'))[0]
+    #         )
+    #     return self._nwm_file
 
     @property
     def gdf(self):
         if not hasattr(self, "_gdf"):
-            bbox = self._hgrid.get_bbox(crs="EPSG:4326", output_type="bbox")
-            self._gdf = gpd.read_file(
-                self.nwm_file,
-                bbox=(bbox.xmin, bbox.ymin, bbox.xmax, bbox.ymax),
-                # bbox=(-75.889435, 38.895308, -74.604034, 39.477546),  # Delaware Bay, debug  # noqa: E501
-                layer=0,
-            )
+            bbox = self.hgrid.get_bbox(output_type="bbox")
+            # print(bbox)
+            # print(self.hgrid.crs)
+            import fiona
+            gdf_coll = []
+            # TODO: Now the reaches are in three diff laters.
+            for reach_layer in [reach_layer for reach_layer in fiona.listlayers(self.nwm_file) if'reaches' in reach_layer]:
+                print(f'append reach_layer: {reach_layer}')
+                gdf_coll.append(
+                    gpd.read_file(
+                        self.nwm_file,
+                        bbox=(bbox.xmin, bbox.ymin, bbox.xmax, bbox.ymax),
+                        layer=reach_layer
+                    )
+                )
+            self._gdf = pd.concat(gdf_coll)
+        print(self._gdf)
+        exit()
+        self._gdf.plot()
+        import matplotlib.pyplot as plt
+        plt.show(block=True)
+        print(self._gdf)
+        print(self._gdf.crs)
+        print(bbox)
+        exit()
         return self._gdf
+
+    @property
+    def nwm_file(self):
+        return self._nwm_file
+
+    @property
+    def _nwm_file(self):
+        return self.__nwm_file
+
+    @_nwm_file.setter
+    def _nwm_file(self, nwm_file):
+        nwm_file = list(DATADIR.glob('**/*hydrofabric*.gdb')) if nwm_file is None else nwm_file
+        if isinstance(nwm_file, list):
+            if len(nwm_file) == 0:
+                tmpdir = tempfile.TemporaryDirectory()
+                logger.info(
+                    f"Downloading National Water Model stream network tar file to {tmpdir}"
+                )
+                try:
+                    wget.download(
+                        "https://www.nohrsc.noaa.gov/pub/staff/keicher/NWM_live/web/data_tools/NWM_channel_hydrofabric.tar.gz",
+                        out=tmpdir.name,
+                        bar=wget.bar_adaptive if logger.getEffectiveLevel() < 30 else None,
+                    )
+                except urllib.error.HTTPError as e:
+                    logger.fatal("Could not download NWM_channel_hydrofabric.tar.gz")
+                    raise e
+                tmpfile = list(pathlib.Path(tmpdir.name).glob("**/*.tar.gz"))[0]
+                with tarfile.open(tmpfile, "r:gz") as src:
+                    logger.info(
+                        f"Extracting National Water Model stream network tar file to {DATADIR}"
+                    )
+
+                    src.extractall(DATADIR)
+                nwm_file = list(DATADIR.glob('**/*.gdb'))[0]
+            elif len(nwm_file) == 1:
+                nwm_file = nwm_file[0]
+            else:
+                raise Exception('Found more than 1 NWM hydrofabric file.')
+        self.__nwm_file = nwm_file       
 
 
 def streamflow_lookup(file, indexes):
@@ -426,44 +490,26 @@ class AWSDataInventory:
         return {"medium_range_mem1": "medium_range.channel_rt_1"}[self.product]
 
 
-class NationalWaterModel(Hydrology):
-    def __init__(self, aggregation_radius=None):
-        self._nwm_file = NWM_FILE
-        if not self._nwm_file.exists():
-            logger.warning(
-                "Downloading National Water Model stream network file to "
-                "the pyschism cache..."
-            )
-            try:
-                wget.download(
-                    "https://www.nohrsc.noaa.gov/pub/staff/keicher/NWM_live/"
-                    "web/data_tools/NWM_channel_hydrofabric.tar.gz",
-                    out=str(self._nwm_file),
-                )
-            except urllib.error.HTTPError as e:
-                logger.fatal("Could not download NWM_channel_hydrofabric.tar.gz")
-                raise e
+class NationalWaterModel(SourceSink):
+    def __init__(self, aggregation_radius=None, pairings=None, nwm_file=None):
+        self.nwm_file = nwm_file
         self.aggregation_radius = aggregation_radius
-        self.pairings = {}
 
     def fetch_data(
         self,
         gr3: Gr3,
         start_date: datetime = None,
         end_date: Union[datetime, timedelta] = None,
-        nprocs=1,
+        nprocs=-1,
+        pairings=None,
     ):
 
-        if not isinstance(end_date, datetime):
-            if isinstance(end_date, timedelta):
-                end_date = start_date + end_date
-            else:
-                end_date = start_date + timedelta(days=end_date)
-
-        pairings = self.get_pairings(gr3)
+        self.start_date = start_date
+        self.end_date = end_date
+        pairings = NWMElementPairings(gr3, nwm_file=self.nwm_file) if pairings is None else pairings
         self._inventory = AWSDataInventory(
-            start_date=start_date,
-            rnday=end_date - start_date,
+            start_date=self.start_date,
+            rnday=self.end_date - self.start_date,
             product="medium_range_mem1",
         )
 
@@ -478,30 +524,18 @@ class NationalWaterModel(Hydrology):
                 streamflow_lookup, [(file, snk_idxs) for file in self.inventory.files]
             )
         pool.join()
-
-        hydro = Hydrology(
-            # start_date=start_date,
-        )
         for i, file in enumerate(self.inventory.files):
             nc = Dataset(file)
             _time = dates.localize_datetime(
                 datetime.strptime(nc.model_output_valid_time, "%Y-%m-%d_%H:%M:%S")
             )
             for j, element_id in enumerate(pairings.sources.keys()):
-                hydro.add_data(_time, element_id, sources[i][j], -9999, 0.0)
+                self.add_data(_time, element_id, sources[i][j], -9999, 0.0)
             for k, element_id in enumerate(pairings.sinks.keys()):
-                hydro.add_data(_time, element_id, -sinks[i][k])
+                self.add_data(_time, element_id, -sinks[i][k])
 
         if self.aggregation_radius is not None:
-            hydro.aggregate_by_radius(gr3, self.aggregation_radius)
-
-    def get_pairings(self, gr3):
-        md5 = gr3.md5
-        pairings = self.pairings.get(md5)
-        if pairings is None:
-            pairings = NWMElementPairings(gr3)
-            self.pairings[md5] = pairings
-        return pairings
+            self.aggregate_by_radius(gr3, self.aggregation_radius)
 
     @property
     def timevector(self):
