@@ -10,6 +10,7 @@ from time import time
 from typing import Union
 import urllib
 
+import json
 from appdirs import user_data_dir
 import boto3
 from botocore import UNSIGNED
@@ -111,7 +112,7 @@ class NWMElementPairings:
                 'No National Water model intersections found on the mesh.')
         intersection = gpd.GeoDataFrame(data, crs=hgrid.crs)
         del data
-        print(intersection)
+        #print(intersection)
 
         # 2) Generate element centroid KDTree
         centroids = []
@@ -353,25 +354,33 @@ class AWSDataInventory:
             #+ timedelta(hours=float(timedelta_str))
 
     def get_nc_pairing_indexes(self, pairings: NWMElementPairings):
+    #def get_nc_pairing_indexes(self, srcs, snks):
         nc_feature_id = Dataset(self.files[0])['feature_id'][:]
 
         def get_aggregated_features(features):
             aggregated_features = []
             for source_feats in features:
                 aggregated_features.extend(list(source_feats))
-            in_file = np.where(
-                np.in1d(nc_feature_id, aggregated_features,
-                        assume_unique=True))[0]
+            #in_file = np.where(
+            #    np.in1d(nc_feature_id, aggregated_features,
+            #            assume_unique=True))[0]
+            in_file=[]
+            for feature in aggregated_features:
+                idx=np.where(nc_feature_id == int(feature))[0]
+                in_file.append(idx.item())
+
             in_file_2 = []
             sidx = 0
             for source_feats in features:
                 eidx = sidx + len(source_feats)
-                in_file_2.append(in_file[sidx:eidx].tolist())
+                #in_file_2.append(in_file[sidx:eidx].tolist())
+                in_file_2.append(in_file[sidx:eidx])
                 sidx = eidx
             return in_file_2
 
         sources = get_aggregated_features(pairings.sources.values())
         sinks = get_aggregated_features(pairings.sinks.values())
+
         return sources, sinks
 
     @property
@@ -586,6 +595,11 @@ class NationalWaterModel(Hydrology):
                 end_date = start_date + timedelta(days=end_date)
 
         pairings = self.get_pairings(gr3)
+        #with open('source_pairings.json', 'r') as fid:
+        #    srcs=json.load(fid)
+        #with open('sink_pairings.json', 'r') as fid:
+        #    snks=json.load(fid)
+
         self._inventory = AWSDataInventory(
                 start_date=start_date,
                 rnday=end_date - start_date,
@@ -595,7 +609,9 @@ class NationalWaterModel(Hydrology):
         self._timevector = [dates.localize_datetime(d)
                             for d in self.inventory._files]
 
+        
         src_idxs, snk_idxs = self.inventory.get_nc_pairing_indexes(pairings)
+        #src_idxs, snk_idxs = self.inventory.get_nc_pairing_indexes(srcs, snks)
         with Pool(processes=nprocs) as pool:
             sources = pool.starmap(
                 streamflow_lookup,
@@ -614,8 +630,10 @@ class NationalWaterModel(Hydrology):
                 nc.model_output_valid_time,
                 "%Y-%m-%d_%H:%M:%S"))
             for j, element_id in enumerate(pairings.sources.keys()):
+            #for j, element_id in enumerate(srcs.keys()):
                 hydro.add_data(_time, element_id, sources[i][j], -9999, 0.)
             for k, element_id in enumerate(pairings.sinks.keys()):
+            #for k, element_id in enumerate(snks.keys()):
                 hydro.add_data(_time, element_id, -sinks[i][k])
 
         if self.aggregation_radius is not None:
