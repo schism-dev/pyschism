@@ -1,3 +1,7 @@
+import signal
+import os
+import errno
+from functools import wraps
 from datetime import datetime, timedelta
 from enum import Enum
 import pathlib
@@ -11,7 +15,8 @@ from matplotlib.transforms import Bbox
 from netCDF4 import Dataset
 import numpy as np
 
-from pyschism.forcing.nws.nws2.sflux import (
+from pyschism.enums import GFSProduct
+from pyschism.forcing.atmosphere.nws.nws2.sflux import (
     SfluxDataset,
     AirComponent,
     PrcComponent,
@@ -23,47 +28,80 @@ BASE_URL = 'https://nomads.ncep.noaa.gov/dods'
 logger = logging.getLogger(__name__)
 
 
-class HRRRInventory:
+class BaseURL(Enum):
+    GFS_0P25 = f'{BASE_URL}/gfs_0p25'
+    GFS_0P25_1HR = f'{BASE_URL}/gfs_0p25_1hr'
+    GFS_0P50 = f'{BASE_URL}/gfs_0p50'
+    GFS_1P00 = f'{BASE_URL}/gfs_1p00'
 
-    def __init__(self, start_date=None, bbox=None):
+    @classmethod
+    def _missing_(self, name):
+        raise ValueError(f'{name} is not a valid GFS product.')
+
+
+class TimeoutError(Exception):
+    pass
+
+
+def timeout(seconds=10, error_message=os.strerror(errno.ETIME)):
+    def decorator(func):
+        def _handle_timeout(signum, frame):
+            raise TimeoutError(error_message)
+
+        def wrapper(*args, **kwargs):
+            signal.signal(signal.SIGALRM, _handle_timeout)
+            signal.alarm(seconds)
+            try:
+                result = func(*args, **kwargs)
+            finally:
+                signal.alarm(0)
+            return result
+
+        return wraps(func)(wrapper)
+
+    return decorator
+
+
+class GFSInventory:
+
+    def __init__(self, product='gfs_0p25_1hr', start_date=None, rnday=4,
+                 bbox=None):
+        self.product = GFSProduct(product) if not \
+            isinstance(product, GFSProduct) else product
         self.start_date = nearest_cycle() if start_date is None else \
             localize_datetime(start_date).astimezone(pytz.utc)
-        #self.rnday = rnday if isinstance(rnday, timedelta) else \
-        #    timedelta(days=rnday)
-        #if self.rnday > timedelta(days=2) - timedelta(hours=1):
-        #    raise ValueError(
-        #        'Maximum run days for HRRR is '
-        #        f'{timedelta(days=2) - timedelta(hours=1)} but got {rnday}.')
-
+        self.rnday = rnday if isinstance(rnday, timedelta) else \
+            timedelta(days=rnday)
         if self.start_date != nearest_cycle(self.start_date):
             raise NotImplementedError(
-                'Argment start_date is does not align with any HRRR cycle '
+                'Argment start_date is does not align with any GFS cycle '
                 'times.')
-        #self._files = {_: None for _ in np.arange(
-        #    self.start_date,
-        #    self.start_date + self.rnday + self.output_interval,
-        #    self.output_interval
-        #).astype(datetime)}
+        self._files = {_: None for _ in np.arange(
+            self.start_date,
+            self.start_date + self.rnday + self.output_interval,
+            self.output_interval
+        ).astype(datetime)}
 
-        #for dt in self.nearest_zulus:
-        #    if None not in list(self._files.values()):
-        #        break
-        base_url = BASE_URL + f'/{self.product}' + \
-            f'/hrrr{start_date.strftime("%Y%m%d")}'
-            # cycle
-            #for cycle in reversed(range(0, 24, int(self.output_interval.total_seconds() / 3600))):
-        test_url = f'{base_url}/hrrr_sfc.t00z'
+        base_url = BASE_URL + f'/{self.product.value}' + \
+            f'/gfs{self.start_date.strftime("%Y%m%d")}'
+        test_url = f'{base_url}/' + \
+                   f'{self.product.name.lower()}_00z'
+        logger.info(f'Fetching data from {test_url}')
         try:
             logger.info(f'Checking url: {test_url}')
-            nc = Dataset(test_url)
+
+            @timeout()
+            def get_netcdf_timeout():
+                return Dataset(test_url)
+            nc = get_netcdf_timeout()
             logger.info('Success!')
         except OSError as e:
             if e.errno == -70:
                 print()
-                #continue
             elif e.errno == -73:
                 nc = False
 
+                @timeout()
                 def retry():
                     try:
                         return Dataset(test_url)
@@ -74,38 +112,37 @@ class HRRRInventory:
                     nc = retry()
             else:
                 raise e
-        self.nc = nc
-        #file_dates = self.get_nc_datevector(nc)
-        #for _datetime in reversed(list(self._files.keys())):
-        #            if _datetime in file_dates:
-        #                if self._files[_datetime] is None:
-        #                    self._files[_datetime] = nc
-        #            else:
-        #                logger.debug(f'No data for time {str(_datetime)} in '
-        #                             f'{test_url}.')
-        #        if not any(nc is None for nc in self._files.values()):
-        #            break
 
-        #missing_records = [dt for dt, nc in self._files.items() if nc is None]
-        #if len(missing_records) > 0:
-        #    raise ValueError(f'No HRRR data for dates: {missing_records}.')
+        #self.nc_datevector = self.get_nc_datevector(nc)
+        #print(f'nc datevector is {nc_datevector}')
+        self.nc = nc
+
+        #for dt, nc in self._files.items():
+        #    print(f'dt is {dt}, nc is {nc}')
+        #for nc in self._files.values():
+        #    print(f'nc is {nc}')
+
+        #if not any(nc is None for nc in self._files.values()):
+        #    raise NotImplementedError(
+        #        'No netcdf file found!')
 
         self._bbox = self._modified_bbox(bbox)
 
-    def put_sflux_field(self, hrrr_varname: str, dst: Dataset,
+    def put_sflux_field(self, gfs_varname: str, dst: Dataset,
                         sflux_varname: str):
 
-        lon_idxs, lat_idxs = self._bbox_indexes(self._bbox)
-        #for i, (dt, nc) in enumerate(self._files.items()):
+        lon_idxs, lat_idxs = self._modified_bbox_indexes(self._bbox)
         logger.info(
-            f'Putting HRRR field {hrrr_varname} for as '
+            f'Putting GFS field {gfs_varname} as '
             f'{sflux_varname} from file '
             f'{self.nc.filepath().replace(f"{BASE_URL}/", "")}.')
 
         def put_nc_field():
             try:
-                dst[sflux_varname][:, :, :] = self.nc.variables[hrrr_varname][
-                        :, lat_idxs, lon_idxs]
+                #make sure sflux1 covers simulation period
+                ntimes=(self.rnday+timedelta(days=1))*24
+                dst[sflux_varname][:, :, :] = self.nc.variables[gfs_varname][
+                    :-1:, lat_idxs, lon_idxs]
                 return True
             except RuntimeError:
                 logger.info('Failed! retrying...')
@@ -137,13 +174,21 @@ class HRRRInventory:
     def get_sflux_timevector(self):
         #timevec = list(self._files.keys())
         timevec = list(self.get_nc_datevector(self.nc))
+        #print(timevec)
         _nearest_zulu = nearest_zulu(np.min(timevec))
+        #print(f'_nearest_zulu is {_nearest_zulu}')
         return [(localize_datetime(x) - _nearest_zulu) / timedelta(days=1)
                 for x in timevec]
 
     def xy_grid(self):
-        lon_idxs, lat_idxs = self._bbox_indexes(self._bbox)
-        return np.meshgrid(self.lon[lon_idxs], self.lat[lat_idxs])
+        lon_idxs, lat_idxs = self._modified_bbox_indexes(self._bbox)
+        lon = []
+        for x in self.lon[lon_idxs]:
+            if x > 180:
+                lon.append(x-360)
+            else:
+                lon.append(x)
+        return np.meshgrid(np.array(lon), self.lat[lat_idxs])
 
     @property
     def nearest_zulu(self):
@@ -155,17 +200,15 @@ class HRRRInventory:
     def nearest_zulus(self):
         return np.arange(
             self.nearest_zulu,
-            self.nearest_zulu - timedelta(days=2),
+            self.nearest_zulu - timedelta(days=10),
             -timedelta(days=1),
         ).astype(datetime)
 
     @property
     def output_interval(self):
-        return timedelta(hours=1)
-
-    @property
-    def product(self):
-        return 'hrrr'
+        if self.product == GFSProduct.GFS_0P25_1HR:
+            return timedelta(hours=1)
+        return timedelta(hours=6)
 
     @property
     def lon(self):
@@ -187,15 +230,13 @@ class HRRRInventory:
 
     def _modified_bbox(self, bbox=None):
         if bbox is None:
-            return Bbox.from_extents(
-                np.min(self.lon),
-                np.min(self.lat),
-                np.max(self.lon),
-                np.max(self.lat)
-            )
-        return bbox
+            return Bbox.from_extents(0, -90, 360, 90)
+        else:
+            xmin = bbox.xmin + 360 if bbox.xmin < 0 else bbox.xmin
+            xmax = bbox.xmax + 360 if bbox.xmax < 0 else bbox.xmax
+            return Bbox.from_extents(xmin, bbox.ymin, xmax, bbox.ymax)
 
-    def _bbox_indexes(self, bbox):
+    def _modified_bbox_indexes(self, bbox):
         lat_idxs = np.where((self.lat >= bbox.ymin)
                             & (self.lat <= bbox.ymax))[0]
         lon_idxs = np.where((self.lon >= bbox.xmin)
@@ -203,13 +244,13 @@ class HRRRInventory:
         return lon_idxs, lat_idxs
 
 
-class HRRR(SfluxDataset):
+class GlobalForecastSystem(SfluxDataset):
 
     def __init__(
             self,
-            product: str = None,
+            product: Union[str, GFSProduct] = GFSProduct.GFS_0P25_1HR,
     ):
-        self.prmsl_name = 'pressfc'
+        self.prmsl_name = 'prmslmsl'
         self.spfh_name = 'spfh2m'
         self.stmp_name = 'tmpsfc'
         self.uwind_name = 'ugrd10m'
@@ -217,35 +258,44 @@ class HRRR(SfluxDataset):
         self.prate_name = 'pratesfc'
         self.dlwrf_name = 'dlwrfsfc'
         self.dswrf_name = 'dswrfsfc'
+        self.product = GFSProduct(product) if not \
+            isinstance(product, GFSProduct) else product
+        self.air = None
+        self.prc = None
+        self.rad = None
 
     def fetch_data(
             self,
             start_date: datetime = None,
-            rnday: Union[float, timedelta] = 1,
+            rnday: Union[float, timedelta] = 4,
             air: bool = True,
             prc: bool = True,
             rad: bool = True,
             bbox: Bbox = None,
     ):
-        """Fetches HRRR data from NOMADS server. """
-        logger.info('Fetching HRRR data.')
+        """Fetches GFS data from NOMADS server. """
+        logger.info('Fetching GFS data from a day early')
         self.start_date = nearest_cycle() if start_date is None else \
             localize_datetime(start_date).astimezone(pytz.utc)
         self.rnday = rnday if isinstance(rnday, timedelta) else \
             timedelta(days=rnday)
-        inventory = HRRRInventory(
+
+        self.start_date = self.start_date-timedelta(days=1)
+
+        inventory = GFSInventory(
+            self.product,
             self.start_date,
-            #self.rnday + self.output_interval,
+            self.rnday + self.output_interval,
             bbox
         )
         nx_grid, ny_grid = inventory.xy_grid()
         if air is True:
             with Dataset(
                 self.tmpdir /
-                f"air_{inventory.product}_"
+                f"air_{inventory.product.value}_"
                 f"{str(self.start_date)}.nc",
                 'w', format='NETCDF3_CLASSIC'
-                    ) as dst:
+            ) as dst:
 
                 # global attributes
                 dst.setncatts({"Conventions": "CF-1.0"})
@@ -270,7 +320,7 @@ class HRRR(SfluxDataset):
                 dst.createVariable('time', 'f4', ('time',))
                 dst['time'].long_name = 'Time'
                 dst['time'].standard_name = 'time'
-                date = nearest_zulu(self.start_date)
+                date = self.start_date
                 dst['time'].units = f'days since {date.year}-{date.month}'\
                                     f'-{date.day} 00:00'\
                                     f'{date.tzinfo}'
@@ -284,7 +334,8 @@ class HRRR(SfluxDataset):
                         ('time', 'ny_grid', 'nx_grid')
                     )
                     logger.info(f'Put field {var}')
-                    inventory.put_sflux_field(getattr(self, f'{var}_name'), dst, var)
+                    inventory.put_sflux_field(
+                        getattr(self, f'{var}_name'), dst, var)
 
                 # prmsl
                 dst['prmsl'].long_name = "Pressure reduced to MSL"
@@ -317,10 +368,10 @@ class HRRR(SfluxDataset):
         if prc is True:
             with Dataset(
                 self.tmpdir /
-                f"prc_{inventory.product}_"
+                f"prc_{inventory.product.value}_"
                 f"{str(self.start_date)}.nc",
                 'w', format='NETCDF3_CLASSIC'
-                    ) as dst:
+            ) as dst:
 
                 # global attributes
                 dst.setncatts({"Conventions": "CF-1.0"})
@@ -344,7 +395,7 @@ class HRRR(SfluxDataset):
                 dst.createVariable('time', 'f4', ('time',))
                 dst['time'].long_name = 'Time'
                 dst['time'].standard_name = 'time'
-                date = nearest_zulu(self.start_date)
+                date = self.start_date
                 dst['time'].units = f'days since {date.year}-{date.month}'\
                                     f'-{date.day} 00:00'\
                                     f'{date.tzinfo}'
@@ -355,7 +406,8 @@ class HRRR(SfluxDataset):
                     dst.createVariable(var, float,
                                        ('time', 'ny_grid', 'nx_grid'))
                     logger.info(f'Put field {var}')
-                    inventory.put_sflux_field(getattr(self, f'{var}_name'), dst, var)
+                    inventory.put_sflux_field(
+                        getattr(self, f'{var}_name'), dst, var)
                 # prate
                 dst['prate'].long_name = "Surface Precipitation Rate"
                 dst['prate'].standard_name = "air_pressure_at_sea_level"
@@ -364,10 +416,10 @@ class HRRR(SfluxDataset):
         if rad is True:
             with Dataset(
                 self.tmpdir /
-                f"rad_{inventory.product}_"
+                f"rad_{inventory.product.value}_"
                 f"{str(self.start_date)}.nc",
                 'w', format='NETCDF3_CLASSIC'
-                    ) as dst:
+            ) as dst:
                 # global attributes
                 dst.setncatts({"Conventions": "CF-1.0"})
                 # dimensions
@@ -390,7 +442,7 @@ class HRRR(SfluxDataset):
                 dst.createVariable('time', 'f4', ('time',))
                 dst['time'].long_name = 'Time'
                 dst['time'].standard_name = 'time'
-                date = nearest_zulu(self.start_date)
+                date = self.start_date
                 dst['time'].units = f'days since {date.year}-{date.month}'\
                                     f'-{date.day} 00:00'\
                                     f'{date.tzinfo}'
@@ -401,7 +453,8 @@ class HRRR(SfluxDataset):
                     dst.createVariable(var, float,
                                        ('time', 'ny_grid', 'nx_grid'))
                     logger.info(f'Put field {var}')
-                    inventory.put_sflux_field(getattr(self, f'{var}_name'), dst, var)
+                    inventory.put_sflux_field(
+                        getattr(self, f'{var}_name'), dst, var)
 
                 # dlwrf
                 dst['dlwrf'].long_name = "Downward Long Wave Radiation "\
@@ -433,4 +486,6 @@ class HRRR(SfluxDataset):
 
     @property
     def output_interval(self):
-        return timedelta(hours=1)
+        if self.product == GFSProduct.GFS_0P25_1HR:
+            return timedelta(hours=1)
+        return timedelta(hours=6)
