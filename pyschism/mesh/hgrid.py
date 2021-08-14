@@ -25,19 +25,20 @@ class Hgrid(Gr3):
     def open(path, crs=None):
         if str(path).endswith('.ll') and crs is None:
             crs = 'epsg:4326'
+
         try:
             response = requests.get(path)
             response.raise_for_status()
             tmpfile = tempfile.NamedTemporaryFile()
             with open(tmpfile.name, "w") as fh:
                 fh.write(response.text)
-            return Hgrid(**grd.read(pathlib.Path(tmpfile.name), crs=crs))
+            _grd = grd.read(pathlib.Path(tmpfile.name), crs=crs)
         except Exception:
-            pass
+            _grd = grd.read(path, crs=crs)
 
-        _grd = grd.read(path, crs=crs)
         _grd['nodes'] = {id: (coords, -val) for id, (coords, val)
                          in _grd['nodes'].items()}
+
         return Hgrid(**_grd)
 
     def to_dict(self, boundaries=True):
