@@ -3,6 +3,8 @@ import logging
 from typing import Union
 
 from pyschism.enums import (
+    # IofWetdryVariables,
+    # IofZcorVariables,
     IofHydroVariables,
     IofDvdVariables,
     IofWwmVariables,

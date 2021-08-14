@@ -11,6 +11,8 @@ import numpy as np
 import xarray
 
 from pyschism.enums import (
+    IofWetdryVariables,
+    IofZcorVariables,
     IofHydroVariables,
     IofDvdVariables,
     IofWwmVariables,
@@ -300,6 +302,8 @@ class OutputVariableCombiner(ABC):
 class OutputsCollector:
 
     surface_output_vars = [
+        IofWetdryVariables,
+        IofZcorVariables,
         IofHydroVariables,
         IofDvdVariables,
         IofWwmVariables,
@@ -466,5 +470,3 @@ class CombinedOutputs:
 
     def __init__(self, resource):
         self.dataset = xarray.open_mfdataset(resource)
-
-
