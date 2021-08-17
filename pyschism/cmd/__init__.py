@@ -7,6 +7,7 @@ from pyschism.cmd.forecast import ForecastCli
 from pyschism.cmd.grd2sms import Grd2SmsCli
 from pyschism.cmd.hgrid import HgridCli
 from pyschism.cmd.outputs import OutputsCli
+from pyschism.cmd.sflux import SfluxCli
 from pyschism.cmd.sms2grd import Sms2grdCli
 from pyschism.cmd.stations import StationsCli
 from pyschism.cmd.tvdflag import TvdflagCli
@@ -22,6 +23,7 @@ __all__ = [
     "Grd2SmsCli",
     "HgridCli",
     "OutputsCli",
+    "SfluxCli",
     "Sms2grdCli",
     "StationsCli",
     "TvdflagCli",

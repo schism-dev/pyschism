@@ -4,7 +4,7 @@ import os
 import pathlib
 import subprocess
 import tempfile
-from typing import Union  # , List, Iterable
+from typing import List, Union  # , Iterable
 
 # import numpy as np
 
@@ -18,7 +18,7 @@ from pyschism.forcing.nws.base import NWS
 from pyschism.forcing.nws.nws2 import NWS2
 
 # from pyschism.forcing.baroclinic import BaroclinicForcing
-from pyschism.forcing.bctides.bctides import Bctides
+from pyschism.forcing.bctides import Bctides, iettype, ifltype, isatype, itetype
 from pyschism.makefile import MakefileDriver
 from pyschism.mesh import Hgrid, Vgrid, Fgrid, gridgr3, prop
 from pyschism.mesh.fgrid import ManningsN, DragCoefficient
@@ -71,7 +71,13 @@ class ModelForcings:
             )
 
         if self.source_sink is not None:
-            self.source_sink.write()
+            self.source_sink.write(
+                output_directory,
+                driver.config.hgrid,
+                start_date=driver.param.opt.start_date,
+                end_date=driver.param.core.rnday,
+                overwrite=overwrite,
+            )
 
         if self.waves is not None:
             self.waves.write()
@@ -340,8 +346,15 @@ class ModelDriver:
         # TODO: init tracers (flag_ic[2:])
 
         if self.config.forcings.nws is not None:
+            if isinstance(self.config.forcings.nws, NWS2):
+                if self.config.forcings.nws.windrot is None:
+                    self.config.forcings.nws.windrot = gridgr3.Windrot.default(self.config.hgrid)
             self.param.opt.wtiminc = self.param.core.dt
             self.param.opt.nws = self.config.forcings.nws.dtype.value
+
+        if self.config.forcings.source_sink is not None:
+            if self.elev_ic is None:
+                self.elev_ic = True
 
         # TODO: init template
         self.param_template = param_template
@@ -441,7 +454,7 @@ class ModelDriver:
         bctides=True,
         nws=True,
         stations=True,
-        use_param_template=True,
+        use_param_template=False,
         albedo=True,
         diffmax=True,
         diffmin=True,
@@ -497,9 +510,8 @@ class ModelDriver:
             )
 
         def obj_write(var, obj, default_filename, overwrite):
-            if var is not False:
-                if hasattr(obj, 'write'):
-                    obj.write(self.outdir / default_filename if var is True else var, overwrite)
+            if var is not False and obj is not None:
+                obj.write(self.outdir / default_filename if var is True else var, overwrite)
 
         obj_write(albedo, self.config.albedo, "albedo.gr3", overwrite)
         obj_write(diffmin, self.config.diffmin, "diffmin.gr3", overwrite)
@@ -570,7 +582,7 @@ class ModelDriver:
             if not isinstance(elev_ic, (gridgr3.ElevIc, bool)):
                 raise_type_error("elev_ic", elev_ic, gridgr3.ElevIc)
             if elev_ic is True:
-                self._elev_ic = gridgr3.ElevIc.default(self.hgrid)
+                elev_ic = gridgr3.ElevIc.default(self.config.hgrid)
             self.param.opt.ic_elev = 1
             if elev_ic is False:
                 self.param.opt.ic_elev = 0
@@ -647,27 +659,40 @@ class ModelConfig(metaclass=ModelConfigMeta):
     """
 
     def __init__(
-        self,
-        hgrid: Hgrid,
-        vgrid: Vgrid = None,
-        fgrid: Fgrid = None,
-        bctides: Bctides = None,
-        nws: NWS = None,
-        source_sink: SourceSink = None,
-        waves=None,
-        stratification: Union[int, str, Stratification] = None,
-        albedo: gridgr3.Albedo = None,
-        diffmin: gridgr3.Diffmin = None,
-        diffmax: gridgr3.Diffmax = None,
-        watertype: gridgr3.Watertype = None,
-        estuary: gridgr3.Estuary = None,
-        shapiro: gridgr3.Shapiro = None,
-        fluxflag: prop.Fluxflag = None,
-        tvdflag: prop.Tvdflag = None,
+            self,
+            hgrid: Hgrid,
+            vgrid: Vgrid = None,
+            fgrid: Fgrid = None,
+            iettype: iettype.Iettype = None,
+            ifltype: ifltype.Ifltype = None,
+            itetype: itetype.Itetype = None,
+            isatype: isatype.Isatype = None,
+            # itrtype: itrtype.Itrtype = None,
+            nws: NWS = None,
+            source_sink: Union[List[SourceSink], SourceSink] = None,
+            waves=None,
+            stratification: Union[int, str, Stratification] = None,
+            albedo: gridgr3.Albedo = None,
+            diffmin: gridgr3.Diffmin = None,
+            diffmax: gridgr3.Diffmax = None,
+            watertype: gridgr3.Watertype = None,
+            estuary: gridgr3.Estuary = None,
+            shapiro: gridgr3.Shapiro = None,
+            fluxflag: prop.Fluxflag = None,
+            tvdflag: prop.Tvdflag = None,
     ):
         self.hgrid = hgrid
         self.vgrid = vgrid
         self.fgrid = fgrid
+        self.iettype = iettype
+        self.ifltype = ifltype
+        self.itetype = itetype
+        self.isatype = isatype
+        # self.itrtype = itrtype
+        self.nws = nws
+        self.source_sink = source_sink
+        self.waves = waves
+        self.stratification = stratification
         self.albedo = albedo
         self.diffmin = diffmin
         self.diffmax = diffmax
@@ -676,34 +701,27 @@ class ModelConfig(metaclass=ModelConfigMeta):
         self.fluxflag = fluxflag
         self.tvdflag = tvdflag
         self.estuary = estuary
-        self.forcings = ModelForcings(
-            bctides=bctides,
-            nws=nws,
-            source_sink=source_sink,
-            waves=waves,
-        )
-        self.stratification = stratification
 
     def coldstart(
-        self,
-        timestep: Union[float, timedelta] = 150.0,
-        start_date: datetime = None,
-        end_date: Union[datetime, timedelta] = None,
-        dramp: Union[float, timedelta] = None,
-        drampbc: Union[float, timedelta] = None,
-        dramp_ss: Union[float, timedelta] = None,
-        drampwafo: Union[float, timedelta] = None,
-        drampwind: Union[float, timedelta] = None,
-        elev_ic: gridgr3.ElevIc = None,
-        temp_ic: gridgr3.TempIc = None,
-        salt_ic: gridgr3.TempIc = None,
-        nspool: Union[int, timedelta] = None,
-        ihfskip: int = None,
-        nhot_write: Union[int, timedelta] = None,
-        stations: Stations = None,
-        server_config: ServerConfig = None,
-        param_template=None,
-        **surface_outputs,
+            self,
+            timestep: Union[float, timedelta] = 150.0,
+            start_date: datetime = None,
+            end_date: Union[datetime, timedelta] = None,
+            dramp: Union[float, timedelta] = None,
+            drampbc: Union[float, timedelta] = None,
+            dramp_ss: Union[float, timedelta] = None,
+            drampwafo: Union[float, timedelta] = None,
+            drampwind: Union[float, timedelta] = None,
+            elev_ic: gridgr3.ElevIc = None,
+            temp_ic: gridgr3.TempIc = None,
+            salt_ic: gridgr3.TempIc = None,
+            nspool: Union[int, timedelta] = None,
+            ihfskip: int = None,
+            nhot_write: Union[int, timedelta] = None,
+            stations: Stations = None,
+            server_config: ServerConfig = None,
+            param_template=None,
+            **surface_outputs,
     ) -> ModelDriver:
 
         if start_date is None:
@@ -734,7 +752,7 @@ class ModelConfig(metaclass=ModelConfigMeta):
             self,
             dt=timestep,
             start_date=start_date,
-            rnday=(end_date - start_date) / timedelta(days=1),
+            rnday=end_date - start_date,
             dramp=dramp,
             drampbc=drampbc,
             dramp_ss=dramp_ss,
@@ -882,3 +900,29 @@ class ModelConfig(metaclass=ModelConfigMeta):
         elif isinstance(stratification, (str, int)):
             stratification = Stratification(stratification)
         self._stratification = stratification
+
+    @property
+    def forcings(self):
+        if not hasattr(self, '_forcings'):
+            self._forcings = ModelForcings(
+                bctides=self.bctides,
+                nws=self.nws,
+                source_sink=self.source_sink,
+                waves=self.waves,
+            )
+
+        return self._forcings
+
+    @property
+    def bctides(self):
+        if not hasattr(self, '_bctides'):
+            self._bctides = Bctides(
+                self.hgrid,
+                vgrid=self.vgrid,
+                iettype=self.iettype,
+                ifltype=self.ifltype,
+                isatype=self.isatype,
+                itetype=self.itetype,
+                # cutoff_depth=self.cutoff_depth,
+            )
+        return self._bctides

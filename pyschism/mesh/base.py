@@ -234,6 +234,26 @@ class Elements:
                 ))[0]))
         return self.gdf.loc[eidxs].geometry.unary_union.exterior
 
+    def get_triangulation_mask(self, element_mask):
+
+        triangulation_mask = []
+        for i, element in enumerate(self.elements.values()):
+            if len(element) == 3:
+                if element_mask[i]:
+                    triangulation_mask.append(True)
+                else:
+                    triangulation_mask.append(False)
+        for i, element in enumerate(self.elements.values()):
+            if len(element) == 4:
+                if element_mask[i]:
+                    triangulation_mask.append(True)
+                    triangulation_mask.append(True)
+                else:
+                    triangulation_mask.append(False)
+                    triangulation_mask.append(False)
+
+        return np.array(triangulation_mask)
+
     @property
     def array(self):
         if not hasattr(self, '_array'):
@@ -530,7 +550,7 @@ class Gr3(ABC):
             crs: Union[str, CRS] = None,
             output_type: str = None
     ) -> Union[Polygon, Bbox]:
-        output_type = 'polygon' if output_type is None else output_type
+        output_type = 'bbox' if output_type is None else output_type
         xmin, xmax = np.min(self.coord[:, 0]), np.max(self.coord[:, 0])
         ymin, ymax = np.min(self.coord[:, 1]), np.max(self.coord[:, 1])
         crs = self.crs if crs is None else crs

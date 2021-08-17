@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
 import logging
 import pathlib
 from typing import Union
@@ -48,6 +48,7 @@ class Param:
         if path.is_file() and not overwrite:
             raise IOError(f"File {path} exists and overwrite=False")
         if use_template:
+            PARAM_TEMPLATE = GitParamTemplate().path if use_template is True else use_template
             f90nml.patch(PARAM_TEMPLATE, self.to_dict(), path)
         else:
             with open(path, "w") as f:

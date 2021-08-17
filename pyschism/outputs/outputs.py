@@ -44,49 +44,60 @@ def get_stack_id_by_datetime(dt: datetime, flattened_timevector, stacks) -> str:
     return output_stack
 
 
-def get_local_time_index(dt: datetime, stacks, flattened_timevector) -> str:
-    for stack_data in stacks.values():
-        if dt in stack_data['timevector']:
-            return stack_data['timevector'].index(dt)
-    raise ValueError(
-            'The are no output slices corresponding to requested datetime:'
-            f' {dt}. Available datetimes are '
-            f'{flattened_timevector}.')
-
-
-def aggregate_by_datetime(shape, filenames, n_local_to_global, hgrid, name, dt, stacks, flattened_timevector):
-    values = np.full(shape, np.nan)
-    stack_id = get_stack_id_by_datetime(dt, flattened_timevector, stacks)
-    local_time_index = get_local_time_index(dt, stacks, flattened_timevector)
-    for file in filenames:
-        cpu_id = file.name.split('_')[1]
-        _n_local_to_global = n_local_to_global[cpu_id]
-        local_node_ids = list(_n_local_to_global.keys())
-        global_node_ids = list(
-            map(lambda x: _n_local_to_global[x], local_node_ids))
-        idxs = list(map(hgrid.nodes.get_index_by_id, global_node_ids))
-        if file.name.endswith(f'{stack_id}.nc'):
-            values[idxs] = Dataset(file)[name][local_time_index, :]
-    return values
+# def aggregate_by_datetime(shape, filenames, n_local_to_global, hgrid, name, dt, stacks, flattened_timevector):
+#     values = np.full(shape, np.nan)
+#     stack_id = get_stack_id_by_datetime(dt, flattened_timevector, stacks)
+#     local_time_index = get_local_time_index(dt, stacks, flattened_timevector)
+#     for file in filenames:
+#         cpu_id = file.name.split('_')[1]
+#         _n_local_to_global = n_local_to_global[cpu_id]
+#         local_node_ids = list(_n_local_to_global.keys())
+#         global_node_ids = list(
+#             map(lambda x: _n_local_to_global[x], local_node_ids))
+#         idxs = list(map(hgrid.nodes.get_index_by_id, global_node_ids))
+#         if file.name.endswith(f'{stack_id}.nc'):
+#             values[idxs] = Dataset(file)[name][local_time_index, :]
+#     return values
 
 
 class OutputVariableCombiner(ABC):
 
-    def __init__(self, name, parent, rank, nvrt, start_step=0):
-        self.name = name
-        # self.fields = parent.fields.select_by_ncvar(self.name)
+    def __init__(self, parent, name, start_step=0):
         self.parent = parent
-        self.rank = rank
-        self.nvrt = nvrt
-        self.path = parent.path
-        self.filenames = parent.filenames
-        self.stacks = parent.stacks
-        self.flattened_timevector = parent.flattened_timevector
-        self.hgrid = parent.hgrid
-        self.n_local_to_global = parent.n_local_to_global
-        self.s_local_to_global = parent.s_local_to_global
-        self.e_local_to_global = parent.e_local_to_global
+        self.name = name
         self.current_step = start_step
+
+    @property
+    def flattened_timevector(self):
+        return self.parent.flattened_timevector
+
+    @property
+    def shape(self):
+        return self.ncvar.shape[1:]
+
+    @property
+    def filenames(self):
+        return self.parent.filenames
+
+    @property
+    def hgrid(self):
+        return self.parent.hgrid
+
+    @property
+    def n_local_to_global(self):
+        return self.parent.n_local_to_global
+
+    @property
+    def s_local_to_global(self):
+        return self.parent.s_local_to_global
+
+    @property
+    def e_local_to_global(self):
+        return self.parent.e_local_to_global
+
+    @property
+    def stacks(self):
+        return self.parent.stacks
 
     def animation(
             self,
@@ -105,7 +116,6 @@ class OutputVariableCombiner(ABC):
             ymax=None,
             vmin=None,
             vmax=None,
-
     ):
         from matplotlib.animation import FuncAnimation
         import matplotlib.pyplot as plt
@@ -122,7 +132,8 @@ class OutputVariableCombiner(ABC):
         ymax = np.max(self.hgrid.y) if ymax is None else ymax
         vmin = np.min(self.values) if vmin is None else vmin
         vmax = np.max(self.values) if vmax is None else vmax
-        # unit = OutputVariableUnit[OutputVariableShortName(variable).name].value
+
+        triangulation.set_mask(self.hgrid.elements.get_triangulation_mask(self.parent.wetdry_elem.values))
 
         def animate(index):
             self.current_step = index
@@ -134,7 +145,7 @@ class OutputVariableCombiner(ABC):
             else:
                 cax = None
 
-            # triangulation.set_mask(self.nc['wetdry_elem'][index])
+            triangulation.set_mask(self.hgrid.elements.get_triangulation_mask(self.parent.wetdry_elem.values))
 
             if wireframe:
                 ax.triplot(triangulation, color='k', linewidth=0.7)
@@ -162,7 +173,7 @@ class OutputVariableCombiner(ABC):
                 m, cax=cax, format='%.1f',
                 boundaries=np.linspace(vmin, vmax, levels)
             )
-
+            ax.axis('scaled')
             # cbar = fig.colorbar(_ax)
             # cbar.ax.set_ylabel(f'{variable} [{unit}]', rotation=90)
 
@@ -178,7 +189,7 @@ class OutputVariableCombiner(ABC):
             blit=False
             )
 
-        if save:
+        if save not in [False, None]:
             anim.save(
                 pathlib.Path(save),
                 writer='imagemagick',
@@ -201,48 +212,71 @@ class OutputVariableCombiner(ABC):
             raise TypeError('Argument dt must be datetime, timedelta or int '
                             f'not type {type(dt)}')
 
-    def aggregate_parallel(self, nprocs=16):
-        from time import time
-        from multiprocessing import Pool
-        start = time()
-        with Pool(processes=nprocs) as p:
-            # shape, filenames, n_local_to_global, hgrid, name, dt, stacks, flattened_timevector
-            res = p.starmap(
-                aggregate_by_datetime,
-                [
-                    (self.shape, self.filenames, self.n_local_to_global,
-                     self.hgrid, self.name, dt, self.stacks,
-                     self.flattened_timevector)
-                    for dt in self.flattened_timevector
-                ]
-            )
-        p.join()
-        print(f'parallel took {time()-start}')
-        start = time()
-        for dt in self.flattened_timevector:
-            aggregate_by_datetime(
-                self.shape, self.filenames, self.n_local_to_global, self.hgrid,
-                self.name, dt, self.stacks,
-                self.flattened_timevector)
-        print(f'serial took {time()-start}')
-        # breakpoint()
+    # def aggregate_parallel(self, nprocs=16):
+    #     from time import time
+    #     from multiprocessing import Pool
+    #     start = time()
+    #     with Pool(processes=nprocs) as p:
+    #         # shape, filenames, n_local_to_global, hgrid, name, dt, stacks, flattened_timevector
+    #         res = p.starmap(
+    #             aggregate_by_datetime,
+    #             [
+    #                 (self.shape, self.filenames, self.n_local_to_global,
+    #                  self.hgrid, self.name, dt, self.stacks,
+    #                  self.flattened_timevector)
+    #                 for dt in self.flattened_timevector
+    #             ]
+    #         )
+    #     p.join()
+    #     print(f'parallel took {time()-start}')
+    #     start = time()
+    #     for dt in self.flattened_timevector:
+    #         aggregate_by_datetime(
+    #             self.shape, self.filenames, self.n_local_to_global, self.hgrid,
+    #             self.name, dt, self.stacks,
+    #             self.flattened_timevector)
+    #     print(f'serial took {time()-start}')
+    #     # breakpoint()
 
     def aggregate_by_index(self, index):
         return self.aggregate_by_datetime(self.flattened_timevector[index])
 
     def aggregate_by_datetime(self, dt):
-        values = np.full(self.shape, np.nan)
+
         stack_id = self.get_stack_id_by_datetime(dt)
-        local_time_index = self.get_local_time_index(dt)
-        for file in self.filenames:
+        filenames = [file for file in self.filenames if str(file).endswith(f'{stack_id}.nc')]
+        ncvar = Dataset(filenames[0])[self.name]
+        shape = []
+        if ncvar.dimensions[1] == 'nSCHISM_hgrid_node':
+            shape.append(self.hgrid.nodes.values.shape[0])
+        elif ncvar.dimensions[1] == 'nSCHISM_hgrid_face':
+            shape.append(self.hgrid.elements.index.shape[0])
+        else:
+            raise Exception(f'Unhandled dimension1 {self.ncvar.dimensions[1]}')
+
+        if len(ncvar.dimensions[1:]) > 1:
+            raise Exception(f'Unhandled number of dimensions {self.ncvar.dimensions}')
+        
+        values = np.full(tuple(shape), np.nan)
+
+        for i, file in enumerate(filenames):
+            ncvar = Dataset(filenames[i])[self.name]
             cpu_id = file.name.split('_')[1]
-            n_local_to_global = self.n_local_to_global[cpu_id]
-            local_node_ids = list(n_local_to_global.keys())
-            global_node_ids = list(
-                map(lambda x: n_local_to_global[x], local_node_ids))
-            idxs = list(map(self.hgrid.nodes.get_index_by_id, global_node_ids))
-            if file.name.endswith(f'{stack_id}.nc'):
-                values[idxs] = Dataset(file)[self.name][local_time_index, :]
+            if ncvar.dimensions[1] == 'nSCHISM_hgrid_node':
+                n_local_to_global = self.n_local_to_global[cpu_id]
+                local_node_ids = list(n_local_to_global.keys())
+                global_node_ids = list(
+                    map(lambda x: n_local_to_global[x], local_node_ids))
+                idxs = list(map(self.hgrid.nodes.get_index_by_id, global_node_ids))
+            elif ncvar.dimensions[1] == 'nSCHISM_hgrid_face':
+                e_local_to_global = self.e_local_to_global[cpu_id]
+                local_elem_ids = list(e_local_to_global.keys())
+                global_elem_ids = list(
+                    map(lambda x: e_local_to_global[x], local_elem_ids))
+                idxs = list(map(self.hgrid.elements.get_index_by_id, global_elem_ids))
+            local_time_index = self.get_local_time_index(dt)
+            values[idxs] = ncvar[local_time_index, :]
+
         return values
 
     def get_stack_id_by_datetime(self, dt: datetime) -> str:
@@ -287,16 +321,20 @@ class OutputVariableCombiner(ABC):
             current_step = self.timesteps[0]
         self._current_step = current_step
 
-    @property
-    def shape(self):
-        if not hasattr(self, '_shape'):
-            shape = [self.hgrid.values.shape[0]]
-            if self.rank is not None:
-                shape.append(self.rank)
-            if self.nvrt is not None:
-                shape.append(self.nvrt)
-            self._shape = tuple(shape)
-        return self._shape
+    # @property
+    # def ncvar(self):
+    #     return self.stacks
+
+    # @property
+    # def shape(self):
+    #     if not hasattr(self, '_shape'):
+    #         shape = [self.hgrid.values.shape[0]]
+    #         if self.rank is not None:
+    #             shape.append(self.rank)
+    #         if self.nvrt is not None:
+    #             shape.append(self.nvrt)
+    #         self._shape = tuple(shape)
+    #     return self._shape
 
 
 class OutputsCollector:
@@ -392,21 +430,12 @@ class OutputsCollector:
             for vartype in vargroup:
                 nc = Dataset(self.filenames[0])
                 if vartype.name in nc.variables:
-                    shape = nc[vartype.name].shape
-                    rank = None
-                    nvrt = None
-                    if len(shape) >= 3:
-                        rank = shape[2]
-                    if len(shape) >= 4:
-                        nvrt = shape[3]
                     setattr(
                         self,
                         vartype.name,
                         OutputVariableCombiner(
-                            vartype.name,
                             self,
-                            rank,
-                            nvrt,
+                            vartype.name,
                             start_step=0
                         ))
 

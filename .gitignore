@@ -10,7 +10,6 @@ forecast
 .vscode
 *.swp
 *.nc
-hgrid.*
-fgrid.*
-vgrid.*
+*.gr3
+*.ll
 .idea

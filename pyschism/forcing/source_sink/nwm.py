@@ -1,7 +1,7 @@
 from collections import defaultdict
 from datetime import datetime, timedelta
 import logging
-from multiprocessing import Pool
+from multiprocessing import Pool, cpu_count
 import pathlib
 
 import tarfile
@@ -13,6 +13,7 @@ import appdirs
 import boto3
 from botocore import UNSIGNED
 from botocore.config import Config
+import fiona
 import geopandas as gpd
 import matplotlib.pyplot as plt
 from netCDF4 import Dataset
@@ -233,22 +234,22 @@ class NWMElementPairings:
     def hgrid(self):
         return self._hgrid
 
-    @property
-    def _hgrid(self):
-        return self.__hgrid
+    # @property
+    # def _hgrid(self):
+    #     return self.__hgrid
 
-    @_hgrid.setter
-    def _hgrid(self, hgrid: Gr3):
-        hgrid = Hgrid(**hgrid.to_dict())
-        hgrid.transform_to(
-            gpd.read_file(self.nwm_file, rows=1, layer=0).crs
-            # 'epsg:4269',
-            )
-        self.__hgrid = hgrid
+    # @_hgrid.setter
+    # def _hgrid(self, hgrid: Gr3):
+    #     hgrid = Hgrid(**hgrid.to_dict())
+    #     hgrid.transform_to(
+    #         gpd.read_file(self.nwm_file, rows=1, layer=0).crs
+    #         # 'epsg:4269',
+    #         )
+    #     self.__hgrid = hgrid
 
-    @_hgrid.deleter
-    def _hgrid(self):
-        del self.__hgrid
+    # @_hgrid.deleter
+    # def _hgrid(self):
+    #     del self.__hgrid
 
     # @property
     # def nwm_file(self):
@@ -267,31 +268,18 @@ class NWMElementPairings:
     @property
     def gdf(self):
         if not hasattr(self, "_gdf"):
-            bbox = self.hgrid.get_bbox(output_type="bbox")
-            # print(bbox)
-            # print(self.hgrid.crs)
-            import fiona
             gdf_coll = []
-            # TODO: Now the reaches are in three diff laters.
             for reach_layer in [reach_layer for reach_layer in fiona.listlayers(self.nwm_file) if'reaches' in reach_layer]:
-                print(f'append reach_layer: {reach_layer}')
+                layer_crs = gpd.read_file(self.nwm_file, rows=1, layer=reach_layer).crs
+                bbox = self.hgrid.get_bbox(crs=layer_crs)
                 gdf_coll.append(
                     gpd.read_file(
                         self.nwm_file,
                         bbox=(bbox.xmin, bbox.ymin, bbox.xmax, bbox.ymax),
                         layer=reach_layer
-                    )
+                        )
                 )
             self._gdf = pd.concat(gdf_coll)
-        print(self._gdf)
-        exit()
-        self._gdf.plot()
-        import matplotlib.pyplot as plt
-        plt.show(block=True)
-        print(self._gdf)
-        print(self._gdf.crs)
-        print(bbox)
-        exit()
         return self._gdf
 
     @property
@@ -346,12 +334,12 @@ def streamflow_lookup(file, indexes):
     return data
 
 
-class AWSDataInventory:
+class AWSForecatsInventory:
     def __init__(
         self,
         start_date: datetime = None,
         rnday: Union[int, float, timedelta] = timedelta(days=5.0),
-        product="medium_range_mem1",
+        product=None,
         verbose=False,
         fallback=True,
     ):
@@ -368,7 +356,7 @@ class AWSDataInventory:
         )
         # self.start_date = self.start_date.replace(tzinfo=None)
         self.rnday = rnday if isinstance(rnday, timedelta) else timedelta(days=rnday)
-        self.product = product
+        self.product = "medium_range_mem1" if product is None else product
         self.fallback = fallback
         self._files = {
             _: None
@@ -430,14 +418,15 @@ class AWSDataInventory:
             aggregated_features = []
             for source_feats in features:
                 aggregated_features.extend(list(source_feats))
-            in_file = np.where(
-                np.in1d(nc_feature_id, aggregated_features, assume_unique=True)
-            )[0]
+            in_file = []
+            for feature in aggregated_features:
+                idx = np.where(nc_feature_id == int(feature))[0]
+                in_file.append(idx.item())
             in_file_2 = []
             sidx = 0
             for source_feats in features:
                 eidx = sidx + len(source_feats)
-                in_file_2.append(in_file[sidx:eidx].tolist())
+                in_file_2.append(in_file[sidx:eidx])
                 sidx = eidx
             return in_file_2
 
@@ -490,32 +479,193 @@ class AWSDataInventory:
         return {"medium_range_mem1": "medium_range.channel_rt_1"}[self.product]
 
 
+class AWSHindcastInventory:
+
+    def __init__(
+            self,
+            start_date: datetime = None,
+            rnday: Union[int, float, timedelta] = timedelta(days=5.),
+            product=None,
+            verbose=False,
+            fallback=True,
+    ):
+        """This will download the National Water Model retro data.
+        A 26-year (January 1993 through December 2018) retrospective 
+        simulation using version 2.0 of the NWM. 
+
+        NetCDF files are saved to the system's temporary directory.
+        """
+        self.start_date = dates.nearest_cycle() if start_date is None \
+            else dates.nearest_cycle(dates.localize_datetime(start_date))
+        # self.start_date = self.start_date.replace(tzinfo=None)
+        self.rnday = rnday if isinstance(rnday, timedelta) \
+            else timedelta(days=rnday)
+        self.product = 'CHRTOUT_DOMAIN1.comp' if product is None else product
+        self.fallback = fallback
+        self._files = {_: None for _ in np.arange(
+            self.start_date,
+            self.start_date + self.rnday + self.output_interval,
+            self.output_interval
+        ).astype(datetime)}
+
+        paginator = self.s3.get_paginator('list_objects_v2')
+        pages = paginator.paginate(
+            Bucket=self.bucket,
+            Prefix=f'full_physics/{self.start_date.year}'
+        )
+
+        self.data = []
+        for page in pages:
+            for obj in page['Contents']:
+                self.data.append(obj)
+
+        self.file_metadata = list(sorted([
+            _['Key'] for _ in self.data if 'CHRTOUT_DOMAIN1.comp' in _['Key']
+        ]))
+
+        timevector = np.arange(
+            datetime(self.start_date.year, 1, 1),
+            datetime(self.start_date.year+1, 1, 1),
+            np.timedelta64(1, 'h'),
+            dtype='datetime64'
+        )
+
+        timefile = {pd.to_datetime(str(timevector[i])): self.file_metadata[i] for i in range(len(timevector))}
+ 
+        for requested_time, _ in self._files.items():
+            key = timefile.get(requested_time)
+            logger.info(f'Requesting NWM data for time {requested_time}')
+
+            self._files[requested_time] = self.request_data(key, requested_time)
+
+    def request_data(self, key, request_time):
+
+        filename = pathlib.Path(self.tmpdir.name) / key
+        filename.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(filename, 'wb') as f:
+            logger.info(f'Downloading file {key}, ')
+            self.s3.download_fileobj(self.bucket, key, f)
+        return filename
+
+    def get_nc_pairing_indexes(self, pairings: NWMElementPairings):
+        nc_feature_id = Dataset(self.files[0])['feature_id'][:]
+
+        def get_aggregated_features(features):
+            aggregated_features = []
+            for source_feats in features:
+                aggregated_features.extend(list(source_feats))
+            in_file = []
+            for feature in aggregated_features:
+                idx = np.where(nc_feature_id == int(feature))[0]
+                in_file.append(idx.item())
+            in_file_2 = []
+            sidx = 0
+            for source_feats in features:
+                eidx = sidx + len(source_feats)
+                in_file_2.append(in_file[sidx:eidx])
+                sidx = eidx
+            return in_file_2
+
+        sources = get_aggregated_features(pairings.sources.values())
+        sinks = get_aggregated_features(pairings.sinks.values())
+        return sources, sinks
+
+    @property
+    def bucket(self):
+        return 'noaa-nwm-retro-v2.0-pds'
+
+    @property
+    def nearest_cycle(self) -> datetime:
+        return dates.nearest_cycle(self.start_date)
+
+    @property
+    def output_interval(self) -> timedelta:
+        return {
+            'CHRTOUT_DOMAIN1.comp': timedelta(hours=1)
+        }[self.product]
+
+    @property
+    def s3(self):
+        try:
+            return self._s3
+        except AttributeError:
+            self._s3 = boto3.client(
+                's3', config=Config(signature_version=UNSIGNED))
+            return self._s3
+
+    @property
+    def tmpdir(self):
+        try:
+            return self._tmpdir
+        except AttributeError:
+            self._tmpdir = tempfile.TemporaryDirectory()
+            return self._tmpdir
+
+    @property
+    def files(self):
+        return sorted(list(pathlib.Path(self.tmpdir.name).glob('**/*.comp')))
+
+
+class AWSDataInventory:
+
+    def __new__(
+        cls,
+        start_date,
+        rnday,
+        product=None,
+        verbose=False,
+        fallback=True
+    ):
+        # AWSHindcastInventory -> January 1993 through December 2018
+        if start_date >= dates.localize_datetime(datetime(1993, 1, 1, 0, 0)) \
+                and start_date + rnday <= dates.localize_datetime(datetime(2018, 12, 31, 23, 59)):
+            return AWSHindcastInventory(start_date, rnday, product, verbose, fallback)
+
+        elif start_date >= dates.nearest_zulu() - timedelta(days=30):
+            return AWSForecatsInventory(start_date, rnday, product, verbose, fallback)
+
+        else:
+            raise Exception(f'No NWM model data for start_date {start_date} and end_date {start_date+rnday}.')
+
+
 class NationalWaterModel(SourceSink):
+
+    start_date = dates.StartDate()
+    end_date = dates.EndDate()
+    # run_days = dates.RunDays()
+
     def __init__(self, aggregation_radius=None, pairings=None, nwm_file=None):
         self.nwm_file = nwm_file
         self.aggregation_radius = aggregation_radius
+        self.pairings = pairings
 
-    def fetch_data(
+    def write(
         self,
+        output_directory,
         gr3: Gr3,
         start_date: datetime = None,
         end_date: Union[datetime, timedelta] = None,
+        overwrite: bool = False,
         nprocs=-1,
         pairings=None,
+        product=None,
     ):
-
+        nprocs = -1 if nprocs is None else nprocs
+        nprocs = cpu_count() if nprocs == -1 else nprocs
         self.start_date = start_date
         self.end_date = end_date
-        pairings = NWMElementPairings(gr3, nwm_file=self.nwm_file) if pairings is None else pairings
+        pairings = self.pairings if pairings is None else pairings
+        self.pairings = NWMElementPairings(gr3, nwm_file=self.nwm_file) if pairings is None else pairings
         self._inventory = AWSDataInventory(
             start_date=self.start_date,
             rnday=self.end_date - self.start_date,
-            product="medium_range_mem1",
+            # product="medium_range_mem1",
         )
 
         self._timevector = [dates.localize_datetime(d) for d in self.inventory._files]
 
-        src_idxs, snk_idxs = self.inventory.get_nc_pairing_indexes(pairings)
+        src_idxs, snk_idxs = self.inventory.get_nc_pairing_indexes(self.pairings)
         with Pool(processes=nprocs) as pool:
             sources = pool.starmap(
                 streamflow_lookup, [(file, src_idxs) for file in self.inventory.files]
@@ -524,15 +674,22 @@ class NationalWaterModel(SourceSink):
                 streamflow_lookup, [(file, snk_idxs) for file in self.inventory.files]
             )
         pool.join()
+        self._data = {}
         for i, file in enumerate(self.inventory.files):
             nc = Dataset(file)
             _time = dates.localize_datetime(
                 datetime.strptime(nc.model_output_valid_time, "%Y-%m-%d_%H:%M:%S")
             )
-            for j, element_id in enumerate(pairings.sources.keys()):
-                self.add_data(_time, element_id, sources[i][j], -9999, 0.0)
-            for k, element_id in enumerate(pairings.sinks.keys()):
-                self.add_data(_time, element_id, -sinks[i][k])
+            for j, element_id in enumerate(self.pairings.sources.keys()):
+                self._data.setdefault(_time, {}).setdefault(element_id, {}).update(
+                    {
+                        "flow": sources[i][j],
+                        "temperature": -9999,
+                        "salinity": 0.,
+                    }
+                )
+            for k, element_id in enumerate(self.pairings.sinks.keys()):
+                self._data.setdefault(_time, {}).setdefault(element_id, {}).update({"flow": -sinks[i][k]})
 
         if self.aggregation_radius is not None:
             self.aggregate_by_radius(gr3, self.aggregation_radius)

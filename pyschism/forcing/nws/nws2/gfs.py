@@ -10,6 +10,7 @@ from typing import Union
 import logging
 
 
+import appdirs
 import pytz
 from matplotlib.transforms import Bbox
 from netCDF4 import Dataset
@@ -77,13 +78,15 @@ class GFSInventory:
         self.rnday = rnday if isinstance(rnday, timedelta) else timedelta(days=rnday)
         if self.start_date != nearest_cycle(self.start_date):
             raise NotImplementedError(
-                "Argment start_date is does not align with any GFS cycle " "times."
+                "Argument start_date is does not align with any GFS cycle " "times."
             )
+        end_date = (self.start_date + self.rnday).astimezone(pytz.utc)
+        end_date.replace(tzinfo=None)
         self._files = {
             _: None
             for _ in np.arange(
                 self.start_date,
-                self.start_date + self.rnday + self.output_interval,
+                end_date + self.output_interval,
                 self.output_interval,
             ).astype(datetime)
         }
@@ -97,6 +100,8 @@ class GFSInventory:
                 + f'/gfs{nearest_zulu(dt).strftime("%Y%m%d")}'
             )
             for cycle in reversed(range(0, 24, 6)):
+                if dt + timedelta(hours=cycle) > dt:
+                    continue
                 test_url = f"{base_url}/" + f"{self.product.name.lower()}_{cycle:02d}z"
                 try:
                     logger.info(f"Checking url: {test_url}")
@@ -126,7 +131,14 @@ class GFSInventory:
                     else:
                         raise e
                 file_dates = self.get_nc_datevector(nc)
+
                 for _datetime in reversed(list(self._files.keys())):
+                    if np.datetime64(_datetime) == end_date:
+                        max_gfs_end_date = np.max(file_dates) - self.output_interval
+                        if np.datetime64(end_date) > np.datetime64(max_gfs_end_date):
+                            raise IOError(
+                                f"Requested end date at {end_date - self.output_interval} is larger than the max allowed GFS end_date {max_gfs_end_date}"
+                            )
                     if _datetime in file_dates:
                         if self._files[_datetime] is None:
                             self._files[_datetime] = nc
@@ -148,26 +160,25 @@ class GFSInventory:
                 f"{sflux_varname} from file "
                 f'{nc.filepath().replace(f"{BASE_URL}/", "")}.'
             )
-            # x = 0
-            # backoff_in_seconds = 1
+            # TODO: exponential time backoff retry
             def put_nc_field():
                 try:
+                    time_index = self.get_nc_time_index(nc, dt)
                     dst[sflux_varname][i, :, :] = nc.variables[gfs_varname][
-                        self.get_nc_time_index(nc, dt), lat_idxs, lon_idxs
+                        time_index, lat_idxs, lon_idxs
                     ]
-                    x = 0
+                    dst.sync()
+                    if np.any(dst[sflux_varname][i, :, :].mask) is True:
+                        raise Exception(
+                            f"Junk value in nc_field {gfs_varname}, index {time_index}"
+                        )
                     return True
                 except RuntimeError:
-                    # sleep = (backoff_in_seconds * 2 ** x)
-                    # import time
-                    # time.sleep(sleep)
-                    # x += 1
                     return False
 
             success = False
             while success is False:
                 success = put_nc_field()
-            dst.sync()
 
     def get_nc_time_index(self, nc, dt):
         return np.where(np.in1d(self.get_nc_datevector(nc), [dt]))[0][0]
@@ -274,14 +285,17 @@ class GlobalForecastSystem(SfluxDataset):
         self.prc = None
         self.rad = None
 
-    def fetch_data(
+    def write(
         self,
+        outdir: Union[str, os.PathLike],
+        level,
         start_date: datetime = None,
         rnday: Union[float, timedelta] = 4,
         air: bool = True,
         prc: bool = True,
         rad: bool = True,
         bbox: Bbox = None,
+        overwrite: bool = False,
     ):
         """Fetches GFS data from NOMADS server."""
         logger.info("Fetching GFS data.")
@@ -291,9 +305,11 @@ class GlobalForecastSystem(SfluxDataset):
             else localize_datetime(start_date).astimezone(pytz.utc)
         )
         self.rnday = rnday if isinstance(rnday, timedelta) else timedelta(days=rnday)
+
         inventory = GFSInventory(
             self.product, self.start_date, self.rnday + self.output_interval, bbox
         )
+
         nx_grid, ny_grid = inventory.xy_grid()
         if air is True:
             with Dataset(
@@ -470,18 +486,34 @@ class GlobalForecastSystem(SfluxDataset):
                 )
                 dst["dswrf"].units = "W/m^2"
 
-        self.resource = self.tmpdir
+        self.resource = list(self.tmpdir.glob("*.nc"))
         if air is True:
             self.air = AirComponent(self.fields)
+
         if prc is True:
             self.prc = PrcComponent(self.fields)
+
         if rad is True:
             self.rad = RadComponent(self.fields)
+
+        super().write(
+            outdir,
+            level,
+            overwrite=overwrite,
+            start_date=start_date,
+            rnday=rnday,
+            air=air,
+            rad=rad,
+            prc=prc,
+        )
+        del self._tmpdir
 
     @property
     def tmpdir(self):
         if not hasattr(self, "_tmpdir"):
-            self._tmpdir = tempfile.TemporaryDirectory()
+            self._tmpdir = tempfile.TemporaryDirectory(
+                prefix=appdirs.user_cache_dir("pyschism/gfs")
+            )
         return pathlib.Path(self._tmpdir.name)
 
     @property

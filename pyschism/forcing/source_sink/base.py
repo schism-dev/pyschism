@@ -1,5 +1,5 @@
-from datetime import datetime, timedelta
-from functools import partial
+from datetime import timedelta
+from functools import lru_cache
 import logging
 import os
 import pathlib
@@ -8,7 +8,7 @@ from typing import Union
 import geopandas as gpd
 import numpy as np
 import pandas as pd
-import pyproj
+from pyproj import Proj, CRS, Transformer
 import pytz
 from shapely import ops
 from shapely.geometry import Point
@@ -155,7 +155,7 @@ class SourceSink:
     # run_days = dates.RunDays()
 
     # TODO: This class is missing a time interpolator.
-    _data = {}
+    # _data = {}
 
     # def __init__(self, start_date: datetime = None, rnday: timedelta = None):
     #     self.start_date = start_date
@@ -164,46 +164,46 @@ class SourceSink:
     def __len__(self):
         return len(self._data)
 
-    def add_data(
-        self,
-        time: datetime,
-        element_id: str,
-        flow: float,
-        temperature: float = np.nan,
-        salinity: float = np.nan,
-    ):
+    # def add_data(
+    #     self,
+    #     time: datetime,
+    #     element_id: str,
+    #     flow: float,
+    #     temperature: float = np.nan,
+    #     salinity: float = np.nan,
+    # ):
 
-        time = dates.localize_datetime(time).astimezone(pytz.utc)
-        data_for_element = self._data.get(time, {}).get("element_id", {})
+    #     time = dates.localize_datetime(time).astimezone(pytz.utc)
+    #     data_for_element = self._data.get(time, {}).get("element_id", {})
 
-        # TODO: What happens if we have two different flows that both are
-        # assigned to the same element? Example: 100 m^3/s @ 1 psu then
-        # another flow on the same element of 1 m^3/s @ 100 psu. How do we
-        # combine these on a single element? Flow is just simple summation,
+    #     # TODO: What happens if we have two different flows that both are
+    #     # assigned to the same element? Example: 100 m^3/s @ 1 psu then
+    #     # another flow on the same element of 1 m^3/s @ 100 psu. How do we
+    #     # combine these on a single element? Flow is just simple summation,
 
-        _tmp = data_for_element.get("temperature", np.nan)
-        if not np.isnan(_tmp):
-            if _tmp != temperature:
-                raise NotImplementedError(
-                    "Two different values of temperature for same " "time/element."
-                )
+    #     _tmp = data_for_element.get("temperature", np.nan)
+    #     if not np.isnan(_tmp):
+    #         if _tmp != temperature:
+    #             raise NotImplementedError(
+    #                 "Two different values of temperature for same " "time/element."
+    #             )
 
-        _sal = data_for_element.get("salinity", np.nan)
-        if not np.isnan(_sal):
-            if _sal != salinity:
-                raise NotImplementedError(
-                    "Two different values of salinity for same time/element."
-                )
+    #     _sal = data_for_element.get("salinity", np.nan)
+    #     if not np.isnan(_sal):
+    #         if _sal != salinity:
+    #             raise NotImplementedError(
+    #                 "Two different values of salinity for same time/element."
+    #             )
 
-        self._data.setdefault(time, {}).setdefault(element_id, {}).update(
-            {
-                "flow": np.nansum([data_for_element.get("flow", np.nan), flow]),
-                "temperature": temperature,
-                "salinity": salinity,
-            }
-        )
-        if hasattr(self, "_df"):
-            del self._df
+    #     self._data.setdefault(time, {}).setdefault(element_id, {}).update(
+    #         {
+    #             "flow": np.nansum([data_for_element.get("flow", np.nan), flow]),
+    #             "temperature": temperature,
+    #             "salinity": salinity,
+    #         }
+    #     )
+    #     if hasattr(self, "_df"):
+    #         del self._df
 
     def get_element_timeseries(self, element_id):
         data = {}
@@ -269,8 +269,7 @@ class SourceSink:
                     )
                 )
             ]
-            point = np.array(row.geometry.centroid)
-            circle = get_circle_of_radius(point[0], point[1], radius)
+            circle = get_circle_of_radius(row.geometry.centroid.x, row.geometry.centroid.y, radius)
             sources_in_circle = possible_sources.loc[possible_sources.within(circle)]
             for row_in_circle in sources_in_circle.itertuples():
                 aggregation_mapping[row_in_circle.element_id] = row.element_id
@@ -278,7 +277,7 @@ class SourceSink:
         # --- move data from one element to the other
         for current, target in aggregation_mapping.items():
             for time, data in self.get_element_timeseries(current).items():
-                self.add_data(time, target, **data)
+                self._data[time][target]['flow'] = self._data[time][current]['flow'] + self._data[time][target]['flow']
 
         for current, target in aggregation_mapping.items():
             if current != target:
@@ -445,23 +444,12 @@ class SourceSink:
         return self._df
 
 
+@lru_cache(maxsize=None)
 def get_circle_of_radius(lon, lat, radius):
-
-    local_azimuthal_projection = (
-        "+proj=aeqd +R=6371000 +units=m " f"+lat_0={lat} +lon_0={lon}"
-    )
-    wgs84_to_aeqd = partial(
-        pyproj.transform,
-        pyproj.Proj("+proj=longlat +datum=WGS84 +no_defs"),
-        pyproj.Proj(local_azimuthal_projection),
-    )
-    aeqd_to_wgs84 = partial(
-        pyproj.transform,
-        pyproj.Proj(local_azimuthal_projection),
-        pyproj.Proj("+proj=longlat +datum=WGS84 +no_defs"),
-    )
-
+    wgs84 = CRS.from_user_input("+proj=longlat +datum=WGS84 +no_defs")
+    aeqd = CRS.from_user_input("+proj=aeqd +R=6371000 +units=m " f"+lat_0={lat} +lon_0={lon}")
+    wgs84_to_aeqd = Transformer.from_crs(wgs84, aeqd, always_xy=True).transform
+    aeqd_to_wgs84 = Transformer.from_crs(aeqd, wgs84, always_xy=True).transform
     center = Point(float(lon), float(lat))
     point_transformed = ops.transform(wgs84_to_aeqd, center)
-
     return ops.transform(aeqd_to_wgs84, point_transformed.buffer(radius))

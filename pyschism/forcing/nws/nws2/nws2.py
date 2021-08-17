@@ -28,32 +28,19 @@ class NWS2(NWS):
         self.sflux_2 = sflux_2
         self.windrot = windrot
 
-    def fetch_data(self, start_date=None, rnday=None, bbox=None, air=True, rad=True, prc=True):
-        
-        if hasattr(self.sflux_1, 'fetch_data'):
-            self.sflux_1.fetch_data(
-                start_date,
-                rnday,
-                bbox=bbox,
-                air=air,
-                rad=rad,
-                prc=prc,
-            )
-        if self.sflux_2 is not None:
-            if hasattr(self.sflux_2, 'fetch_data'):
-                self.sflux_2.fetch_data(
-                    start_date,
-                    rnday,
-                    bbox=bbox,
-                    air=air,
-                    rad=rad,
-                    prc=prc,
-                    )
-
     def __str__(self):
         data = []
         data = '\n'.join(data)
         return f'&sflux_inputs\n{data}/\n'
+
+    @classmethod
+    def read(cls, path, sflux_1_glob='*_1.*', sflux_2_glob='*_2.*'):
+        path = pathlib.Path(path)
+        sflux_2 = list(path.glob(sflux_2_glob))
+        return cls(
+                sflux_1=SfluxDataset(list(path.glob(sflux_1_glob))),
+                sflux_2=SfluxDataset(sflux_2) if len(sflux_2) > 0 else None,
+            )
 
     def write(
             self,
@@ -78,23 +65,24 @@ class NWS2(NWS):
         self.sflux_1.write(
             path,
             1,
-            overwrite,
             start_date=start_date,
             rnday=end_date,
             air=air,
             rad=rad,
             prc=prc,
+            bbox=bbox,
+            overwrite=overwrite,
         )
         if self.sflux_2 is not None:
             self.sflux_2.write(
                 path,
                 2,
-                overwrite,
                 start_date=start_date,
                 rnday=end_date,
                 air=air,
                 rad=rad,
                 prc=prc,
+                overwrite=overwrite,
                 )
         # # write windrot data
         if windrot is not False and self.windrot is not None:

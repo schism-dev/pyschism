@@ -1522,3 +1522,11 @@ def add_stations_outputs_to_parser(parser):
         action="store_true",
         help="Include water level output for stations.",
     )
+
+
+def add_vmin_to_parser(parser):
+    parser.add_argument('--vmin', type=float)
+
+
+def add_vmax_to_parser(parser):
+    parser.add_argument('--vmax', type=float)

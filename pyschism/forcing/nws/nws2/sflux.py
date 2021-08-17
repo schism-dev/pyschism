@@ -120,7 +120,6 @@ class Variable:
     def get_fields(self, start_date: datetime = None,
                    rnday: Union[float, int, timedelta] = None,
                    ) -> cf.FieldList:
-
         if start_date is None:
             start_date = self.datetime_array[0]
 
@@ -154,6 +153,113 @@ class Variable:
                 fields.append(self.fields[i])
                 break
         return cf.FieldList(fields)
+
+    def animation(
+            self,
+            save=False,
+            fps=3,
+            start_frame=0,
+            end_frame=-1,
+            figsize=None,
+            wireframe=False,
+            cmap='jet',
+            levels=256,
+            show=False,
+            xmin=None,
+            xmax=None,
+            ymin=None,
+            ymax=None,
+            vmin=None,
+            vmax=None,
+
+    ):
+        from matplotlib.animation import FuncAnimation
+        import matplotlib.pyplot as plt
+        # self.current_step = start_frame
+        fig = plt.figure(figsize)
+        ax = fig.add_subplot(111)
+
+        plt.tight_layout(pad=2)
+
+        # triangulation = self.hgrid.triangulation
+        # xmin = np.min(self.hgrid.x) if xmin is None else xmin
+        # xmax = np.max(self.hgrid.x) if xmax is None else xmax
+        # ymin = np.min(self.hgrid.y) if ymin is None else ymin
+        # ymax = np.max(self.hgrid.y) if ymax is None else ymax
+        # vmin = np.min(self.values) if vmin is None else vmin
+        # vmax = np.max(self.values) if vmax is None else vmax
+
+        # triangulation.set_mask(self.hgrid.elements.get_triangulation_mask(self.parent.wetdry_elem.values))
+        
+        arrays = self.get_fields()[0].array
+        def animate(index):
+            # self.current_step = index
+            _ax = fig.get_axes()
+            ax.clear()
+            if len(_ax) > 1:
+                cax = _ax[1]
+                cax.cla()
+            else:
+                cax = None
+
+            # triangulation.set_mask(self.hgrid.elements.get_triangulation_mask(self.parent.wetdry_elem.values))
+
+            # if wireframe:
+            #     ax.triplot(triangulation, color='k', linewidth=0.7)
+
+            # ax.tricontourf(
+            #     triangulation,
+            #     self.values,
+            #     cmap=cmap,
+            #     levels=levels,
+            #     vmin=vmin,
+            #     vmax=vmax
+            #     )
+            # print(fields[index].array)
+            print(self.datetime_array[index], arrays[index])
+            ax.contourf(arrays[index])
+
+            # ax.set_ylim(ymin, ymax, auto=True)
+            # ax.set_xlim(xmin, xmax, auto=True)
+
+            ax.set_xlabel('Longitude (°E)')
+            ax.set_ylabel('Latitude (°N)')
+
+            ax.set_title(self.datetime_array[index].strftime('%b %d, %Y %H:%M'))
+            # m = plt.cm.ScalarMappable(cmap=cmap)
+            # m.set_array(self.values[index])
+            # m.set_clim(vmin, vmax)
+            # cbar = fig.colorbar(
+            #     m, cax=cax, format='%.1f',
+            #     boundaries=np.linspace(vmin, vmax, levels)
+            # )
+
+            # cbar = fig.colorbar(_ax)
+            # cbar.ax.set_ylabel(f'{variable} [{unit}]', rotation=90)
+
+        end_frame = end_frame % len(arrays) if end_frame < 0 else end_frame
+        start_frame = start_frame % len(arrays) if start_frame < 0 else start_frame
+        frames = range(start_frame, end_frame)
+        # print(fields.array[start_frame])
+        ax.contourf(arrays[start_frame])
+        anim = FuncAnimation(
+            fig,
+            animate,
+            frames,
+            blit=False
+            )
+
+        if save:
+            anim.save(
+                pathlib.Path(save),
+                writer='imagemagick',
+                fps=fps
+            )
+
+        if show:
+            plt.show()
+
+        return anim
 
 
 class BaseComponent(ABC):
@@ -313,64 +419,7 @@ class RadComponent(BaseComponent):
                               "W/m^2")
 
 
-class Resource:
-
-    def __set__(self, obj, resource: Union[str, os.PathLike]):
-        obj.__dict__['resource'] = resource
-
-    def __get__(self, obj, val):
-        return obj.__dict__['resource']
-
-
-class Fields:
-
-    def __get__(self, obj, val):
-        fields = obj.__dict__.get('fields')
-        if fields is None:
-            fields = cf.read(obj.resource, ignore_read_error=True)
-            # check lon
-            try:
-                lon = fields.select_by_ncvar('lon')[0]
-            except IndexError:
-                raise ValueError(f"Resource {obj.resource} does not contain a "
-                                 "'lon' variable.")
-            if len(lon.get_data_axes()) != 2:
-                raise ValueError("'lon' variable must be a 2-dimensional "
-                                 "array")
-            fnames = lon.get_filenames()
-            lons = fields.select_by_ncvar('lon')
-            _logger.info(f'fields.select_by_var() returned {lons}')
-            for i in range(len(lons) - 1):
-                if not (lon.array == lons[i+1].array).all():
-                    raise ValueError(
-                        "Invalid sflux dataset. Found two different 'lon' "
-                        f"fields on files {fnames} and "
-                        f'{lons[i+1].get_filenames()}')
-            # check lat
-            try:
-                lat = fields.select_by_ncvar('lat')[0]
-            except IndexError:
-                raise ValueError(f"Resource {obj.resource} does not contain a "
-                                 "'lat' variable.")
-            if len(lat.get_data_axes()) != 2:
-                raise ValueError("'lat' variable must be a 2-dimensional "
-                                 "array")
-            fnames = lat.get_filenames()
-            lats = fields.select_by_ncvar('lat')
-            for i in range(len(lats) - 1):
-                if not (lat.array == lats[i+1].array).all():
-                    raise ValueError(
-                        "Invalid sflux dataset. Found two different 'lat' "
-                        f"fields on files {fnames} and "
-                        f'{lats[i+1].get_filenames()}')
-            obj.__dict__['fields'] = fields
-        return fields
-
-
 class SfluxDataset:
-
-    resource = Resource()
-    fields = Fields()
 
     def __init__(self, resource: Union[str, os.PathLike], prmsl_name='prmsl',
                  spfh_name='spfh', stmp_name='stmp', uwind_name='uwind',
@@ -400,8 +449,7 @@ class SfluxDataset:
         if outdir.name != 'sflux':
             outdir /= 'sflux'
         outdir.mkdir(exist_ok=True)
-        if hasattr(self, 'fetch_data'):
-            self.fetch_data(start_date=start_date, rnday=rnday, air=air, rad=rad, prc=prc, bbox=bbox)
+
         if hasattr(self, 'air'):
             if self.air is not None:
                 if air is True:
@@ -422,3 +470,55 @@ class SfluxDataset:
         for attr in ['air', 'prc', 'rad']:
             if hasattr(self, attr):
                 return getattr(self, attr).timevector
+
+    @property
+    def resource(self):
+        return self._resource
+
+    @resource.setter
+    def resource(self, resource):
+        self._resource = resource
+        if hasattr(self, '_fields'):
+            del self._fields
+
+    @property
+    def fields(self):
+        if not hasattr(self, '_fields'):
+            fields = cf.read(self.resource, ignore_read_error=True)
+            # check lon
+            try:
+                lon = fields.select_by_ncvar('lon')[0]
+            except IndexError:
+                raise ValueError(f"Resource {self.resource} does not contain a "
+                                 "'lon' variable.")
+            if len(lon.get_data_axes()) != 2:
+                raise ValueError("'lon' variable must be a 2-dimensional "
+                                 "array")
+            fnames = lon.get_filenames()
+            lons = fields.select_by_ncvar('lon')
+            _logger.info(f'fields.select_by_var() returned {lons}')
+            for i in range(len(lons) - 1):
+                if not (lon.array == lons[i+1].array).all():
+                    raise ValueError(
+                        "Invalid sflux dataset. Found two different 'lon' "
+                        f"fields on files {fnames} and "
+                        f'{lons[i+1].get_filenames()}')
+            # check lat
+            try:
+                lat = fields.select_by_ncvar('lat')[0]
+            except IndexError:
+                raise ValueError(f"Resource {self.resource} does not contain a "
+                                 "'lat' variable.")
+            if len(lat.get_data_axes()) != 2:
+                raise ValueError("'lat' variable must be a 2-dimensional "
+                                 "array")
+            fnames = lat.get_filenames()
+            lats = fields.select_by_ncvar('lat')
+            for i in range(len(lats) - 1):
+                if not (lat.array == lats[i+1].array).all():
+                    raise ValueError(
+                        "Invalid sflux dataset. Found two different 'lat' "
+                        f"fields on files {fnames} and "
+                        f'{lats[i+1].get_filenames()}')
+            self._fields = fields
+        return self._fields
