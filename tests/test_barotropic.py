@@ -4,8 +4,6 @@ import logging
 import pathlib
 import shutil
 
-import appdirs
-
 from pyschism import dates
 from pyschism.driver import ModelConfig
 from pyschism.forcing.bctides import iettype, ifltype

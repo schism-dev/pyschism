@@ -354,7 +354,8 @@ class ModelDriver:
 
         if self.config.forcings.source_sink is not None:
             if self.elev_ic is None:
-                self.elev_ic = True
+                if self.hotstart is None:
+                    self.elev_ic = True
 
         # TODO: init template
         self.param_template = param_template

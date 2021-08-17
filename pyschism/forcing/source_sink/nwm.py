@@ -383,7 +383,7 @@ class AWSForecatsInventory:
         file_metadata = list(
             reversed(
                 sorted(
-                    [_["Key"] for _ in self.data["Contents"] if "channel" in _["Key"]]
+                    [_["Key"] for _ in self.data["Contents"] if "channel" in _["Key"] and 'Contents' in self.data]
                 )
             )
         )
