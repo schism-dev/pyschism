@@ -54,6 +54,7 @@ class NWS2(NWS):
             rad=True,
             prc=True,
     ):
+
         # write sflux namelist
         path = pathlib.Path(path)
         if path.name != 'sflux':
@@ -129,14 +130,3 @@ class NWS2(NWS):
                 f'Argument windrot must be of type {gridgr3.Windrot} or None, '
                 f'not type {type(windrot)}.')
         self._windrot = windrot
-
-    @property
-    def timevector(self):
-        if self.sflux_2 is None:
-            return self.sflux_1.timevector
-        rnday_1 = self.sflux_1.timevector[-1] - self.sflux_1.timevector[0]
-        rnday_2 = self.sflux_2.timevector[-1] - self.sflux_2.timevector[0]
-        if rnday_2 <= rnday_1:
-            return self.sflux_2.timevector
-        else:
-            return self.sflux_1.timevector

@@ -15,8 +15,6 @@ from pyschism.mesh import Hgrid
 def test_barotropic_forecast():
 
     test_output_directory = pathlib.Path('/tmp/test')
-    if test_output_directory.exists():
-        shutil.rmtree(test_output_directory)
 
     config = ModelConfig(
         Hgrid.open(
@@ -40,9 +38,8 @@ def test_barotropic_forecast():
     nearest_cycle = dates.nearest_cycle()
     spinup_time = timedelta(
         # days=4
-        days=1
-        )
-
+        days=0.25
+    )
     coldstart = config.coldstart(
         start_date=nearest_cycle - spinup_time,
         end_date=nearest_cycle,
@@ -54,16 +51,18 @@ def test_barotropic_forecast():
         elev=True,
         dahv=True,
     )
+
     coldstart.run(test_output_directory / "coldstart")
+
     hotstart = config.hotstart(
         coldstart,
-        end_date=timedelta(days=4),
+        end_date=timedelta(days=1) + timedelta(hours=23.),
         timestep=150.0,
         nspool=timedelta(hours=1.),
         elev=True,
         dahv=True,
     )
-    hotstart.run(test_output_directory / "hotstart")
+    hotstart.run(test_output_directory / "hotstart", overwrite=True)
 
 
 if __name__ == "__main__":

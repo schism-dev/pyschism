@@ -76,10 +76,11 @@ class GFSInventory:
             else localize_datetime(start_date).astimezone(pytz.utc)
         )
         self.rnday = rnday if isinstance(rnday, timedelta) else timedelta(days=rnday)
-        if self.start_date != nearest_cycle(self.start_date):
-            raise NotImplementedError(
-                "Argument start_date is does not align with any GFS cycle " "times."
-            )
+        # if self.start_date != nearest_cycle(self.start_date):
+        #     raise NotImplementedError(
+        #         "Argument start_date is does not align with any GFS cycle " "times."
+        #     )
+        self.check_dates(self.start_date, self.rnday)
         end_date = (self.start_date + self.rnday).astimezone(pytz.utc)
         end_date.replace(tzinfo=None)
         self._files = {
@@ -103,42 +104,11 @@ class GFSInventory:
                 if dt + timedelta(hours=cycle) > dt:
                     continue
                 test_url = f"{base_url}/" + f"{self.product.name.lower()}_{cycle:02d}z"
-                try:
-                    logger.info(f"Checking url: {test_url}")
-
-                    @timeout()
-                    def get_netcdf_timeout():
-                        return Dataset(test_url)
-
-                    nc = get_netcdf_timeout()
-                    logger.info("Success!")
-                except OSError as e:
-                    if e.errno == -70:
-                        print()
-                        continue
-                    elif e.errno == -73:
-                        nc = False
-
-                        @timeout()
-                        def retry():
-                            try:
-                                return Dataset(test_url)
-                            except Exception:
-                                return False
-
-                        while not isinstance(nc, Dataset):
-                            nc = retry()
-                    else:
-                        raise e
+                nc = None
+                while nc is None:
+                    nc = self.fetch_nc_by_url(test_url)
                 file_dates = self.get_nc_datevector(nc)
-
                 for _datetime in reversed(list(self._files.keys())):
-                    if np.datetime64(_datetime) == end_date:
-                        max_gfs_end_date = np.max(file_dates) - self.output_interval
-                        if np.datetime64(end_date) > np.datetime64(max_gfs_end_date):
-                            raise IOError(
-                                f"Requested end date at {end_date - self.output_interval} is larger than the max allowed GFS end_date {max_gfs_end_date}"
-                            )
                     if _datetime in file_dates:
                         if self._files[_datetime] is None:
                             self._files[_datetime] = nc
@@ -150,6 +120,65 @@ class GFSInventory:
             raise ValueError(f"No GFS data for dates: {missing_records}.")
 
         self._bbox = self._modified_bbox(bbox)
+
+    def check_dates(self, start_date, rnday):
+
+        end_date = (start_date + rnday).astimezone(pytz.utc)
+        end_date.replace(tzinfo=None)
+        nc = None
+        i = 0
+        while nc is None:
+
+            dt = nearest_cycle(nearest_cycle(datetime.utcnow()) - (i*self.output_interval))
+            cycle = (6 * np.floor(dt.hour / 6)) % 24
+            base_url = (
+                BASE_URL
+                + f"/{self.product.value}"
+                + f'/gfs{dt.strftime("%Y%m%d")}'
+            )
+            test_url = f"{base_url}/" + f"{self.product.name.lower()}_{int(cycle):02d}z"
+            nc = self.fetch_nc_by_url(test_url)
+            i += 1
+        datevec = self.get_nc_datevector(nc)
+        # print(np.datetime64(np.max(datevec)))
+        # print(np.datetime64(end_date - self.output_interval))
+        if np.datetime64(np.max(datevec)) < np.datetime64(end_date - 2*self.output_interval):
+            raise IOError(
+                f"Requested end date at {end_date - self.output_interval} is larger than the max allowed GFS end_date "
+                f' {np.max(datevec) - self.output_interval}')
+
+    @staticmethod
+    def fetch_nc_by_url(url):
+        try:
+            logger.info(f"Checking url: {url}")
+
+            @timeout()
+            def get_netcdf_timeout():
+                return Dataset(url)
+
+            nc = get_netcdf_timeout()
+            logger.info("Success!")
+            return nc
+        except OSError as e:
+            if e.errno == -70:
+                print()
+                logger.info("URL not yet in server.")
+                return None
+            elif e.errno == -73:
+                nc = False
+
+                @timeout()
+                def retry():
+                    try:
+                        return Dataset(url)
+                    except Exception:
+                        return False
+
+                while not isinstance(nc, Dataset):
+                    logger.info("retrying...")
+                    nc = retry()
+            else:
+                raise e
 
     def put_sflux_field(self, gfs_varname: str, dst: Dataset, sflux_varname: str):
 
@@ -498,7 +527,7 @@ class GlobalForecastSystem(SfluxDataset):
 
         super().write(
             outdir,
-            level,
+            1,
             overwrite=overwrite,
             start_date=start_date,
             rnday=rnday,

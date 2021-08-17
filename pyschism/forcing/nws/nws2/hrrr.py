@@ -1,16 +1,16 @@
 from datetime import datetime, timedelta
-from enum import Enum
 import pathlib
 import tempfile
 from typing import Union
 import logging
 
-
+import appdirs
 import pytz
 from matplotlib.transforms import Bbox
 from netCDF4 import Dataset
 import numpy as np
 
+from pyschism.forcing.nws.nws2.gfs import timeout
 from pyschism.forcing.nws.nws2.sflux import (
     SfluxDataset,
     AirComponent,
@@ -25,96 +25,135 @@ logger = logging.getLogger(__name__)
 
 class HRRRInventory:
 
-    def __init__(self, start_date=None, bbox=None):
+    def __init__(self, start_date=None, rnday=2, bbox=None):
         self.start_date = nearest_cycle() if start_date is None else \
             localize_datetime(start_date).astimezone(pytz.utc)
-        #self.rnday = rnday if isinstance(rnday, timedelta) else \
-        #    timedelta(days=rnday)
-        #if self.rnday > timedelta(days=2) - timedelta(hours=1):
-        #    raise ValueError(
-        #        'Maximum run days for HRRR is '
-        #        f'{timedelta(days=2) - timedelta(hours=1)} but got {rnday}.')
+        self.rnday = rnday if isinstance(rnday, timedelta) else \
+            timedelta(days=rnday)
+        # if self.rnday > timedelta(days=2) - timedelta(hours=1):
+        #     raise ValueError(
+        #         'Maximum run days for HRRR is '
+        #         f'{timedelta(days=2) - timedelta(hours=1)} but got {rnday}.')
 
-        if self.start_date != nearest_cycle(self.start_date):
-            raise NotImplementedError(
-                'Argment start_date is does not align with any HRRR cycle '
-                'times.')
-        #self._files = {_: None for _ in np.arange(
-        #    self.start_date,
-        #    self.start_date + self.rnday + self.output_interval,
-        #    self.output_interval
-        #).astype(datetime)}
-
-        #for dt in self.nearest_zulus:
-        #    if None not in list(self._files.values()):
-        #        break
-        base_url = BASE_URL + f'/{self.product}' + \
-            f'/hrrr{start_date.strftime("%Y%m%d")}'
+        # if self.start_date != nearest_cycle(self.start_date):
+        #     raise NotImplementedError(
+        #         'Argment start_date is does not align with any HRRR cycle '
+        #         'times.')
+        self.check_dates(self.start_date, self.rnday)
+        end_date = (self.start_date + self.rnday).astimezone(pytz.utc)
+        end_date.replace(tzinfo=None)
+        self._files = {_: None for _ in np.arange(
+            self.start_date,
+            self.start_date + self.rnday + self.output_interval,
+            self.output_interval
+        ).astype(datetime)}
+        nearest_end_date = nearest_cycle(datetime.utcnow(), period=1)
+        nearest_end_date.replace(tzinfo=None)
+        for dt in self.nearest_zulus:
+            if None not in list(self._files.values()):
+                break
+            base_url = BASE_URL + f'/{self.product}' + \
+                f'/hrrr{nearest_zulu(dt).strftime("%Y%m%d")}'
             # cycle
-            #for cycle in reversed(range(0, 24, int(self.output_interval.total_seconds() / 3600))):
-        test_url = f'{base_url}/hrrr_sfc.t00z'
+            for cycle in reversed(range(0, 24, int(self.output_interval.total_seconds() / 3600))):
+                if np.datetime64(dt + timedelta(hours=cycle)) > np.datetime64(nearest_end_date):
+                    continue
+                test_url = f'{base_url}/' + \
+                           f'hrrr_sfc.t{cycle:02d}z'
+                nc = self.fetch_nc_by_url(test_url)
+                if nc is None:
+                    continue
+                file_dates = self.get_nc_datevector(nc)
+                for _datetime in reversed(list(self._files.keys())):
+                    if _datetime in file_dates:
+                        if self._files[_datetime] is None:
+                            self._files[_datetime] = nc
+
+                if not any(nc is None for nc in self._files.values()):
+                    break
+
+        missing_records = [dt for dt, nc in self._files.items() if nc is None]
+        if len(missing_records) > 0:
+            raise ValueError(f'No HRRR data for dates: {missing_records}.')
+
+        self._bbox = self._modified_bbox(bbox)
+
+    def check_dates(self, start_date, rnday):
+
+        end_date = (start_date + rnday).astimezone(pytz.utc)
+        end_date.replace(tzinfo=None)
+        nc = None
+        i = 0
+        while nc is None:
+            dt = nearest_cycle(nearest_cycle(datetime.utcnow()) - (i*self.output_interval))
+            cycle = dt.hour % 24
+            base_url = BASE_URL + f'/{self.product}' + \
+                f'/hrrr{nearest_zulu(dt).strftime("%Y%m%d")}'
+            test_url = f'{base_url}/' + f'hrrr_sfc.t{int(cycle):02d}z'
+            nc = self.fetch_nc_by_url(test_url)
+            i += 1
+        datevec = self.get_nc_datevector(nc)
+        if np.datetime64(np.max(datevec)) < np.datetime64(end_date - 2*self.output_interval):
+            raise IOError(
+                f"Requested end date at {end_date - self.output_interval} is larger than the max allowed HRRR end_date "
+                f' {np.max(datevec) - self.output_interval}')
+
+    @staticmethod
+    def fetch_nc_by_url(url):
         try:
-            logger.info(f'Checking url: {test_url}')
-            nc = Dataset(test_url)
-            logger.info('Success!')
+            logger.info(f"Checking url: {url}")
+
+            @timeout()
+            def get_netcdf_timeout():
+                return Dataset(url)
+
+            nc = get_netcdf_timeout()
+            logger.info("Success!")
+            return nc
         except OSError as e:
             if e.errno == -70:
                 print()
-                #continue
+                logger.info("URL not yet in server.")
+                return None
             elif e.errno == -73:
                 nc = False
 
+                @timeout()
                 def retry():
                     try:
-                        return Dataset(test_url)
+                        return Dataset(url)
                     except Exception:
                         return False
 
                 while not isinstance(nc, Dataset):
+                    logger.info("retrying...")
                     nc = retry()
             else:
                 raise e
-        self.nc = nc
-        #file_dates = self.get_nc_datevector(nc)
-        #for _datetime in reversed(list(self._files.keys())):
-        #            if _datetime in file_dates:
-        #                if self._files[_datetime] is None:
-        #                    self._files[_datetime] = nc
-        #            else:
-        #                logger.debug(f'No data for time {str(_datetime)} in '
-        #                             f'{test_url}.')
-        #        if not any(nc is None for nc in self._files.values()):
-        #            break
-
-        #missing_records = [dt for dt, nc in self._files.items() if nc is None]
-        #if len(missing_records) > 0:
-        #    raise ValueError(f'No HRRR data for dates: {missing_records}.')
-
-        self._bbox = self._modified_bbox(bbox)
 
     def put_sflux_field(self, hrrr_varname: str, dst: Dataset,
                         sflux_varname: str):
 
         lon_idxs, lat_idxs = self._bbox_indexes(self._bbox)
-        #for i, (dt, nc) in enumerate(self._files.items()):
-        logger.info(
-            f'Putting HRRR field {hrrr_varname} for as '
-            f'{sflux_varname} from file '
-            f'{self.nc.filepath().replace(f"{BASE_URL}/", "")}.')
+        for i, (dt, nc) in enumerate(self._files.items()):
+            logger.info(
+                f'Putting HRRR field {hrrr_varname} for time {dt} as '
+                f'{sflux_varname} from file '
+                f'{nc.filepath().replace(f"{BASE_URL}/", "")}.')
 
-        def put_nc_field():
-            try:
-                dst[sflux_varname][:, :, :] = self.nc.variables[hrrr_varname][
-                        :, lat_idxs, lon_idxs]
-                return True
-            except RuntimeError:
-                logger.info('Failed! retrying...')
-                return False
+            def put_nc_field():
+                try:
+                    dst[sflux_varname][i, :, :] = nc.variables[hrrr_varname][
+                            self.get_nc_time_index(nc, dt), lat_idxs, lon_idxs]
+                    return True
+                except RuntimeError:
+                    logger.info('Failed! retrying...')
+                    return False
 
-        success = False
-        while success is False:
-            success = put_nc_field()
-        dst.sync()
+            success = False
+            while success is False:
+                success = put_nc_field()
+            dst.sync()
 
     def get_nc_time_index(self, nc, dt):
         return np.where(np.in1d(self.get_nc_datevector(nc), [dt]))[0][0]
@@ -135,8 +174,7 @@ class HRRRInventory:
             return self.get_nc_datevector(nc)
 
     def get_sflux_timevector(self):
-        #timevec = list(self._files.keys())
-        timevec = list(self.get_nc_datevector(self.nc))
+        timevec = list(self._files.keys())
         _nearest_zulu = nearest_zulu(np.min(timevec))
         return [(localize_datetime(x) - _nearest_zulu) / timedelta(days=1)
                 for x in timevec]
@@ -170,19 +208,19 @@ class HRRRInventory:
     @property
     def lon(self):
         if not hasattr(self, '_lon'):
-            #nc = self._files[list(self._files.keys())[0]]
-            self._lon = self.nc.variables['lon'][:]
+            nc = self._files[list(self._files.keys())[0]]
+            self._lon = nc.variables['lon'][:]
             if not hasattr(self, '_lat'):
-                self._lat = self.nc.variables['lat'][:]
+                self._lat = nc.variables['lat'][:]
         return self._lon
 
     @property
     def lat(self):
         if not hasattr(self, '_lat'):
-            #nc = self._files[list(self._files.keys())[0]]
-            self._lat = self.nc.variables['lat'][:]
+            nc = self._files[list(self._files.keys())[0]]
+            self._lat = nc.variables['lat'][:]
             if not hasattr(self, '_lon'):
-                self._lon = self.nc.variables['lon'][:]
+                self._lon = nc.variables['lon'][:]
         return self._lat
 
     def _modified_bbox(self, bbox=None):
@@ -218,14 +256,17 @@ class HRRR(SfluxDataset):
         self.dlwrf_name = 'dlwrfsfc'
         self.dswrf_name = 'dswrfsfc'
 
-    def fetch_data(
+    def write(
             self,
+            outdir,
+            level,
             start_date: datetime = None,
-            rnday: Union[float, timedelta] = 1,
+            rnday: Union[float, timedelta] = 4,
             air: bool = True,
             prc: bool = True,
             rad: bool = True,
             bbox: Bbox = None,
+            overwrite: bool = False
     ):
         """Fetches HRRR data from NOMADS server. """
         logger.info('Fetching HRRR data.')
@@ -235,7 +276,7 @@ class HRRR(SfluxDataset):
             timedelta(days=rnday)
         inventory = HRRRInventory(
             self.start_date,
-            #self.rnday + self.output_interval,
+            self.rnday + self.output_interval,
             bbox
         )
         nx_grid, ny_grid = inventory.xy_grid()
@@ -425,10 +466,24 @@ class HRRR(SfluxDataset):
         if rad is True:
             self.rad = RadComponent(self.fields)
 
+        super().write(
+            outdir,
+            2,
+            overwrite=overwrite,
+            start_date=start_date,
+            rnday=rnday,
+            air=air,
+            rad=rad,
+            prc=prc,
+        )
+        del self._tmpdir
+
     @property
     def tmpdir(self):
         if not hasattr(self, '_tmpdir'):
-            self._tmpdir = tempfile.TemporaryDirectory()
+            self._tmpdir = tempfile.TemporaryDirectory(
+                prefix=appdirs.user_cache_dir("pyschism/hrrr")
+            )
         return pathlib.Path(self._tmpdir.name)
 
     @property
