@@ -91,7 +91,8 @@ class GFSInventory:
                 self.output_interval,
             ).astype(datetime)
         }
-
+        nearest_end_date = nearest_cycle(datetime.utcnow(), period=6)
+        nearest_end_date.replace(tzinfo=None)
         for dt in self.nearest_zulus:
             if None not in list(self._files.values()):
                 break
@@ -101,12 +102,12 @@ class GFSInventory:
                 + f'/gfs{nearest_zulu(dt).strftime("%Y%m%d")}'
             )
             for cycle in reversed(range(0, 24, 6)):
-                if dt + timedelta(hours=cycle) > dt:
+                if np.datetime64(dt + timedelta(hours=cycle)) > np.datetime64(nearest_end_date):
                     continue
                 test_url = f"{base_url}/" + f"{self.product.name.lower()}_{cycle:02d}z"
-                nc = None
-                while nc is None:
-                    nc = self.fetch_nc_by_url(test_url)
+                nc = self.fetch_nc_by_url(test_url)
+                if nc is None:
+                    continue
                 file_dates = self.get_nc_datevector(nc)
                 for _datetime in reversed(list(self._files.keys())):
                     if _datetime in file_dates:
