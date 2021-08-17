@@ -44,7 +44,7 @@ class TimeoutError(Exception):
     pass
 
 
-def timeout(seconds=10, error_message=os.strerror(errno.ETIME)):
+def timeout(seconds=30, error_message=os.strerror(errno.ETIME)):
     def decorator(func):
         def _handle_timeout(signum, frame):
             raise TimeoutError(error_message)
@@ -178,6 +178,10 @@ class GFSInventory:
                 while not isinstance(nc, Dataset):
                     logger.info("retrying...")
                     nc = retry()
+
+            elif e.errno == -72:
+                return None
+
             else:
                 raise e
 
@@ -528,7 +532,7 @@ class GlobalForecastSystem(SfluxDataset):
 
         super().write(
             outdir,
-            1,
+            level,
             overwrite=overwrite,
             start_date=start_date,
             rnday=rnday,

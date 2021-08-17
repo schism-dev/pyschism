@@ -25,7 +25,10 @@ logger = logging.getLogger(__name__)
 
 class HRRRInventory:
 
-    def __init__(self, start_date=None, rnday=2, bbox=None):
+    def __init__(self, file_interval=timedelta(hours=6)):
+        self.file_interval = file_interval
+
+    def __call__(self, start_date=None, rnday=2, bbox=None):
         self.start_date = nearest_cycle() if start_date is None else \
             localize_datetime(start_date).astimezone(pytz.utc)
         self.rnday = rnday if isinstance(rnday, timedelta) else \
@@ -42,6 +45,8 @@ class HRRRInventory:
         self.check_dates(self.start_date, self.rnday)
         end_date = (self.start_date + self.rnday).astimezone(pytz.utc)
         end_date.replace(tzinfo=None)
+        start_date = self.start_date
+        start_date.replace(tzinfo=None)
         self._files = {_: None for _ in np.arange(
             self.start_date,
             self.start_date + self.rnday + self.output_interval,
@@ -55,7 +60,7 @@ class HRRRInventory:
             base_url = BASE_URL + f'/{self.product}' + \
                 f'/hrrr{nearest_zulu(dt).strftime("%Y%m%d")}'
             # cycle
-            for cycle in reversed(range(0, 24, int(self.output_interval.total_seconds() / 3600))):
+            for cycle in reversed(range(0, 24, int(self.file_interval / timedelta(hours=1)))):
                 if np.datetime64(dt + timedelta(hours=cycle)) > np.datetime64(nearest_end_date):
                     continue
                 test_url = f'{base_url}/' + \
@@ -68,7 +73,6 @@ class HRRRInventory:
                     if _datetime in file_dates:
                         if self._files[_datetime] is None:
                             self._files[_datetime] = nc
-
                 if not any(nc is None for nc in self._files.values()):
                     break
 
@@ -128,6 +132,10 @@ class HRRRInventory:
                 while not isinstance(nc, Dataset):
                     logger.info("retrying...")
                     nc = retry()
+
+            # elif e.errno == -72:
+            #     return None
+
             else:
                 raise e
 
@@ -240,6 +248,17 @@ class HRRRInventory:
                             & (self.lon <= bbox.xmax))[0]
         return lon_idxs, lat_idxs
 
+    @property
+    def file_interval(self):
+        if not hasattr(self, '_file_interval'):
+            self._file_interval = timedelta(hours=1)
+        return self._file_interval
+
+    @file_interval.setter
+    def file_interval(self, file_interval):
+        assert isinstance(file_interval, timedelta)
+        self._file_interval = file_interval
+
 
 class HRRR(SfluxDataset):
 
@@ -255,6 +274,7 @@ class HRRR(SfluxDataset):
         self.prate_name = 'pratesfc'
         self.dlwrf_name = 'dlwrfsfc'
         self.dswrf_name = 'dswrfsfc'
+        self.inventory = HRRRInventory()
 
     def write(
             self,
@@ -274,16 +294,16 @@ class HRRR(SfluxDataset):
             localize_datetime(start_date).astimezone(pytz.utc)
         self.rnday = rnday if isinstance(rnday, timedelta) else \
             timedelta(days=rnday)
-        inventory = HRRRInventory(
+        self.inventory(
             self.start_date,
             self.rnday + self.output_interval,
             bbox
         )
-        nx_grid, ny_grid = inventory.xy_grid()
+        nx_grid, ny_grid = self.inventory.xy_grid()
         if air is True:
             with Dataset(
                 self.tmpdir /
-                f"air_{inventory.product}_"
+                f"air_{self.inventory.product}_"
                 f"{str(self.start_date)}.nc",
                 'w', format='NETCDF3_CLASSIC'
                     ) as dst:
@@ -316,7 +336,7 @@ class HRRR(SfluxDataset):
                                     f'-{date.day} 00:00'\
                                     f'{date.tzinfo}'
                 dst['time'].base_date = (date.year, date.month, date.day, 0)
-                dst['time'][:] = inventory.get_sflux_timevector()
+                dst['time'][:] = self.inventory.get_sflux_timevector()
 
                 for var in AirComponent.var_types:
                     dst.createVariable(
@@ -325,7 +345,7 @@ class HRRR(SfluxDataset):
                         ('time', 'ny_grid', 'nx_grid')
                     )
                     logger.info(f'Put field {var}')
-                    inventory.put_sflux_field(getattr(self, f'{var}_name'), dst, var)
+                    self.inventory.put_sflux_field(getattr(self, f'{var}_name'), dst, var)
 
                 # prmsl
                 dst['prmsl'].long_name = "Pressure reduced to MSL"
@@ -358,7 +378,7 @@ class HRRR(SfluxDataset):
         if prc is True:
             with Dataset(
                 self.tmpdir /
-                f"prc_{inventory.product}_"
+                f"prc_{self.inventory.product}_"
                 f"{str(self.start_date)}.nc",
                 'w', format='NETCDF3_CLASSIC'
                     ) as dst:
@@ -390,13 +410,13 @@ class HRRR(SfluxDataset):
                                     f'-{date.day} 00:00'\
                                     f'{date.tzinfo}'
                 dst['time'].base_date = (date.year, date.month, date.day, 0)
-                dst['time'][:] = inventory.get_sflux_timevector()
+                dst['time'][:] = self.inventory.get_sflux_timevector()
 
                 for var in PrcComponent.var_types:
                     dst.createVariable(var, float,
                                        ('time', 'ny_grid', 'nx_grid'))
                     logger.info(f'Put field {var}')
-                    inventory.put_sflux_field(getattr(self, f'{var}_name'), dst, var)
+                    self.inventory.put_sflux_field(getattr(self, f'{var}_name'), dst, var)
                 # prate
                 dst['prate'].long_name = "Surface Precipitation Rate"
                 dst['prate'].standard_name = "air_pressure_at_sea_level"
@@ -405,7 +425,7 @@ class HRRR(SfluxDataset):
         if rad is True:
             with Dataset(
                 self.tmpdir /
-                f"rad_{inventory.product}_"
+                f"rad_{self.inventory.product}_"
                 f"{str(self.start_date)}.nc",
                 'w', format='NETCDF3_CLASSIC'
                     ) as dst:
@@ -436,13 +456,13 @@ class HRRR(SfluxDataset):
                                     f'-{date.day} 00:00'\
                                     f'{date.tzinfo}'
                 dst['time'].base_date = (date.year, date.month, date.day, 0)
-                dst['time'][:] = inventory.get_sflux_timevector()
+                dst['time'][:] = self.inventory.get_sflux_timevector()
 
                 for var in RadComponent.var_types:
                     dst.createVariable(var, float,
                                        ('time', 'ny_grid', 'nx_grid'))
                     logger.info(f'Put field {var}')
-                    inventory.put_sflux_field(getattr(self, f'{var}_name'), dst, var)
+                    self.inventory.put_sflux_field(getattr(self, f'{var}_name'), dst, var)
 
                 # dlwrf
                 dst['dlwrf'].long_name = "Downward Long Wave Radiation "\
@@ -468,7 +488,7 @@ class HRRR(SfluxDataset):
 
         super().write(
             outdir,
-            2,
+            level,
             overwrite=overwrite,
             start_date=start_date,
             rnday=rnday,
