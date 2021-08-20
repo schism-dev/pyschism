@@ -180,22 +180,18 @@ class NWMElementPairings:
         for eid, features in self.sources.items():
             # for feat in features:
             eidx = self.hgrid.elements.get_index_by_id(eid)
-            data.append({
-                    'geometry': egdf.iloc[eidx].geometry
-                })
+            data.append({"geometry": egdf.iloc[eidx].geometry})
         src_gdf = gpd.GeoDataFrame(data)
         data = []
         for eid, features in self.sinks.items():
             # for feat in features:
             eidx = self._hgrid.elements.get_index_by_id(eid)
-            data.append({
-                    'geometry': egdf.iloc[eidx].geometry
-                })
+            data.append({"geometry": egdf.iloc[eidx].geometry})
         snk_gdf = gpd.GeoDataFrame(data)
 
-        ax = egdf.plot(facecolor="none",  edgecolor='black', lw=0.7)
-        src_gdf.plot(color='red', ax=ax, alpha=0.5)
-        snk_gdf.plot(color='blue', ax=ax, alpha=0.5)
+        ax = egdf.plot(facecolor="none", edgecolor="black", lw=0.7)
+        src_gdf.plot(color="red", ax=ax, alpha=0.5)
+        snk_gdf.plot(color="blue", ax=ax, alpha=0.5)
         plt.show()
 
     @property
@@ -207,8 +203,10 @@ class NWMElementPairings:
                 data.append(
                     {
                         "element_id": eid,
-                        "geometry": self.hgrid.elements.gdf.loc[eidx].geometry,
-                        "features": list(features),
+                        "geometry": LineString(
+                            self.hgrid.elements.gdf.loc[eidx].geometry.exterior.coords
+                        ),
+                        "features": " ".join(list(map(str, features))),
                     }
                 )
             self._sources_gdf = gpd.GeoDataFrame(data)
@@ -223,8 +221,10 @@ class NWMElementPairings:
                 data.append(
                     {
                         "element_id": eid,
-                        "geometry": self.hgrid.elements.gdf.loc[eidx].geometry,
-                        "features": list(features),
+                        "geometry": LineString(
+                            self.hgrid.elements.gdf.loc[eidx].geometry.exterior.coords
+                        ),
+                        "features": " ".join(list(map(str, features))),
                     }
                 )
             self._sinks_gdf = gpd.GeoDataFrame(data)
@@ -269,15 +269,19 @@ class NWMElementPairings:
     def gdf(self):
         if not hasattr(self, "_gdf"):
             gdf_coll = []
-            for reach_layer in [reach_layer for reach_layer in fiona.listlayers(self.nwm_file) if'reaches' in reach_layer]:
+            for reach_layer in [
+                reach_layer
+                for reach_layer in fiona.listlayers(self.nwm_file)
+                if "reaches" in reach_layer
+            ]:
                 layer_crs = gpd.read_file(self.nwm_file, rows=1, layer=reach_layer).crs
                 bbox = self.hgrid.get_bbox(crs=layer_crs)
                 gdf_coll.append(
                     gpd.read_file(
                         self.nwm_file,
                         bbox=(bbox.xmin, bbox.ymin, bbox.xmax, bbox.ymax),
-                        layer=reach_layer
-                        )
+                        layer=reach_layer,
+                    )
                 )
             self._gdf = pd.concat(gdf_coll)
         return self._gdf
@@ -292,7 +296,9 @@ class NWMElementPairings:
 
     @_nwm_file.setter
     def _nwm_file(self, nwm_file):
-        nwm_file = list(DATADIR.glob('**/*hydrofabric*.gdb')) if nwm_file is None else nwm_file
+        nwm_file = (
+            list(DATADIR.glob("**/*hydrofabric*.gdb")) if nwm_file is None else nwm_file
+        )
         if isinstance(nwm_file, list):
             if len(nwm_file) == 0:
                 tmpdir = tempfile.TemporaryDirectory()
@@ -303,7 +309,9 @@ class NWMElementPairings:
                     wget.download(
                         "https://www.nohrsc.noaa.gov/pub/staff/keicher/NWM_live/web/data_tools/NWM_channel_hydrofabric.tar.gz",
                         out=tmpdir.name,
-                        bar=wget.bar_adaptive if logger.getEffectiveLevel() < 30 else None,
+                        bar=wget.bar_adaptive
+                        if logger.getEffectiveLevel() < 30
+                        else None,
                     )
                 except urllib.error.HTTPError as e:
                     logger.fatal("Could not download NWM_channel_hydrofabric.tar.gz")
@@ -315,12 +323,12 @@ class NWMElementPairings:
                     )
 
                     src.extractall(DATADIR)
-                nwm_file = list(DATADIR.glob('**/*.gdb'))[0]
+                nwm_file = list(DATADIR.glob("**/*.gdb"))[0]
             elif len(nwm_file) == 1:
                 nwm_file = nwm_file[0]
             else:
-                raise Exception('Found more than 1 NWM hydrofabric file.')
-        self.__nwm_file = nwm_file       
+                raise Exception("Found more than 1 NWM hydrofabric file.")
+        self.__nwm_file = nwm_file
 
 
 def streamflow_lookup(file, indexes):
@@ -383,7 +391,11 @@ class AWSForecatsInventory:
         file_metadata = list(
             reversed(
                 sorted(
-                    [_["Key"] for _ in self.data["Contents"] if "channel" in _["Key"] and 'Contents' in self.data]
+                    [
+                        _["Key"]
+                        for _ in self.data["Contents"]
+                        if "channel" in _["Key"] and "Contents" in self.data
+                    ]
                 )
             )
         )
@@ -480,61 +492,67 @@ class AWSForecatsInventory:
 
 
 class AWSHindcastInventory:
-
     def __init__(
-            self,
-            start_date: datetime = None,
-            rnday: Union[int, float, timedelta] = timedelta(days=5.),
-            product=None,
-            verbose=False,
-            fallback=True,
+        self,
+        start_date: datetime = None,
+        rnday: Union[int, float, timedelta] = timedelta(days=5.0),
+        product=None,
+        verbose=False,
+        fallback=True,
     ):
         """This will download the National Water Model retro data.
-        A 26-year (January 1993 through December 2018) retrospective 
-        simulation using version 2.0 of the NWM. 
+        A 26-year (January 1993 through December 2018) retrospective
+        simulation using version 2.0 of the NWM.
 
         NetCDF files are saved to the system's temporary directory.
         """
-        self.start_date = dates.nearest_cycle() if start_date is None \
+        self.start_date = (
+            dates.nearest_cycle()
+            if start_date is None
             else dates.nearest_cycle(dates.localize_datetime(start_date))
+        )
         # self.start_date = self.start_date.replace(tzinfo=None)
-        self.rnday = rnday if isinstance(rnday, timedelta) \
-            else timedelta(days=rnday)
-        self.product = 'CHRTOUT_DOMAIN1.comp' if product is None else product
+        self.rnday = rnday if isinstance(rnday, timedelta) else timedelta(days=rnday)
+        self.product = "CHRTOUT_DOMAIN1.comp" if product is None else product
         self.fallback = fallback
-        self._files = {_: None for _ in np.arange(
-            self.start_date,
-            self.start_date + self.rnday + self.output_interval,
-            self.output_interval
-        ).astype(datetime)}
+        self._files = {
+            _: None
+            for _ in np.arange(
+                self.start_date,
+                self.start_date + self.rnday + self.output_interval,
+                self.output_interval,
+            ).astype(datetime)
+        }
 
-        paginator = self.s3.get_paginator('list_objects_v2')
+        paginator = self.s3.get_paginator("list_objects_v2")
         pages = paginator.paginate(
-            Bucket=self.bucket,
-            Prefix=f'full_physics/{self.start_date.year}'
+            Bucket=self.bucket, Prefix=f"full_physics/{self.start_date.year}"
         )
 
         self.data = []
         for page in pages:
-            for obj in page['Contents']:
+            for obj in page["Contents"]:
                 self.data.append(obj)
 
-        self.file_metadata = list(sorted([
-            _['Key'] for _ in self.data if 'CHRTOUT_DOMAIN1.comp' in _['Key']
-        ]))
+        self.file_metadata = list(
+            sorted([_["Key"] for _ in self.data if "CHRTOUT_DOMAIN1.comp" in _["Key"]])
+        )
 
         timevector = np.arange(
             datetime(self.start_date.year, 1, 1),
-            datetime(self.start_date.year+1, 1, 1),
-            np.timedelta64(1, 'h'),
-            dtype='datetime64'
+            datetime(self.start_date.year + 1, 1, 1),
+            np.timedelta64(1, "h"),
+            dtype="datetime64",
         )
 
-        timefile = {pd.to_datetime(str(timevector[i])): self.file_metadata[i] for i in range(len(timevector))}
- 
+        timefile = {
+            pd.to_datetime(str(timevector[i])): self.file_metadata[i]
+            for i in range(len(timevector))
+        }
+
         for requested_time, _ in self._files.items():
             key = timefile.get(requested_time)
-            logger.info(f'Requesting NWM data for time {requested_time}')
+            logger.info(f"Requesting NWM data for time {requested_time}")
 
             self._files[requested_time] = self.request_data(key, requested_time)
 
@@ -543,13 +561,13 @@ class AWSHindcastInventory:
         filename = pathlib.Path(self.tmpdir.name) / key
         filename.parent.mkdir(parents=True, exist_ok=True)
 
-        with open(filename, 'wb') as f:
-            logger.info(f'Downloading file {key}, ')
+        with open(filename, "wb") as f:
+            logger.info(f"Downloading file {key}, ")
             self.s3.download_fileobj(self.bucket, key, f)
         return filename
 
     def get_nc_pairing_indexes(self, pairings: NWMElementPairings):
-        nc_feature_id = Dataset(self.files[0])['feature_id'][:]
+        nc_feature_id = Dataset(self.files[0])["feature_id"][:]
 
         def get_aggregated_features(features):
             aggregated_features = []
@@ -573,7 +591,7 @@ class AWSHindcastInventory:
 
     @property
     def bucket(self):
-        return 'noaa-nwm-retro-v2.0-pds'
+        return "noaa-nwm-retro-v2.0-pds"
 
     @property
     def nearest_cycle(self) -> datetime:
@@ -581,17 +599,14 @@ class AWSHindcastInventory:
 
     @property
     def output_interval(self) -> timedelta:
-        return {
-            'CHRTOUT_DOMAIN1.comp': timedelta(hours=1)
-        }[self.product]
+        return {"CHRTOUT_DOMAIN1.comp": timedelta(hours=1)}[self.product]
 
     @property
     def s3(self):
         try:
             return self._s3
         except AttributeError:
-            self._s3 = boto3.client(
-                's3', config=Config(signature_version=UNSIGNED))
+            self._s3 = boto3.client("s3", config=Config(signature_version=UNSIGNED))
             return self._s3
 
     @property
@@ -604,29 +619,26 @@ class AWSHindcastInventory:
 
     @property
     def files(self):
-        return sorted(list(pathlib.Path(self.tmpdir.name).glob('**/*.comp')))
+        return sorted(list(pathlib.Path(self.tmpdir.name).glob("**/*.comp")))
 
 
 class AWSDataInventory:
-
-    def __new__(
-        cls,
-        start_date,
-        rnday,
-        product=None,
-        verbose=False,
-        fallback=True
-    ):
+    def __new__(cls, start_date, rnday, product=None, verbose=False, fallback=True):
         # AWSHindcastInventory -> January 1993 through December 2018
-        if start_date >= dates.localize_datetime(datetime(1993, 1, 1, 0, 0)) \
-                and start_date + rnday <= dates.localize_datetime(datetime(2018, 12, 31, 23, 59)):
+        if start_date >= dates.localize_datetime(
+            datetime(1993, 1, 1, 0, 0)
+        ) and start_date + rnday <= dates.localize_datetime(
+            datetime(2018, 12, 31, 23, 59)
+        ):
             return AWSHindcastInventory(start_date, rnday, product, verbose, fallback)
 
         elif start_date >= dates.nearest_zulu() - timedelta(days=30):
             return AWSForecatsInventory(start_date, rnday, product, verbose, fallback)
 
         else:
-            raise Exception(f'No NWM model data for start_date {start_date} and end_date {start_date+rnday}.')
+            raise Exception(
+                f"No NWM model data for start_date {start_date} and end_date {start_date+rnday}."
+            )
 
 
 class NationalWaterModel(SourceSink):
@@ -656,7 +668,11 @@ class NationalWaterModel(SourceSink):
         self.start_date = start_date
         self.end_date = end_date
         pairings = self.pairings if pairings is None else pairings
-        self.pairings = NWMElementPairings(gr3, nwm_file=self.nwm_file) if pairings is None else pairings
+        self.pairings = (
+            NWMElementPairings(gr3, nwm_file=self.nwm_file)
+            if pairings is None
+            else pairings
+        )
         self._inventory = AWSDataInventory(
             start_date=self.start_date,
             rnday=self.end_date - self.start_date,
@@ -685,11 +701,13 @@ class NationalWaterModel(SourceSink):
                     {
                         "flow": sources[i][j],
                         "temperature": -9999,
-                        "salinity": 0.,
+                        "salinity": 0.0,
                     }
                 )
             for k, element_id in enumerate(self.pairings.sinks.keys()):
-                self._data.setdefault(_time, {}).setdefault(element_id, {}).update({"flow": -sinks[i][k]})
+                self._data.setdefault(_time, {}).setdefault(element_id, {}).update(
+                    {"flow": -sinks[i][k]}
+                )
 
         if self.aggregation_radius is not None:
             self.aggregate_by_radius(gr3, self.aggregation_radius)
