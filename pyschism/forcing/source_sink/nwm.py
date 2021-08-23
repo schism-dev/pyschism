@@ -75,6 +75,7 @@ class NWMElementPairings:
             if hgrid.hull.rings().geometry.intersects(pm.geometry).any():
                 exact_indexes.add(pm.Index)
         reaches = self.gdf.iloc[list(exact_indexes)]
+        self._reaches=reaches
         logger.info(f"Finding exact features took {time()-start}.")
 
         # release some memory
@@ -93,14 +94,12 @@ class NWMElementPairings:
             for ring in hgrid.hull.rings().itertuples():
                 if ring.geometry.intersects(reach.geometry):
                     _intersections = ring.geometry.intersection(reach.geometry)
+
                     if isinstance(_intersections, MultiPoint):
-                        # features with even number of intersections are
-                        # discarded.
-                        if len(_intersections.geoms) % 2 == 0:
-                            continue
-                        # if a feature has an odd number of intersections > 1,
-                        # we only take the last point.
-                        _intersections = _intersections.geoms[-1]
+                        for point in _intersections:
+                            data.append({"geometry": point, "reachIndex": i})
+                        continue
+
                     data.append({"geometry": _intersections, "reachIndex": i})
                     break
 
@@ -108,6 +107,7 @@ class NWMElementPairings:
             # TODO: change for warning in future.
             raise IOError("No National Water model intersections found on the mesh.")
         intersection = gpd.GeoDataFrame(data, crs=hgrid.crs)
+        self._intersection=intersection
         del data
 
         # 2) Generate element centroid KDTree
@@ -139,8 +139,10 @@ class NWMElementPairings:
         # del self._hgrid  # release
 
         start = time()
-        sources = defaultdict(set)
-        sinks = defaultdict(set)
+        #sources = defaultdict(set)
+        #sinks = defaultdict(set)
+        sources = defaultdict(list)
+        sinks = defaultdict(list)
         for reach_index, paired_elements_idxs in element_index.items():
             reach = reaches.iloc[reach_index]
             point_of_intersection = intersection.loc[
@@ -164,9 +166,11 @@ class NWMElementPairings:
                             .intersection(hull)
                             .intersects(Point(downstream))
                         ):
-                            sources[element.id].add(reach.feature_id)
+                            #sources[element.id].add(reach.feature_id)
+                            sources[element.id].append(reach.feature_id)
                         else:
-                            sinks[element.id].add(reach.feature_id)
+                            #sinks[element.id].add(reach.feature_id)
+                            sinks[element.id].append(reach.feature_id)
 
         logger.info("Sorting features into sources and sinks took: " f"{time()-start}.")
 
@@ -229,6 +233,14 @@ class NWMElementPairings:
                 )
             self._sinks_gdf = gpd.GeoDataFrame(data)
         return self._sinks_gdf
+
+    @property
+    def intersection(self):
+        return self._intersection
+
+    @property
+    def reaches(self):
+        return self._reaches
 
     @property
     def hgrid(self):
