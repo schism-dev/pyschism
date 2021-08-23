@@ -161,16 +161,17 @@ class HRRRInventory:
 
         lon_idxs, lat_idxs = self._bbox_indexes(self._bbox)
         for i, (dt, nc) in enumerate(self._files.items()):
+            time_index = self.get_nc_time_index(nc, dt)
             logger.info(
                 f"Putting HRRR field {hrrr_varname} for time {dt} as "
                 f"{sflux_varname} from file "
-                f'{nc.filepath().replace(f"{BASE_URL}/", "")}.'
+                f'{nc.filepath().replace(f"{BASE_URL}/", "")}[{time_index}].'
             )
 
             def put_nc_field():
                 try:
                     dst[sflux_varname][i, :, :] = nc.variables[hrrr_varname][
-                        self.get_nc_time_index(nc, dt), lat_idxs, lon_idxs
+                        time_index, lat_idxs, lon_idxs
                     ]
                     return True
                 except RuntimeError:

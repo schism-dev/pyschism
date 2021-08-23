@@ -192,15 +192,15 @@ class GFSInventory:
 
         lon_idxs, lat_idxs = self._modified_bbox_indexes(self._bbox)
         for i, (dt, nc) in enumerate(self._files.items()):
+            time_index = self.get_nc_time_index(nc, dt)
             logger.info(
                 f"Putting GFS field {gfs_varname} for time {dt} as "
                 f"{sflux_varname} from file "
-                f'{nc.filepath().replace(f"{BASE_URL}/", "")}.'
+                f'{nc.filepath().replace(f"{BASE_URL}/", "")}[{time_index}].'
             )
             # TODO: exponential time backoff retry
             def put_nc_field():
                 try:
-                    time_index = self.get_nc_time_index(nc, dt)
                     dst[sflux_varname][i, :, :] = nc.variables[gfs_varname][
                         time_index, lat_idxs, lon_idxs
                     ]
