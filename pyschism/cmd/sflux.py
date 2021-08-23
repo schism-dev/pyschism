@@ -1,4 +1,5 @@
 import argparse
+from datetime import timedelta
 import pathlib
 import sys
 
@@ -55,6 +56,14 @@ class AnimateSubCli:
 
 class GenerateSubCli:
     def __init__(self, args):
+        if args.file_interval_sflux_1 is not None:
+            args.sflux.sflux_1.inventory.file_interval = timedelta(
+                hours=args.file_interval_sflux_1
+            )
+        if args.file_interval_sflux_2 is not None:
+            args.sflux.sflux_2.inventory.file_interval = timedelta(
+                hours=args.file_interval_sflux_2
+            )
         args.sflux.write(
             args.output_directory,
             start_date=args.start_date,

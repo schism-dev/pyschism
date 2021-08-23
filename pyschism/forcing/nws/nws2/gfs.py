@@ -9,8 +9,6 @@ import tempfile
 from typing import Union
 import logging
 
-
-import appdirs
 import pytz
 from matplotlib.transforms import Bbox
 from netCDF4 import Dataset
@@ -102,7 +100,9 @@ class GFSInventory:
                 + f'/gfs{nearest_zulu(dt).strftime("%Y%m%d")}'
             )
             for cycle in reversed(range(0, 24, 6)):
-                if np.datetime64(dt + timedelta(hours=cycle)) > np.datetime64(nearest_end_date):
+                if np.datetime64(dt + timedelta(hours=cycle)) > np.datetime64(
+                    nearest_end_date
+                ):
                     continue
                 test_url = f"{base_url}/" + f"{self.product.name.lower()}_{cycle:02d}z"
                 nc = self.fetch_nc_by_url(test_url)
@@ -130,12 +130,12 @@ class GFSInventory:
         i = 0
         while nc is None:
 
-            dt = nearest_cycle(nearest_cycle(datetime.utcnow()) - (i*self.output_interval))
+            dt = nearest_cycle(
+                nearest_cycle(datetime.utcnow()) - (i * self.output_interval)
+            )
             cycle = (6 * np.floor(dt.hour / 6)) % 24
             base_url = (
-                BASE_URL
-                + f"/{self.product.value}"
-                + f'/gfs{dt.strftime("%Y%m%d")}'
+                BASE_URL + f"/{self.product.value}" + f'/gfs{dt.strftime("%Y%m%d")}'
             )
             test_url = f"{base_url}/" + f"{self.product.name.lower()}_{int(cycle):02d}z"
             nc = self.fetch_nc_by_url(test_url)
@@ -143,10 +143,13 @@ class GFSInventory:
         datevec = self.get_nc_datevector(nc)
         # print(np.datetime64(np.max(datevec)))
         # print(np.datetime64(end_date - self.output_interval))
-        if np.datetime64(np.max(datevec)) < np.datetime64(end_date - 2*self.output_interval):
+        if np.datetime64(np.max(datevec)) < np.datetime64(
+            end_date - 2 * self.output_interval
+        ):
             raise IOError(
                 f"Requested end date at {end_date - self.output_interval} is larger than the max allowed GFS end_date "
-                f' {np.max(datevec) - self.output_interval}')
+                f" {np.max(datevec) - self.output_interval}"
+            )
 
     @staticmethod
     def fetch_nc_by_url(url):
@@ -545,9 +548,7 @@ class GlobalForecastSystem(SfluxDataset):
     @property
     def tmpdir(self):
         if not hasattr(self, "_tmpdir"):
-            self._tmpdir = tempfile.TemporaryDirectory(
-                prefix=appdirs.user_cache_dir("pyschism/gfs")
-            )
+            self._tmpdir = tempfile.TemporaryDirectory()
         return pathlib.Path(self._tmpdir.name)
 
     @property
