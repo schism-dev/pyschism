@@ -25,7 +25,6 @@ from shapely.geometry import LinearRing, Point, MultiPoint, LineString, box
 import wget
 
 from pyschism import dates
-from pyschism.mesh.hgrid import Hgrid
 from pyschism.mesh.base import Gr3
 
 from pyschism.forcing.source_sink.base import SourceSink
@@ -37,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 
 class NWMElementPairings:
-    def __init__(self, hgrid, nwm_file=None):
+    def __init__(self, hgrid: Gr3, nwm_file=None):
 
         self._nwm_file = nwm_file
 
@@ -665,17 +664,16 @@ class NationalWaterModel(SourceSink):
         self.nwm_file = nwm_file
         self.aggregation_radius = aggregation_radius
         self.pairings = pairings
+        self._data = None
 
-    def write(
-        self,
-        output_directory,
-        gr3: Gr3,
-        start_date: datetime = None,
-        end_date: Union[datetime, timedelta] = None,
-        overwrite: bool = False,
-        nprocs=-1,
-        pairings=None,
-        product=None,
+    def fetch_data(
+            self,
+            gr3: Gr3,
+            start_date: datetime = None,
+            end_date: Union[datetime, timedelta] = None,
+            nprocs=-1,
+            pairings=None,
+            product=None
     ):
         nprocs = -1 if nprocs is None else nprocs
         nprocs = cpu_count() if nprocs == -1 else nprocs
@@ -723,8 +721,42 @@ class NationalWaterModel(SourceSink):
                     {"flow": -sinks[i][k]}
                 )
 
+    def write(
+        self,
+        output_directory,
+        gr3: Gr3,
+        start_date: datetime = None,
+        end_date: Union[datetime, timedelta] = None,
+        overwrite: bool = False,
+        nprocs=-1,
+        pairings=None,
+        product=None,
+        msource: Union[str, bool] = True,
+        vsource: Union[str, bool] = True,
+        vsink: Union[str, bool] = True,
+        source_sink: Union[str, bool] = True,
+    ):
+        if self._data is None:
+            self.fetch_data(
+                gr3,
+                start_date=start_date,
+                end_date=end_date,
+                nprocs=nprocs,
+                pairings=pairings,
+                product=product
+            )
+
         if self.aggregation_radius is not None:
             self.aggregate_by_radius(gr3, self.aggregation_radius)
+
+        super().write(
+            output_directory,
+            overwrite=overwrite,
+            msource=msource,
+            vsource=vsource,
+            vsink=vsink,
+            source_sink=source_sink
+            )
 
     @property
     def timevector(self):
