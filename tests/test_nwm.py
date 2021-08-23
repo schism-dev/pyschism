@@ -5,6 +5,14 @@ from pyschism.forcing.source_sink.base import logger as source_sink_base_logger
 from pyschism.mesh import Hgrid
 
 
+for each file:
+    my_idxs.append()
+
+pool.starmap (
+    func,
+    [(nc, my_idxs[i]) for enumerate(each_file)]
+)
+
 def test_nwm():
 
     hgrid = Hgrid.open('https://raw.githubusercontent.com/geomesh/test-data/main/NWM/hgrid.ll')

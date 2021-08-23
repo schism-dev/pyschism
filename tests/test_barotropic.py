@@ -11,10 +11,12 @@ from pyschism.forcing.nws import NWS2, GFS, HRRR
 from pyschism.forcing.source_sink import NWM
 from pyschism.mesh import Hgrid
 
+SCHISM_BINARY = 'pschism_TVD-VL'
+
 
 def test_barotropic_forecast():
 
-    test_output_directory = pathlib.Path('/tmp/test')
+    test_output_directory = pathlib.Path("/tmp/test")
     if test_output_directory.exists():
         shutil.rmtree(test_output_directory)
 
@@ -23,18 +25,16 @@ def test_barotropic_forecast():
             "https://raw.githubusercontent.com/geomesh/test-data/main/NWM/hgrid.ll",
             crs="epsg:4326",
         ),
-        iettype=iettype.Iettype3(
-            database="tpxo"
-            ),
-        ifltype=ifltype.Ifltype3(
-            database="tpxo"
-            ),
-        nws=NWS2(
-                GFS(),
-                HRRR()
-            ),
-        source_sink=NWM(aggregation_radius=4000.),
+        iettype=iettype.Iettype3(database="tpxo"),
+        ifltype=ifltype.Ifltype3(database="tpxo"),
+        nws=NWS2(GFS(), HRRR()),
+        source_sink=NWM(
+            # aggregation_radius=4000.
+        ),
     )
+
+    config.forcings.nws.sflux_2.inventory.file_interval = timedelta(hours=6)
+
     # create reference dates
     nearest_cycle = dates.nearest_cycle()
     spinup_time = timedelta(days=1)
@@ -50,17 +50,33 @@ def test_barotropic_forecast():
         dahv=True,
     )
 
-    coldstart.run(test_output_directory / "coldstart")
+    # optionally run or write the coldstart object
+    if shutil.which(SCHISM_BINARY) is not None:
+        coldstart.run(
+            test_output_directory / "coldstart",
+            overwrite=True,
+        )
+
+    else:
+        coldstart.write(test_output_directory / "coldstart", overwrite=True)
 
     hotstart = config.hotstart(
         coldstart,
-        end_date=timedelta(days=1) + timedelta(hours=23.),
+        end_date=timedelta(days=1) + timedelta(hours=23.0),
         timestep=300.0,
-        nspool=timedelta(hours=1.),
+        nspool=timedelta(hours=1.0),
         elev=True,
         dahv=True,
     )
-    hotstart.run(test_output_directory / "hotstart")
+
+    if shutil.which(SCHISM_BINARY) is not None:
+        hotstart.run(
+            test_output_directory / "hotstart",
+            overwrite=True,
+        )
+
+    else:
+        hotstart.write(test_output_directory / "hotstart", overwrite=True)
 
 
 if __name__ == "__main__":

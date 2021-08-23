@@ -111,8 +111,6 @@ class ForecastCli(metaclass=ForecastCliMeta):
                         overwrite=self.args.overwrite
                     )
 
-
-
         #         hotstart.write(self.hotstart_directory,
         #                        overwrite=self.args.overwrite)
 
@@ -127,12 +125,11 @@ class ForecastCli(metaclass=ForecastCliMeta):
 
     @property
     def coldstart(self):
-
         if self.args.vgrid.is2D() is True:
             if self.args.spinup_days is not None:
                 return self.config.coldstart(
                     timestep=self.args.timestep,
-                    start_date=self.start_date - self.args.run_days,
+                    start_date=self.start_date - self.args.spinup_days,
                     end_date=self.start_date,
                     dramp=self.args.spinup_days,
                     drampbc=self.args.spinup_days,
@@ -207,27 +204,16 @@ class ForecastCli(metaclass=ForecastCliMeta):
                 watertype=self.args.watertype,
                 fluxflag=self.args.fluxflag,
                 tvdflag=self.args.tvdflag,
-                bctides=self.bctides,
+                iettype=self.args.iettype,
+                ifltype=self.args.ifltype,
+                itetype=self.args.itetype,
+                isatype=self.args.isatype,
                 nws=self.args.nws,
                 source_sink=self.args.source_sink,
                 # waves=self.args.waves,
             )
         return self._config
 
-    @property
-    def bctides(self):
-        if not hasattr(self, "_bctides"):
-            self._bctides = Bctides(
-                self.args.hgrid,
-                vgrid=self.args.vgrid,
-                iettype=self.args.iettype,
-                ifltype=self.args.ifltype,
-                isatype=self.args.isatype,
-                itetype=self.args.itetype,
-                # itrtype=self.args.itrtype,
-                cutoff_depth=self.args.cutoff_depth,
-            )
-        return self._bctides
 
     # @property
     # def static_directory(self):

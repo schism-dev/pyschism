@@ -117,6 +117,8 @@ def nearest_cycle(input_datetime=None, period=6, method='floor'):
         method = np.floor
     if method == 'ceil':
         method = np.ceil
+    if isinstance(period, timedelta):
+        period /= timedelta(hours=1)
 
     current_cycle = int(period * method(input_datetime.hour / period)) % 24
 

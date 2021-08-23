@@ -1,4 +1,5 @@
 import argparse
+from datetime import datetime, timedelta
 from enum import Enum
 import json
 import logging
@@ -7,7 +8,8 @@ from time import time
 
 import numpy as np
 
-from pyschism.enums import Stratification
+from pyschism import dates
+from pyschism.enums import Stratification, Sflux1Types, Sflux2Types
 from pyschism.mesh import Hgrid, Vgrid, gridgr3
 from pyschism.forcing import nws, bctides, hycom, source_sink
 
@@ -343,7 +345,7 @@ def add_iettype_to_parser(parser):
     class Iettype4Action(argparse.Action):
         def __call__(self, parser, namespace, values, option_string=None):
             if namespace.vgrid.is2D() is True:
-                raise NotImplementedError('--iettype-4 not available for 2D model.')
+                raise NotImplementedError("--iettype-4 not available for 2D model.")
             tmp_parser = argparse.ArgumentParser(add_help=False)
             add_baroclinic_database_to_parser(tmp_parser)
             tmp_args = tmp_parser.parse_known_args()[0]
@@ -352,7 +354,7 @@ def add_iettype_to_parser(parser):
     class Iettype5Action(argparse.Action):
         def __call__(self, parser, namespace, values, option_string=None):
             if namespace.vgrid.is2D() is True:
-                raise NotImplementedError('--iettype-5 not available for 2D model.')
+                raise NotImplementedError("--iettype-5 not available for 2D model.")
             tmp_parser = argparse.ArgumentParser(add_help=False)
             add_tidal_database_to_parser(tmp_parser)
             add_baroclinic_database_to_parser(tmp_parser)
@@ -469,7 +471,7 @@ def add_ifltype_to_parser(parser):
     class Ifltype4Action(argparse.Action):
         def __call__(self, parser, namespace, values, option_string=None):
             if namespace.vgrid.is2D() is True:
-                raise NotImplementedError('--ifltype-4 not available for 2D model.')
+                raise NotImplementedError("--ifltype-4 not available for 2D model.")
             tmp_parser = argparse.ArgumentParser(add_help=False)
             add_baroclinic_database_to_parser(tmp_parser)
             tmp_args = tmp_parser.parse_known_args()[0]
@@ -478,7 +480,7 @@ def add_ifltype_to_parser(parser):
     class Ifltype5Action(argparse.Action):
         def __call__(self, parser, namespace, values, option_string=None):
             if namespace.vgrid.is2D() is True:
-                raise NotImplementedError('--ifltype-5 not available for 2D model.')
+                raise NotImplementedError("--ifltype-5 not available for 2D model.")
             tmp_parser = argparse.ArgumentParser(add_help=False)
             add_tidal_database_to_parser(tmp_parser)
             add_baroclinic_database_to_parser(tmp_parser)
@@ -824,79 +826,65 @@ def add_ibctype_to_parser(parser):
     add_nudge_to_parser(parser)
 
 
-def add_nws_to_parser(parser):
+def add_windrot_to_parser(parser):
+    parser.add_argument(
+        "--windrot",
+        # action=WindrotAction,
+    )
 
-    def add_windrot_to_parser(parser):
-        parser.add_argument(
-            '--windrot',
-            # action=WindrotAction,
+
+def add_sflux_options_to_parser(parser):
+    parser.add_argument(
+        "--file-interval-sflux-1", type=lambda x: timedelta(hours=int(x))
+    )
+    parser.add_argument(
+        "--file-interval-sflux-2", type=lambda x: timedelta(hours=int(x))
+    )
+
+
+class NWS2Action(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        if len(values) > 2:
+            raise ValueError(
+                "pyschism forecast init: error: argument --nws-2/--sflux: "
+                "expected at most two arguments."
+            )
+        # if len(values) == 1:
+        #     values.append(None)
+        sflux_1 = Sflux1Types[values[0].upper()].value(
+            product="gfs_0p25_1hr" if values[0].lower() == "gfs" else values[0].lower()
         )
+        if len(values) == 2:
+            sflux_2 = Sflux2Types[values[1].upper()].value()
+        else:
+            sflux_2 = None
 
-    class NWS2Action(argparse.Action):
-        class Sflux1Types(Enum):
-            # GDAS = GDAS
-            # GDAS_0P25 = GDAS
-            GFS = nws.GFS
-            GFS_0P25 = nws.GFS
-            GFS_0P25_1HR = nws.GFS
-            GFS_0P50 = nws.GFS
-            GFS_1P00 = nws.GFS
-
-            @classmethod
-            def _missing_(cls, name):
-                f = [
-                    f"{name} is not a valid sflux_1 type. Valid values are: ",
-                ]
-                for sflux_type in cls:
-                    f.append(sflux_type.name.lower())
-                f.append(".")
-                raise ValueError("".join(f))
-
-        class Sflux2Types(Enum):
-            HRRR = nws.HRRR
-
-            @classmethod
-            def _missing_(cls, name):
-                f = [
-                    f"{name} is not a valid sflux_2 type. Valid values are: ",
-                ]
-                for sflux_type in cls:
-                    f.append(sflux_type.name.lower())
-                f.append(".")
-                raise ValueError("".join(f))
-
-        def __call__(self, parser, namespace, values, option_string=None):
-            if len(values) > 2:
-                raise ValueError(
-                    "pyschism forecast init: error: argument --nws-2/--sflux: "
-                    "expected at most two arguments."
-                )
-            if len(values) == 1:
-                values.append(None)
-            sflux_1 = self.Sflux1Types[values[0].upper()].value(
-                product="gfs_0p25_1hr" if values[0].lower() == "gfs" else values[0].lower()
+        tmp_parser = argparse.ArgumentParser(add_help=False)
+        if not bool(set(sys.argv).intersection(["-h", "--help"])):
+            add_windrot_to_parser(tmp_parser)
+            tmp_args = tmp_parser.parse_known_args()[0]
+            windrot = (
+                gridgr3.Windrot.default(namespace.hgrid)
+                if tmp_args.windrot is None
+                else tmp_args.windrot
             )
-            if len(values) == 2:
-                sflux_2 = self.Sflux2Types[values[1].upper()].value()
-            else:
-                sflux_2 = None
+        else:
+            windrot = None
+        setattr(namespace, self.dest, nws.NWS2(sflux_1, sflux_2, windrot=windrot))
 
-            tmp_parser = argparse.ArgumentParser(add_help=False)
-            if not bool(set(sys.argv).intersection(['-h', '--help'])):
-                add_windrot_to_parser(tmp_parser)
-                tmp_args = tmp_parser.parse_known_args()[0]
-                windrot = gridgr3.Windrot.default(namespace.hgrid) if tmp_args.windrot is None else tmp_args.windrot
-            else:
-                windrot = None
-            setattr(
-                namespace,
-                self.dest,
-                nws.NWS2(
-                    sflux_1,
-                    sflux_2,
-                    windrot=windrot
-                )
-            )
+
+def add_sflux_to_parser(parser):
+    parser.add_argument(
+        "sflux",
+        nargs="+",
+        action=NWS2Action,
+        metavar="sflux_level",
+    )
+    add_sflux_options_to_parser(parser)
+    add_windrot_to_parser(parser)
+
+
+def add_nws_to_parser(parser):
 
     nws_group = parser.add_argument_group("Atmospheric forcing options")
     nws_parser = nws_group.add_mutually_exclusive_group()
@@ -912,7 +900,8 @@ def add_nws_to_parser(parser):
         action=NWS2Action,
         metavar="sflux_level",
     )
-    add_windrot_to_parser(nws_parser)
+    add_sflux_options_to_parser(parser)
+    add_windrot_to_parser(parser)
     nws_parser.add_argument(
         "--nws-3",
         dest="nws",
@@ -927,9 +916,7 @@ def add_nws_to_parser(parser):
 
 
 def add_source_sink_to_parser(parser):
-
     class SourceSinkAction(argparse.Action):
-
         class SourceSinkTypes(Enum):
             NWM = source_sink.NWM
 
@@ -952,17 +939,21 @@ def add_source_sink_to_parser(parser):
             ss = source_sink.SourceSink()
 
             for source_sink_request in values:
-                ss.add_forcing(self.SourceSinkTypes[source_sink_request.upper()].value())
+                ss.add_forcing(
+                    self.SourceSinkTypes[source_sink_request.upper()].value()
+                )
 
             setattr(namespace, self.dest, ss)
 
-    ss_parser = parser.add_argument_group("Source/Sink forcing options").add_mutually_exclusive_group()
+    ss_parser = parser.add_argument_group(
+        "Source/Sink forcing options"
+    ).add_mutually_exclusive_group()
     ss_parser.add_argument(
-        '--source-sink',
-        dest='source_sink',
-        nargs='+',
+        "--source-sink",
+        dest="source_sink",
+        nargs="+",
         action=SourceSinkAction,
-        help="Add source/sink terms to model."
+        help="Add source/sink terms to model.",
     )
 
 
@@ -1010,11 +1001,57 @@ def add_generic_ic_to_parser(parser, name):
     ic.add_argument(f"--{name}-ic-crs")
 
 
+def add_dates_to_parser(parser):
+    def add_datetime_format_to_parser(parser):
+        parser.add_argument(
+            "--datetime-format", "--strptime", default=r"%Y-%m-%dT%H:%M:%S"
+        )
+
+    def add_start_date_to_parser(parser):
+        class StartDateAction(argparse.Action):
+            def __call__(self, parser, namespace, values, option_string=None):
+                tmp_parser = argparse.ArgumentParser(add_help=False)
+                add_datetime_format_to_parser(tmp_parser)
+                tmp_args = tmp_parser.parse_known_args()[0]
+                start_date = datetime.strptime(values, tmp_args.datetime_format)
+                setattr(namespace, self.dest, start_date)
+
+        parser.add_argument(
+            "--start-date",
+            action=StartDateAction,
+            default=dates.nearest_cycle(),
+        )
+
+    def add_end_date_to_parser(parser):
+        class EndDateAction(argparse.Action):
+            def __call__(self, parser, namespace, values, option_string=None):
+                if not isinstance(values, timedelta):
+                    tmp_parser = argparse.ArgumentParser(add_help=False)
+                    add_datetime_format_to_parser(tmp_parser)
+                    tmp_args = tmp_parser.parse_known_args()[0]
+                    values = datetime.strptime(values, tmp_args.datetime_format)
+                setattr(namespace, self.dest, values)
+
+        end_time_group = parser.add_mutually_exclusive_group(required=True)
+
+        end_time_group.add_argument("--end-date", action=EndDateAction, dest="end_date")
+
+        end_time_group.add_argument(
+            "--run-days",
+            action=EndDateAction,
+            dest="end_date",
+            type=lambda x: timedelta(days=float(x)),
+        )
+
+    add_start_date_to_parser(parser)
+    add_end_date_to_parser(parser)
+
+
 def add_elev_ic_to_parser(parser):
     class ElevIcAction(argparse.Action):
         def __call__(self, parser, namespace, values, option_string=None):
 
-            if 'no' in option_string:
+            if "no" in option_string:
                 setattr(namespace, self.dest, False)
                 return
             # if user passes argument, it will be opened.
@@ -1040,8 +1077,8 @@ def add_elev_ic_to_parser(parser):
         # type=Elev,
         action=ElevIcAction,
         help="Elevation initial condition file. If omitted, one will be created.",
-        nargs='?',
-        dest='elev_ic',
+        nargs="?",
+        dest="elev_ic",
     )
     elev_ic.add_argument(
         "--no-elev-ic",
@@ -1049,7 +1086,7 @@ def add_elev_ic_to_parser(parser):
         action=ElevIcAction,
         help="Elevation initial condition file. If omitted, one will be created.",
         nargs=0,
-        dest='elev_ic',
+        dest="elev_ic",
     )
     elev_group.add_argument(
         "--elev-ic-crs",
@@ -1525,8 +1562,8 @@ def add_stations_outputs_to_parser(parser):
 
 
 def add_vmin_to_parser(parser):
-    parser.add_argument('--vmin', type=float)
+    parser.add_argument("--vmin", type=float)
 
 
 def add_vmax_to_parser(parser):
-    parser.add_argument('--vmax', type=float)
+    parser.add_argument("--vmax", type=float)

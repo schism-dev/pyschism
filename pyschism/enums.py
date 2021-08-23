@@ -703,3 +703,41 @@ class NationalWaterModelDataSource(Enum):
     @classmethod
     def _missing_(self, name):
         raise ValueError(f"{name} is not a valid National Water Model data source.")
+
+
+class Sflux1Types(Enum):
+
+    from pyschism.forcing import nws
+    # GDAS = GDAS
+    # GDAS_0P25 = GDAS
+    GFS = nws.GFS
+    GFS_0P25 = nws.GFS
+    GFS_0P25_1HR = nws.GFS
+    GFS_0P50 = nws.GFS
+    GFS_1P00 = nws.GFS
+
+    @classmethod
+    def _missing_(cls, name):
+        f = [
+            f"{name} is not a valid sflux_1 type. Valid values are: ",
+        ]
+        for sflux_type in cls:
+            f.append(sflux_type.name.lower())
+        f.append(".")
+        raise ValueError("".join(f))
+
+
+class Sflux2Types(Enum):
+
+    from pyschism.forcing import nws
+    HRRR = nws.HRRR
+
+    @classmethod
+    def _missing_(cls, name):
+        f = [
+            f"{name} is not a valid sflux_2 type. Valid values are: ",
+        ]
+        for sflux_type in cls:
+            f.append(sflux_type.name.lower())
+        f.append(".")
+        raise ValueError("".join(f))
