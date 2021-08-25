@@ -38,6 +38,8 @@ logger = logging.getLogger(__name__)
 class NWMElementPairings:
     def __init__(self, hgrid: Gr3, nwm_file=None):
 
+        # TODO: Accelerate using dask: https://blog.dask.org/2017/09/21/accelerating-geopandas-1
+
         self._nwm_file = nwm_file
 
         logger.info("Computing NWMElementPairings...")
@@ -92,14 +94,13 @@ class NWMElementPairings:
         for i, reach in enumerate(reaches.itertuples()):
             for ring in hgrid.hull.rings().itertuples():
                 if ring.geometry.intersects(reach.geometry):
-                    _intersections = ring.geometry.intersection(reach.geometry)
-
-                    if isinstance(_intersections, MultiPoint):
-                        for point in _intersections.geoms:
+                    intersections = ring.geometry.intersection(reach.geometry)
+                    if isinstance(intersections, MultiPoint):
+                        for point in intersections.geoms:
                             data.append({"geometry": point, "reachIndex": i})
                         continue
 
-                    data.append({"geometry": _intersections, "reachIndex": i})
+                    data.append({"geometry": intersections, "reachIndex": i})
                     break
 
         if len(data) == 0:
@@ -135,11 +136,8 @@ class NWMElementPairings:
         )
 
         hull = hgrid.hull.multipolygon()
-        # del self._hgrid  # release
 
         start = time()
-        # sources = defaultdict(set)
-        # sinks = defaultdict(set)
         sources = defaultdict(list)
         sinks = defaultdict(list)
         for reach_index, paired_elements_idxs in element_index.items():
@@ -147,49 +145,44 @@ class NWMElementPairings:
             points_of_intersection = intersection.loc[
                 intersection["reachIndex"] == reach_index
             ]
-            for element_idx in paired_elements_idxs:
-                element = hgrid.elements.gdf.iloc[element_idx]
-                if not isinstance(reach.geometry, LineString):
-                    geom = ops.linemerge(reach.geometry)
-                else:
-                    geom = reach.geometry
-                for segment in map(LineString, zip(geom.coords[:-1], geom.coords[1:])):
-                    segment_origin = Point(segment.coords[0])
-                    for row in points_of_intersection.itertuples():
-                        poi = row.geometry
-                        if segment.intersects(poi.buffer(np.finfo(np.float32).eps)):
-                            d1 = segment_origin.distance(poi)
-                            downstream = segment.interpolate(
-                                d1 + np.finfo(np.float32).eps
-                            )
-                            if (
-                                box(*segment.bounds)
-                                .intersection(hull)
-                                .intersects(Point(downstream))
-                            ):
-                                # sources[element.id].add(reach.feature_id)
-                                sources[element.id].append(reach.feature_id)
-                            else:
-                                # sinks[element.id].add(reach.feature_id)
-                                sinks[element.id].append(reach.feature_id)
-
+            if not isinstance(reach.geometry, LineString):
+                geom = ops.linemerge(reach.geometry)
+            else:
+                geom = reach.geometry
+            for segment in map(LineString, zip(geom.coords[:-1], geom.coords[1:])):
+                segment_origin = Point(segment.coords[0])
+                for i, row in enumerate(points_of_intersection.itertuples()):
+                    poi = row.geometry
+                    if segment.intersects(poi.buffer(np.finfo(np.float32).eps)):
+                        d1 = segment_origin.distance(poi)
+                        downstream = segment.interpolate(
+                            d1 + np.finfo(np.float32).eps
+                        )
+                        element = hgrid.elements.gdf.iloc[paired_elements_idxs[i]]
+                        if (
+                            box(*LineString([poi, downstream]).bounds)
+                            .intersection(hull)
+                            .intersects(downstream)
+                        ):
+                            sources[element.id].append(reach.feature_id)
+                        else:
+                            sinks[element.id].append(reach.feature_id)
         logger.info("Sorting features into sources and sinks took: " f"{time()-start}.")
-
         self.sources = sources
         self.sinks = sinks
+
+        # self.make_plot()
 
     def make_plot(self):
         # verification plot
         data = []
-        egdf = self.hgrid.elements.geodataframe()
-        for eid, features in self.sources.items():
-            # for feat in features:
+        egdf = self.hgrid.elements.gdf
+        for eid in self.sources.keys():
             eidx = self.hgrid.elements.get_index_by_id(eid)
             data.append({"geometry": egdf.iloc[eidx].geometry})
         src_gdf = gpd.GeoDataFrame(data)
         data = []
-        for eid, features in self.sinks.items():
-            # for feat in features:
+        for eid in self.sinks.keys():
             eidx = self._hgrid.elements.get_index_by_id(eid)
             data.append({"geometry": egdf.iloc[eidx].geometry})
         snk_gdf = gpd.GeoDataFrame(data)
@@ -667,13 +660,13 @@ class NationalWaterModel(SourceSink):
         self._data = None
 
     def fetch_data(
-            self,
-            gr3: Gr3,
-            start_date: datetime = None,
-            end_date: Union[datetime, timedelta] = None,
-            nprocs=-1,
-            pairings=None,
-            product=None
+        self,
+        gr3: Gr3,
+        start_date: datetime = None,
+        end_date: Union[datetime, timedelta] = None,
+        nprocs=-1,
+        pairings=None,
+        product=None,
     ):
         nprocs = -1 if nprocs is None else nprocs
         nprocs = cpu_count() if nprocs == -1 else nprocs
@@ -743,7 +736,7 @@ class NationalWaterModel(SourceSink):
                 end_date=end_date,
                 nprocs=nprocs,
                 pairings=pairings,
-                product=product
+                product=product,
             )
 
         if self.aggregation_radius is not None:
@@ -755,8 +748,8 @@ class NationalWaterModel(SourceSink):
             msource=msource,
             vsource=vsource,
             vsink=vsink,
-            source_sink=source_sink
-            )
+            source_sink=source_sink,
+        )
 
     @property
     def timevector(self):
