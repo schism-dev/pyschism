@@ -27,7 +27,7 @@ import wget
 from pyschism import dates
 from pyschism.mesh.base import Gr3
 
-from pyschism.forcing.source_sink.base import SourceSink
+from pyschism.forcing.source_sink.base import SourceSink, Sources, Sinks
 
 DATADIR = pathlib.Path(appdirs.user_data_dir("pyschism/nwm"))
 DATADIR.mkdir(exist_ok=True, parents=True)
@@ -170,8 +170,6 @@ class NWMElementPairings:
         logger.info("Sorting features into sources and sinks took: " f"{time()-start}.")
         self.sources = sources
         self.sinks = sinks
-
-        # self.make_plot()
 
     def make_plot(self):
         # verification plot
@@ -695,14 +693,15 @@ class NationalWaterModel(SourceSink):
                 streamflow_lookup, [(file, snk_idxs) for file in self.inventory.files]
             )
         pool.join()
-        self._data = {}
+        source_data = {}
+        sink_data = {}
         for i, file in enumerate(self.inventory.files):
             nc = Dataset(file)
             _time = dates.localize_datetime(
                 datetime.strptime(nc.model_output_valid_time, "%Y-%m-%d_%H:%M:%S")
             )
             for j, element_id in enumerate(self.pairings.sources.keys()):
-                self._data.setdefault(_time, {}).setdefault(element_id, {}).update(
+                source_data.setdefault(_time, {}).setdefault(element_id, {}).update(
                     {
                         "flow": sources[i][j],
                         "temperature": -9999,
@@ -710,9 +709,12 @@ class NationalWaterModel(SourceSink):
                     }
                 )
             for k, element_id in enumerate(self.pairings.sinks.keys()):
-                self._data.setdefault(_time, {}).setdefault(element_id, {}).update(
+                sink_data.setdefault(_time, {}).setdefault(element_id, {}).update(
                     {"flow": -sinks[i][k]}
                 )
+        self._sources = Sources(source_data)
+        self._sinks = Sinks(sink_data)
+        self._data = {**source_data, **sink_data}
 
     def write(
         self,
