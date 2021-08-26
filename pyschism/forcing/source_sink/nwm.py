@@ -700,18 +700,25 @@ class NationalWaterModel(SourceSink):
             _time = dates.localize_datetime(
                 datetime.strptime(nc.model_output_valid_time, "%Y-%m-%d_%H:%M:%S")
             )
-            for j, element_id in enumerate(self.pairings.sources.keys()):
-                source_data.setdefault(_time, {}).setdefault(element_id, {}).update(
-                    {
-                        "flow": sources[i][j],
-                        "temperature": -9999,
-                        "salinity": 0.0,
-                    }
-                )
-            for k, element_id in enumerate(self.pairings.sinks.keys()):
-                sink_data.setdefault(_time, {}).setdefault(element_id, {}).update(
-                    {"flow": -sinks[i][k]}
-                )
+            for element_id, features in self.pairings.sources.items():
+                for j, feature_id in enumerate(features):
+                    source_data.setdefault(_time, {}).setdefault(element_id, []).append(
+                        {
+                            "feature_id": feature_id,
+                            "flow": sources[i][j],
+                            "temperature": -9999,
+                            "salinity": 0.0,
+                        }
+                    )
+            for element_id, features in self.pairings.sinks.items():
+                for k, feature_id in enumerate(features):
+                    sink_data.setdefault(_time, {}).setdefault(element_id, []).append(
+                        {
+                            "feature_id": feature_id,
+                            "flow": -sinks[i][k],
+                        }
+                    )
+
         self._sources = Sources(source_data)
         self._sinks = Sinks(sink_data)
         self._data = {**source_data, **sink_data}
