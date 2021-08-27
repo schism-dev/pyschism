@@ -140,33 +140,63 @@ class NWMElementPairings:
         start = time()
         sources = defaultdict(list)
         sinks = defaultdict(list)
-        for reach_index, paired_elements_idxs in element_index.items():
+        for i in np.arange(len(intersection)):
+            poi=intersection.iloc[i].geometry
+            reach_index=intersection.iloc[i].reachIndex
             reach = reaches.iloc[reach_index]
-            points_of_intersection = intersection.loc[
-                intersection["reachIndex"] == reach_index
-            ]
+            element = hgrid.elements.gdf.iloc[idxs[i]]
+
             if not isinstance(reach.geometry, LineString):
                 geom = ops.linemerge(reach.geometry)
             else:
                 geom = reach.geometry
+
             for segment in map(LineString, zip(geom.coords[:-1], geom.coords[1:])):
-                segment_origin = Point(segment.coords[0])
-                for i, row in enumerate(points_of_intersection.itertuples()):
-                    poi = row.geometry
-                    if segment.intersects(poi.buffer(np.finfo(np.float32).eps)):
-                        d1 = segment_origin.distance(poi)
-                        downstream = segment.interpolate(
-                            d1 + np.finfo(np.float32).eps
+                if segment.intersects(poi.buffer(np.finfo(np.float32).eps)):
+                    segment_origin = Point(segment.coords[0])
+                    d1 =  segment_origin.distance(poi)
+                    downstream = segment.interpolate(
+                        d1 + np.finfo(np.float32).eps
+                        #d1 + 1.0e-3
                         )
-                        element = hgrid.elements.gdf.iloc[paired_elements_idxs[i]]
-                        if (
-                            box(*LineString([poi, downstream]).bounds)
-                            .intersection(hull)
-                            .intersects(downstream)
-                        ):
-                            sources[element.id].append(reach.feature_id)
-                        else:
-                            sinks[element.id].append(reach.feature_id)
+
+                    if (
+                        box(*LineString([poi, downstream]).bounds)
+                        .intersection(hull)
+                        .intersects(Point(downstream))
+                    ):
+                        sources[element.id].append(reach.feature_id)
+                    else:
+                        sinks[element.id].append(reach.feature_id)
+                    break
+
+#        for reach_index, paired_elements_idxs in element_index.items():
+#            reach = reaches.iloc[reach_index]
+#            points_of_intersection = intersection.loc[
+#                intersection["reachIndex"] == reach_index
+#            ]
+#            if not isinstance(reach.geometry, LineString):
+#                geom = ops.linemerge(reach.geometry)
+#            else:
+#                geom = reach.geometry
+#            for segment in map(LineString, zip(geom.coords[:-1], geom.coords[1:])):
+#                segment_origin = Point(segment.coords[0])
+#                for i, row in enumerate(points_of_intersection.itertuples()):
+#                    poi = row.geometry
+#                    if segment.intersects(poi.buffer(np.finfo(np.float32).eps)):
+#                        d1 = segment_origin.distance(poi)
+#                        downstream = segment.interpolate(
+#                            d1 + np.finfo(np.float32).eps
+#                        )
+#                        element = hgrid.elements.gdf.iloc[paired_elements_idxs[i]]
+#                        if (
+#                            box(*LineString([poi, downstream]).bounds)
+#                            .intersection(hull)
+#                            .intersects(downstream)
+#                        ):
+#                            sources[element.id].append(reach.feature_id)
+#                        else:
+#                            sinks[element.id].append(reach.feature_id)
         logger.info("Sorting features into sources and sinks took: " f"{time()-start}.")
         self.sources = sources
         self.sinks = sinks
@@ -338,6 +368,8 @@ class NWMElementPairings:
 def streamflow_lookup(file, indexes):
     nc = Dataset(file)
     streamflow = nc["streamflow"][:]
+    idx=np.where(streamflow < -1e-5)
+    streamflow[idx]=0.0
     data = []
     # TODO: read scaling factor directly from netcdf file?
     for indxs in indexes:
@@ -700,24 +732,37 @@ class NationalWaterModel(SourceSink):
             _time = dates.localize_datetime(
                 datetime.strptime(nc.model_output_valid_time, "%Y-%m-%d_%H:%M:%S")
             )
-            for element_id, features in self.pairings.sources.items():
-                for j, feature_id in enumerate(features):
-                    source_data.setdefault(_time, {}).setdefault(element_id, []).append(
-                        {
-                            "feature_id": feature_id,
-                            "flow": sources[i][j],
-                            "temperature": -9999,
-                            "salinity": 0.0,
-                        }
-                    )
-            for element_id, features in self.pairings.sinks.items():
-                for k, feature_id in enumerate(features):
-                    sink_data.setdefault(_time, {}).setdefault(element_id, []).append(
-                        {
-                            "feature_id": feature_id,
-                            "flow": -sinks[i][k],
-                        }
-                    )
+            for j, element_id in enumerate(self.pairings.sources.keys()):
+                source_data.setdefault(_time, {}).setdefault(element_id, []).append(
+                    {
+                        "flow": sources[i][j],
+                        "temperature": -9999,
+                        "salinity": 0.0,
+                    }
+                )
+                
+
+#                for j, feature_id in enumerate(features):
+#                    source_data.setdefault(_time, {}).setdefault(element_id, []).append(
+#                        {
+#                            "feature_id": feature_id,
+#                            "flow": sources[i][j],
+#                            "temperature": -9999,
+#                            "salinity": 0.0,
+#                        }
+#                    )
+            for k, element_id in enumerate(self.pairings.sinks.keys()):
+                sink_data.setdefault(_time, {}).setdefault(element_id, []).append(
+                    {
+                        "flow": -sinks[i][k],
+                    }
+                )
+#                    sink_data.setdefault(_time, {}).setdefault(element_id, []).append(
+#                        {
+#                            "feature_id": feature_id,
+#                            "flow": -sinks[i][k],
+#                        }
+#                    )
 
         self._sources = Sources(source_data)
         self._sinks = Sinks(sink_data)
