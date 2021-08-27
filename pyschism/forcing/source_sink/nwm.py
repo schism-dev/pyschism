@@ -370,17 +370,15 @@ class AWSDataInventory(ABC):
         ) and start_date + rnday <= dates.localize_datetime(
             datetime(2018, 12, 31, 23, 59)
         ):
-            obj = AWSHindcastInventory.__new__(cls)
+            return AWSHindcastInventory.__new__(cls)
 
         elif start_date >= dates.nearest_zulu() - timedelta(days=30):
-            obj = AWSForecastInventory.__new__(cls)
+            return AWSForecastInventory.__new__(cls)
 
         else:
             raise Exception(
                 f"No NWM model data for start_date {start_date} and end_date {start_date+rnday}."
             )
-        obj.__init__(start_date, rnday, product, verbose, fallback, cache)
-        return obj
 
     @abstractmethod
     def request_data(self, request_time):
@@ -392,7 +390,7 @@ class AWSDataInventory(ABC):
         raise NotImplementedError
 
     def get_nc_pairing_indexes(self, pairings: NWMElementPairings):
-        nc_feature_id = Dataset(self.files[0])["feature_id"][:]
+        nc_feature_id = Dataset(list(self.files.values())[0])["feature_id"][:]
 
         def get_aggregated_features(features):
             aggregated_features = []
@@ -432,6 +430,10 @@ class AWSDataInventory(ABC):
             self.__tmpdir = tempfile.TemporaryDirectory()
             self._tmpdir = pathlib.Path(self.__tmpdir.name)
         return self._tmpdir
+
+    @property
+    def files(self):
+        return self._files
 
 
 class AWSHindcastInventory(AWSDataInventory):
@@ -505,7 +507,6 @@ class AWSHindcastInventory(AWSDataInventory):
             )
 
     def request_data(self, key):
-
         filename = self.tmpdir / key
         filename.parent.mkdir(parents=True, exist_ok=True)
         if filename.is_file() is False:
@@ -523,8 +524,8 @@ class AWSHindcastInventory(AWSDataInventory):
         return {"CHRTOUT_DOMAIN1.comp": timedelta(hours=1)}[self.product]
 
     @property
-    def files(self):
-        return sorted(list(pathlib.Path(self.tmpdir.name).glob("**/*.comp")))
+    def cached_files(self):
+        return sorted(list(self.tmpdir.glob("**/*.comp")))
 
     @property
     def cache(self):
@@ -648,7 +649,7 @@ class AWSForecastInventory(AWSDataInventory):
 
     @property
     def files(self):
-        return sorted(list(pathlib.Path(self.tmpdir.name).glob("**/*.nc")))
+        return sorted(list(self.tmpdir.glob("**/*.nc")))
 
     @property
     def requested_product(self):
@@ -716,21 +717,25 @@ class NationalWaterModel(SourceSink):
             # product="medium_range_mem1",
         )
 
-        self._timevector = [dates.localize_datetime(d) for d in self.inventory._files]
+        self._timevector = [
+            dates.localize_datetime(d) for d in self.inventory.files.keys()
+        ]
 
         src_idxs, snk_idxs = self.inventory.get_nc_pairing_indexes(self.pairings)
 
         with Pool(processes=nprocs) as pool:
             sources = pool.starmap(
-                streamflow_lookup, [(file, src_idxs) for file in self.inventory.files]
+                streamflow_lookup,
+                [(file, src_idxs) for file in self.inventory.files.values()],
             )
             sinks = pool.starmap(
-                streamflow_lookup, [(file, snk_idxs) for file in self.inventory.files]
+                streamflow_lookup,
+                [(file, snk_idxs) for file in self.inventory.files.values()],
             )
         pool.join()
         source_data = {}
         sink_data = {}
-        for i, file in enumerate(self.inventory.files):
+        for i, file in enumerate(self.inventory.files.values()):
             nc = Dataset(file)
             _time = dates.localize_datetime(
                 datetime.strptime(nc.model_output_valid_time, "%Y-%m-%d_%H:%M:%S")

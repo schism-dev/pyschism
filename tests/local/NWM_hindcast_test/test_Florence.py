@@ -17,7 +17,7 @@ output_directory = pathlib.Path("Florence")
 startdate = datetime(2018, 8, 24)
 
 rnday = 36
-rnday = 2
+rnday = 2 / 24
 import os
 
 hgrid = Hgrid.open(
@@ -38,9 +38,10 @@ else:
     pairings = NWMElementPairings.load_json(hgrid, sources_pairings, sinks_pairings)
 
 nwm = NationalWaterModel(aggregation_radius=4000, pairings=pairings, cache=True)
-
+# print(rnday)
+# exit()
 nwm.write(
-    output_directory / f"rnday{rnday}",
+    output_directory,
     hgrid,
     startdate,
     rnday,
