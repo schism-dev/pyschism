@@ -2,7 +2,6 @@ from datetime import datetime
 import logging
 import pathlib
 
-
 from pyschism.forcing.source_sink.nwm import NationalWaterModel, NWMElementPairings
 from pyschism.mesh import Hgrid
 
@@ -11,19 +10,19 @@ logging.basicConfig(
     force=True,
 )
 
-# logging.getLogger('pyschism').setLevel(logging.DEBUG)
+logging.getLogger("pyschism").setLevel(logging.DEBUG)
 
 output_directory = pathlib.Path("Florence")
 
 startdate = datetime(2018, 8, 24)
 
 rnday = 36
-# rnday = 1/24
-# rnday = 15
-# import os
+rnday = 2
+import os
+
 hgrid = Hgrid.open(
-    "hgrid.gr3",
-    # os.getenv('NWM_TEST_MESH'),
+    # HGRID_PATH,
+    os.getenv("NWM_TEST_MESH"),
     crs="epsg:4326",
 )
 
@@ -38,7 +37,7 @@ if all([sources_pairings.is_file(), sinks_pairings.is_file()]) is False:
 else:
     pairings = NWMElementPairings.load_json(hgrid, sources_pairings, sinks_pairings)
 
-nwm = NationalWaterModel(aggregation_radius=4000, pairings=pairings)
+nwm = NationalWaterModel(aggregation_radius=4000, pairings=pairings, cache=True)
 
 nwm.write(
     output_directory / f"rnday{rnday}",
@@ -51,6 +50,7 @@ nwm.write(
 exit()
 
 # test how much longer it takes depending on the value of rnday
+logging.getLogger("pyschism").setLevel(logging.WARNING)
 
 
 def Fibonacci(n):
