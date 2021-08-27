@@ -1,5 +1,6 @@
 from collections import defaultdict
 from datetime import datetime, timedelta
+import json
 import logging
 from multiprocessing import Pool, cpu_count
 import pathlib
@@ -75,8 +76,8 @@ class NWMElementPairings:
         for pm in possible_matches.itertuples():
             if hgrid.hull.rings().geometry.intersects(pm.geometry).any():
                 exact_indexes.add(pm.Index)
-        reaches = self.gdf.iloc[list(exact_indexes)]
-        self._reaches = reaches
+        self._reaches = reaches = self.gdf.iloc[list(exact_indexes)]
+
         logger.info(f"Finding exact features took {time()-start}.")
 
         # release some memory
@@ -106,8 +107,8 @@ class NWMElementPairings:
         if len(data) == 0:
             # TODO: change for warning in future.
             raise IOError("No National Water model intersections found on the mesh.")
-        intersection = gpd.GeoDataFrame(data, crs=hgrid.crs)
-        self._intersection = intersection
+        self._intersection = intersection = gpd.GeoDataFrame(data, crs=hgrid.crs)
+ 
         del data
 
         # 2) Generate element centroid KDTree
@@ -141,8 +142,8 @@ class NWMElementPairings:
         sources = defaultdict(list)
         sinks = defaultdict(list)
         for i in np.arange(len(intersection)):
-            poi=intersection.iloc[i].geometry
-            reach_index=intersection.iloc[i].reachIndex
+            poi = intersection.iloc[i].geometry
+            reach_index = intersection.iloc[i].reachIndex
             reach = reaches.iloc[reach_index]
             element = hgrid.elements.gdf.iloc[idxs[i]]
 
@@ -154,10 +155,9 @@ class NWMElementPairings:
             for segment in map(LineString, zip(geom.coords[:-1], geom.coords[1:])):
                 if segment.intersects(poi.buffer(np.finfo(np.float32).eps)):
                     segment_origin = Point(segment.coords[0])
-                    d1 =  segment_origin.distance(poi)
+                    d1 = segment_origin.distance(poi)
                     downstream = segment.interpolate(
                         d1 + np.finfo(np.float32).eps
-                        #d1 + 1.0e-3
                         )
 
                     if (
@@ -220,6 +220,28 @@ class NWMElementPairings:
         snk_gdf.plot(color="blue", ax=ax, alpha=0.5)
         plt.show()
 
+    def save_json(self, sources=True, sinks=True):
+
+        sources = "sources.json" if sources is True else sources
+        if sources:
+            logger.info(f'Saving {sources}')
+            with open(sources, 'w') as fh:
+                json.dump(self.sources, fh)
+
+        sinks = "sinks.json" if sinks is True else sinks
+        if sinks:
+            with open(sinks, 'w') as fh:
+                logger.info(f'Saving {sinks}')
+                json.dump(self.sinks, fh)
+
+    @staticmethod
+    def load_json(hgrid, sources=None, sinks=None):
+        pairings = NWMElementPairings.__new__(NWMElementPairings)
+        pairings.sources = json.load(open(sources)) if sources is not None else {}
+        pairings.sinks = json.load(open(sinks)) if sinks is not None else {}
+        pairings._hgrid = hgrid
+        return pairings
+
     @property
     def sources_gdf(self):
         if not hasattr(self, "_sources_gdf"):
@@ -267,37 +289,6 @@ class NWMElementPairings:
     @property
     def hgrid(self):
         return self._hgrid
-
-    # @property
-    # def _hgrid(self):
-    #     return self.__hgrid
-
-    # @_hgrid.setter
-    # def _hgrid(self, hgrid: Gr3):
-    #     hgrid = Hgrid(**hgrid.to_dict())
-    #     hgrid.transform_to(
-    #         gpd.read_file(self.nwm_file, rows=1, layer=0).crs
-    #         # 'epsg:4269',
-    #         )
-    #     self.__hgrid = hgrid
-
-    # @_hgrid.deleter
-    # def _hgrid(self):
-    #     del self.__hgrid
-
-    # @property
-    # def nwm_file(self):
-
-    #     # NOTE: There's a tradeoff between time spent decompressing the file vs. the memory it takes to store it.
-
-    #     if not hasattr(self, "_nwm_file"):
-    #         self._tmpdir = tempfile.TemporaryDirectory()
-    #         with tarfile.open(NWM_FILE, "r:gz") as src:
-    #             src.extractall(self._tmpdir.name)
-    #         self._nwm_file = (
-    #             list(pathlib.Path(self._tmpdir.name).glob('**/*.gdb'))[0]
-    #         )
-    #     return self._nwm_file
 
     @property
     def gdf(self):
@@ -365,15 +356,13 @@ class NWMElementPairings:
         self.__nwm_file = nwm_file
 
 
-def streamflow_lookup(file, indexes):
+def streamflow_lookup(file, indexes, threshold=-1e-5):
     nc = Dataset(file)
     streamflow = nc["streamflow"][:]
-    idx=np.where(streamflow < -1e-5)
-    streamflow[idx]=0.0
+    streamflow[np.where(streamflow < threshold)] = 0.0
     data = []
-    # TODO: read scaling factor directly from netcdf file?
     for indxs in indexes:
-        # Dataset already considered scale_factor and offset
+        # Note: Dataset already consideres scale factor and offset.
         data.append(np.sum(streamflow[indxs]))
     return data
 
@@ -689,24 +678,22 @@ class NationalWaterModel(SourceSink):
         self.pairings = pairings
         self._data = None
 
-    def fetch_data(
+    def _fetch_data(
         self,
         gr3: Gr3,
         start_date: datetime = None,
         end_date: Union[datetime, timedelta] = None,
         nprocs=-1,
-        pairings=None,
         product=None,
     ):
         nprocs = -1 if nprocs is None else nprocs
         nprocs = cpu_count() if nprocs == -1 else nprocs
         self.start_date = start_date
         self.end_date = end_date
-        pairings = self.pairings if pairings is None else pairings
         self.pairings = (
             NWMElementPairings(gr3, nwm_file=self.nwm_file)
-            if pairings is None
-            else pairings
+            if self.pairings is None
+            else self.pairings
         )
         self._inventory = AWSDataInventory(
             start_date=self.start_date,
@@ -717,6 +704,7 @@ class NationalWaterModel(SourceSink):
         self._timevector = [dates.localize_datetime(d) for d in self.inventory._files]
 
         src_idxs, snk_idxs = self.inventory.get_nc_pairing_indexes(self.pairings)
+
         with Pool(processes=nprocs) as pool:
             sources = pool.starmap(
                 streamflow_lookup, [(file, src_idxs) for file in self.inventory.files]
@@ -732,41 +720,23 @@ class NationalWaterModel(SourceSink):
             _time = dates.localize_datetime(
                 datetime.strptime(nc.model_output_valid_time, "%Y-%m-%d_%H:%M:%S")
             )
-            for j, element_id in enumerate(self.pairings.sources.keys()):
-                source_data.setdefault(_time, {}).setdefault(element_id, []).append(
-                    {
-                        "flow": sources[i][j],
-                        "temperature": -9999,
-                        "salinity": 0.0,
+            for j, element_id in enumerate(self.pairings.sources):
+                source_data.setdefault(_time, {})[element_id] = {
+                    "flow": sources[i][j],
+                    "temperature": -9999.,
+                    "salinity": 0.0,
                     }
-                )
-                
 
-#                for j, feature_id in enumerate(features):
-#                    source_data.setdefault(_time, {}).setdefault(element_id, []).append(
-#                        {
-#                            "feature_id": feature_id,
-#                            "flow": sources[i][j],
-#                            "temperature": -9999,
-#                            "salinity": 0.0,
-#                        }
-#                    )
-            for k, element_id in enumerate(self.pairings.sinks.keys()):
-                sink_data.setdefault(_time, {}).setdefault(element_id, []).append(
-                    {
+            for k, element_id in enumerate(self.pairings.sinks):
+                sink_data.setdefault(_time, {})[element_id] = {
                         "flow": -sinks[i][k],
                     }
-                )
-#                    sink_data.setdefault(_time, {}).setdefault(element_id, []).append(
-#                        {
-#                            "feature_id": feature_id,
-#                            "flow": -sinks[i][k],
-#                        }
-#                    )
-
-        self._sources = Sources(source_data)
-        self._sinks = Sinks(sink_data)
-        self._data = {**source_data, **sink_data}
+        # self._sources = Sources(source_data)
+        # self._sinks = Sinks(sink_data)
+        # self._data = {**source_data, **sink_data}
+        for data_time, elements in {**source_data, **sink_data}.items():
+            for element_id, flow_data in elements.items():
+                self.add_data(data_time, element_id, **flow_data)
 
     def write(
         self,
@@ -776,7 +746,6 @@ class NationalWaterModel(SourceSink):
         end_date: Union[datetime, timedelta] = None,
         overwrite: bool = False,
         nprocs=-1,
-        pairings=None,
         product=None,
         msource: Union[str, bool] = True,
         vsource: Union[str, bool] = True,
@@ -784,12 +753,12 @@ class NationalWaterModel(SourceSink):
         source_sink: Union[str, bool] = True,
     ):
         if self._data is None:
-            self.fetch_data(
+            self._data = {}
+            self._fetch_data(
                 gr3,
                 start_date=start_date,
                 end_date=end_date,
                 nprocs=nprocs,
-                pairings=pairings,
                 product=product,
             )
 

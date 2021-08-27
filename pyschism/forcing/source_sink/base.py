@@ -1,14 +1,15 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 from functools import lru_cache
 import logging
 import os
 import pathlib
-from typing import Union
+from typing import Dict, TypedDict, Union
+
 
 import geopandas as gpd
 import numpy as np
 import pandas as pd
-from pyproj import Proj, CRS, Transformer
+from pyproj import CRS, Transformer
 import pytz
 from shapely import ops
 from shapely.geometry import Point
@@ -32,14 +33,11 @@ class SourceSinkDataset:
 
     @property
     def elements(self):
-        if not hasattr(self, '_elements'):
-            element_table = []
-            for elements in self.data.values():
-                for element, data in elements.items():
-                    element_table.extend(len(data)*[element])
-                break
-            self._elements = element_table
-        return self._elements
+        unique_elements = set()
+        for elements in self.data.values():
+            for element_id in elements.keys():
+                unique_elements.add(element_id)
+        return list(map(str, sorted(list(map(int, unique_elements)))))
 
     @property
     def timevector(self):
@@ -51,8 +49,7 @@ class SourceSinkDataset:
             data = []
             for time, edata in self.data.items():
                 for eid, _edata in edata.items():
-                    for datapoint in _edata:
-                        data.append({"time": time, "element_id": eid, **datapoint})
+                    data.append({"time": time, "element_id": eid, **_edata})
             self._df = pd.DataFrame(data)
         return self._df
 
@@ -61,17 +58,42 @@ class SourceSinkDataset:
         return self._data
 
 
+class SourceDataPoint(TypedDict):
+    flow: float
+    temperature: float
+    salinity: float
+
+
 class Sources(SourceSinkDataset):
-    pass
+    
+    def __init__(self, data: Dict[datetime, Dict[str, SourceDataPoint]]):
+        for time, edata in data.items():
+            assert isinstance(time, datetime)
+            for eid, datapoint in edata.items():
+                assert datapoint['flow'] >= 0., f'Invalid source point for element_id={eid} during time {str(time)}. '
+                f'Sources must be >= 0 but got value of {datapoint["flow"]}.'
+                assert isinstance(datapoint['temperature'], float)
+                assert isinstance(datapoint['salinity'], float)
+        super().__init__(data)
+
+
+class SinkDataPoint(TypedDict):
+    flow: float
 
 
 class Sinks(SourceSinkDataset):
-    pass
+    def __init__(self, data: Dict[datetime, Dict[str, SinkDataPoint]]):
+        for time, edata in data.items():
+            assert isinstance(time, datetime)
+            for eid, datapoint in edata.items():
+                assert datapoint['flow'] <= 0., f'Invalid sink point for element_id={eid} during time {str(time)}. '
+                f'Sinks must be <= 0 but got value of {datapoint["flow"]}.'
+        super().__init__(data)
 
 
 class TimeHistoryFile:
-    def __init__(self, data, start_date, rnday, filename):
-        self.data = data
+    def __init__(self, source_sink: SourceSinkDataset, start_date, rnday, filename):
+        self.data = source_sink
         self.filename = filename
         self.start_date = start_date
         self.rnday = rnday
@@ -84,8 +106,7 @@ class TimeHistoryFile:
                 continue
             line = [f"{relative_time:G}"]
             for element_id in self.data.elements:
-                for datapoint in self.data._data[time][element_id]:
-                    line.append(f'{datapoint["flow"]:.4e}')
+                line.append(f'{self.data.data[time][element_id]["flow"]:.4e}')
             data.append(" ".join(line))
         return "\n".join(data)
 
@@ -113,12 +134,10 @@ class Msource(TimeHistoryFile):
             if relative_time < 0:
                 continue
             line = [f"{relative_time:G}"]
-            for element_id in self.data.elements:
-                for datapoint in self.data._data[time][element_id]:
-                    line.append(f'{datapoint["temperature"]: .4e}')
-            for element_id in self.data.elements:
-                for datapoint in self.data._data[time][element_id]:
-                    line.append(f'{datapoint["salinity"]: .4e}')
+            for element_id, datapoint in self.data.elements.items():
+                line.append(f'{datapoint["temperature"]: .4e}')
+            for element_id, datapoint in self.data.elements.items():
+                line.append(f'{datapoint["salinity"]: .4e}')
             data.append(" ".join(line))
         return "\n".join(data)
 
@@ -159,76 +178,140 @@ class SourceSink:
 
     def __add__(self, other):
         source_sink = SourceSink()
-        source_sink.sources = Sources({**self.sources, **other.sources})
-        source_sink.sinks = Sinks({**self.sinks, **other.sinks})
+        source_sink.sources = Sources({**self.sources.data, **other.sources.data})
+        source_sink.sinks = Sinks({**self.sinks.data, **other.sinks.data})
         return source_sink
 
     def __len__(self):
         return len(self._data)
 
-    # def aggregate_by_radius(self, hgrid, radius, nprocs=-1):
+    def add_data(
+        self,
+        time: datetime,
+        element_id: str,
+        flow: float,
+        temperature: float = np.nan,
+        salinity: float = np.nan,
+    ):
 
-    #     # --- Generate aggregation mapping
+        time = dates.localize_datetime(time).astimezone(pytz.utc)
+        data_for_element = self._data.get(time, {}).get("element_id", {})
 
-    #     # gather extreme values
-    #     source_max = {element_id: -float("inf") for element_id in self.sources.elements}
-    #     for element_data in self.sources.data.values():
-    #         for element_id, data in element_data.items():
-    #             source_max[element_id] = np.max([source_max[element_id], data["flow"]])
+        # TODO: What happens if we have two different flows that both are
+        # assigned to the same element? Example: 100 m^3/s @ 1 psu then
+        # another flow on the same element of 1 m^3/s @ 100 psu. How do we
+        # combine these on a single element? Flow is just simple summation,
 
-    #     sink_max = {element_id: float("inf") for element_id in self.sinks.elements}
-    #     for element_data in self.sinks.data.values():
-    #         for element_id, data in element_data.items():
-    #             sink_max[element_id] = np.min([sink_max[element_id], data["flow"]])
+        _tmp = data_for_element.get("temperature", np.nan)
+        if not np.isnan(_tmp):
+            if _tmp != temperature:
+                raise NotImplementedError(
+                    "Two different values of temperature for same " "time/element."
+                )
 
-    #     aggregate_gdf = []
-    #     for element_id, maxflow in {**source_max, **sink_max}.items():
-    #         element_index = hgrid.elements.get_index_by_id(element_id)
-    #         aggregate_gdf.append(
-    #             {
-    #                 "element_id": element_id,
-    #                 "geometry": hgrid.elements.gdf.loc[element_index].geometry,
-    #                 "maxflow": maxflow,
-    #             }
-    #         )
-    #     aggregate_gdf = gpd.GeoDataFrame(aggregate_gdf, crs=hgrid.crs).sort_values(
-    #         by="maxflow", key=abs, ascending=False
-    #     )
+        _sal = data_for_element.get("salinity", np.nan)
+        if not np.isnan(_sal):
+            if _sal != salinity:
+                raise NotImplementedError(
+                    "Two different values of salinity for same time/element."
+                )
 
-    #     aggregation_mapping = {}
-    #     for row in aggregate_gdf.itertuples():
-    #         if row.element_id in aggregation_mapping:
-    #             continue
-    #         aggregation_mapping[row.element_id] = row.element_id
-    #         possible_sources = aggregate_gdf.loc[
-    #             aggregate_gdf.index.difference(
-    #                 np.where(
-    #                     aggregate_gdf["element_id"].isin(list(aggregation_mapping))
-    #                 )
-    #             )
-    #         ]
-    #         circle = get_circle_of_radius(row.geometry.centroid.x, row.geometry.centroid.y, radius)
-    #         sources_in_circle = possible_sources.loc[possible_sources.within(circle)]
-    #         for row_in_circle in sources_in_circle.itertuples():
-    #             aggregation_mapping[row_in_circle.element_id] = row.element_id
+        self._data.setdefault(time, {}).setdefault(element_id, {}).update(
+            {
+                "flow": np.nansum([data_for_element.get("flow", np.nan), flow]),
+                "temperature": temperature,
+                "salinity": salinity,
+            }
+        )
+        if hasattr(self, "_df"):
+            del self._df
 
-    #     # --- move data from one element to the other
-    #     # for current, target in aggregation_mapping.items():
-    #     #     for time, data in self.get_element_timeseries(current).items():
-    #     #         self._data[time][target]['flow'] = self._data[time][current]['flow'] + self._data[time][target]['flow']
+    def get_element_timeseries(self, element_id):
+        data = {}
+        element_data = self.df[(self.df['element_id'] == element_id)]
+        for row in element_data.sort_values(by=['time']).itertuples():
+            data.setdefault(row.time, {}).update({
+                'flow': row.flow,
+                'temperature': row.temperature,
+                'salinity': row.salinity})
+        return data
 
-    #     # for current, target in aggregation_mapping.items():
-    #     #     if current != target:
-    #     #         self.remove_element_timeseries(current)
+    # def get_interpolated_timeseries(self, element_id):
+    #     f = self.get_element_interpolator(element_id)
+    #     self.timevector
 
-    #     if hasattr(self, "_sources"):
-    #         del self._sources
+    def remove_element_timeseries(self, element_id):
+        for time in self._data:
+            self._data[time].pop(element_id)
+        if hasattr(self, '_df'):
+            del self._df
 
-    #     if hasattr(self, "_sinks"):
-    #         del self._sinks
+    def aggregate_by_radius(self, hgrid, radius):
 
-    #     if hasattr(self, "_df"):
-    #         del self._df
+        logger.info('Begin aggregate_by_radius...')
+        start = datetime.now()
+        # --- Generate aggregation mapping
+        # gather extreme values
+        source_max = {element_id: -float("inf") for element_id in self.sources.elements}
+        for element_data in self.sources.data.values():
+            for element_id, data in element_data.items():
+                source_max[element_id] = np.max([source_max[element_id], data["flow"]])
+
+        sink_max = {element_id: float("inf") for element_id in self.sinks.elements}
+        for element_data in self.sinks.data.values():
+            for element_id, data in element_data.items():
+                sink_max[element_id] = np.min([sink_max[element_id], data["flow"]])
+
+        aggregate_gdf = []
+        for element_id, maxflow in {**source_max, **sink_max}.items():
+            element_index = hgrid.elements.get_index_by_id(element_id)
+            aggregate_gdf.append(
+                {
+                    "element_id": element_id,
+                    "geometry": hgrid.elements.gdf.loc[element_index].geometry,
+                    "maxflow": maxflow,
+                }
+            )
+        aggregate_gdf = gpd.GeoDataFrame(aggregate_gdf, crs=hgrid.crs).sort_values(
+            by="maxflow", key=abs, ascending=False
+        )
+
+        aggregation_mapping = {}
+        for row in aggregate_gdf.itertuples():
+            if row.element_id in aggregation_mapping:
+                continue
+            aggregation_mapping[row.element_id] = row.element_id
+            possible_sources = aggregate_gdf.loc[
+                aggregate_gdf.index.difference(
+                    np.where(
+                        aggregate_gdf["element_id"].isin(list(aggregation_mapping))
+                    )
+                )
+            ]
+            circle = get_circle_of_radius(row.geometry.centroid.x, row.geometry.centroid.y, radius)
+            sources_in_circle = possible_sources.loc[possible_sources.within(circle)]
+            for row_in_circle in sources_in_circle.itertuples():
+                aggregation_mapping[row_in_circle.element_id] = row.element_id
+
+        # --- move data from one element to the other
+        for current, target in aggregation_mapping.items():
+            for time, data in self.get_element_timeseries(current).items():
+                self._data[time][target]['flow'] = self._data[time][current]['flow'] + self._data[time][target]['flow']
+
+        for current, target in aggregation_mapping.items():
+            if current != target:
+                self.remove_element_timeseries(current)
+
+        if hasattr(self, '_sources'):
+            del self._sources
+
+        if hasattr(self, '_sinks'):
+            del self._sinks
+
+        if hasattr(self, '_df'):
+            del self._df
+
+        logger.info(f'aggregate_by_radius took {datetime.now()-start}...')
 
     def write(
         self,
@@ -239,6 +322,9 @@ class SourceSink:
         vsink: Union[str, bool] = True,
         source_sink: Union[str, bool] = True,
     ):
+
+        path = pathlib.Path(path)
+        path.mkdir(exist_ok=overwrite, parents=True)
 
         # unpack sources, sinks
         sources, sinks = self.sources, self.sinks
@@ -285,28 +371,21 @@ class SourceSink:
                     # TODO:  Are irregular timeseries allowed?
                     # if not, we need an interpolator here.
                     for row in element_data.sort_values(by=["time"]).itertuples():
-                        sources.setdefault(row.time, {}).setdefault(
-                            element_id, []
-                        ).append(
-                            {
+                        sources.setdefault(row.time, {})[element_id] = {
                                 "flow": row.flow,
                                 "temperature": row.temperature,
                                 "salinity": row.salinity,
                             }
-                        )
+                        
                 # handle elements that are both sources and sinks
                 elif not np.all(flow_data < 0) and np.any(flow_data > 0.0):
                     for row in element_data.sort_values(by=["time"]).itertuples():
                         flow = row.flow if row.flow >= 0.0 else 0.0
-                        sources.setdefault(row.time, {}).setdefault(
-                            element_id, []
-                        ).append(
-                            {
+                        sources.setdefault(row.time, {})[element_id] = {
                                 "flow": flow,
                                 "temperature": row.temperature,
                                 "salinity": row.salinity,
                             }
-                        )
             self._sources = Sources(sources)
         return self._sources
 
@@ -323,15 +402,12 @@ class SourceSink:
                     # TODO:  Are irregular timeseries allowed?
                     # if not, we need an interpolator here.
                     for row in element_data.sort_values(by=["time"]).itertuples():
-                        sinks.setdefault(row.time, {}).setdefault(
-                            element_id, []
-                        ).append({"flow": row.flow})
+                        sinks.setdefault(row.time, {})[element_id] = {"flow": row.flow}
                 # handle elements that are both sources and sinks
                 elif not np.all(flow_data > 0.0) and np.any(flow_data < 0.0):
                     for row in element_data.sort_values(by=["time"]).itertuples():
-                        sinks.setdefault(row.time, {}).setdefault(
-                            element_id, []
-                        ).append({"flow": row.flow if row.flow <= 0.0 else 0.0})
+                        sinks.setdefault(row.time, {})[element_id] = {
+                            "flow": row.flow if row.flow <= 0.0 else 0.0}
             self._sinks = Sinks(sinks)
         return self._sinks
 
@@ -377,8 +453,7 @@ class SourceSink:
             _data = []
             for time, element_data in self._data.items():
                 for element_id, data in element_data.items():
-                    for datapoint in data:
-                        _data.append({"time": time, "element_id": element_id, **datapoint})
+                    _data.append({"time": time, "element_id": element_id, **data})
             self._df = pd.DataFrame(_data)
         return self._df
 
