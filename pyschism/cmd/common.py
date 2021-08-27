@@ -344,26 +344,28 @@ def add_iettype_to_parser(parser):
 
     class Iettype4Action(argparse.Action):
         def __call__(self, parser, namespace, values, option_string=None):
-            if namespace.vgrid.is2D() is True:
-                raise NotImplementedError("--iettype-4 not available for 2D model.")
-            tmp_parser = argparse.ArgumentParser(add_help=False)
-            add_baroclinic_database_to_parser(tmp_parser)
-            tmp_args = tmp_parser.parse_known_args()[0]
-            setattr(namespace, self.dest, self.const(tmp_args.baroclinic_database))
+            if not bool(set(sys.argv).intersection(["-h", "--help"])):
+                if namespace.vgrid.is2D() is True:
+                    raise NotImplementedError("--iettype-4 not available for 2D model.")
+                tmp_parser = argparse.ArgumentParser(add_help=False)
+                add_baroclinic_database_to_parser(tmp_parser)
+                tmp_args = tmp_parser.parse_known_args()[0]
+                setattr(namespace, self.dest, self.const(tmp_args.baroclinic_database))
 
     class Iettype5Action(argparse.Action):
         def __call__(self, parser, namespace, values, option_string=None):
-            if namespace.vgrid.is2D() is True:
-                raise NotImplementedError("--iettype-5 not available for 2D model.")
-            tmp_parser = argparse.ArgumentParser(add_help=False)
-            add_tidal_database_to_parser(tmp_parser)
-            add_baroclinic_database_to_parser(tmp_parser)
-            tmp_args = tmp_parser.parse_known_args()[0]
-            iettype3 = bctides.iettype.Iettype3(database=tmp_args.tidal_database)
-            iettype4 = bctides.iettype.Iettype4(
-                data_source=tmp_args.baroclinic_database
-            )
-            setattr(namespace, self.dest, self.const(iettype3, iettype4))
+            if not bool(set(sys.argv).intersection(["-h", "--help"])):
+                if namespace.vgrid.is2D() is True:
+                    raise NotImplementedError("--iettype-5 not available for 2D model.")
+                tmp_parser = argparse.ArgumentParser(add_help=False)
+                add_tidal_database_to_parser(tmp_parser)
+                add_baroclinic_database_to_parser(tmp_parser)
+                tmp_args = tmp_parser.parse_known_args()[0]
+                iettype3 = bctides.iettype.Iettype3(database=tmp_args.tidal_database)
+                iettype4 = bctides.iettype.Iettype4(
+                    data_source=tmp_args.baroclinic_database
+                )
+                setattr(namespace, self.dest, self.const(iettype3, iettype4))
 
     iettype_group = parser.add_argument_group(
         "Elevation boundary condition options"
@@ -470,26 +472,28 @@ def add_ifltype_to_parser(parser):
 
     class Ifltype4Action(argparse.Action):
         def __call__(self, parser, namespace, values, option_string=None):
-            if namespace.vgrid.is2D() is True:
-                raise NotImplementedError("--ifltype-4 not available for 2D model.")
-            tmp_parser = argparse.ArgumentParser(add_help=False)
-            add_baroclinic_database_to_parser(tmp_parser)
-            tmp_args = tmp_parser.parse_known_args()[0]
-            setattr(namespace, self.dest, self.const(tmp_args.baroclinic_database))
+            if not bool(set(sys.argv).intersection(["-h", "--help"])):
+                if namespace.vgrid.is2D() is True:
+                    raise NotImplementedError("--ifltype-4 not available for 2D model.")
+                tmp_parser = argparse.ArgumentParser(add_help=False)
+                add_baroclinic_database_to_parser(tmp_parser)
+                tmp_args = tmp_parser.parse_known_args()[0]
+                setattr(namespace, self.dest, self.const(tmp_args.baroclinic_database))
 
     class Ifltype5Action(argparse.Action):
         def __call__(self, parser, namespace, values, option_string=None):
-            if namespace.vgrid.is2D() is True:
-                raise NotImplementedError("--ifltype-5 not available for 2D model.")
-            tmp_parser = argparse.ArgumentParser(add_help=False)
-            add_tidal_database_to_parser(tmp_parser)
-            add_baroclinic_database_to_parser(tmp_parser)
-            tmp_args = tmp_parser.parse_known_args()[0]
-            ifltype3 = bctides.ifltype.Ifltype3(database=tmp_args.tidal_database)
-            ifltype4 = bctides.ifltype.Ifltype4(
-                data_source=tmp_args.baroclinic_database
-            )
-            setattr(namespace, self.dest, self.const(ifltype3, ifltype4))
+            if not bool(set(sys.argv).intersection(["-h", "--help"])):
+                if namespace.vgrid.is2D() is True:
+                    raise NotImplementedError("--ifltype-5 not available for 2D model.")
+                tmp_parser = argparse.ArgumentParser(add_help=False)
+                add_tidal_database_to_parser(tmp_parser)
+                add_baroclinic_database_to_parser(tmp_parser)
+                tmp_args = tmp_parser.parse_known_args()[0]
+                ifltype3 = bctides.ifltype.Ifltype3(database=tmp_args.tidal_database)
+                ifltype4 = bctides.ifltype.Ifltype4(
+                    data_source=tmp_args.baroclinic_database
+                )
+                setattr(namespace, self.dest, self.const(ifltype3, ifltype4))
 
     ifltype_group = parser.add_argument_group(
         "Velocity boundary condition options"
