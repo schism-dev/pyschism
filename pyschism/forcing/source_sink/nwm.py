@@ -122,16 +122,12 @@ class NWMElementPairings:
         del centroids
 
         # 3) Match reach/boundary intersection to nearest element centroid
-
         coords = [
             np.array(inters.geometry.coords) for inters in intersection.itertuples()
         ]
         _, idxs = tree.query(np.vstack(coords), workers=-1)
-
-        element_index = defaultdict(list)
-        for i, idx in enumerate(idxs):
-            element_index[intersection.iloc[i].reachIndex].append(idx)
         del tree
+
         logger.info(
             "Pairing features to corresponding element took " f"{time()-start}."
         )
@@ -141,29 +137,22 @@ class NWMElementPairings:
         start = time()
         sources = defaultdict(list)
         sinks = defaultdict(list)
-        for i in np.arange(len(intersection)):
-            poi = intersection.iloc[i].geometry
-            reach_index = intersection.iloc[i].reachIndex
-            reach = reaches.iloc[reach_index]
-            element = hgrid.elements.gdf.iloc[idxs[i]]
-
-            if not isinstance(reach.geometry, LineString):
-                geom = ops.linemerge(reach.geometry)
-            else:
-                geom = reach.geometry
-
-            for segment in map(LineString, zip(geom.coords[:-1], geom.coords[1:])):
+        for row in intersection.itertuples():
+            poi = row.geometry
+            reach = reaches.iloc[row.reachIndex]
+            reach_geom = reach.geometry
+            if not isinstance(reach_geom, LineString):
+                reach_geom = ops.linemerge(reach_geom)
+            for segment in map(LineString, zip(reach_geom.coords[:-1], reach_geom.coords[1:])):
                 if segment.intersects(poi.buffer(np.finfo(np.float32).eps)):
                     segment_origin = Point(segment.coords[0])
                     d1 = segment_origin.distance(poi)
-                    downstream = segment.interpolate(
-                        d1 + np.finfo(np.float32).eps
-                        )
-
+                    downstream = segment.interpolate(d1 + np.finfo(np.float32).eps)
+                    element = hgrid.elements.gdf.iloc[idxs[row.Index]]
                     if (
                         box(*LineString([poi, downstream]).bounds)
                         .intersection(hull)
-                        .intersects(Point(downstream))
+                        .intersects(downstream)
                     ):
                         sources[element.id].append(reach.feature_id)
                     else:

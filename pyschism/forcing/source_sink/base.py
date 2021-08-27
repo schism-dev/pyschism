@@ -247,7 +247,7 @@ class SourceSink:
             del self._df
 
     def aggregate_by_radius(self, hgrid, radius):
-
+        
         logger.info('Begin aggregate_by_radius...')
         start = datetime.now()
         # --- Generate aggregation mapping
@@ -268,7 +268,7 @@ class SourceSink:
             aggregate_gdf.append(
                 {
                     "element_id": element_id,
-                    "geometry": hgrid.elements.gdf.loc[element_index].geometry,
+                    "geometry": hgrid.elements.gdf.iloc[element_index].geometry,
                     "maxflow": maxflow,
                 }
             )
