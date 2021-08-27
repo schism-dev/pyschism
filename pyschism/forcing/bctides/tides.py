@@ -44,6 +44,9 @@ class ActiveConstituents:
 class Tides:
 
     _active_constituents = ActiveConstituents()
+    major_constituents = MAJOR_CONSTITUENTS
+    minor_constituents = MINOR_CONSTITUENTS
+    constituents = ALL_CONSTITUENTS
 
     def __init__(
             self,
