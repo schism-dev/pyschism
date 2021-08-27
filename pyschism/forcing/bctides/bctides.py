@@ -78,8 +78,6 @@ class Bctides(metaclass=BctidesMeta):
         cutoff_depth: float = 50.0,
     ):
         self.hgrid = hgrid
-        # self.start_date = start_date
-        # self.end_date = rnday
         self.vgrid = Vgrid.default() if vgrid is None else vgrid
         self.cutoff_depth = cutoff_depth
         self.iettype = iettype
@@ -148,6 +146,7 @@ class Bctides(metaclass=BctidesMeta):
             self.end_date = end_date
         # self.tidal_database.write(path, )
         output_directory = pathlib.Path(output_directory)
+        output_directory.mkdir(exist_ok=overwrite, parents=True)
         bctides = output_directory / "bctides.in" if bctides is True else bctides
         if bctides.exists() and not overwrite:
             raise IOError("path exists and overwrite is False")

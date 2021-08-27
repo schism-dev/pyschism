@@ -14,8 +14,6 @@ class BctidesCli:
     def __init__(self, args: argparse.Namespace):
         Bctides(
                 args.hgrid,
-                args.start_date,
-                args.run_days,
                 vgrid=args.vgrid,
                 iettype=args.iettype,
                 ifltype=args.ifltype,
@@ -24,9 +22,11 @@ class BctidesCli:
                 # itrtype=args.itrtype,
                 cutoff_depth=args.cutoff_depth,
             ).write(
-            args.output_directory,
-            overwrite=args.overwrite,
-            parallel_download=args.parallel_download
+                args.output_directory,
+                args.start_date,
+                args.end_date,
+                overwrite=args.overwrite,
+                parallel_download=args.parallel_download
         )
 
     @staticmethod
@@ -42,19 +42,20 @@ def add_bctides_options_to_parser(parser):
         help="Allow overwrite of output files."
     )
     common.add_log_level_to_parser(parser)
-    parser.add_argument(
-        "--run-days",
-        type=lambda x: timedelta(days=float(x)),
-        required=True,
-        help='Number of simulation days.'
+    common.add_dates_to_parser(parser)
+    # parser.add_argument(
+    #     "--run-days",
+    #     type=lambda x: timedelta(days=float(x)),
+    #     required=True,
+    #     help='Number of simulation days.'
 
-    )
-    parser.add_argument(
-        "--start-date",
-        type=lambda x: datetime.strptime(x, "%Y-%m-%dT%H:%M:%S"),
-        # help=''
-        # action=DateAction,
-    )
+    # )
+    # parser.add_argument(
+    #     "--start-date",
+    #     type=lambda x: datetime.strptime(x, "%Y-%m-%dT%H:%M:%S"),
+    #     # help=''
+    #     # action=DateAction,
+    # )
     # bctides.add_argument(
     #     "--date-formatting",
     #     type=str,
