@@ -1,9 +1,10 @@
+from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 from functools import lru_cache
 import logging
 import os
 import pathlib
-from typing import Dict, Union
+from typing import Union
 
 
 import geopandas as gpd
@@ -33,11 +34,13 @@ class SourceSinkDataset:
 
     @property
     def elements(self):
-        unique_elements = set()
-        for elements in self.data.values():
-            for element_id in elements.keys():
-                unique_elements.add(element_id)
-        return list(map(str, sorted(list(map(int, unique_elements)))))
+        if not hasattr(self, "_elements"):
+            unique_elements = set()
+            for elements in self.data.values():
+                for element_id in elements.keys():
+                    unique_elements.add(element_id)
+            self._elements = list(map(str, sorted(list(map(int, unique_elements)))))
+        return self._elements
 
     @property
     def timevector(self):
@@ -59,15 +62,16 @@ class SourceSinkDataset:
 
 
 class Sources(SourceSinkDataset):
-    
     def __init__(self, data):
         for time, edata in data.items():
             assert isinstance(time, datetime)
             for eid, datapoint in edata.items():
-                assert datapoint['flow'] >= 0., f'Invalid source point for element_id={eid} during time {str(time)}. '
+                assert (
+                    datapoint["flow"] >= 0.0
+                ), f"Invalid source point for element_id={eid} during time {str(time)}. "
                 f'Sources must be >= 0 but got value of {datapoint["flow"]}.'
-                assert isinstance(datapoint['temperature'], float)
-                assert isinstance(datapoint['salinity'], float)
+                assert isinstance(datapoint["temperature"], float)
+                assert isinstance(datapoint["salinity"], float)
         super().__init__(data)
 
 
@@ -76,29 +80,51 @@ class Sinks(SourceSinkDataset):
         for time, edata in data.items():
             assert isinstance(time, datetime)
             for eid, datapoint in edata.items():
-                assert datapoint['flow'] <= 0., f'Invalid sink point for element_id={eid} during time {str(time)}. '
+                assert (
+                    datapoint["flow"] <= 0.0
+                ), f"Invalid sink point for element_id={eid} during time {str(time)}. "
                 f'Sinks must be <= 0 but got value of {datapoint["flow"]}.'
         super().__init__(data)
 
 
-class TimeHistoryFile:
+class TimeHistoryFile(ABC):
     def __init__(self, source_sink: SourceSinkDataset, start_date, rnday, filename):
-        self.data = source_sink
+        self.dataset = source_sink
         self.filename = filename
         self.start_date = start_date
         self.rnday = rnday
 
     def __str__(self):
-        data = []
-        for time in self.data.timevector:
-            relative_time = (time - self.start_date).total_seconds()
-            if relative_time < 0:
-                continue
-            line = [f"{relative_time:G}"]
-            for element_id in self.data.elements:
-                line.append(f'{self.data.data[time][element_id]["flow"]:.4e}')
-            data.append(" ".join(line))
-        return "\n".join(data)
+
+        # build ts matrix
+        breakpoint()
+        ts_matrix = np.full((len(self.dataset.timevector), len(self.dataset.elements)), np.nan)
+        for i, element_id in enumerate(self.dataset.elements):
+            ts_matrix[:, i] = self.get_element_timeseries(element_id)
+        exit()
+
+        # for element_id in self
+        # ts_matrix = self.get_ts_matrix
+
+        # data = []
+        # for time in self.dataset.timevector:
+        #     relative_time = (time - self.start_date).total_seconds()
+        #     if relative_time < 0:
+        #         continue
+        #     line = [f"{relative_time:G}"]
+        #     for element_id in self.dataset.elements:
+        #         ts = self.get_element_timeseries(element_id)
+
+        #         line.append(f'{self.dataset.data[time][element_id]["flow"]:.4e}')
+        #     data.append(" ".join(line))
+        # return "\n".join(data)
+
+    def get_element_timeseries(self, element_id):
+        print('HEREE!!')
+        values = []
+        for time in self.dataset.timevector:
+            values.append(self.dataset.data[time].get(element_id, np.nan))
+        return np.array(values)
 
     def write(self, path: Union[str, os.PathLike], overwrite: bool = False):
         path = pathlib.Path(path)
@@ -112,6 +138,22 @@ class Vsource(TimeHistoryFile):
     def __init__(self, sources: Sources, start_date, rnday, filename="vsource.th"):
         super().__init__(sources, start_date, rnday, filename)
 
+    # def get_element_timeseries(self, element_id):
+
+    #     ts = self.df[(self.df['element_id'] == element_id)].gdf.sort_values(by=["time"])
+    #     # now pad junk 
+
+    #     data = {}
+    #     for row in ts.itertuples():
+    #         data.setdefault(row.time, {}).update(
+    #             {
+    #                 "flow": row.flow,
+    #             }
+    #         )
+    #     return data
+
+    #         return self.df[(self.df["element_id"] == element_id)].sort_values(by=["time"])
+
 
 class Msource(TimeHistoryFile):
     def __init__(self, sources, start_date, rnday, filename="msource.th"):
@@ -119,15 +161,21 @@ class Msource(TimeHistoryFile):
 
     def __str__(self):
         data = []
-        for time in self.data.timevector:
+        for i, time in enumerate(self.data.timevector):
             relative_time = (time - self.start_date).total_seconds()
             if relative_time < 0:
                 continue
             line = [f"{relative_time:G}"]
-            for element_id, datapoint in self.data.elements.items():
-                line.append(f'{datapoint["temperature"]: .4e}')
-            for element_id, datapoint in self.data.elements.items():
-                line.append(f'{datapoint["salinity"]: .4e}')
+            for element_id in self.data.elements:
+                temperature = (
+                    self.data.data[time].get(element_id, {}).get("temperature", -9999.0)
+                )
+                line.append(f"{temperature: .4e}")
+            for element_id in self.data.elements:
+                salinity = (
+                    self.data.data[time].get(element_id, {}).get("salinity", -9999.0)
+                )
+                line.append(f"{salinity: .4e}")
             data.append(" ".join(line))
         return "\n".join(data)
 
@@ -135,6 +183,15 @@ class Msource(TimeHistoryFile):
 class Vsink(TimeHistoryFile):
     def __init__(self, sinks: Sinks, start_date, rnday, filename="vsink.th"):
         super().__init__(sinks, start_date, rnday, filename)
+
+        # data = {}
+        # for row in (
+        #     self.df[(self.df["element_id"] == element_id)]
+        #     .sort_values(by=["time"])
+        #     .itertuples()
+        # ):
+        #     data.setdefault(row.time, {}).update({"flow": row.flow})
+        # return data
 
 
 class SourceSinkWriter:
@@ -165,7 +222,6 @@ class SourceSinkWriter:
 
 
 class SourceSink:
-
     def __add__(self, other):
         source_sink = SourceSink()
         source_sink.sources = Sources({**self.sources.data, **other.sources.data})
@@ -216,29 +272,28 @@ class SourceSink:
         if hasattr(self, "_df"):
             del self._df
 
-    def get_element_timeseries(self, element_id):
-        data = {}
-        element_data = self.df[(self.df['element_id'] == element_id)]
-        for row in element_data.sort_values(by=['time']).itertuples():
-            data.setdefault(row.time, {}).update({
-                'flow': row.flow,
-                'temperature': row.temperature,
-                'salinity': row.salinity})
-        return data
-
-    # def get_interpolated_timeseries(self, element_id):
-    #     f = self.get_element_interpolator(element_id)
-    #     self.timevector
+    # def get_element_timeseries(self, element_id):
+    #     data = {}
+    #     element_data = self.df[(self.df["element_id"] == element_id)]
+    #     for row in element_data.sort_values(by=["time"]).itertuples():
+    #         data.setdefault(row.time, {}).update(
+    #             {
+    #                 "flow": row.flow,
+    #                 "temperature": row.temperature,
+    #                 "salinity": row.salinity,
+    #             }
+    #         )
+    #     return data
 
     def remove_element_timeseries(self, element_id):
         for time in self._data:
             self._data[time].pop(element_id)
-        if hasattr(self, '_df'):
+        if hasattr(self, "_df"):
             del self._df
 
     def aggregate_by_radius(self, hgrid, radius):
-        
-        logger.info('Begin aggregate_by_radius...')
+
+        logger.info("Begin aggregate_by_radius...")
         start = datetime.now()
         # --- Generate aggregation mapping
         # gather extreme values
@@ -278,7 +333,9 @@ class SourceSink:
                     )
                 )
             ]
-            circle = get_circle_of_radius(row.geometry.centroid.x, row.geometry.centroid.y, radius)
+            circle = get_circle_of_radius(
+                row.geometry.centroid.x, row.geometry.centroid.y, radius
+            )
             sources_in_circle = possible_sources.loc[possible_sources.within(circle)]
             for row_in_circle in sources_in_circle.itertuples():
                 aggregation_mapping[row_in_circle.element_id] = row.element_id
@@ -286,22 +343,28 @@ class SourceSink:
         # --- move data from one element to the other
         for current, target in aggregation_mapping.items():
             for time, data in self.get_element_timeseries(current).items():
-                self._data[time][target]['flow'] = self._data[time][current]['flow'] + self._data[time][target]['flow']
+                self._data[time][target]["flow"] = (
+                    self._data[time][current]["flow"] + self._data[time][target]["flow"]
+                )
 
         for current, target in aggregation_mapping.items():
             if current != target:
                 self.remove_element_timeseries(current)
 
-        if hasattr(self, '_sources'):
+        if hasattr(self, "_sources"):
             del self._sources
 
-        if hasattr(self, '_sinks'):
+        if hasattr(self, "_sinks"):
             del self._sinks
 
-        if hasattr(self, '_df'):
+        if hasattr(self, "_df"):
             del self._df
 
-        logger.info(f'aggregate_by_radius took {datetime.now()-start}...')
+        logger.info(f"aggregate_by_radius took {datetime.now()-start}...")
+
+    @staticmethod
+    def open(source_sink, vsource, vsink, msource, start_date=None):
+        raise NotImplementedError
 
     def write(
         self,
@@ -362,20 +425,20 @@ class SourceSink:
                     # if not, we need an interpolator here.
                     for row in element_data.sort_values(by=["time"]).itertuples():
                         sources.setdefault(row.time, {})[element_id] = {
-                                "flow": row.flow,
-                                "temperature": row.temperature,
-                                "salinity": row.salinity,
-                            }
-                        
+                            "flow": row.flow,
+                            "temperature": row.temperature,
+                            "salinity": row.salinity,
+                        }
+
                 # handle elements that are both sources and sinks
                 elif not np.all(flow_data < 0) and np.any(flow_data > 0.0):
                     for row in element_data.sort_values(by=["time"]).itertuples():
                         flow = row.flow if row.flow >= 0.0 else 0.0
                         sources.setdefault(row.time, {})[element_id] = {
-                                "flow": flow,
-                                "temperature": row.temperature,
-                                "salinity": row.salinity,
-                            }
+                            "flow": flow,
+                            "temperature": row.temperature,
+                            "salinity": row.salinity,
+                        }
             self._sources = Sources(sources)
         return self._sources
 
@@ -397,7 +460,8 @@ class SourceSink:
                 elif not np.all(flow_data > 0.0) and np.any(flow_data < 0.0):
                     for row in element_data.sort_values(by=["time"]).itertuples():
                         sinks.setdefault(row.time, {})[element_id] = {
-                            "flow": row.flow if row.flow <= 0.0 else 0.0}
+                            "flow": row.flow if row.flow <= 0.0 else 0.0
+                        }
             self._sinks = Sinks(sinks)
         return self._sinks
 
@@ -451,7 +515,9 @@ class SourceSink:
 @lru_cache(maxsize=None)
 def get_circle_of_radius(lon, lat, radius):
     wgs84 = CRS.from_user_input("+proj=longlat +datum=WGS84 +no_defs")
-    aeqd = CRS.from_user_input("+proj=aeqd +R=6371000 +units=m " f"+lat_0={lat} +lon_0={lon}")
+    aeqd = CRS.from_user_input(
+        "+proj=aeqd +R=6371000 +units=m " f"+lat_0={lat} +lon_0={lon}"
+    )
     wgs84_to_aeqd = Transformer.from_crs(wgs84, aeqd, always_xy=True).transform
     aeqd_to_wgs84 = Transformer.from_crs(aeqd, wgs84, always_xy=True).transform
     center = Point(float(lon), float(lat))

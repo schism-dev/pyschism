@@ -6,6 +6,7 @@ import logging
 from multiprocessing import Pool, cpu_count
 import os
 import pathlib
+import shutil
 
 import tarfile
 import tempfile
@@ -39,7 +40,7 @@ logger = logging.getLogger(__name__)
 
 
 class NWMElementPairings:
-    def __init__(self, hgrid: Gr3, nwm_file=None):
+    def __init__(self, hgrid: Gr3, nwm_file=None, workers=-1):
 
         # TODO: Accelerate using dask: https://blog.dask.org/2017/09/21/accelerating-geopandas-1
 
@@ -78,7 +79,7 @@ class NWMElementPairings:
         for pm in possible_matches.itertuples():
             if hgrid.hull.rings().geometry.intersects(pm.geometry).any():
                 exact_indexes.add(pm.Index)
-        self._reaches = reaches = self.gdf.iloc[list(exact_indexes)]
+        reaches = self.gdf.iloc[list(exact_indexes)]
 
         logger.info(f"Finding exact features took {time()-start}.")
 
@@ -109,7 +110,7 @@ class NWMElementPairings:
         if len(data) == 0:
             # TODO: change for warning in future.
             raise IOError("No National Water model intersections found on the mesh.")
-        self._intersection = intersection = gpd.GeoDataFrame(data, crs=hgrid.crs)
+        intersection = gpd.GeoDataFrame(data, crs=hgrid.crs)
 
         del data
 
@@ -127,7 +128,7 @@ class NWMElementPairings:
         coords = [
             np.array(inters.geometry.coords) for inters in intersection.itertuples()
         ]
-        _, idxs = tree.query(np.vstack(coords), workers=-1)
+        _, idxs = tree.query(np.vstack(coords), workers=workers)
         del tree
 
         logger.info(
@@ -163,33 +164,6 @@ class NWMElementPairings:
                         sinks[element.id].append(reach.feature_id)
                     break
 
-        #        for reach_index, paired_elements_idxs in element_index.items():
-        #            reach = reaches.iloc[reach_index]
-        #            points_of_intersection = intersection.loc[
-        #                intersection["reachIndex"] == reach_index
-        #            ]
-        #            if not isinstance(reach.geometry, LineString):
-        #                geom = ops.linemerge(reach.geometry)
-        #            else:
-        #                geom = reach.geometry
-        #            for segment in map(LineString, zip(geom.coords[:-1], geom.coords[1:])):
-        #                segment_origin = Point(segment.coords[0])
-        #                for i, row in enumerate(points_of_intersection.itertuples()):
-        #                    poi = row.geometry
-        #                    if segment.intersects(poi.buffer(np.finfo(np.float32).eps)):
-        #                        d1 = segment_origin.distance(poi)
-        #                        downstream = segment.interpolate(
-        #                            d1 + np.finfo(np.float32).eps
-        #                        )
-        #                        element = hgrid.elements.gdf.iloc[paired_elements_idxs[i]]
-        #                        if (
-        #                            box(*LineString([poi, downstream]).bounds)
-        #                            .intersection(hull)
-        #                            .intersects(downstream)
-        #                        ):
-        #                            sources[element.id].append(reach.feature_id)
-        #                        else:
-        #                            sinks[element.id].append(reach.feature_id)
         logger.info("Sorting features into sources and sinks took: " f"{time()-start}.")
         self.sources = sources
         self.sinks = sinks
@@ -230,7 +204,9 @@ class NWMElementPairings:
     @staticmethod
     def load_json(hgrid, sources=None, sinks=None):
         pairings = NWMElementPairings.__new__(NWMElementPairings)
+        logger.info(f"Loading pairing sources: {sources}")
         pairings.sources = json.load(open(sources)) if sources is not None else {}
+        logger.info(f"Loading pairing sinks: {sinks}")
         pairings.sinks = json.load(open(sinks)) if sinks is not None else {}
         pairings._hgrid = hgrid
         return pairings
@@ -270,14 +246,6 @@ class NWMElementPairings:
                 )
             self._sinks_gdf = gpd.GeoDataFrame(data)
         return self._sinks_gdf
-
-    @property
-    def intersection(self):
-        return self._intersection
-
-    @property
-    def reaches(self):
-        return self._reaches
 
     @property
     def hgrid(self):
@@ -510,9 +478,11 @@ class AWSHindcastInventory(AWSDataInventory):
         filename = self.tmpdir / key
         filename.parent.mkdir(parents=True, exist_ok=True)
         if filename.is_file() is False:
-            with open(filename, "wb") as f:
+            tmpfile = tempfile.NamedTemporaryFile().name
+            with open(tmpfile, "wb") as f:
                 logger.info(f"Downloading file {key}, ")
                 self.s3.download_fileobj(self.bucket, key, f)
+            shutil.move(tmpfile, filename)
         return filename
 
     @property
@@ -614,11 +584,14 @@ class AWSForecastInventory(AWSDataInventory):
         for key in file_metadata[0:240:3]:
             if request_time != self.key2date(key):
                 continue
-            filename = pathlib.Path(self.tmpdir.name) / key
+            filename = self.tmpdir / key
             filename.parent.mkdir(parents=True, exist_ok=True)
-            with open(filename, "wb") as f:
-                logger.info(f"Downloading file {key}, ")
-                self.s3.download_fileobj(self.bucket, key, f)
+            if filename.is_file() is False:
+                tmpfile = tempfile.NamedTemporaryFile().name
+                with open(tmpfile, "wb") as f:
+                    logger.info(f"Downloading file {key}, ")
+                    self.s3.download_fileobj(self.bucket, key, f)
+                shutil.move(tmpfile, filename)
             return filename
 
     def key2date(self, key):
@@ -706,7 +679,7 @@ class NationalWaterModel(SourceSink):
         self.start_date = start_date
         self.end_date = end_date
         self.pairings = (
-            NWMElementPairings(gr3, nwm_file=self.nwm_file)
+            NWMElementPairings(gr3, nwm_file=self.nwm_file, workers=nprocs)
             if self.pairings is None
             else self.pairings
         )
@@ -751,12 +724,9 @@ class NationalWaterModel(SourceSink):
                 sink_data.setdefault(_time, {})[element_id] = {
                     "flow": -sinks[i][k],
                 }
-        # self._sources = Sources(source_data)
-        # self._sinks = Sinks(sink_data)
-        # self._data = {**source_data, **sink_data}
-        for data_time, elements in {**source_data, **sink_data}.items():
-            for element_id, flow_data in elements.items():
-                self.add_data(data_time, element_id, **flow_data)
+        self._sources = Sources(source_data)
+        self._sinks = Sinks(sink_data)
+        self._data = {**source_data, **sink_data}
 
     def write(
         self,

@@ -374,8 +374,9 @@ class Elements:
             for id, element in self.elements.items():
                 data.append({
                     'geometry': Polygon(
-                        self.nodes.coord[list(
-                            map(self.get_index_by_id, element))]),
+                        self.nodes.coord[
+                            list(map(self.get_index_by_id, element))
+                            ]),
                     'id': id})
             self._gdf = gpd.GeoDataFrame(data, crs=self.nodes.crs)
             logger.info('Generating elements geodataframe took '
