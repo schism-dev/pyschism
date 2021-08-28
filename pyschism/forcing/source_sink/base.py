@@ -3,7 +3,7 @@ from functools import lru_cache
 import logging
 import os
 import pathlib
-from typing import Dict, TypedDict, Union
+from typing import Dict, Union
 
 
 import geopandas as gpd
@@ -58,15 +58,9 @@ class SourceSinkDataset:
         return self._data
 
 
-class SourceDataPoint(TypedDict):
-    flow: float
-    temperature: float
-    salinity: float
-
-
 class Sources(SourceSinkDataset):
     
-    def __init__(self, data: Dict[datetime, Dict[str, SourceDataPoint]]):
+    def __init__(self, data):
         for time, edata in data.items():
             assert isinstance(time, datetime)
             for eid, datapoint in edata.items():
@@ -77,12 +71,8 @@ class Sources(SourceSinkDataset):
         super().__init__(data)
 
 
-class SinkDataPoint(TypedDict):
-    flow: float
-
-
 class Sinks(SourceSinkDataset):
-    def __init__(self, data: Dict[datetime, Dict[str, SinkDataPoint]]):
+    def __init__(self, data):
         for time, edata in data.items():
             assert isinstance(time, datetime)
             for eid, datapoint in edata.items():
