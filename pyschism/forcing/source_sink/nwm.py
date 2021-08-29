@@ -478,11 +478,15 @@ class AWSHindcastInventory(AWSDataInventory):
         filename = self.tmpdir / key
         filename.parent.mkdir(parents=True, exist_ok=True)
         if filename.is_file() is False:
-            tmpfile = tempfile.NamedTemporaryFile().name
-            with open(tmpfile, "wb") as f:
-                logger.info(f"Downloading file {key}, ")
-                self.s3.download_fileobj(self.bucket, key, f)
-            shutil.move(tmpfile, filename)
+            cached_file = list(self.tmpdir.glob(f'**/{filename.name}'))
+            if len(cached_file) == 1:
+                filename = cached_file[0]
+            else:
+                tmpfile = tempfile.NamedTemporaryFile().name
+                with open(tmpfile, "wb") as f:
+                    logger.info(f"Downloading file {key}, ")
+                    self.s3.download_fileobj(self.bucket, key, f)
+                shutil.move(tmpfile, filename)
         return filename
 
     @property
