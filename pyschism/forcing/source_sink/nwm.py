@@ -456,6 +456,8 @@ class AWSHindcastInventory(AWSDataInventory):
             Bucket=self.bucket, Prefix=f"full_physics/{self.start_date.year}"
         )
 
+        # TODO: If end_date.year != start_date.year, we must append to pagination.
+
         self.data = []
         for page in pages:
             for obj in page["Contents"]:
