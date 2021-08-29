@@ -177,7 +177,7 @@ class NWMElementPairings:
         for eid in self.sources.keys():
             eidx = self.hgrid.elements.get_index_by_id(eid)
             data.append({"geometry": egdf.iloc[eidx].geometry})
-        src_gdf = gpd.GeoDataFr\ame(data)
+        src_gdf = gpd.GeoDataFrame(data)
         data = []
         for eid in self.sinks.keys():
             eidx = self._hgrid.elements.get_index_by_id(eid)
