@@ -109,16 +109,17 @@ class NWMElementPairings:
 
         if len(data) == 0:
             # TODO: change for warning in future.
-            raise IOError("No National Water model intersections found on the mesh.")
+            raise IOError(
+                "No National Water model intersections found on the mesh.")
         intersection = gpd.GeoDataFrame(data, crs=hgrid.crs)
-
         del data
 
         # 2) Generate element centroid KDTree
         centroids = []
         for element in hgrid.elements.elements.values():
             cent = LinearRing(
-                hgrid.nodes.coord[list(map(hgrid.nodes.get_index_by_id, element))]
+                hgrid.nodes.coord[list(
+                    map(hgrid.nodes.get_index_by_id, element))]
             ).centroid
             centroids.append((cent.x, cent.y))
         tree = cKDTree(centroids)
@@ -142,17 +143,17 @@ class NWMElementPairings:
         sinks = defaultdict(list)
         for row in intersection.itertuples():
             poi = row.geometry
-            reach = reaches.iloc[row.reachIndex]
-            reach_geom = reach.geometry
-            if not isinstance(reach_geom, LineString):
-                reach_geom = ops.linemerge(reach_geom)
+            reach = reaches.iloc[row.reachIndex].geometry
+            if not isinstance(reach, LineString):
+                reach = ops.linemerge(reach)
             for segment in map(
-                LineString, zip(reach_geom.coords[:-1], reach_geom.coords[1:])
+                LineString, zip(reach.coords[:-1], reach.coords[1:])
             ):
                 if segment.intersects(poi.buffer(np.finfo(np.float32).eps)):
                     segment_origin = Point(segment.coords[0])
                     d1 = segment_origin.distance(poi)
-                    downstream = segment.interpolate(d1 + np.finfo(np.float32).eps)
+                    downstream = segment.interpolate(
+                        d1 + np.finfo(np.float32).eps)
                     element = hgrid.elements.gdf.iloc[idxs[row.Index]]
                     if (
                         box(*LineString([poi, downstream]).bounds)
@@ -164,7 +165,8 @@ class NWMElementPairings:
                         sinks[element.id].append(reach.feature_id)
                     break
 
-        logger.info("Sorting features into sources and sinks took: " f"{time()-start}.")
+        logger.info(
+            "Sorting features into sources and sinks took: " f"{time()-start}.")
         self.sources = sources
         self.sinks = sinks
 
@@ -175,7 +177,7 @@ class NWMElementPairings:
         for eid in self.sources.keys():
             eidx = self.hgrid.elements.get_index_by_id(eid)
             data.append({"geometry": egdf.iloc[eidx].geometry})
-        src_gdf = gpd.GeoDataFrame(data)
+        src_gdf = gpd.GeoDataFr\ame(data)
         data = []
         for eid in self.sinks.keys():
             eidx = self._hgrid.elements.get_index_by_id(eid)
@@ -205,7 +207,8 @@ class NWMElementPairings:
     def load_json(hgrid, sources=None, sinks=None):
         pairings = NWMElementPairings.__new__(NWMElementPairings)
         logger.info(f"Loading pairing sources: {sources}")
-        pairings.sources = json.load(open(sources)) if sources is not None else {}
+        pairings.sources = json.load(
+            open(sources)) if sources is not None else {}
         logger.info(f"Loading pairing sinks: {sinks}")
         pairings.sinks = json.load(open(sinks)) if sinks is not None else {}
         pairings._hgrid = hgrid
@@ -260,7 +263,8 @@ class NWMElementPairings:
                 for reach_layer in fiona.listlayers(self.nwm_file)
                 if "reaches" in reach_layer
             ]:
-                layer_crs = gpd.read_file(self.nwm_file, rows=1, layer=reach_layer).crs
+                layer_crs = gpd.read_file(
+                    self.nwm_file, rows=1, layer=reach_layer).crs
                 bbox = self.hgrid.get_bbox(crs=layer_crs)
                 gdf_coll.append(
                     gpd.read_file(
@@ -283,7 +287,8 @@ class NWMElementPairings:
     @_nwm_file.setter
     def _nwm_file(self, nwm_file):
         nwm_file = (
-            list(DATADIR.glob("**/*hydrofabric*.gdb")) if nwm_file is None else nwm_file
+            list(DATADIR.glob("**/*hydrofabric*.gdb")
+                 ) if nwm_file is None else nwm_file
         )
         if isinstance(nwm_file, list):
             if len(nwm_file) == 0:
@@ -300,9 +305,11 @@ class NWMElementPairings:
                         else None,
                     )
                 except urllib.error.HTTPError as e:
-                    logger.fatal("Could not download NWM_channel_hydrofabric.tar.gz")
+                    logger.fatal(
+                        "Could not download NWM_channel_hydrofabric.tar.gz")
                     raise e
-                tmpfile = list(pathlib.Path(tmpdir.name).glob("**/*.tar.gz"))[0]
+                tmpfile = list(pathlib.Path(
+                    tmpdir.name).glob("**/*.tar.gz"))[0]
                 with tarfile.open(tmpfile, "r:gz") as src:
                     logger.info(
                         f"Extracting National Water Model stream network tar file to {DATADIR}"
@@ -389,7 +396,8 @@ class AWSDataInventory(ABC):
         try:
             return self._s3
         except AttributeError:
-            self._s3 = boto3.client("s3", config=Config(signature_version=UNSIGNED))
+            self._s3 = boto3.client(
+                "s3", config=Config(signature_version=UNSIGNED))
             return self._s3
 
     @property
@@ -431,7 +439,8 @@ class AWSHindcastInventory(AWSDataInventory):
             else dates.nearest_cycle(dates.localize_datetime(start_date))
         )
         # self.start_date = self.start_date.replace(tzinfo=None)
-        self.rnday = rnday if isinstance(rnday, timedelta) else timedelta(days=rnday)
+        self.rnday = rnday if isinstance(
+            rnday, timedelta) else timedelta(days=rnday)
         self.fallback = fallback
         self._files = {
             _: None
@@ -453,7 +462,8 @@ class AWSHindcastInventory(AWSDataInventory):
                 self.data.append(obj)
 
         self.file_metadata = list(
-            sorted([_["Key"] for _ in self.data if "CHRTOUT_DOMAIN1.comp" in _["Key"]])
+            sorted([_["Key"]
+                   for _ in self.data if "CHRTOUT_DOMAIN1.comp" in _["Key"]])
         )
 
         timevector = np.arange(
@@ -511,7 +521,8 @@ class AWSHindcastInventory(AWSDataInventory):
             self._cache = False
         elif cache is True:
             self._cache = pathlib.Path(
-                appdirs.user_cache_dir(f"pyschism/nwm/hindcast_data/{self.product}")
+                appdirs.user_cache_dir(
+                    f"pyschism/nwm/hindcast_data/{self.product}")
             )
             self._cache.mkdir(exist_ok=True, parents=True)
             self._tmpdir = self._cache
@@ -521,7 +532,8 @@ class AWSHindcastInventory(AWSDataInventory):
             self._cache.mkdir(exist_ok=True, parents=True)
             self._tmpdir = self._cache
         else:
-            raise TypeError(f"Unhandled argument cache={cache} of type {type(cache)}.")
+            raise TypeError(
+                f"Unhandled argument cache={cache} of type {type(cache)}.")
 
 
 class AWSForecastInventory(AWSDataInventory):
@@ -551,7 +563,8 @@ class AWSForecastInventory(AWSDataInventory):
             else dates.nearest_cycle(dates.localize_datetime(start_date))
         )
         # self.start_date = self.start_date.replace(tzinfo=None)
-        self.rnday = rnday if isinstance(rnday, timedelta) else timedelta(days=rnday)
+        self.rnday = rnday if isinstance(
+            rnday, timedelta) else timedelta(days=rnday)
         self.fallback = fallback
         self._files = {
             _: None
@@ -642,7 +655,8 @@ class AWSForecastInventory(AWSDataInventory):
             self._cache = False
         elif cache is True:
             self._cache = pathlib.Path(
-                appdirs.user_cache_dir(f"pyschism/nwm/forecast_data/{self.product}")
+                appdirs.user_cache_dir(
+                    f"pyschism/nwm/forecast_data/{self.product}")
             )
             self._cache.mkdir(exist_ok=True, parents=True)
             self._tmpdir = self._cache
@@ -652,7 +666,8 @@ class AWSForecastInventory(AWSDataInventory):
             self._cache.mkdir(exist_ok=True, parents=True)
             self._tmpdir = self._cache
         else:
-            raise TypeError(f"Unhandled argument cache={cache} of type {type(cache)}.")
+            raise TypeError(
+                f"Unhandled argument cache={cache} of type {type(cache)}.")
 
 
 class NationalWaterModel(SourceSink):
@@ -698,7 +713,8 @@ class NationalWaterModel(SourceSink):
             dates.localize_datetime(d) for d in self.inventory.files.keys()
         ]
 
-        src_idxs, snk_idxs = self.inventory.get_nc_pairing_indexes(self.pairings)
+        src_idxs, snk_idxs = self.inventory.get_nc_pairing_indexes(
+            self.pairings)
 
         with Pool(processes=nprocs) as pool:
             sources = pool.starmap(
@@ -715,7 +731,8 @@ class NationalWaterModel(SourceSink):
         for i, file in enumerate(self.inventory.files.values()):
             nc = Dataset(file)
             _time = dates.localize_datetime(
-                datetime.strptime(nc.model_output_valid_time, "%Y-%m-%d_%H:%M:%S")
+                datetime.strptime(nc.model_output_valid_time,
+                                  "%Y-%m-%d_%H:%M:%S")
             )
             for j, element_id in enumerate(self.pairings.sources):
                 source_data.setdefault(_time, {})[element_id] = {

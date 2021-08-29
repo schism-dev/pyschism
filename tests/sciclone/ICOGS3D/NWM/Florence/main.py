@@ -33,8 +33,11 @@ else:
     pairings = NWMElementPairings.load_json(
         hgrid, sources_pairings, sinks_pairings)
 
-nwm = NationalWaterModel(aggregation_radius=4000,
-                         pairings=pairings, cache=True)
+nwm = NationalWaterModel(
+    aggregation_radius=4000,
+    pairings=pairings,
+    cache='NWM_v2.0'
+)
 
 nwm.write(
     output_directory,
