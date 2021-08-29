@@ -40,12 +40,15 @@ class SourceSinkDataset:
             for elements in self.data.values():
                 for element_id in elements.keys():
                     unique_elements.add(element_id)
-            self._elements = list(map(str, sorted(list(map(int, unique_elements)))))
+            self._elements = list(
+                map(str, sorted(list(map(int, unique_elements)))))
         return self._elements
 
     @property
     def timevector(self):
-        return list(sorted(self.data.keys()))
+        if not hasattr(self, '_timevector'):
+            self._timevector = list(sorted(self.data.keys()))
+        return self._timevector
 
     @property
     def df(self):
@@ -96,9 +99,13 @@ class TimeHistoryFile(ABC):
         self.rnday = rnday
 
     def __str__(self):
-
+        logger.info(
+            f'Generate {self.__class__.__name__.lower()} time history string.')
+        start = datetime.now()
         # build ts matrix
-        ts_matrix = np.full((len(self.dataset.timevector), len(self.dataset.elements)), np.nan)
+        ts_matrix = np.full((len(self.dataset.timevector),
+                            len(self.dataset.elements)), np.nan)
+
         for i, element_id in enumerate(self.dataset.elements):
             ts_matrix[:, i] = self.get_element_timeseries(element_id)
 
@@ -108,25 +115,32 @@ class TimeHistoryFile(ABC):
                 finite = np.where(np.isfinite(ts_matrix[:, column_index]))[0]
                 ts_matrix[:finite[0], column_index] = 0.
                 ts_matrix[finite[-1]:, column_index] = 0.
-                fit = interp1d(np.array(self.dataset.timevector)[finite], ts_matrix[finite, column_index])
-                non_finite = np.where(np.isfinite(ts_matrix[:, column_index]))[0]
-                ts_matrix[non_finite, column_index] = fit(np.array(self.dataset.timevector)[non_finite])
+                fit = interp1d(np.array(self.dataset.timevector)[
+                               finite], ts_matrix[finite, column_index])
+                non_finite = np.where(np.isfinite(
+                    ts_matrix[:, column_index]))[0]
+                ts_matrix[non_finite, column_index] = fit(
+                    np.array(self.dataset.timevector)[non_finite])
 
         data = []
         for i, row in enumerate(ts_matrix):
-            relative_time = (self.dataset.timevector[i] - self.start_date).total_seconds()
+            relative_time = (
+                self.dataset.timevector[i] - self.start_date).total_seconds()
             if relative_time < 0:
                 continue
             data.append(" ".join([
                 f"{relative_time:G}",
                 *[f'{x:.4e}' for x in row]
             ]))
+        logger.info(
+            f'Generate time history string took {datetime.now() - start}.')
         return "\n".join(data)
 
     def get_element_timeseries(self, element_id):
         values = []
         for time in self.dataset.timevector:
-            values.append(self.dataset.data[time].get(element_id, {}).get('flow', np.nan))
+            values.append(self.dataset.data[time].get(
+                element_id, {}).get('flow', np.nan))
         return np.array(values)
 
     def write(self, path: Union[str, os.PathLike], overwrite: bool = False):
@@ -155,12 +169,14 @@ class Msource(TimeHistoryFile):
             line = [f"{relative_time:G}"]
             for element_id in self.dataset.elements:
                 temperature = (
-                    self.dataset.data[time].get(element_id, {}).get("temperature", -9999.0)
+                    self.dataset.data[time].get(
+                        element_id, {}).get("temperature", -9999.0)
                 )
                 line.append(f"{temperature: .4e}")
             for element_id in self.dataset.elements:
                 salinity = (
-                    self.dataset.data[time].get(element_id, {}).get("salinity", -9999.0)
+                    self.dataset.data[time].get(
+                        element_id, {}).get("salinity", -9999.0)
                 )
                 line.append(f"{salinity: .4e}")
             data.append(" ".join(line))
@@ -170,8 +186,10 @@ class Msource(TimeHistoryFile):
         temp = []
         salt = []
         for time in self.dataset.timevector:
-            temp.append(self.dataset.data[time].get(element_id, {}).get('temperature', -9999.0))
-            salt.append(self.dataset.data[time].get(element_id, {}).get('salinity', -9999.0))
+            temp.append(self.dataset.data[time].get(
+                element_id, {}).get('temperature', -9999.0))
+            salt.append(self.dataset.data[time].get(
+                element_id, {}).get('salinity', -9999.0))
         return np.array(temp), np.array(salt)
 
 
@@ -187,6 +205,8 @@ class SourceSinkWriter:
         self.filename = filename
 
     def __str__(self):
+        logger.info('Generate source_sink string')
+        start = datetime.now()
         source_id = self.sources.elements
         data = []
         data.append(f"{len(source_id)}")
@@ -197,6 +217,8 @@ class SourceSinkWriter:
         data.append(f"{len(sink_id)}")
         for element_id in sink_id:
             data.append(f"{element_id}")
+        logger.info(
+            f'Generate source_sink string took {datetime.now() - start}')
         return "\n".join(data)
 
     def write(self, path: Union[str, os.PathLike], overwrite: bool = False):
@@ -210,7 +232,8 @@ class SourceSinkWriter:
 class SourceSink:
     def __add__(self, other):
         source_sink = SourceSink()
-        source_sink.sources = Sources({**self.sources.data, **other.sources.data})
+        source_sink.sources = Sources(
+            {**self.sources.data, **other.sources.data})
         source_sink.sinks = Sinks({**self.sinks.data, **other.sinks.data})
         return source_sink
 
@@ -283,15 +306,19 @@ class SourceSink:
         start = datetime.now()
         # --- Generate aggregation mapping
         # gather extreme values
-        source_max = {element_id: -float("inf") for element_id in self.sources.elements}
+        source_max = {element_id: -float("inf")
+                      for element_id in self.sources.elements}
         for element_data in self.sources.data.values():
             for element_id, data in element_data.items():
-                source_max[element_id] = np.max([source_max[element_id], data["flow"]])
+                source_max[element_id] = np.max(
+                    [source_max[element_id], data["flow"]])
 
-        sink_max = {element_id: float("inf") for element_id in self.sinks.elements}
+        sink_max = {element_id: float("inf")
+                    for element_id in self.sinks.elements}
         for element_data in self.sinks.data.values():
             for element_id, data in element_data.items():
-                sink_max[element_id] = np.min([sink_max[element_id], data["flow"]])
+                sink_max[element_id] = np.min(
+                    [sink_max[element_id], data["flow"]])
 
         aggregate_gdf = []
         for element_id, maxflow in {**source_max, **sink_max}.items():
@@ -315,14 +342,16 @@ class SourceSink:
             possible_sources = aggregate_gdf.loc[
                 aggregate_gdf.index.difference(
                     np.where(
-                        aggregate_gdf["element_id"].isin(list(aggregation_mapping))
+                        aggregate_gdf["element_id"].isin(
+                            list(aggregation_mapping))
                     )
                 )
             ]
             circle = get_circle_of_radius(
                 row.geometry.centroid.x, row.geometry.centroid.y, radius
             )
-            sources_in_circle = possible_sources.loc[possible_sources.within(circle)]
+            sources_in_circle = possible_sources.loc[possible_sources.within(
+                circle)]
             for row_in_circle in sources_in_circle.itertuples():
                 aggregation_mapping[row_in_circle.element_id] = row.element_id
 
@@ -330,7 +359,8 @@ class SourceSink:
         for current, target in aggregation_mapping.items():
             for time, data in self.get_element_timeseries(current).items():
                 self._data[time][target]["flow"] = (
-                    self._data[time][current]["flow"] + self._data[time][target]["flow"]
+                    self._data[time][current]["flow"] +
+                    self._data[time][target]["flow"]
                 )
 
         for current, target in aggregation_mapping.items():
@@ -381,21 +411,24 @@ class SourceSink:
         elif isinstance(vsource, str):
             fname = vsource
         if vsource is not False:
-            Vsource(sources, self.start_date, self.rnday, fname).write(path, overwrite)
+            Vsource(sources, self.start_date, self.rnday,
+                    fname).write(path, overwrite)
 
         if msource is True:
             fname = "msource.th"
         elif isinstance(msource, str):
             fname = msource
         if msource is not False:
-            Msource(sources, self.start_date, self.rnday, fname).write(path, overwrite)
+            Msource(sources, self.start_date, self.rnday,
+                    fname).write(path, overwrite)
 
         if vsink is True:
             fname = "vsink.th"
         elif isinstance(vsink, str):
             fname = vsink
         if vsink is not False:
-            Vsink(sinks, self.start_date, self.rnday, fname).write(path, overwrite)
+            Vsink(sinks, self.start_date, self.rnday,
+                  fname).write(path, overwrite)
 
     @property
     def sources(self):
@@ -441,7 +474,8 @@ class SourceSink:
                     # TODO:  Are irregular timeseries allowed?
                     # if not, we need an interpolator here.
                     for row in element_data.sort_values(by=["time"]).itertuples():
-                        sinks.setdefault(row.time, {})[element_id] = {"flow": row.flow}
+                        sinks.setdefault(row.time, {})[element_id] = {
+                            "flow": row.flow}
                 # handle elements that are both sources and sinks
                 elif not np.all(flow_data > 0.0) and np.any(flow_data < 0.0):
                     for row in element_data.sort_values(by=["time"]).itertuples():
@@ -463,7 +497,8 @@ class SourceSink:
     def start_date(self, start_date):
         self._start_date = start_date
         if start_date is not None:
-            self._start_date = dates.localize_datetime(start_date).astimezone(pytz.utc)
+            self._start_date = dates.localize_datetime(
+                start_date).astimezone(pytz.utc)
         return self._start_date
 
     @property
@@ -479,7 +514,8 @@ class SourceSink:
         self._rnday = rnday
         if rnday is not None:
             self._rnday = (
-                rnday if isinstance(rnday, timedelta) else timedelta(days=rnday)
+                rnday if isinstance(
+                    rnday, timedelta) else timedelta(days=rnday)
             )
         return self._rnday
 
@@ -493,7 +529,8 @@ class SourceSink:
             _data = []
             for time, element_data in self._data.items():
                 for element_id, data in element_data.items():
-                    _data.append({"time": time, "element_id": element_id, **data})
+                    _data.append(
+                        {"time": time, "element_id": element_id, **data})
             self._df = pd.DataFrame(_data)
         return self._df
 

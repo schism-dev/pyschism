@@ -34,11 +34,11 @@ else:
         hgrid, sources_pairings, sinks_pairings)
 
 nwm = NationalWaterModel(
-    aggregation_radius=4000,
+    # aggregation_radius=4000,
     pairings=pairings,
     cache='NWM_v2.0'
 )
-
+start = datetime.now()
 nwm.write(
     output_directory,
     hgrid,
@@ -46,3 +46,4 @@ nwm.write(
     rnday,
     overwrite=True,
 )
+print(f'Write out took {datetime.now() - start}')

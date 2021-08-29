@@ -715,7 +715,8 @@ class NationalWaterModel(SourceSink):
 
         src_idxs, snk_idxs = self.inventory.get_nc_pairing_indexes(
             self.pairings)
-
+        logger.info(f'Start aggregating NWM timeseries using nprocs={nprocs}')
+        start = datetime.now()
         with Pool(processes=nprocs) as pool:
             sources = pool.starmap(
                 streamflow_lookup,
@@ -745,6 +746,7 @@ class NationalWaterModel(SourceSink):
                 sink_data.setdefault(_time, {})[element_id] = {
                     "flow": -sinks[i][k],
                 }
+        logger.info(f'Timeseries aggregation took {datetime.now() - start}')
         self._sources = Sources(source_data)
         self._sinks = Sinks(sink_data)
         self._data = {**source_data, **sink_data}
