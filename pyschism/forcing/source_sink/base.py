@@ -1,4 +1,4 @@
-from abc import ABC, abstractmethod
+from abc import ABC
 from datetime import datetime, timedelta
 from functools import lru_cache
 import logging
@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 from pyproj import CRS, Transformer
 import pytz
+from scipy.interpolate import interp1d
 from shapely import ops
 from shapely.geometry import Point
 
@@ -97,33 +98,35 @@ class TimeHistoryFile(ABC):
     def __str__(self):
 
         # build ts matrix
-        breakpoint()
         ts_matrix = np.full((len(self.dataset.timevector), len(self.dataset.elements)), np.nan)
         for i, element_id in enumerate(self.dataset.elements):
             ts_matrix[:, i] = self.get_element_timeseries(element_id)
-        exit()
 
-        # for element_id in self
-        # ts_matrix = self.get_ts_matrix
+        if np.any(np.any(np.isnan(ts_matrix), axis=0)):
+            # handle irregular datasets (untested)
+            for column_index in np.where(np.any(np.isnan(ts_matrix), axis=0)):
+                finite = np.where(np.isfinite(ts_matrix[:, column_index]))[0]
+                ts_matrix[:finite[0], column_index] = 0.
+                ts_matrix[finite[-1]:, column_index] = 0.
+                fit = interp1d(np.array(self.dataset.timevector)[finite], ts_matrix[finite, column_index])
+                non_finite = np.where(np.isfinite(ts_matrix[:, column_index]))[0]
+                ts_matrix[non_finite, column_index] = fit(np.array(self.dataset.timevector)[non_finite])
 
-        # data = []
-        # for time in self.dataset.timevector:
-        #     relative_time = (time - self.start_date).total_seconds()
-        #     if relative_time < 0:
-        #         continue
-        #     line = [f"{relative_time:G}"]
-        #     for element_id in self.dataset.elements:
-        #         ts = self.get_element_timeseries(element_id)
-
-        #         line.append(f'{self.dataset.data[time][element_id]["flow"]:.4e}')
-        #     data.append(" ".join(line))
-        # return "\n".join(data)
+        data = []
+        for i, row in enumerate(ts_matrix):
+            relative_time = (self.dataset.timevector[i] - self.start_date).total_seconds()
+            if relative_time < 0:
+                continue
+            data.append(" ".join([
+                f"{relative_time:G}",
+                *[f'{x:.4e}' for x in row]
+            ]))
+        return "\n".join(data)
 
     def get_element_timeseries(self, element_id):
-        print('HEREE!!')
         values = []
         for time in self.dataset.timevector:
-            values.append(self.dataset.data[time].get(element_id, np.nan))
+            values.append(self.dataset.data[time].get(element_id, {}).get('flow', np.nan))
         return np.array(values)
 
     def write(self, path: Union[str, os.PathLike], overwrite: bool = False):
@@ -138,22 +141,6 @@ class Vsource(TimeHistoryFile):
     def __init__(self, sources: Sources, start_date, rnday, filename="vsource.th"):
         super().__init__(sources, start_date, rnday, filename)
 
-    # def get_element_timeseries(self, element_id):
-
-    #     ts = self.df[(self.df['element_id'] == element_id)].gdf.sort_values(by=["time"])
-    #     # now pad junk 
-
-    #     data = {}
-    #     for row in ts.itertuples():
-    #         data.setdefault(row.time, {}).update(
-    #             {
-    #                 "flow": row.flow,
-    #             }
-    #         )
-    #     return data
-
-    #         return self.df[(self.df["element_id"] == element_id)].sort_values(by=["time"])
-
 
 class Msource(TimeHistoryFile):
     def __init__(self, sources, start_date, rnday, filename="msource.th"):
@@ -161,37 +148,36 @@ class Msource(TimeHistoryFile):
 
     def __str__(self):
         data = []
-        for i, time in enumerate(self.data.timevector):
+        for i, time in enumerate(self.dataset.timevector):
             relative_time = (time - self.start_date).total_seconds()
             if relative_time < 0:
                 continue
             line = [f"{relative_time:G}"]
-            for element_id in self.data.elements:
+            for element_id in self.dataset.elements:
                 temperature = (
-                    self.data.data[time].get(element_id, {}).get("temperature", -9999.0)
+                    self.dataset.data[time].get(element_id, {}).get("temperature", -9999.0)
                 )
                 line.append(f"{temperature: .4e}")
-            for element_id in self.data.elements:
+            for element_id in self.dataset.elements:
                 salinity = (
-                    self.data.data[time].get(element_id, {}).get("salinity", -9999.0)
+                    self.dataset.data[time].get(element_id, {}).get("salinity", -9999.0)
                 )
                 line.append(f"{salinity: .4e}")
             data.append(" ".join(line))
         return "\n".join(data)
 
+    def get_element_timeseries(self, element_id):
+        temp = []
+        salt = []
+        for time in self.dataset.timevector:
+            temp.append(self.dataset.data[time].get(element_id, {}).get('temperature', -9999.0))
+            salt.append(self.dataset.data[time].get(element_id, {}).get('salinity', -9999.0))
+        return np.array(temp), np.array(salt)
+
 
 class Vsink(TimeHistoryFile):
     def __init__(self, sinks: Sinks, start_date, rnday, filename="vsink.th"):
         super().__init__(sinks, start_date, rnday, filename)
-
-        # data = {}
-        # for row in (
-        #     self.df[(self.df["element_id"] == element_id)]
-        #     .sort_values(by=["time"])
-        #     .itertuples()
-        # ):
-        #     data.setdefault(row.time, {}).update({"flow": row.flow})
-        # return data
 
 
 class SourceSinkWriter:
@@ -272,18 +258,18 @@ class SourceSink:
         if hasattr(self, "_df"):
             del self._df
 
-    # def get_element_timeseries(self, element_id):
-    #     data = {}
-    #     element_data = self.df[(self.df["element_id"] == element_id)]
-    #     for row in element_data.sort_values(by=["time"]).itertuples():
-    #         data.setdefault(row.time, {}).update(
-    #             {
-    #                 "flow": row.flow,
-    #                 "temperature": row.temperature,
-    #                 "salinity": row.salinity,
-    #             }
-    #         )
-    #     return data
+    def get_element_timeseries(self, element_id):
+        data = {}
+        element_data = self.df[(self.df["element_id"] == element_id)]
+        for row in element_data.sort_values(by=["time"]).itertuples():
+            data.setdefault(row.time, {}).update(
+                {
+                    "flow": row.flow,
+                    "temperature": row.temperature,
+                    "salinity": row.salinity,
+                }
+            )
+        return data
 
     def remove_element_timeseries(self, element_id):
         for time in self._data:
