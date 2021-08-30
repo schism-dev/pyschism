@@ -61,6 +61,7 @@ setuptools.setup(
         'boto3',
         'rtree',
         'requests',
+         'PyYAML',
     ],
     entry_points={'console_scripts': ['pyschism = pyschism.__main__:main']},
     tests_require=['nose'],
