@@ -160,9 +160,9 @@ class NWMElementPairings:
                         .intersection(hull)
                         .intersects(downstream)
                     ):
-                        sources[element.id].append(reach.feature_id)
+                        sources[element.id].append(reaches.iloc[row.reachIndex].feature_id)
                     else:
-                        sinks[element.id].append(reach.feature_id)
+                        sinks[element.id].append(reaches.iloc[row.reachIndex].feature_id)
                     break
 
         logger.info(
