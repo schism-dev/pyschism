@@ -120,7 +120,7 @@ class Bctides(metaclass=BctidesMeta):
                         ]
                     )
                 )
-        global_constituents = sorted(self.tides.get_active_constituents())
+        global_constituents = self.tides.get_active_constituents()
         f.append(f"{len(self.gdf)}")
         for boundary in self.gdf.itertuples():
             f.append(self.get_forcing_string(boundary, global_constituents))
@@ -255,7 +255,8 @@ class Bctides(metaclass=BctidesMeta):
             if bctype is not None:
                 # sensitive to MRO.
                 return str(
-                    getattr(bctype, f"{bctype.__class__.__bases__[0].__name__.lower()}")
+                    getattr(
+                        bctype, f"{bctype.__class__.__bases__[0].__name__.lower()}")
                 )
             return "0"
 

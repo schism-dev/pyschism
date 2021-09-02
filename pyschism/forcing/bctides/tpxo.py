@@ -6,6 +6,7 @@ import appdirs
 from netCDF4 import Dataset
 import numpy as np
 from scipy.interpolate import griddata
+from scipy.interpolate.fitpack2 import RectBivariateSpline
 
 from pyschism.forcing.bctides.base import TidalDataProvider
 
@@ -18,16 +19,16 @@ TPXO_VELOCITY = 'u_tpxo9.v1.nc'
 
 def raise_missing_file(fpath, fname):
     raise FileNotFoundError('\n'.join([
-                f'No TPXO file found at "{fpath}".',
-                'New users will need to register and request a copy of '
-                f'the TPXO9 NetCDF file (specifically `{fname}`) '
-                'from the authors at https://www.tpxo.net.',
-                'Once you obtain `h_tpxo9.v1.nc`, you can follow one of the '
-                'following options: ',
-                f'1) copy or symlink the file to "{fpath}"',
-                f'2) set the environment variable `{fname}` to point'
-                ' to the file',
-            ]))
+        f'No TPXO file found at "{fpath}".',
+        'New users will need to register and request a copy of '
+        f'the TPXO9 NetCDF file (specifically `{fname}`) '
+        'from the authors at https://www.tpxo.net.',
+        'Once you obtain `h_tpxo9.v1.nc`, you can follow one of the '
+        'following options: ',
+        f'1) copy or symlink the file to "{fpath}"',
+        f'2) set the environment variable `{fname}` to point'
+        ' to the file',
+    ]))
 
 
 class TPXO(TidalDataProvider):
@@ -108,41 +109,43 @@ class TPXO(TidalDataProvider):
             ncarray = self.h
         elif phys_var == 'velocity':
             ncarray = self.uv
-        array = ncarray[ncvar][
-                lower_c.index(constituent.lower()), :, :].flatten()
-        _x = np.asarray(
+        zi = ncarray[ncvar][
+            lower_c.index(constituent.lower()), :, :]
+        xo = np.asarray(
             [x + 360. if x < 0. else x for x in vertices[:, 0]]).flatten()
-        _y = vertices[:, 1].flatten()
-        x, y = np.meshgrid(self.x, self.y, indexing='ij')
-        x = x.flatten()
-        y = y.flatten()
+        yo = vertices[:, 1].flatten()
+        xi, yi = np.meshgrid(self.x, self.y, indexing='ij')
+        xi = xi.flatten()
+        yi = yi.flatten()
+        zi = zi.flatten()
         dx = np.mean(np.diff(self.x))
         dy = np.mean(np.diff(self.y))
         # buffer the bbox by 2 difference units
-        _idx = np.where(
-                np.logical_and(
-                        np.logical_and(
-                                x >= np.min(_x) - 2 * dx,
-                                x <= np.max(_x) + 2 * dx
-                        ),
-                        np.logical_and(
-                                y >= np.min(_y) - 2 * dy,
-                                y <= np.max(_y) + 2 * dy
-                        )
-                )
+        mask1 = np.logical_and(
+            np.logical_and(
+                xi >= np.min(xo) - 2 * dx,
+                xi <= np.max(xo) + 2 * dx
+            ),
+            np.logical_and(
+                yi >= np.min(yo) - 2 * dy,
+                yi <= np.max(yo) + 2 * dy
+            )
         )
+        # remove junk values from input array
+        mask2 = np.ma.masked_where(zi != 0., zi)
+        iidx = np.where(np.logical_and(mask1, mask2))
         values = griddata(
-                (x[_idx], y[_idx]),
-                array[_idx],
-                (_x, _y),
-                method='linear',
-                fill_value=np.nan,
+            (xi[iidx], yi[iidx]),
+            zi[iidx],
+            (xo, yo),
+            method='linear',
+            fill_value=np.nan,
         )
         nan_idxs = np.where(np.isnan(values))
         values[nan_idxs] = griddata(
-                (x[_idx], y[_idx]),
-                array[_idx],
-                (_x[nan_idxs], _y[nan_idxs]),
-                method='nearest',
+            (xi[iidx], yi[iidx]),
+            zi[iidx],
+            (xo[nan_idxs], yo[nan_idxs]),
+            method='nearest',
         )
         return values
