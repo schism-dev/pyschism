@@ -74,7 +74,7 @@ class Shapiro(Gr3Field):
         _tmpdir = tempfile.TemporaryDirectory()
         tmpdir = pathlib.Path(_tmpdir.name)
         hgrid = hgrid.copy()
-        hgrid.transform_to(dst_crs)
+        hgrid.nodes.transform_to_cpp()
         hgrid.write(tmpdir / "hgrid.gr3")
         subprocess.check_call(["gen_slope_filter"], cwd=tmpdir)
         outdir = pathlib.Path(outdir)

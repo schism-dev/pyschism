@@ -67,6 +67,16 @@ class Nodes:
         if hasattr(self, "_gdf"):
             del self._gdf
 
+    def transform_to_cpp(self, lonc = -77.07, latc = 24.0):
+        longitude = list(self.coord[:, 0]/180*np.pi)
+        latitude = list(self.coord[:, 1]/180*np.pi)
+        radius = 6378206.4
+        loncc = lonc/180*np.pi
+        latcc = latc/180*np.pi
+        x = [radius*(longitude[i]-loncc)*np.cos(latcc) for i in np.arange(len(longitude))]
+        y = [radius*latitude[i] for i in np.arange(len(latitude))]
+        self._coords=np.vstack([x, y]).T
+
     def get_xy(self, crs: Union[CRS, str] = None):
         if crs is not None:
             crs = CRS.from_user_input(crs)
