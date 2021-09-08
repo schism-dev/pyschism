@@ -462,7 +462,7 @@ class ModelDriver:
         watertype=True,
         windrot=True,
         shapiro=True,
-        fluxflag=True,
+        fluxflag=False,
         tvdflag=True,
         elev_ic=True,
         temp_ic=True,

@@ -70,14 +70,16 @@ class Watertype(Gr3Field):
 
 class Shapiro(Gr3Field):
     @classmethod
-    def from_binary(cls, outdir: Union[str, os.PathLike], hgrid, dst_crs):
+    #def from_binary(cls, outdir: Union[str, os.PathLike], hgrid):
+    def from_binary(cls, hgrid):
         _tmpdir = tempfile.TemporaryDirectory()
         tmpdir = pathlib.Path(_tmpdir.name)
         hgrid = hgrid.copy()
         hgrid.nodes.transform_to_cpp()
         hgrid.write(tmpdir / "hgrid.gr3")
         subprocess.check_call(["gen_slope_filter"], cwd=tmpdir)
-        outdir = pathlib.Path(outdir)
+        #outdir = pathlib.Path(outdir)
+        #shutil.copy2(tmpdir / 'slope_filter.gr3', outdir / 'shapiro.gr3')
         obj = cls.open(tmpdir / "slope_filter.gr3")
         obj.description = "shapiro"
         return obj
