@@ -362,7 +362,7 @@ def add_iettype_to_parser(parser):
                 add_tidal_database_to_parser(tmp_parser)
                 add_baroclinic_database_to_parser(tmp_parser)
                 tmp_args = tmp_parser.parse_known_args()[0]
-                iettype3 = bctides.iettype.Iettype3(database=tmp_args.tidal_database)
+                iettype3 = bctides.iettype.Iettype3(constituents=tmp_args.constituents, database=tmp_args.tidal_database)
                 iettype4 = bctides.iettype.Iettype4(
                     data_source=tmp_args.baroclinic_database
                 )
@@ -490,7 +490,7 @@ def add_ifltype_to_parser(parser):
                 add_tidal_database_to_parser(tmp_parser)
                 add_baroclinic_database_to_parser(tmp_parser)
                 tmp_args = tmp_parser.parse_known_args()[0]
-                ifltype3 = bctides.ifltype.Ifltype3(database=tmp_args.tidal_database)
+                ifltype3 = bctides.ifltype.Ifltype3(constituents=tmp_args.constituents, database=tmp_args.tidal_database)
                 ifltype4 = bctides.ifltype.Ifltype4(
                     data_source=tmp_args.baroclinic_database
                 )
