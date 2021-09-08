@@ -17,6 +17,7 @@ from matplotlib.transforms import Bbox
 import numpy as np
 from pyproj import Transformer, CRS
 import requests
+from shapely import ops
 from shapely.geometry import (
     box,
     LinearRing,
@@ -260,6 +261,19 @@ class Elements:
                     triangulation_mask.append(False)
 
         return np.array(triangulation_mask)
+
+    def get_areas(self):
+        if self.nodes.crs.is_geographic:
+            elements = []
+            for row in self.gdf.itertuples():
+                aeqd = CRS.from_user_input(
+                    f"+proj=aeqd +R=6371000 +units=m " f"+lat_0={row.geometry.centroid.y} +lon_0={row.geometry.centroid.x}"
+                )
+                current_to_aeqd = Transformer.from_crs(self.nodes.crs, aeqd, always_xy=True).transform
+                elements.append(ops.transform(current_to_aeqd))
+            return [element.area for element in elements]
+        else:
+            return [row.geometry.area for row in self.gdf.itertuples()]
 
     @property
     def array(self):
