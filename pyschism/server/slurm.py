@@ -108,6 +108,19 @@ class SlurmConfig(ServerConfig):
             self.SLURM_JOB_FILE,
         ]
 
+        # if self.modules is not None:
+        #     f.extend([
+        #         '',
+        #         f'module load {" ".join(module for module in self._modules)}'
+        #         ])
+
+        # if self._path_prefix is not None:
+        #     f += f'\n' f'PATH={self._path_prefix}:$PATH\n'
+
+        # if self._extra_commands is not None:
+        #     f += '\n'
+        #     for command in self._extra_commands:
+        #         f += f'{command}\n'
         # self.modules = modules
         # self.path_prefix = path_prefix
         # self.extra_commands = extra_commands

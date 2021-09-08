@@ -348,7 +348,9 @@ class ModelDriver:
         if self.config.forcings.nws is not None:
             if isinstance(self.config.forcings.nws, NWS2):
                 if self.config.forcings.nws.windrot is None:
-                    self.config.forcings.nws.windrot = gridgr3.Windrot.default(self.config.hgrid)
+                    self.config.forcings.nws.windrot = gridgr3.Windrot.default(
+                        self.config.hgrid
+                    )
             self.param.opt.wtiminc = self.param.core.dt
             self.param.opt.nws = self.config.forcings.nws.dtype.value
 
@@ -512,7 +514,9 @@ class ModelDriver:
 
         def obj_write(var, obj, default_filename, overwrite):
             if var is not False and obj is not None:
-                obj.write(self.outdir / default_filename if var is True else var, overwrite)
+                obj.write(
+                    self.outdir / default_filename if var is True else var, overwrite
+                )
 
         obj_write(albedo, self.config.albedo, "albedo.gr3", overwrite)
         obj_write(diffmin, self.config.diffmin, "diffmin.gr3", overwrite)
@@ -572,6 +576,15 @@ class ModelDriver:
         #     self.obnd.fetch_data(outdir, self.start_date, rnday=3, bbox=self.config.hgrid.get_bbox())
 
         # update forcings
+
+    @property
+    def outdir(self):
+        return self._outdir
+
+    @outdir.setter
+    def outdir(self, outdir):
+        self.config.outdir = outdir
+        self._outdir = outdir
 
     @property
     def elev_ic(self):
@@ -660,27 +673,27 @@ class ModelConfig(metaclass=ModelConfigMeta):
     """
 
     def __init__(
-            self,
-            hgrid: Hgrid,
-            vgrid: Vgrid = None,
-            fgrid: Fgrid = None,
-            iettype: iettype.Iettype = None,
-            ifltype: ifltype.Ifltype = None,
-            itetype: itetype.Itetype = None,
-            isatype: isatype.Isatype = None,
-            # itrtype: itrtype.Itrtype = None,
-            nws: NWS = None,
-            source_sink: Union[List[SourceSink], SourceSink] = None,
-            waves=None,
-            stratification: Union[int, str, Stratification] = None,
-            albedo: gridgr3.Albedo = None,
-            diffmin: gridgr3.Diffmin = None,
-            diffmax: gridgr3.Diffmax = None,
-            watertype: gridgr3.Watertype = None,
-            estuary: gridgr3.Estuary = None,
-            shapiro: gridgr3.Shapiro = None,
-            fluxflag: prop.Fluxflag = None,
-            tvdflag: prop.Tvdflag = None,
+        self,
+        hgrid: Hgrid,
+        vgrid: Vgrid = None,
+        fgrid: Fgrid = None,
+        iettype: iettype.Iettype = None,
+        ifltype: ifltype.Ifltype = None,
+        itetype: itetype.Itetype = None,
+        isatype: isatype.Isatype = None,
+        # itrtype: itrtype.Itrtype = None,
+        nws: NWS = None,
+        source_sink: Union[List[SourceSink], SourceSink] = None,
+        waves=None,
+        stratification: Union[int, str, Stratification] = None,
+        albedo: gridgr3.Albedo = None,
+        diffmin: gridgr3.Diffmin = None,
+        diffmax: gridgr3.Diffmax = None,
+        watertype: gridgr3.Watertype = None,
+        estuary: gridgr3.Estuary = None,
+        shapiro: gridgr3.Shapiro = None,
+        fluxflag: prop.Fluxflag = None,
+        tvdflag: prop.Tvdflag = None,
     ):
         self.hgrid = hgrid
         self.vgrid = vgrid
@@ -704,25 +717,25 @@ class ModelConfig(metaclass=ModelConfigMeta):
         self.estuary = estuary
 
     def coldstart(
-            self,
-            timestep: Union[float, timedelta] = 150.0,
-            start_date: datetime = None,
-            end_date: Union[datetime, timedelta] = None,
-            dramp: Union[float, timedelta] = None,
-            drampbc: Union[float, timedelta] = None,
-            dramp_ss: Union[float, timedelta] = None,
-            drampwafo: Union[float, timedelta] = None,
-            drampwind: Union[float, timedelta] = None,
-            elev_ic: gridgr3.ElevIc = None,
-            temp_ic: gridgr3.TempIc = None,
-            salt_ic: gridgr3.TempIc = None,
-            nspool: Union[int, timedelta] = None,
-            ihfskip: int = None,
-            nhot_write: Union[int, timedelta] = None,
-            stations: Stations = None,
-            server_config: ServerConfig = None,
-            param_template=None,
-            **surface_outputs,
+        self,
+        timestep: Union[float, timedelta] = 150.0,
+        start_date: datetime = None,
+        end_date: Union[datetime, timedelta] = None,
+        dramp: Union[float, timedelta] = None,
+        drampbc: Union[float, timedelta] = None,
+        dramp_ss: Union[float, timedelta] = None,
+        drampwafo: Union[float, timedelta] = None,
+        drampwind: Union[float, timedelta] = None,
+        elev_ic: gridgr3.ElevIc = None,
+        temp_ic: gridgr3.TempIc = None,
+        salt_ic: gridgr3.TempIc = None,
+        nspool: Union[int, timedelta] = None,
+        ihfskip: int = None,
+        nhot_write: Union[int, timedelta] = None,
+        stations: Stations = None,
+        server_config: ServerConfig = None,
+        param_template=None,
+        **surface_outputs,
     ) -> ModelDriver:
 
         if start_date is None:
@@ -904,7 +917,7 @@ class ModelConfig(metaclass=ModelConfigMeta):
 
     @property
     def forcings(self):
-        if not hasattr(self, '_forcings'):
+        if not hasattr(self, "_forcings"):
             self._forcings = ModelForcings(
                 bctides=self.bctides,
                 nws=self.nws,
@@ -916,7 +929,7 @@ class ModelConfig(metaclass=ModelConfigMeta):
 
     @property
     def bctides(self):
-        if not hasattr(self, '_bctides'):
+        if not hasattr(self, "_bctides"):
             self._bctides = Bctides(
                 self.hgrid,
                 vgrid=self.vgrid,
