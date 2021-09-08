@@ -5,11 +5,13 @@ from typing import Union
 import logging
 #from multiprocessing import Pool
 
+import appdirs
 import numpy as np
 import cdsapi
 import netCDF4 as nc4
 from netCDF4 import Dataset
 import pandas as pd
+from matplotlib.transforms import Bbox
 
 from pyschism.forcing.nws.nws2.sflux import (
     SfluxDataset,
@@ -109,155 +111,158 @@ class ERA5DataInventory:
                 lon.append(x)
         return np.meshgrid(np.array(lon), self.lat[lat_idxs])
 
-def put_sflux_fields(iday, date, timevector, ds, nx_grid, ny_grid, lon_idxs, lat_idxs, OUTDIR):
+def put_sflux_fields(iday, date, timevector, ds, nx_grid, ny_grid, lon_idxs, lat_idxs, air, rad, prc, OUTDIR):
     #print(iday)
     #print(file)
     rt=pd.to_datetime(str(date))
     idx=np.where(rt == timevector)[0].item()
     times=[i/24 for i in np.arange(24)]
 
-    with Dataset(OUTDIR / "sflux_air_1.{:04}.nc".format(iday+1), 'w', format='NETCDF3_CLASSIC') as dst:
-        dst.setncatts({"Conventions": "CF-1.0"})
-        # dimensions
-        dst.createDimension('nx_grid', nx_grid.shape[1])
-        dst.createDimension('ny_grid', ny_grid.shape[0])
-        dst.createDimension('time', None)
-        # variables
-        # lon
-        dst.createVariable('lon', 'f4', ('ny_grid', 'nx_grid'))
-        dst['lon'].long_name = "Longitude"
-        dst['lon'].standard_name = "longitude"
-        dst['lon'].units = "degrees_east"
-        dst['lon'][:] = nx_grid
-        # lat
-        dst.createVariable('lat', 'f4', ('ny_grid', 'nx_grid'))
-        dst['lat'].long_name = "Latitude"
-        dst['lat'].standard_name = "latitude"
-        dst['lat'].units = "degrees_north"
-        dst['lat'][:] = ny_grid
-        # time
-        dst.createVariable('time', 'f4', ('time',))
-        dst['time'].long_name = 'Time'
-        dst['time'].standard_name = 'time'
-        dst['time'].units = f'days since {rt.year}-{rt.month}'\
-                            f'-{rt.day} 00:00 UTC'
-        dst['time'].base_date = (rt.year, rt.month, rt.day, 0)
-        dst['time'][:] = times
+    if air is True:
+        with Dataset(OUTDIR / "sflux_air_1.{:04}.nc".format(iday+1), 'w', format='NETCDF3_CLASSIC') as dst:
+            dst.setncatts({"Conventions": "CF-1.0"})
+            # dimensions
+            dst.createDimension('nx_grid', nx_grid.shape[1])
+            dst.createDimension('ny_grid', ny_grid.shape[0])
+            dst.createDimension('time', None)
+            # variables
+            # lon
+            dst.createVariable('lon', 'f4', ('ny_grid', 'nx_grid'))
+            dst['lon'].long_name = "Longitude"
+            dst['lon'].standard_name = "longitude"
+            dst['lon'].units = "degrees_east"
+            dst['lon'][:] = nx_grid
+            # lat
+            dst.createVariable('lat', 'f4', ('ny_grid', 'nx_grid'))
+            dst['lat'].long_name = "Latitude"
+            dst['lat'].standard_name = "latitude"
+            dst['lat'].units = "degrees_north"
+            dst['lat'][:] = ny_grid
+            # time
+            dst.createVariable('time', 'f4', ('time',))
+            dst['time'].long_name = 'Time'
+            dst['time'].standard_name = 'time'
+            dst['time'].units = f'days since {rt.year}-{rt.month}'\
+                                f'-{rt.day} 00:00 UTC'
+            dst['time'].base_date = (rt.year, rt.month, rt.day, 0)
+            dst['time'][:] = times
 
-        # prmsl
-        dst.createVariable('prmsl', 'f4', ('time', 'ny_grid', 'nx_grid'))
-        dst['prmsl'].long_name = "Pressure reduced to MSL"
-        dst['prmsl'].standard_name = "air_pressure_at_sea_level"
-        dst['prmsl'].units = "Pa"
-        dst['prmsl'][:,:,:]=ds['msl'][idx:idx+25,lat_idxs,lon_idxs]
+            # prmsl
+            dst.createVariable('prmsl', 'f4', ('time', 'ny_grid', 'nx_grid'))
+            dst['prmsl'].long_name = "Pressure reduced to MSL"
+            dst['prmsl'].standard_name = "air_pressure_at_sea_level"
+            dst['prmsl'].units = "Pa"
+            dst['prmsl'][:,:,:]=ds['msl'][idx:idx+25,lat_idxs,lon_idxs]
 
-        # spfh
-        dst.createVariable('spfh', 'f4', ('time', 'ny_grid', 'nx_grid'))
-        dst['spfh'].long_name = "Surface Specific Humidity "\
-                                "(2m AGL)"
-        dst['spfh'].standard_name = "specific_humidity"
-        dst['spfh'].units = "1"
-        dst['spfh'][:,:,:]=ds['d2m'][idx:idx+25,lat_idxs,lon_idxs]
+            # spfh
+            dst.createVariable('spfh', 'f4', ('time', 'ny_grid', 'nx_grid'))
+            dst['spfh'].long_name = "Surface Specific Humidity "\
+                                    "(2m AGL)"
+            dst['spfh'].standard_name = "specific_humidity"
+            dst['spfh'].units = "1"
+            dst['spfh'][:,:,:]=ds['d2m'][idx:idx+25,lat_idxs,lon_idxs]
 
-        # stmp
-        dst.createVariable('stmp', 'f4', ('time', 'ny_grid', 'nx_grid'))
-        dst['stmp'].long_name = "Surface Air Temperature (2m AGL)"
-        dst['stmp'].standard_name = "air_temperature"
-        dst['stmp'].units = "K"
-        dst['stmp'][:,:,:]=ds['t2m'][idx:idx+25,lat_idxs,lon_idxs]
+            # stmp
+            dst.createVariable('stmp', 'f4', ('time', 'ny_grid', 'nx_grid'))
+            dst['stmp'].long_name = "Surface Air Temperature (2m AGL)"
+            dst['stmp'].standard_name = "air_temperature"
+            dst['stmp'].units = "K"
+            dst['stmp'][:,:,:]=ds['t2m'][idx:idx+25,lat_idxs,lon_idxs]
 
-        # uwind
-        dst.createVariable('uwind', 'f4', ('time', 'ny_grid', 'nx_grid'))
-        dst['uwind'].long_name = "Surface Eastward Air Velocity "\
-            "(10m AGL)"
-        dst['uwind'].standard_name = "eastward_wind"
-        dst['uwind'].units = "m/s"
-        dst['uwind'][:,:,:]=ds['u10'][idx:idx+25,lat_idxs,lon_idxs]
+            # uwind
+            dst.createVariable('uwind', 'f4', ('time', 'ny_grid', 'nx_grid'))
+            dst['uwind'].long_name = "Surface Eastward Air Velocity "\
+                "(10m AGL)"
+            dst['uwind'].standard_name = "eastward_wind"
+            dst['uwind'].units = "m/s"
+            dst['uwind'][:,:,:]=ds['u10'][idx:idx+25,lat_idxs,lon_idxs]
 
-        # vwind
-        dst.createVariable('vwind', 'f4', ('time', 'ny_grid', 'nx_grid'))
-        dst['vwind'].long_name = "Surface Northward Air Velocity "\
-            "(10m AGL)"
-        dst['vwind'].standard_name = "northward_wind"
-        dst['vwind'].units = "m/s"
-        dst['vwind'][:,:,:]=ds['v10'][idx:idx+25,lat_idxs,lon_idxs]
+            # vwind
+            dst.createVariable('vwind', 'f4', ('time', 'ny_grid', 'nx_grid'))
+            dst['vwind'].long_name = "Surface Northward Air Velocity "\
+                "(10m AGL)"
+            dst['vwind'].standard_name = "northward_wind"
+            dst['vwind'].units = "m/s"
+            dst['vwind'][:,:,:]=ds['v10'][idx:idx+25,lat_idxs,lon_idxs]
 
-    with Dataset(OUTDIR / "sflux_prc_1.{:04}.nc".format(iday+1), 'w', format='NETCDF3_CLASSIC') as dst:
-        dst.setncatts({"Conventions": "CF-1.0"})
-        # dimensions
-        dst.createDimension('nx_grid', nx_grid.shape[1])
-        dst.createDimension('ny_grid', ny_grid.shape[0])
-        dst.createDimension('time', None)
-        # variables
-        # lon
-        dst.createVariable('lon', 'f4', ('ny_grid', 'nx_grid'))
-        dst['lon'].long_name = "Longitude"
-        dst['lon'].standard_name = "longitude"
-        dst['lon'].units = "degrees_east"
-        dst['lon'][:] = nx_grid
-        # lat
-        dst.createVariable('lat', 'f4', ('ny_grid', 'nx_grid'))
-        dst['lat'].long_name = "Latitude"
-        dst['lat'].standard_name = "latitude"
-        dst['lat'].units = "degrees_north"
-        dst['lat'][:] = ny_grid
-        # time
-        dst.createVariable('time', 'f4', ('time',))
-        dst['time'].long_name = 'Time'
-        dst['time'].standard_name = 'time'
-        dst['time'].units = f'days since {rt.year}-{rt.month}'\
-                            f'-{rt.day} 00:00 UTC'
-        dst['time'].base_date = (rt.year, rt.month, rt.day, 0)
-        dst['time'][:] = times
+    if prc is True:
+        with Dataset(OUTDIR / "sflux_prc_1.{:04}.nc".format(iday+1), 'w', format='NETCDF3_CLASSIC') as dst:
+            dst.setncatts({"Conventions": "CF-1.0"})
+            # dimensions
+            dst.createDimension('nx_grid', nx_grid.shape[1])
+            dst.createDimension('ny_grid', ny_grid.shape[0])
+            dst.createDimension('time', None)
+            # variables
+            # lon
+            dst.createVariable('lon', 'f4', ('ny_grid', 'nx_grid'))
+            dst['lon'].long_name = "Longitude"
+            dst['lon'].standard_name = "longitude"
+            dst['lon'].units = "degrees_east"
+            dst['lon'][:] = nx_grid
+            # lat
+            dst.createVariable('lat', 'f4', ('ny_grid', 'nx_grid'))
+            dst['lat'].long_name = "Latitude"
+            dst['lat'].standard_name = "latitude"
+            dst['lat'].units = "degrees_north"
+            dst['lat'][:] = ny_grid
+            # time
+            dst.createVariable('time', 'f4', ('time',))
+            dst['time'].long_name = 'Time'
+            dst['time'].standard_name = 'time'
+            dst['time'].units = f'days since {rt.year}-{rt.month}'\
+                                f'-{rt.day} 00:00 UTC'
+            dst['time'].base_date = (rt.year, rt.month, rt.day, 0)
+            dst['time'][:] = times
 
-        # prate
-        dst.createVariable('prate', 'f4', ('time', 'ny_grid', 'nx_grid'))
-        dst['prate'].long_name = "Surface Precipitation Rate"
-        dst['prate'].standard_name = "air_pressure_at_sea_level"
-        dst['prate'].units = "kg/m^2/s"
-        dst['prate'][:,:,:]=ds['mtpr'][idx:idx+25,lat_idxs,lon_idxs]
+            # prate
+            dst.createVariable('prate', 'f4', ('time', 'ny_grid', 'nx_grid'))
+            dst['prate'].long_name = "Surface Precipitation Rate"
+            dst['prate'].standard_name = "air_pressure_at_sea_level"
+            dst['prate'].units = "kg/m^2/s"
+            dst['prate'][:,:,:]=ds['mtpr'][idx:idx+25,lat_idxs,lon_idxs]
 
-    with Dataset(OUTDIR / "sflux_rad_1.{:04}.nc".format(iday+1), 'w', format='NETCDF3_CLASSIC') as dst:
-        dst.setncatts({"Conventions": "CF-1.0"})
-        # dimensions
-        dst.createDimension('nx_grid', nx_grid.shape[1])
-        dst.createDimension('ny_grid', ny_grid.shape[0])
-        dst.createDimension('time', None)
-        # variables
-        # lon
-        dst.createVariable('lon', 'f4', ('ny_grid', 'nx_grid'))
-        dst['lon'].long_name = "Longitude"
-        dst['lon'].standard_name = "longitude"
-        dst['lon'].units = "degrees_east"
-        dst['lon'][:] = nx_grid
-        # lat
-        dst.createVariable('lat', 'f4', ('ny_grid', 'nx_grid'))
-        dst['lat'].long_name = "Latitude"
-        dst['lat'].standard_name = "latitude"
-        dst['lat'].units = "degrees_north"
-        dst['lat'][:] = ny_grid
-        # time
-        dst.createVariable('time', 'f4', ('time',))
-        dst['time'].long_name = 'Time'
-        dst['time'].standard_name = 'time'
-        dst['time'].units = f'days since {rt.year}-{rt.month}'\
-                            f'-{rt.day} 00:00 UTC'
-        dst['time'].base_date = (rt.year, rt.month, rt.day, 0)
-        dst['time'][:] = times
+    if rad is True:
+        with Dataset(OUTDIR / "sflux_rad_1.{:04}.nc".format(iday+1), 'w', format='NETCDF3_CLASSIC') as dst:
+            dst.setncatts({"Conventions": "CF-1.0"})
+            # dimensions
+            dst.createDimension('nx_grid', nx_grid.shape[1])
+            dst.createDimension('ny_grid', ny_grid.shape[0])
+            dst.createDimension('time', None)
+            # variables
+            # lon
+            dst.createVariable('lon', 'f4', ('ny_grid', 'nx_grid'))
+            dst['lon'].long_name = "Longitude"
+            dst['lon'].standard_name = "longitude"
+            dst['lon'].units = "degrees_east"
+            dst['lon'][:] = nx_grid
+            # lat
+            dst.createVariable('lat', 'f4', ('ny_grid', 'nx_grid'))
+            dst['lat'].long_name = "Latitude"
+            dst['lat'].standard_name = "latitude"
+            dst['lat'].units = "degrees_north"
+            dst['lat'][:] = ny_grid
+            # time
+            dst.createVariable('time', 'f4', ('time',))
+            dst['time'].long_name = 'Time'
+            dst['time'].standard_name = 'time'
+            dst['time'].units = f'days since {rt.year}-{rt.month}'\
+                                f'-{rt.day} 00:00 UTC'
+            dst['time'].base_date = (rt.year, rt.month, rt.day, 0)
+            dst['time'][:] = times
 
-        # dlwrf
-        dst.createVariable('dlwrf', 'f4', ('time', 'ny_grid', 'nx_grid'))
-        dst['dlwrf'].long_name = "Downward Long Wave Radiation Flux"
-        dst['dlwrf'].standard_name = "surface_downwelling_longwave_flux_in_air"
-        dst['dlwrf'].units = "W/m^2"
-        dst['dlwrf'][:,:,:]=ds['msdwlwrf'][idx:idx+25,lat_idxs,lon_idxs]
+            # dlwrf
+            dst.createVariable('dlwrf', 'f4', ('time', 'ny_grid', 'nx_grid'))
+            dst['dlwrf'].long_name = "Downward Long Wave Radiation Flux"
+            dst['dlwrf'].standard_name = "surface_downwelling_longwave_flux_in_air"
+            dst['dlwrf'].units = "W/m^2"
+            dst['dlwrf'][:,:,:]=ds['msdwlwrf'][idx:idx+25,lat_idxs,lon_idxs]
 
-        # dwrf
-        dst.createVariable('dswrf', 'f4', ('time', 'ny_grid', 'nx_grid'))
-        dst['dswrf'].long_name = "Downward Long Wave Radiation Flux"
-        dst['dswrf'].standard_name = "surface_downwelling_shortwave_flux_in_air"
-        dst['dswrf'].units = "W/m^2"
-        dst['dswrf'][:,:,:]=ds['msdwswrf'][idx:idx+25,lat_idxs,lon_idxs]
+            # dwrf
+            dst.createVariable('dswrf', 'f4', ('time', 'ny_grid', 'nx_grid'))
+            dst['dswrf'].long_name = "Downward Long Wave Radiation Flux"
+            dst['dswrf'].standard_name = "surface_downwelling_shortwave_flux_in_air"
+            dst['dswrf'].units = "W/m^2"
+            dst['dswrf'][:,:,:]=ds['msdwswrf'][idx:idx+25,lat_idxs,lon_idxs]
 
 
 class ERA5(SfluxDataset):
@@ -276,15 +281,16 @@ class ERA5(SfluxDataset):
         self.prc = None
         self.rad = None
 
-    def gen_sflux(
+    def write(
         self,
+        outdir,
         start_date: datetime = None,
         rnday: Union[float, timedelta] = 4,
         air: bool = True,
         prc: bool = True,
         rad: bool = True,
-        bbox = None,
-        outdir = None,
+        bbox: Bbox = None,
+        overwrite: bool=False,
     ):
         self.start_date=start_date
         self.rnday=rnday
@@ -309,12 +315,34 @@ class ERA5(SfluxDataset):
         time1=ds['time']
         times=nc4.num2date(time1,units=time1.units,only_use_cftime_datetimes=False)
 
-        #outdir=pathlib.Path('./ERA5')
-        #print(outdir)
-        #with Pool(processes=nprocs) as pool:
-        #    pool.starmap(put_sflux_fields, [(iday, file, nx_grid, ny_grid, lon_idxs, lat_idxs, outdir)
-        #        #for requested_date,file in self.inventory._files.items()])
-        #        for iday,file in enumerate(self.inventory._files.items())])
         for iday, date in enumerate(dates):
-            put_sflux_fields(iday, date, times, ds, nx_grid, ny_grid, lon_idxs, lat_idxs, outdir)
+            #put_sflux_fields(iday, date, times, ds, nx_grid, ny_grid, lon_idxs, lat_idxs, air=air, rad=rad, prc=prc, OUTDIR=self.tmpdir)
+            put_sflux_fields(iday, date, times, ds, nx_grid, ny_grid, lon_idxs, lat_idxs, air=air, rad=rad, prc=prc, OUTDIR=outdir)
+ 
+        #self.resource = list(self.tmpdir.glob("*.nc"))
+        #if air is True:
+        #    self.air = AirComponent(self.fields)
+        #if prc is True:
+        #    self.prc = PrcComponent(self.fields)
+        #if rad is True:
+        #    self.rad = RadComponent(self.fields)
 
+        #super().write(
+        #    outdir,
+        #    level,
+        #    overwrite=overwrite,
+        #    start_date=start_date,
+        #    rnday=rnday,
+        #    air=air,
+        #    rad=rad,
+        #    prc=prc,
+        #)
+        #del self._tmpdir
+
+    #@property
+    #def tmpdir(self):
+    #    if not hasattr(self, "_tmpdir"):
+    #        self._tmpdir = tempfile.TemporaryDirectory(
+    #            prefix=appdirs.user_cache_dir()
+    #        )
+    #    return pathlib.Path(self._tmpdir.name)
