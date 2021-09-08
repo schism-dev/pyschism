@@ -492,7 +492,7 @@ class HRRR(SfluxDataset):
                 )
                 dst["dswrf"].units = "W/m^2"
 
-        self.resource = self.tmpdir
+        self.resource = list(self.tmpdir.glob("*.nc"))
         if air is True:
             self.air = AirComponent(self.fields)
         if prc is True:
@@ -516,7 +516,7 @@ class HRRR(SfluxDataset):
     def tmpdir(self):
         if not hasattr(self, "_tmpdir"):
             self._tmpdir = tempfile.TemporaryDirectory(
-                prefix=appdirs.user_cache_dir("pyschism/hrrr")
+                prefix=appdirs.user_cache_dir()
             )
         return pathlib.Path(self._tmpdir.name)
 
