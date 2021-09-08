@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 from enum import Enum
 import logging
 # import os
-from typing import Callable, List, Union
+from typing import Callable, Union
 
 import numpy as np
 

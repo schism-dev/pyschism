@@ -57,18 +57,18 @@ class DefaultMakefile(Makefile):
             r"MAKEFILE_PATH:=$(abspath $(lastword $(MAKEFILE_LIST)))",
             r"ROOT_DIR:=$(dir $(MAKEFILE_PATH))",
             str(self.server_config),
-            self.default,
-            self.symlinks,
+            # self.default,
+            # self.symlinks,
             self.run,
             self.tail,
         ]
         return "\n".join([line.replace("    ", "\t") for line in f])
 
-    @property
-    def default(self):
-        return r"""
-default: symlinks
-"""
+#     @property
+#     def default(self):
+#         return r"""
+# default: symlinks
+# """
 
     @property
     def run(self):
@@ -77,13 +77,18 @@ default: symlinks
             'run:',
             '    @set -e;\\',
         ]
-
+        if self.server_config.modules_init is not None:
+            f.append(f'    source {self.server_config.modules_init};\\')
+        if self.server_config.modulepath is not None:
+            f.append(f'    export MODULEPATH={self.server_config.modulepath};\\')
+        if self.server_config.modules is not None:
+            f.append(f'    module load {" ".join(module for module in self.server_config.modules)};\\')
         if self.hotstart is not None:
             f.extend([
-                f'    pushd {self.hotstart.path.parent};\\',
+                f'    pushd {self._relpath if hasattr(self, "_relpath") else self.hotstart.path.parent.resolve()};\\',
                 f'    {self.hotstart.binary} -i {self.hotstart.iteration};\\',
                 '    popd;\\',
-                f'    mv {self.hotstart.path} ./hotstart.nc;\\',
+                f'    mv {self._relpath / self.hotstart.path.name if hasattr(self, "_relpath") else self.hotstart.path.resolve()} ./hotstart.nc;\\',
             ])
 
         return '\n'.join([line.replace("    ", "\t") for line in f]) + r"""
@@ -96,6 +101,13 @@ default: symlinks
     kill "$${tail_pid}";\
     exit $${err_code}
 """
+
+    def write(self, path: Union[str, os.PathLike], overwrite: bool = False):
+        if self.hotstart is not None:
+            self._relpath = pathlib.Path(os.path.relpath(self.hotstart.path.parent, path.parent))
+        super().write(path, overwrite)
+        if hasattr(self, '_relpath'):
+            del self._relpath
 
 
 class SlurmMakefile(Makefile):

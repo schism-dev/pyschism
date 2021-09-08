@@ -1,37 +1,23 @@
 import argparse
 from datetime import timedelta
 from enum import Enum
-
-# import json
 import logging
-
-# import os
 import pathlib
+from pyschism.server.slurm import SlurmConfig
 
-# import shutil
-
-# import geopandas as gpd
 from psutil import cpu_count
 
 from pyschism import dates
-from pyschism.driver import ModelConfig
-
-# from pyschism.enums import ForecastProduct
-# from pyschism.forcing.nws import NWS2, GFS, HRRR
-# from pyschism.forcing.source_sink import NWM
-# from pyschism.forcing.bctides import Tides
 from pyschism.cmd import common
-from pyschism.forcing.bctides import Bctides
+from pyschism.driver import ModelConfig
 from pyschism.mesh import gridgr3, prop
-
-# from pyschism.mesh.fgrid import Fgrid, ManningsN, DragCoefficient
 from pyschism.param.schout import SurfaceOutputVars
+from pyschism.server import ServerConfig, SlurmConfig
 
 logger = logging.getLogger(__name__)
 
 CONFIG_FILE_NAME = "config.json"
 STATIC_DIRECTORY = "static"
-FORECAST_DIRECTORY = "forecast"
 
 
 class GridGr3Type(Enum):
@@ -83,112 +69,93 @@ class ForecastCli(metaclass=ForecastCliMeta):
     def __init__(self, args: argparse.Namespace):
         self.start_date = dates.nearest_cycle()
         self.args = args
-
         if self.args.skip_run is True:
             if self.coldstart is not None:
                 if self.args.spinup_days is not None:
                     self.coldstart.write(
                         self.coldstart_directory,
                         overwrite=self.args.overwrite,
-
                     )
                 else:
                     self.coldstart.write(
-                        self.hotstart_directory,
-                        overwrite=self.args.overwrite
-
+                        self.hotstart_directory, overwrite=self.args.overwrite
                     )
+
         else:
             if self.coldstart is not None:
                 if self.args.spinup_days is not None:
                     self.coldstart.run(
-                        self.coldstart_directory,
-                        overwrite=self.args.overwrite
+                        self.coldstart_directory, overwrite=self.args.overwrite
                     )
                 else:
                     self.coldstart.run(
-                        self.hotstart_directory,
-                        overwrite=self.args.overwrite
+                        self.hotstart_directory, overwrite=self.args.overwrite
                     )
 
-        #         hotstart.write(self.hotstart_directory,
-        #                        overwrite=self.args.overwrite)
-
-    #         hotstart.run(self.hotstart_directory,
-    #                      overwrite=self.args.overwrite)
-
-    # def load_user_arguments(self):
-    #     raise NotImplementedError
-
-    # def get_drivers(self):
-    #     return self.get_coldstart(), self.get_hotstart()
+        if self.args.skip_run is True:
+            self.hotstart.write(self.hotstart_directory, overwrite=self.args.overwrite)
+        else:
+            self.hotstart.run(self.hotstart_directory, overwrite=self.args.overwrite)
 
     @property
     def coldstart(self):
-        if self.args.vgrid.is2D() is True:
-            if self.args.spinup_days is not None:
-                return self.config.coldstart(
-                    timestep=self.args.timestep,
-                    start_date=self.start_date - self.args.spinup_days,
-                    end_date=self.start_date,
-                    dramp=self.args.spinup_days,
-                    drampbc=self.args.spinup_days,
-                    dramp_ss=self.args.spinup_days,
-                    drampwafo=self.args.spinup_days,
-                    drampwind=self.args.spinup_days,
-                    elev_ic=self.args.elev_ic,
-                    temp_ic=self.args.temp_ic,
-                    salt_ic=self.args.salt_ic,
-                    nspool=None,
-                    ihfskip=None,
-                    nhot_write=None,
-                    stations=None,
-                    server_config=None,
-                    param_template=self.args.use_param_template,
-                    # **self.user_requested_surface_outputs,
-                )
-            else:
-                return self.config.coldstart(
-                    timestep=self.args.timestep,
-                    start_date=self.start_date,
-                    end_date=self.args.run_days,
-                    elev_ic=self.args.elev_ic,
-                    temp_ic=self.args.temp_ic,
-                    salt_ic=self.args.salt_ic,
-                    nspool=None,
-                    ihfskip=None,
-                    nhot_write=None,
-                    stations=None,
-                    server_config=None,
-                    param_template=self.args.use_param_template,
-                    # **self.user_requested_surface_outputs, 
-                )
+        if not hasattr(self, "_coldstart"):
+            if self.args.vgrid.is2D() is True:
+                if self.args.spinup_days is not None:
+                    self._coldstart = self.config.coldstart(
+                        timestep=self.args.timestep,
+                        start_date=self.start_date - self.args.spinup_days,
+                        end_date=self.start_date,
+                        dramp=self.args.spinup_days,
+                        drampbc=self.args.spinup_days,
+                        dramp_ss=self.args.spinup_days,
+                        drampwafo=self.args.spinup_days,
+                        drampwind=self.args.spinup_days,
+                        elev_ic=self.args.elev_ic,
+                        temp_ic=self.args.temp_ic,
+                        salt_ic=self.args.salt_ic,
+                        nspool=None,
+                        ihfskip=None,
+                        nhot_write=None,
+                        stations=None,
+                        server_config=self.server_config,
+                        param_template=self.args.use_param_template,
+                        # **self.user_requested_surface_outputs,
+                    )
+                else:
+                    self._coldstart = self.config.coldstart(
+                        timestep=self.args.timestep,
+                        start_date=self.start_date,
+                        end_date=self.args.run_days,
+                        elev_ic=self.args.elev_ic,
+                        temp_ic=self.args.temp_ic,
+                        salt_ic=self.args.salt_ic,
+                        nspool=None,
+                        ihfskip=None,
+                        nhot_write=None,
+                        stations=None,
+                        server_config=self.server_config,
+                        param_template=self.args.use_param_template,
+                        # **self.user_requested_surface_outputs,
+                    )
 
-        else:
-            raise NotImplementedError("Model is 3D.")
+            else:
+                raise NotImplementedError("Model is 3D.")
+        return self._coldstart
 
     @property
     def hotstart(self):
-
-        raise NotImplementedError("hotstart")
-
-        def get_surface_outputs():
-            surface_outputs = {}
-            outvars = []
-            for vardata in self.surface_output_vars.values():
-                for varname, _ in vardata:
-                    outvars.append(varname)
-            for key, val in self.args.__dict__.items():
-                if key in outvars and val is True:
-                    surface_outputs[key] = val
-            return surface_outputs
-
         return self.config.hotstart(
-            self.get_hotstart_driver(),
+            self.coldstart,
             timestep=self.args.timestep,
-            end_date=timedelta(days=2) - timedelta(hours=2),
-            nspool=self.args.nspool,
-            **get_surface_outputs(),
+            end_date=self.args.run_days,
+            nspool=None,
+            ihfskip=None,
+            nhot_write=None,
+            stations=None,
+            server_config=self.server_config,
+            param_template=self.args.use_param_template,
+            # **self.user_requested_surface_outputs,
         )
 
     @property
@@ -214,17 +181,9 @@ class ForecastCli(metaclass=ForecastCliMeta):
             )
         return self._config
 
-
-    # @property
-    # def static_directory(self):
-    #     if not hasattr(self, '_static_directory'):
-    #         self._static_directory = self.project_directory / STATIC_DIRECTORY
-    #         self._static_directory.mkdir(exist_ok=self.args.overwrite)
-    #     return self._static_directory
-
     @property
     def forecasts_directory(self):
-        return self.args.project_directory / FORECAST_DIRECTORY
+        return self.args.project_directory / "runs"
 
     @property
     def coldstart_directory(self):
@@ -239,163 +198,40 @@ class ForecastCli(metaclass=ForecastCliMeta):
             self._hotstart_directory.mkdir(exist_ok=True)
         return self._hotstart_directory
 
-    # @property
-    # def hgrid_path(self):
-    #     if not hasattr(self, '_hgrid_path'):
-    #         hgrid_path = self.static_directory / 'hgrid.gr3'
-    #         if not hgrid_path.exists() or self.args.overwrite is True:
-    #             logger.info(
-    #                 f'Copying hgrid file from {self.args.hgrid} to '
-    #                 f'{hgrid_path}.'
-    #                 )
-    #             if self.args.overwrite is True:
-    #                 if hgrid_path.is_file():
-    #                     os.remove(hgrid_path)
-    #             shutil.copy2(self.args.hgrid, hgrid_path,
-    #                          follow_symlinks=True)
-    #         self._hgrid_path = hgrid_path
-    #     return self._hgrid_path
-
-    # @property
-    # def vgrid_path(self):
-    #     if not hasattr(self, '_vgrid_path'):
-    #         vgrid_path = self.static_directory / 'vgrid.in'
-    #         if not vgrid_path.exists() or self.args.overwrite is True:
-    #             if self.args.vgrid_bin is not None:
-    #                 logger.info(
-    #                     f'Calling vgrid binary from {self.args.vgrid_bin}.')
-    #                 Vgrid.from_binary(
-    #                     self.hgrid,
-    #                     binary=self.args.vgrid_bin
-    #                 ).write(
-    #                     vgrid_path,
-    #                     overwrite=self.args.overwrite
-    #                 )
-    #             else:
-    #                 if self.args.vgrid is None:
-    #                     logger.info(
-    #                         f'Writing default vgrid file to {vgrid_path}.')
-    #                     Vgrid.default().write(
-    #                         vgrid_path,
-    #                         overwrite=self.args.overwrite)
-    #                 else:
-    #                     logger.info(
-    #                         f'Copying vgrid file from {self.args.vgrid} to '
-    #                         f'path {vgrid_path}.')
-    #                     if self.args.overwrite is True:
-    #                         if vgrid_path.is_file():
-    #                             os.remove(vgrid_path)
-    #                     shutil.copy2(self.args.vgrid, vgrid_path,
-    #                                  follow_symlinks=True)
-    #         self._vgrid_path = vgrid_path
-    #     return self._vgrid_path
-
-    # @property
-    # def fgrid_path(self):
-    #     if not hasattr(self, '_fgrid_path'):
-
-    #         # user did not specify an fgrid
-    #         if self.args.fgrid is None:
-
-    #             if self.vgrid.is2D():
-    #                 fgrid_path = self.static_directory / 'manning.gr3'
-    #                 logger.info(
-    #                     'Initializing default mannings file for 2D model to '
-    #                     f'{fgrid_path}.')
-    #                 ManningsN.linear_with_depth(
-    #                     self.hgrid).write(fgrid_path,
-    #                                       overwrite=self.args.overwrite)
-    #             else:
-    #                 fgrid_path = self.static_directory / 'drag.gr3'
-    #                 logger.info(
-    #                     'Initializing default drag file for 3D model to '
-    #                     f'{fgrid_path}')
-    #                 DragCoefficient.linear_with_depth(
-    #                     self.hgrid).write(fgrid_path,
-    #                                       overwrite=self.args.overwrite)
-
-    #         else:
-    #             # user can override fgrid_type for files with arbitrary names
-    #             # auto means that we derive the type of fgrid from the filename
-    #             if self.args.fgrid_type == 'auto':
-    #                 # just opens the Fgrid to make sure it's valid
-    #                 fgrid = Fgrid.open(
-    #                     self.args.fgrid,
-    #                     crs=self.args.fgrid_crs
-    #                 )
-    #                 fgrid_path = self.static_directory / fgrid.name
-    #                 if len(fgrid.nodes) != len(self.hgrid.nodes):
-    #                     raise Exception(
-    #                         'Nodes array mismatch between fgrid '
-    #                         f'{self.args.fgrid} and hgrid {self.args.hgrid}.')
-
-    #                 if len(fgrid.elements) != len(self.hgrid.elements):
-    #                     raise Exception(
-    #                         'Elements array mismatch between fgrid '
-    #                         f'{self.args.fgrid} and hgrid {self.args.hgrid}.')
-
-    #             # user specified an fgrid_type
-    #             else:
-    #                 fgrid_path = self.static_directory / \
-    #                     (self.args.fgrid_type + '.gr3')
-
-    #             if self.args.overwrite is True:
-    #                 if fgrid_path.is_file():
-    #                     os.remove(fgrid_path)
-
-    #             logger.info(
-    #                 f'Copying friction file {self.args.fgrid} to '
-    #                 f'{fgrid_path}.')
-
-    #             shutil.copy2(self.args.fgrid, fgrid_path,
-    #                          follow_symlinks=True)
-
-    #         self._fgrid_path = fgrid_path
-    #     return self._fgrid_path
-
-    # @property
-    # def hgrid(self):
-    #     if not hasattr(self, '_hgrid'):
-    #         self._hgrid = Hgrid.open(self.hgrid_path, crs=self.args.hgrid_crs)
-    #     return self._hgrid
-
-    # @property
-    # def vgrid(self):
-    #     if not hasattr(self, '_vgrid'):
-    #         self._vgrid = Vgrid.open(self.vgrid_path)
-    #     return self._vgrid
-
-    # @property
-    # def fgrid(self):
-    #     if not hasattr(self, '_fgrid'):
-    #         self._fgrid = Fgrid.open(self.fgrid_path, crs=self.args.fgrid_crs)
-    #     return self._fgrid
-
-    # @property
-    # def fluxflag(self):
-    #     if not hasattr(self, '_fluxflag'):
-    #         if self.args.fluxflag is None:
-    #             if self.vgrid.is3D() is True:
-    #                 fluxflag = prop.Fluxflag.default(self.hgrid)
-    #             else:
-    #                 fluxflag = None
-    #         else:
-    #             fluxflag = self.args.fluxflag
-    #         self._fluxflag = fluxflag
-    #     return self._fluxflag
-
-    # @property
-    # def tvdflag(self):
-    #     if not hasattr(self, '_tvdflag'):
-    #         if self.args.tvdflag is None:
-    #             if self.vgrid.is3D() is True:
-    #                 tvdflag = prop.Tvdflag.default(self.hgrid)
-    #             else:
-    #                 tvdflag = None
-    #         else:
-    #             tvdflag = self.args.tvdflag
-    #         self._tvdflag = tvdflag
-    #     return self._tvdflag
+    @property
+    def server_config(self):
+        if not hasattr(self, "_server_config"):
+            if self.args.workload_manager is None:
+                self._server_config = ServerConfig(
+                    nproc=None,
+                    # symlink_outputs: str = None,
+                    schism_binary=self.args.schism_binary,
+                    mpi_launcher=None,
+                    modules=self.args.modules,
+                    modulepath=self.args.modulepath,
+                    modules_init=self.args.modules_init,
+                )
+            elif self.args.workload_manager == "slurm":
+                self._server_config = SlurmConfig(
+                    account=None,
+                    ntasks=None,
+                    partition=None,
+                    walltime=None,
+                    filename=None,
+                    run_directory=None,
+                    run_name=None,
+                    mail_type=None,
+                    mail_user=None,
+                    log_filename=None,
+                    modules=None,
+                    schism_binary=self.args.schism_binary,
+                    extra_commands=None,
+                    launcher=None,
+                    nodes=None,
+                    symlink_outputs=None,
+                    mpi_launcher=None,
+                )
+        return self._server_config
 
     @staticmethod
     def add_subparser_action(subparsers):
@@ -466,6 +302,9 @@ def add_forecast_init_to_parser(parser):
     common.add_ic_to_parser(parser)
     common.add_prop_to_parser(parser)
     common.add_ibctype_to_parser(parser)
+    common.add_tidal_constituents_to_parser(parser)
+    common.add_tidal_database_to_parser(parser)
+    common.add_baroclinic_database_to_parser(parser)
     common.add_bctides_options_to_parser(parser)
     common.add_nws_to_parser(parser)
     common.add_source_sink_to_parser(parser)
@@ -473,6 +312,9 @@ def add_forecast_init_to_parser(parser):
     common.add_surface_outputs_to_parser(parser)
     common.add_stations_outputs_to_parser(parser)
     common.add_log_level_to_parser(parser)
+    common.add_schism_binary_to_parser(parser)
+    common.add_modules_to_parser(parser)
+    common.add_workload_manager_options_to_parser(parser)
     parser.add_argument(
         "--overwrite", action="store_true", help="Allow overwrite of output directory."
     )
@@ -485,38 +327,6 @@ def add_forecast_update_to_parser(parser):
 
 
 # ------ drafts ----------
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 #     init.add_argument('hgrid', help='Horizontal grid file.')

@@ -16,17 +16,17 @@ def init_logger():
     tmp_args, _ = tmp_parser.parse_known_args()
     if tmp_args.log_level is not None:
         logging.basicConfig(
-            level={
+            format="[%(asctime)s] %(name)s %(levelname)s: %(message)s",
+            force=True,
+        )
+
+        logging.getLogger("pyschism").setLevel({
                 "warning": logging.WARNING,
                 "info": logging.INFO,
                 "debug": logging.DEBUG,
                 "critical": logging.CRITICAL,
                 "notset": logging.NOTSET,
-            }[tmp_args.log_level],
-            format="[%(asctime)s] %(name)s %(levelname)s: %(message)s",
-            force=True,
-        )
-
+            }[tmp_args.log_level])
         logging.Formatter.converter = lambda *args: datetime.now(
             tz=timezone("UTC")
         ).timetuple()

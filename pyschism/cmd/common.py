@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from enum import Enum
 import json
 import logging
+import pathlib
 import sys
 from time import time
 
@@ -1571,3 +1572,127 @@ def add_vmin_to_parser(parser):
 
 def add_vmax_to_parser(parser):
     parser.add_argument("--vmax", type=float)
+
+
+def add_schism_binary_to_parser(parser):
+    parser.add_argument("--schism-binary", default="pschism_TVD-VL")
+
+
+def add_modules_to_parser(parser):
+    parser.add_argument("--modules-init")
+    parser.add_argument("--modulepath")
+    parser.add_argument("--module", action="append", dest="modules")
+
+
+def add_slurm_to_parser(parser):
+    parser.add_argument("--account")
+    parser.add_argument("--partition")
+    parser.add_argument("--walltime", type=float, help="In hours, float.")
+    parser.add_argument("--slurm-filename")
+    parser.add_argument("--slurm-rundir")
+    parser.add_argument("--run-name")
+    parser.add_argument("--mail-type")
+    parser.add_argument("--mail-user")
+    parser.add_argument("--log-filename")
+    parser.add_argument("--path-prefix")
+    parser.add_argument("--slurm-nodes")
+    parser.add_argument("--slurm-launcher", default="srun")
+    parser.add_argument("--extra-commands", action="append")
+
+
+def add_workload_manager_options_to_parser(parser):
+    wlm = parser.add_subparsers(dest="workload_manager")
+    add_slurm_to_parser(wlm.add_parser("slurm"))
+
+    # --- Parser design #1
+    # class WorkloadManagerAction(argparse.Action):
+
+    #     def __call__(self, parser, namespace, values, option_string=None):
+    #         setattr(namespace, self.dest, values[2:])
+    # options = parser.add_argument_group('Workload manager options')
+    # manager = options.add_mutually_exclusive_group()
+    # manager.add_argument(
+    #     '--torque',
+    #     '--pbs',
+    #     action=WorkloadManagerAction,
+    #     dest='workload_manager',
+    #     nargs=0,
+    # )
+    # manager.add_argument(
+    #     '--slurm',
+    #     action=WorkloadManagerAction,
+    #     dest='workload_manager',
+    #     nargs=0,
+    # )
+
+    # options.add_argument('--account')
+    # options.add_argument('--partition')
+    # options.add_argument('--walltime', type=float, help="In hours, float.")
+    # options.add_argument('--filename')
+
+    # --- Parser design # 2: Using subparsers
+    # options = parser.add_argument_group('Workload manager options')
+    # add_torque_to_parser(wlm.add_parser("torque"))
+    # add_pbs_to_parser(wlm.add_parser("pbs"))
+
+    # torque = wlm.add_parser("torque")
+
+    # server_config = init.add_subparsers(dest="server_config")
+    # slurm = server_config.add_parser(
+    #     'slurm', help="Add options for slurm run configuration.")
+    # # slurm.add_argument('--account')
+    # # slurm.add_argument('--partition')
+    # # slurm.add_argument('--walltime', type=float, help="In hours, float.")
+    # # slurm.add_argument('--slurm-filename')
+    # # slurm.add_argument('--slurm-rundir')
+    # # slurm.add_argument('--run-name')
+    # # slurm.add_argument('--mail-type')
+    # # slurm.add_argument('--mail-user')
+    # # slurm.add_argument('--log-filename')
+    # slurm.add_argument('--path-prefix')
+    # # slurm.add_argument('--slurm-nodes')
+    # # slurm.add_argument('--slurm-launcher', default='srun')
+    # # slurm.add_argument('--extra-commands', action='append')
+
+    # # add server options
+    # parser.add_argument('--hostname')
+    # parser.add_argument('--port', type=int)
+    # parser.add_argument('--wdir', required=True if '--hostname' in sys.argv else False)
+    # parser.add_argument('--keep-wdir', action='store_true')
+    # parser.add_argument('--binaries-path', '--binaries-prefix', dest='binaries_prefix')
+    # parser.add_argument('--source-script')
+    # parser.add_argument('--additional-mpi-options')
+
+    # # make nproc required when using ssh
+    # # args = parser.parse_known_args()[0]
+    # if '--hostname' in sys.argv:
+    #     parser.add_argument('--nproc', '--ncpu', type=int, required=True)
+    # else:
+    #     parser.add_argument('--nproc', '--ncpu', type=int, default=-1)
+
+    # # add resource manager option
+    # manager = parser.add_mutually_exclusive_group()
+    # manager.add_argument('--use-torque', action='store_true')
+    # manager.add_argument('--use-pbs', action='store_true')
+    # manager.add_argument('--use-slurm', action='store_true')
+
+    # # flag some options as required when a resource manager is enabled
+    # _required = '--use-torque' in sys.argv
+    # _required = _required | ('--use-pbs' in sys.argv)
+    # _required = _required | ('--use-slurm' in sys.argv)
+
+    # # resource manager specific options
+    # # parser.add_argument('--account', required=_required)
+    # parser.add_argument('--slurm-ntasks', required=_required, type=int)
+    # # parser.add_argument('--walltime', required=_required, type=float)
+    # # parser.add_argument('--partition')
+    # # parser.add_argument('--slurm-filename')
+    # # parser.add_argument('--slurm-rundir')
+    # # parser.add_argument('--run-name')
+    # # parser.add_argument('--mail-type')
+    # # parser.add_argument('--mail-user')
+    # # parser.add_argument('--log-filename')
+    # # parser.add_argument('--slurm-nodes')
+    # # parser.add_argument('--slurm-launcher', default='srun')
+    # # parser.add_argument('--extra-commands', action='append')
+    # # parser.add_argument('--module', default=list(), action='append', dest='modules')
