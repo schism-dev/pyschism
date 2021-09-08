@@ -270,7 +270,7 @@ class Elements:
                     f"+proj=aeqd +R=6371000 +units=m " f"+lat_0={row.geometry.centroid.y} +lon_0={row.geometry.centroid.x}"
                 )
                 current_to_aeqd = Transformer.from_crs(self.nodes.crs, aeqd, always_xy=True).transform
-                elements.append(ops.transform(current_to_aeqd))
+                elements.append(ops.transform(current_to_aeqd, row.geometry))
             return [element.area for element in elements]
         else:
             return [row.geometry.area for row in self.gdf.itertuples()]
