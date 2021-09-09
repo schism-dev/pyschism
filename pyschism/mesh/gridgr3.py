@@ -43,6 +43,33 @@ class Gr3Field(Gr3):
         picks = [i.index for i in gdf_in.itertuples()]
         self.values[picks] = value
 
+    def modify_by_region(self, hgrid, fname, value, depth1, flag):
+        '''
+        reset (flag==0) or add (flag==1) value to a region
+        '''
+        lines=[line.strip().split() for line in open(fname, 'r').readlines()]
+        data=np.squeeze(np.array([lines[3:]])).astype('float')
+        x=data[:,0]
+        y=data[:,1]
+        coords = list( zip(x, y))
+        poly = Polygon(coords)
+
+        #region is in cpp projection 
+        gdf1 = gpd.GeoDataFrame(
+                {'geometry': [poly]})
+
+        points = [Point(*coord) for coord in self.coords]
+        gdf2 = gpd.GeoDataFrame(
+                 {'geometry': points, 'index': list(range(len(points)))})
+        gdf_in = gpd.sjoin(gdf2, gdf1, op="within")
+        picks = [i.index for i in gdf_in.itertuples()]
+        if flag == 0:
+            self.values[picks] = value
+        else:
+            picks2 = np.where(-hgrid.values > depth1)
+            picks3 = np.intersect1d(picks, picks2)
+            self.values[picks3] = self.values[picks3] + value
+
 
 class Albedo(Gr3Field):
     @classmethod
@@ -80,7 +107,7 @@ class Shapiro(Gr3Field):
         subprocess.check_call(["gen_slope_filter"], cwd=tmpdir)
         #outdir = pathlib.Path(outdir)
         #shutil.copy2(tmpdir / 'slope_filter.gr3', outdir / 'shapiro.gr3')
-        obj = cls.open(tmpdir / "slope_filter.gr3")
+        obj = cls.open(tmpdir / "slope_filter.gr3", crs='epsg:4326')
         obj.description = "shapiro"
         return obj
 

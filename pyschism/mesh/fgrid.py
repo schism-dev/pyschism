@@ -70,7 +70,7 @@ class Fgrid(Gr3):
             self,
             region: Union[Polygon, MultiPolygon],
             value
-    ):
+     ):
         # Assuming input polygons are in EPSG:4326
         if isinstance(region, Polygon):
             region = [region]
@@ -79,12 +79,41 @@ class Fgrid(Gr3):
 
         points = [Point(*coord) for coord in self.coords]
         gdf2 = gpd.GeoDataFrame(
-                {'geometry': points, 'index': list(range(len(points)))},
+                 {'geometry': points, 'index': list(range(len(points)))},
                 crs=self.crs)
         gdf_in = gpd.sjoin(gdf2, gdf1, op="within")
         picks = ([i.index for i in gdf_in.itertuples()])
         self.values[picks] = value
 
+    def modify_by_region(self, hgrid, fname, value, depth1, flag):
+        '''
+        reset (flag==0) or add (flag==1) value to a region
+        '''
+        lines=[line.strip().split() for line in open(fname, 'r').readlines()]
+        data=np.squeeze(np.array([lines[3:]])).astype('float')
+        x=data[:,0]
+        y=data[:,1]
+        coords = list( zip(x, y))
+        poly = Polygon(coords)
+
+        # Assuming input polygons are in EPSG:4326
+        #if isinstance(region, Polygon):
+        #    region = [region]
+        gdf1 = gpd.GeoDataFrame(
+                {'geometry': [poly]}, crs=self.crs)
+
+        points = [Point(*coord) for coord in self.coords]
+        gdf2 = gpd.GeoDataFrame(
+                 {'geometry': points, 'index': list(range(len(points)))},
+                crs=self.crs)
+        gdf_in = gpd.sjoin(gdf2, gdf1, op="within")
+        picks = [i.index for i in gdf_in.itertuples()]
+        if flag == 0:
+            self.values[picks] = value
+        else:
+            picks2 = np.where(-hgrid.values > depth1)
+            picks3 = np.intersect1d(picks, picks2)
+            self.values[picks3] = self.values[picks3] + value
 
 class ManningsN(Fgrid):
     """  Class for representing Manning's n values.  """
