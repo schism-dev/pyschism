@@ -359,6 +359,7 @@ def add_iettype_to_parser(parser):
                 if namespace.vgrid.is2D() is True:
                     raise NotImplementedError("--iettype-5 not available for 2D model.")
                 tmp_parser = argparse.ArgumentParser(add_help=False)
+                add_tidal_constituents_to_parser(tmp_parser)
                 add_tidal_database_to_parser(tmp_parser)
                 add_baroclinic_database_to_parser(tmp_parser)
                 tmp_args = tmp_parser.parse_known_args()[0]
@@ -487,6 +488,7 @@ def add_ifltype_to_parser(parser):
                 if namespace.vgrid.is2D() is True:
                     raise NotImplementedError("--ifltype-5 not available for 2D model.")
                 tmp_parser = argparse.ArgumentParser(add_help=False)
+                add_tidal_constituents_to_parser(tmp_parser)
                 add_tidal_database_to_parser(tmp_parser)
                 add_baroclinic_database_to_parser(tmp_parser)
                 tmp_args = tmp_parser.parse_known_args()[0]
