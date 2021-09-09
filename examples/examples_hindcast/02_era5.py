@@ -2,7 +2,7 @@ from datetime import datetime
 from time import time
 import pathlib
 
-from pyschism.forcing.atmosphere.era5 import ERA5
+from pyschism.forcing.nws.nws2.era5 import ERA5
 
 from pyschism.mesh.hgrid import Hgrid
 
@@ -14,5 +14,5 @@ bbox = hgrid.get_bbox('EPSG:4326', output_type='bbox')
 
 er=ERA5()
 outdir = pathlib.Path('./ERA5')
-er.gen_sflux(startdate, rnday=10, bbox=bbox, outdir=outdir)
+er.write(outdir=outdir, start_date=startdate, rnday=10, air=True, rad=True, prc=True, bbox=bbox, overwrite=True)
 print(f'It took {(time()-t0)/60} minutes to generate 10 days')
