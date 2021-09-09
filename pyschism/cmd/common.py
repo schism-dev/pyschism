@@ -3,7 +3,6 @@ from datetime import datetime, timedelta
 from enum import Enum
 import json
 import logging
-import pathlib
 import sys
 from time import time
 
@@ -13,6 +12,7 @@ from pyschism import dates
 from pyschism.enums import Stratification, Sflux1Types, Sflux2Types
 from pyschism.mesh import Hgrid, Vgrid, gridgr3
 from pyschism.forcing import nws, bctides, hycom, source_sink
+from pyschism.utils.timedeltatype import TimeDeltaType
 
 
 logger = logging.getLogger(__name__)
@@ -363,7 +363,9 @@ def add_iettype_to_parser(parser):
                 add_tidal_database_to_parser(tmp_parser)
                 add_baroclinic_database_to_parser(tmp_parser)
                 tmp_args = tmp_parser.parse_known_args()[0]
-                iettype3 = bctides.iettype.Iettype3(constituents=tmp_args.constituents, database=tmp_args.tidal_database)
+                iettype3 = bctides.iettype.Iettype3(
+                    constituents=tmp_args.constituents, database=tmp_args.tidal_database
+                )
                 iettype4 = bctides.iettype.Iettype4(
                     data_source=tmp_args.baroclinic_database
                 )
@@ -492,7 +494,9 @@ def add_ifltype_to_parser(parser):
                 add_tidal_database_to_parser(tmp_parser)
                 add_baroclinic_database_to_parser(tmp_parser)
                 tmp_args = tmp_parser.parse_known_args()[0]
-                ifltype3 = bctides.ifltype.Ifltype3(constituents=tmp_args.constituents, database=tmp_args.tidal_database)
+                ifltype3 = bctides.ifltype.Ifltype3(
+                    constituents=tmp_args.constituents, database=tmp_args.tidal_database
+                )
                 ifltype4 = bctides.ifltype.Ifltype4(
                     data_source=tmp_args.baroclinic_database
                 )
@@ -1589,16 +1593,21 @@ def add_modules_to_parser(parser):
 def add_slurm_to_parser(parser):
     parser.add_argument("--account")
     parser.add_argument("--partition")
-    parser.add_argument("--walltime", type=float, help="In hours, float.")
-    parser.add_argument("--slurm-filename")
-    parser.add_argument("--slurm-rundir")
+    parser.add_argument(
+        "--walltime",
+        type=lambda x: TimeDeltaType()(x),  #   help="In hours, float."
+    )
+    parser.add_argument("--ntasks", required=True, type=int)
+    parser.add_argument("--filename")
+    parser.add_argument("--rundir")
     parser.add_argument("--run-name")
     parser.add_argument("--mail-type")
     parser.add_argument("--mail-user")
     parser.add_argument("--log-filename")
-    parser.add_argument("--path-prefix")
-    parser.add_argument("--slurm-nodes")
-    parser.add_argument("--slurm-launcher", default="srun")
+    parser.add_argument("--path-prepend")
+    parser.add_argument("--ld_library_path-prepend")
+    parser.add_argument("--nodes")
+    parser.add_argument("--launcher", default="srun")
     parser.add_argument("--extra-commands", action="append")
 
 

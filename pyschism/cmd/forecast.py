@@ -213,11 +213,11 @@ class ForecastCli(metaclass=ForecastCliMeta):
                 )
             elif self.args.workload_manager == "slurm":
                 self._server_config = SlurmConfig(
-                    account=None,
-                    ntasks=None,
-                    partition=None,
-                    walltime=None,
-                    filename=None,
+                    account=self.args.account,
+                    ntasks=self.args.ntasks,
+                    partition=self.args.partition,
+                    walltime=self.args.walltime,
+                    filename=self.args.filename,
                     run_directory=None,
                     run_name=None,
                     mail_type=None,
@@ -228,7 +228,7 @@ class ForecastCli(metaclass=ForecastCliMeta):
                     modules_init=self.args.modules_init,
                     schism_binary=self.args.schism_binary,
                     extra_commands=None,
-                    launcher=self.args.slurm_launcher,
+                    launcher=self.args.launcher,
                     nodes=None,
                     # symlink_outputs=None,
                 )
