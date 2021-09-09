@@ -116,6 +116,7 @@ setuptools.setup(
         'tqdm',
         'tqdm-logging-wrapper',
         'xmltodict',
+        'cdsapi',
         # 'dask_geopandas @ git+git://github.com/geopandas/dask-geopandas.git@master',
     ],
     entry_points={'console_scripts': ['pyschism = pyschism.__main__:main']},

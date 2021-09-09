@@ -19,8 +19,12 @@ class Makefile(ABC):
         if path.exists() and overwrite is not True:
             raise IOError(
                 f"File {str(path)} exists and overwrite is not True.")
+        if self.hotstart is not None:
+            self._relpath = pathlib.Path(os.path.relpath(self.hotstart.path.parent, path.parent))
         with open(path, 'w') as f:
             f.write(str(self))
+        if hasattr(self, '_relpath'):
+            del self._relpath
 
     @property
     @abstractmethod
@@ -102,13 +106,6 @@ class DefaultMakefile(Makefile):
     exit $${err_code}
 """
 
-    def write(self, path: Union[str, os.PathLike], overwrite: bool = False):
-        if self.hotstart is not None:
-            self._relpath = pathlib.Path(os.path.relpath(self.hotstart.path.parent, path.parent))
-        super().write(path, overwrite)
-        if hasattr(self, '_relpath'):
-            del self._relpath
-
 
 class SlurmMakefile(Makefile):
 
@@ -118,8 +115,10 @@ class SlurmMakefile(Makefile):
             r"MAKEFILE_PATH:=$(abspath $(lastword $(MAKEFILE_LIST)))",
             r"ROOT_DIR:=$(dir $(MAKEFILE_PATH))",
             str(self.server_config),
+            '',
             self.default,
-            self.symlinks,
+            '',
+            # self.symlinks,
             self.slurm,
             self.run,
             self.tail,
@@ -128,58 +127,76 @@ class SlurmMakefile(Makefile):
 
     @property
     def default(self):
-        return """
-default: slurm
-"""
+        return 'default: run'
 
     @property
     def slurm(self):
-        return r"""
-slurm: symlinks
-    @set -e;\
-    printf "#!/bin/bash --login\n" > ${SLURM_JOB_FILE};\
-    printf "#SBATCH -D .\n" >> ${SLURM_JOB_FILE};\
-    if [ ! -z "${SLURM_ACCOUNT}" ];\
-    then \
-        printf "#SBATCH -A ${SLURM_ACCOUNT}\n" >> ${SLURM_JOB_FILE};\
-    fi;\
-    if [ ! -z "${SLURM_MAIL_USER}" ];\
-    then \
-        printf "#SBATCH --mail-user=${SLURM_MAIL_USER}\n" >> ${SLURM_JOB_FILE};\
-        printf "#SBATCH --mail-type=${SLURM_MAIL_TYPE:-all}\n" >> ${SLURM_JOB_FILE};\
-    fi;\
-    printf "#SBATCH --output=${SLURM_LOG_FILE}\n" >> ${SLURM_JOB_FILE};\
-    printf "#SBATCH -n ${SLURM_NTASKS}\n" >> ${SLURM_JOB_FILE};\
-    if [ ! -z "${SLURM_WALLTIME}" ];\
-    then \
-        printf "#SBATCH --time=${SLURM_WALLTIME}\n" >> ${SLURM_JOB_FILE};\
-    fi;\
-    if [ ! -z "${SLURM_PARTITION}" ] ;\
-    then \
-        printf "#SBATCH --partition=${SLURM_PARTITION}\n" >> ${SLURM_JOB_FILE};\
-    fi;\
-    printf "\nset -e\n" >> ${SLURM_JOB_FILE};\
-    printf "${MPI_LAUNCHER} ${SCHISM_BINARY}" >> ${SLURM_JOB_FILE}
-"""
+        def indent(n, string):
+            return n*' ' + string
+
+        def modules():
+            f = []
+            if self.server_config.modules_init is not None:
+                f.append(indent(4, fr'printf ". {self.server_config.modules_init}\n" >> ' + '${SLURM_JOB_FILE};' + '\\'))
+            if self.server_config.modulepath is not None:
+                f.append(indent(4, fr'printf "export MODULEPATH={self.server_config.modulepath}\n" >> ' + r'${SLURM_JOB_FILE};' + '\\'))
+            if self.server_config.modules is not None:
+                f.append(indent(4, 'printf "module load ' + fr'{" ".join([module for module in self.server_config.modules])}\n" >> ' + r'${SLURM_JOB_FILE};' + '\\'))
+            return f
+
+        def hotstart():
+            f = []
+            if self.hotstart is not None:
+                return [
+                    indent(4, fr'printf "pushd {self._relpath if hasattr(self, "_relpath") else self.hotstart.path.parent.resolve()}\n" >> ' + '${SLURM_JOB_FILE};' + '\\'),
+                    indent(4, fr'printf "{self.hotstart.binary} -i {self.hotstart.iteration}\n" >>' + '${SLURM_JOB_FILE};' + '\\'),
+                    indent(4, r'printf "popd\n" >>' + '${SLURM_JOB_FILE};' + '\\'),
+                    indent(4, fr'printf "mv {self._relpath / self.hotstart.path.name if hasattr(self, "_relpath") else self.hotstart.path.resolve()} ./hotstart.nc\n" >> ' + '${SLURM_JOB_FILE};' + '\\'),
+                ]
+            return f
+
+        return '\n'.join([
+            'slurm:',
+            indent(4, '@set -e;\\'),
+            indent(4, r'printf "#!/bin/bash --login\n" > ${SLURM_JOB_FILE};' + '\\'),
+            indent(4, r'printf "#SBATCH -D .\n" >> ${SLURM_JOB_FILE};' + '\\'),
+            indent(4, r'if [ ! -z "${SLURM_ACCOUNT}" ];'+'\\'),
+            indent(4, 'then ' + '\\'),
+            indent(8, r'printf "#SBATCH -A ${SLURM_ACCOUNT}\n" >> ${SLURM_JOB_FILE};' + '\\'),
+            indent(4, r'fi;' + '\\'),
+            indent(4, r'if [ ! -z "${SLURM_MAIL_USER}" ];'+'\\'),
+            indent(4, 'then ' + '\\'),
+            indent(8, r'printf "#SBATCH --mail-user=${SLURM_MAIL_USER}\n" >> ${SLURM_JOB_FILE};' + '\\'),
+            indent(8, r'printf "#SBATCH --mail-type=${SLURM_MAIL_TYPE:-all}\n" >> ${SLURM_JOB_FILE};' + '\\'),
+            indent(4, r'fi;' + '\\'),
+            indent(4, r'printf "#SBATCH --output=${SLURM_LOG_FILE}\n" >> ${SLURM_JOB_FILE};' + '\\'),
+            indent(4, r'printf "#SBATCH -n ${SLURM_NTASKS}\n" >> ${SLURM_JOB_FILE};' + '\\'),
+            indent(4, r'if [ ! -z "${SLURM_WALLTIME}" ];'+'\\'),
+            indent(4, 'then ' + '\\'),
+            indent(8, r'printf "#SBATCH --time=${SLURM_WALLTIME}\n" >> ${SLURM_JOB_FILE};' + '\\'),
+            indent(4, r'fi;' + '\\'),
+            indent(4, r'if [ ! -z "${SLURM_PARTITION}" ];'+'\\'),
+            indent(4, 'then ' + '\\'),
+            indent(8, r'printf "#SBATCH --partition=${SLURM_PARTITION}\n" >> ${SLURM_JOB_FILE};' + '\\'),
+            indent(4, r'fi;' + '\\'),
+            indent(4, r'printf "\nset -e\n" >> ${SLURM_JOB_FILE};' + '\\'),
+            *modules(),
+            *hotstart(),
+            indent(4, r'printf "${MPI_LAUNCHER} ${SCHISM_BINARY}" >> ${SLURM_JOB_FILE}')
+        ])
 
     @property
     def run(self):
-        f1 = [
+        f = [
             '',
-            'run:',
+            'run: slurm',
             '    @set -e;\\',
         ]
 
-        if self.hotstart is not None:
-            f1.extend([
-                f'    pushd {self.hotstart.path.parent};\\',
-                f'    {self.hotstart.binary} -i {self.hotstart.iteration};\\',
-                '    popd;\\',
-                f'    mv {self.hotstart.path} ./hotstart.nc;\\',
-            ])
-
-        return '\n'.join([line.replace("    ", "\t") for line in f1]) + r"""
+        return '\n'.join([line.replace("    ", "\t") for line in f]) + r"""
     touch ${SLURM_LOG_FILE};\
+    rm -rf outputs/mirror.out outputs/fatal.error;\
+    touch outputs/mirror.out outputs/fatal.error;\
     eval 'tail -f ${SLURM_LOG_FILE} outputs/mirror.out outputs/fatal.error &';\
     tail_pid=$${!};\
     job_id=$$(sbatch ${SLURM_JOB_FILE});\

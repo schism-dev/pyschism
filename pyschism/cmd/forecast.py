@@ -223,13 +223,14 @@ class ForecastCli(metaclass=ForecastCliMeta):
                     mail_type=None,
                     mail_user=None,
                     log_filename=None,
-                    modules=None,
+                    modules=self.args.modules,
+                    modulepath=self.args.modulepath,
+                    modules_init=self.args.modules_init,
                     schism_binary=self.args.schism_binary,
                     extra_commands=None,
-                    launcher=None,
+                    launcher=self.args.slurm_launcher,
                     nodes=None,
-                    symlink_outputs=None,
-                    mpi_launcher=None,
+                    # symlink_outputs=None,
                 )
         return self._server_config
 

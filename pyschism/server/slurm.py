@@ -45,12 +45,14 @@ class SlurmConfig(ServerConfig):
             mail_user: str = None,
             log_filename: str = None,
             modules: List[str] = None,
+            modulepath=None,
+            modules_init=None,
             schism_binary: str = None,
             extra_commands: List[str] = None,
             launcher: str = None,
             nodes: int = None,
-            symlink_outputs: str = None,
-            mpi_launcher: str = None,
+            # symlink_outputs: str = None,
+            # mpi_launcher: str = None,
     ):
         """
         Instantiate a new Slurm shell script (`*.job`).
@@ -85,18 +87,20 @@ class SlurmConfig(ServerConfig):
         self.modules = modules
         self.schism_binary = schism_binary
         self.extra_commands = extra_commands
-        self.launcher = launcher
+        # self.launcher = launcher
         self.nodes = nodes
-        self.symlink_outputs = symlink_outputs
-        self.mpi_launcher = mpi_launcher
+        # self.symlink_outputs = symlink_outputs
+        self.mpi_launcher = launcher
+        self.modulepath = modulepath
+        self.modules_init = modules_init
 
     def __str__(self):
         f = [
             self.MPI_LAUNCHER,
             self.SCHISM_BINARY,
-            self.SYMLINK_OUTPUTS,
+            # self.SYMLINK_OUTPUTS,
             self.SLURM_NTASKS,
-            self.SYMLINK_OUTPUTS,
+            # self.SYMLINK_OUTPUTS,
             self.SLURM_ACCOUNT,
             self.SLURM_RUN_NAME,
             self.SLURM_PARTITION,
