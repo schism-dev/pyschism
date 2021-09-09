@@ -4,7 +4,7 @@ OVERWRITE=false
 
 init:
 	@declare -a opts=();\
-	opts+=('.');\
+	opts+=('forecast');\
 	opts+=('../hgrid.ll');\
 	opts+=(--timestep=${TIMESTEP});\
 	if [[ ${OVERWRITE} = true ]];\

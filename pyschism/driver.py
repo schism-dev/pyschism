@@ -54,7 +54,7 @@ class ModelForcings:
                 output_directory,
                 start_date=driver.param.opt.start_date,
                 end_date=driver.param.core.rnday,
-                overwrite=overwrite,
+                overwrite=True,
                 parallel_download=parallel_download,
                 progress_bar=progress_bar,
             )
