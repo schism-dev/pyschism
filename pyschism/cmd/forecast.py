@@ -203,7 +203,7 @@ class ForecastCli(metaclass=ForecastCliMeta):
         if not hasattr(self, "_server_config"):
             if self.args.workload_manager is None:
                 self._server_config = ServerConfig(
-                    nproc=None,
+                    nproc=self.args.ntasks,
                     # symlink_outputs: str = None,
                     schism_binary=self.args.schism_binary,
                     mpi_launcher=None,

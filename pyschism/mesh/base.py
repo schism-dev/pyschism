@@ -72,11 +72,15 @@ class Nodes:
         longitude = list(self.coord[:, 0]/180*np.pi)
         latitude = list(self.coord[:, 1]/180*np.pi)
         radius = 6378206.4
-        loncc = lonc/180*np.pi
-        latcc = latc/180*np.pi
-        x = [radius*(longitude[i]-loncc)*np.cos(latcc) for i in np.arange(len(longitude))]
-        y = [radius*latitude[i] for i in np.arange(len(latitude))]
-        self._coords=np.vstack([x, y]).T
+        loncc = lonc / 180 * np.pi
+        latcc = latc / 180 * np.pi
+        x = [
+            radius * (longitude[i] - loncc) * np.cos(latcc)
+            for i in np.arange(len(longitude))
+        ]
+        y = [radius * latitude[i] for i in np.arange(len(latitude))]
+        self._coords = np.vstack([x, y]).T
+        self._crs = None
 
     def get_xy(self, crs: Union[CRS, str] = None):
         if crs is not None:
@@ -86,7 +90,6 @@ class Nodes:
                 x, y = transformer.transform(self.coord[:, 0], self.coord[:, 1])
                 return np.vstack([x, y]).T
         return self.coord
-
 
     @property
     def gdf(self):
@@ -247,20 +250,18 @@ class Elements:
         '''
         compute nodal ball information
         '''
-        elnode=self.array
-        NP=len(self.nodes.values)
-        nne=np.zeros(NP).astype('int')
-        ine=[[] for i in np.arange(NP)]
+        elnode = self.array
+        NP = len(self.nodes.values)
+        nne = np.zeros(NP).astype('int')
+        ine = [[] for i in np.arange(NP)]
         for i, element in enumerate(elnode):
-           ele=element[~element.mask]
-           i34=len(ele)
-           inds=elnode[i, :i34]
-           nne[inds]=nne[inds]+1
-           [ine[indi].append(i) for indi in inds]
-        ine=np.array([np.array(ine[i]) for i in np.arange(NP)], dtype='O') 
-        self.nne=nne
-        self.ine=ine
-        return self.nne, self.ine
+            ele = element[~element.mask]
+            i34 = len(ele)
+            inds = elnode[i, :i34]
+            nne[inds] = nne[inds]+1
+            [ine[indi].append(i) for indi in inds]
+        ine = np.array([np.array(ine[i]) for i in np.arange(NP)], dtype='O') 
+        return nne, ine
 
     def get_triangulation_mask(self, element_mask):
 
@@ -287,9 +288,12 @@ class Elements:
             elements = []
             for row in self.gdf.itertuples():
                 aeqd = CRS.from_user_input(
-                    f"+proj=aeqd +R=6371000 +units=m " f"+lat_0={row.geometry.centroid.y} +lon_0={row.geometry.centroid.x}"
+                    f"+proj=aeqd +R=6371000 +units=m "
+                    f"+lat_0={row.geometry.centroid.y} +lon_0={row.geometry.centroid.x}"
                 )
-                current_to_aeqd = Transformer.from_crs(self.nodes.crs, aeqd, always_xy=True).transform
+                current_to_aeqd = Transformer.from_crs(
+                    self.nodes.crs, aeqd, always_xy=True
+                ).transform
                 elements.append(ops.transform(current_to_aeqd, row.geometry))
             return [element.area for element in elements]
         else:
