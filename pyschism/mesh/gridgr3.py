@@ -96,16 +96,17 @@ class Watertype(Gr3Field):
 
 
 class Shapiro(Gr3Field):
+    #https://github.com/wzhengui/pylibs/blob/1ee35efaa2d52fa682113126d84846ba33318f99/Utility/schism_file.py#L265
     @classmethod
     def slope_filter(cls, hgrid, shapiro_vals1, depths, shapiro_max, threshold_slope, regions, shapiro_vals2, flags, lonc, latc):
         hgrid = hgrid.copy()
-        print(hgrid.nodes.values[:10])
+        #print(hgrid.nodes.values[:10])
         hgrid.nodes.transform_to_cpp(lonc, latc)
         xy = hgrid.nodes.coords
         x = xy[:,0]
         y = xy[:,1]
         dp = -hgrid.nodes.values
-        print(dp[:10])
+        #print(dp[:10])
 
         elnode = hgrid.elements.array
         fp = np.any(elnode.mask, axis=1)
