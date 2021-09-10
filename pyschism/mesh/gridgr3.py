@@ -97,18 +97,91 @@ class Watertype(Gr3Field):
 
 class Shapiro(Gr3Field):
     @classmethod
+    def slope_filter(cls, hgrid, shapiro_vals1, depths, shapiro_max, threshold_slope, regions, shapiro_vals2, flags, lonc, latc):
+        hgrid = hgrid.copy()
+        print(hgrid.nodes.values[:10])
+        hgrid.nodes.transform_to_cpp(lonc, latc)
+        xy = hgrid.nodes.coords
+        x = xy[:,0]
+        y = xy[:,1]
+        dp = -hgrid.nodes.values
+        print(dp[:10])
+
+        elnode = hgrid.elements.array
+        fp = np.any(elnode.mask, axis=1)
+        fpn = ~fp
+
+        x1=x[elnode[:,0]]; y1=y[elnode[:,0]]; v1=dp[elnode[:,0]]
+        x2=x[elnode[:,1]]; y2=y[elnode[:,1]]; v2=dp[elnode[:,1]]
+        x3=x[elnode[:,2]]; y3=y[elnode[:,2]]; v3=dp[elnode[:,2]]
+        x4=x[elnode[:,3]]; y4=y[elnode[:,3]]; v4=dp[elnode[:,3]]
+        x4[fp]=x1[fp]; y4[fp]=y1[fp]; v4[fp]=v1[fp]
+        a1=((x2-x1)*(y3-y1)-(x3-x1)*(y2-y1))/2
+        a2=((x3-x1)*(y4-y1)-(x4-x1)*(y3-y1))/2
+
+        #compute gradients
+        dpedx=(v1*(y2-y3)+v2*(y3-y1)+v3*(y1-y2))/(2*a1)
+        dpedy=((x3-x2)*v1+(x1-x3)*v2+(x2-x1)*v3)/(2*a1)
+        dpedxy=np.sqrt(dpedx**2+dpedy**2)
+
+        #modify quads
+        dpedx2=(v1[fpn]*(y3[fpn]-y4[fpn])+v3[fpn]*(y4[fpn]-y1[fpn])+v4[fpn]*(y1[fpn]-y3[fpn]))/(2*a2[fpn])
+        dpedy2=((x4[fpn]-x3[fpn])*v1[fpn]+(x1[fpn]-x4[fpn])*v3[fpn]+(x3[fpn]-x1[fpn])*v4[fpn])/(2*a2[fpn])
+        dpedxy2=np.sqrt(dpedx2**2+dpedy2**2)
+        
+        dpedx[fpn]=(dpedx[fpn]+dpedx2)/2
+        dpedy[fpn]=(dpedy[fpn]+dpedy2)/2
+        dpedxy[fpn]=(dpedxy[fpn]+dpedxy2)/2
+
+        #get node ball information
+        nne, ine = hgrid.elements.get_node_ball()
+         
+        #interpolate into nodes
+        dpdxy=[]
+        for inode in np.arange(len(dp)):
+            ind=ine[inode]
+            dpdxy.append(np.max(dpedxy[ind]))
+        slope=np.array(dpdxy)
+
+        shapiro=shapiro_max*np.tanh(2*slope/threshold_slope)
+
+        # further tweaks on shallow waters
+        if len(depths) != len(shapiro_vals1):
+            raise Exception(f'lengths of depths {len(depths)} and shapiro_vals1 {len(shapiro_vals1)} inconsistent')
+        fp = dp < depths[-1]
+        shapiro[fp] = np.maximum(shapiro[fp], np.interp(dp[fp], depths, shapiro_vals1))
+
+        shapiro = cls(
+            nodes={id: (xy[i, :], shapiro[i]) for i, id in enumerate(hgrid.nodes.id)},
+            elements=hgrid.elements.to_dict(),
+            crs=None,
+            description=f"shapiro threshold_slope={threshold_slope} lonc={lonc} latc={latc}",
+        )
+        #shapiro.write('shapiro_pyschism_noregion.gr3', overwrite=True)
+
+        if regions is not None:
+            for reg, value, flag in zip(regions, shapiro_vals2, flags):
+                cls.modify_by_region(shapiro, hgrid, reg, value, depths[0], flag)
+
+        return shapiro
+
+
+    @classmethod
     #def from_binary(cls, outdir: Union[str, os.PathLike], hgrid):
-    def from_binary(cls, hgrid):
+    #lonc = -77.07, latc = 24.0
+    def from_binary(cls, hgrid, lonc, latc):
         _tmpdir = tempfile.TemporaryDirectory()
         tmpdir = pathlib.Path(_tmpdir.name)
         hgrid = hgrid.copy()
-        hgrid.nodes.transform_to_cpp()
-        hgrid.write(tmpdir / "hgrid.gr3")
+        #print(hgrid.nodes.values[:10])
+        hgrid.nodes.transform_to_cpp(lonc, latc)
+        hgrid.write(tmpdir / "hgrid.gr3", overwrite=True)
+        #hgrid.write("./hgrid_xy2.gr3", overwrite=True)
         subprocess.check_call(["gen_slope_filter"], cwd=tmpdir)
         #outdir = pathlib.Path(outdir)
         #shutil.copy2(tmpdir / 'slope_filter.gr3', outdir / 'shapiro.gr3')
         obj = cls.open(tmpdir / "slope_filter.gr3", crs='epsg:4326')
-        obj.description = "shapiro"
+        obj.description = "shapiro "
         return obj
 
 

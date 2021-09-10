@@ -68,7 +68,7 @@ class Nodes:
         if hasattr(self, "_gdf"):
             del self._gdf
 
-    def transform_to_cpp(self, lonc = -77.07, latc = 24.0):
+    def transform_to_cpp(self, lonc, latc):
         longitude = list(self.coord[:, 0]/180*np.pi)
         latitude = list(self.coord[:, 1]/180*np.pi)
         radius = 6378206.4
@@ -86,6 +86,7 @@ class Nodes:
                 x, y = transformer.transform(self.coord[:, 0], self.coord[:, 1])
                 return np.vstack([x, y]).T
         return self.coord
+
 
     @property
     def gdf(self):
@@ -241,6 +242,25 @@ class Elements:
                 )
             )
         return self.gdf.loc[eidxs].geometry.unary_union.exterior
+
+    def get_node_ball(self):
+        '''
+        compute nodal ball information
+        '''
+        elnode=self.array
+        NP=len(self.nodes.values)
+        nne=np.zeros(NP).astype('int')
+        ine=[[] for i in np.arange(NP)]
+        for i, element in enumerate(elnode):
+           ele=element[~element.mask]
+           i34=len(ele)
+           inds=elnode[i, :i34]
+           nne[inds]=nne[inds]+1
+           [ine[indi].append(i) for indi in inds]
+        ine=np.array([np.array(ine[i]) for i in np.arange(NP)], dtype='O') 
+        self.nne=nne
+        self.ine=ine
+        return self.nne, self.ine
 
     def get_triangulation_mask(self, element_mask):
 

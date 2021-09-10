@@ -51,6 +51,9 @@ class Hgrid(Gr3):
             return _grd
         return _grd
 
+    def copy(self):
+        return self.__class__(**super().to_dict())
+
     @figure
     def make_plot(
         self,
