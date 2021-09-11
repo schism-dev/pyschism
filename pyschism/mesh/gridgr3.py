@@ -162,7 +162,7 @@ class Shapiro(Gr3Field):
         nne, ine = hgrid.elements.get_node_ball()
          
         # interpolate into nodes
-        dpdxy = fpn[]
+        dpdxy = []
         for inode in np.arange(len(dp)):
             ind = ine[inode]
             dpdxy.append(np.max(dpedxy[ind]))
