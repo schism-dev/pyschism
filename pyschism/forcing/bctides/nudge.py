@@ -29,8 +29,8 @@ class Nudge(Gr3Field):
                     distmin = np.finfo(np.float64).max
                     for j in opbd:
                         rl2 = np.sqrt(
-                            np.square(lon[idn] - lon[j-1])
-                            + np.square(lat[idn] - lat[j-1])
+                            np.square(lon[idn] - lon[j])
+                            + np.square(lat[idn] - lat[j])
                             )
                         if rl2 < distmin:
                             distmin = rl2
