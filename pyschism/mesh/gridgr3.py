@@ -185,7 +185,7 @@ class Shapiro(Gr3Field):
 
         if regions is not None:
             for reg, value, flag in zip(regions, shapiro_vals2, flags):
-                cls.modify_by_region(shapiro, hgrid, reg, value, depths[0], flag)
+                shapiro.modify_by_region(hgrid, reg, value, depths[0], flag)
 
         return shapiro
 
