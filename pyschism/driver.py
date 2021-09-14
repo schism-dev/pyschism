@@ -525,7 +525,7 @@ class ModelDriver:
         obj_write(windrot, self.config.windrot, "windrot_geo2proj.gr3", overwrite)
         obj_write(shapiro, self.config.shapiro, "shapiro.gr3", overwrite)
         obj_write(fluxflag, self.config.fluxflag, "fluxflag.prop", overwrite)
-        obj_write(tvdflag, self.config.tvdflag, "tvdflag.prop", overwrite)
+        obj_write(tvdflag, self.config.tvdflag, "tvd.prop", overwrite)
         obj_write(temp_ic, self.temp_ic, "temp.ic", overwrite)
         obj_write(salt_ic, self.salt_ic, "salt.ic", overwrite)
         obj_write(elev_ic, self.elev_ic, "elev.ic", overwrite)
