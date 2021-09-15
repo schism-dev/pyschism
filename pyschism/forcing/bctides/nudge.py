@@ -38,6 +38,7 @@ class Nudge(Gr3Field):
                 out[idn] = rnu
 
         out = np.zeros(bctides.hgrid.values.shape)
+        elnode = bctides.hgrid.elements.array
         xy = bctides.hgrid.get_xy(crs="epsg:4326")
         opbd = []
         for boundary in bctides.gdf.itertuples():
@@ -50,6 +51,19 @@ class Nudge(Gr3Field):
             logger.info(f"Begin compute_nudge for {self.name}.")
             start = time()
             compute_nudge(xy[:, 0], xy[:, 1], opbd, out)
+            
+            logger.info(f"Get the indexes for nudge.")
+            idxs_nudge = np.zeros(out.shape, dtype=int)
+            idxs = np.where(out > 0)[0]
+            idxs_nudge[idxs] = 1
+            idxs = np.where(np.max(out[elnode], axis=1) > 0)[0]
+            fp = elnode[idxs, -1] < 0
+            idxs_nudge[elnode[idxs[fp], :3]] = 1
+            idxs_nudge[elnode[idxs[~fp], :]] = 1
+            idxs = np.where(idxs_nudge == 1)[0]
+            include = idxs
+            logger.info(f'The shape of include is {len(include)}')
+ 
             logger.info(f"compute_nudge took {time()-start} seconds.")
         super().__init__(
             nodes={i: (coord, out[i]) for i, coord in enumerate(bctides.hgrid.coords)},
@@ -60,7 +74,7 @@ class Nudge(Gr3Field):
 
         self.data_source = data_source
 
-    def write()
+    #def write()
 
     @property
     @abstractmethod
