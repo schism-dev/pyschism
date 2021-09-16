@@ -5,8 +5,8 @@ import logging
 from typing import Dict, Union
 
 from matplotlib.transforms import Bbox
-from metpy.units import units
-from metpy.calc import potential_temperature, height_to_pressure_std
+import seawater as sw
+import netCDF4 as nc4
 from netCDF4 import Dataset
 import numpy as np
 import requests
@@ -126,12 +126,56 @@ class GofsForecastDatasets(GofsDatasetCollection):
     def maximum_time_range(self):
         return self.maximum_datetime - self.minimum_datetime
 
+def get_database(date, Bbox=None):
+    if date >= datetime(2018, 12, 4):
+        database = f'GLBy0.08/expt_93.0'
+    elif date >= datetime(2018, 1, 1) and date < datetime(2018, 12, 3):
+        database = f'GLBv0.08/expt_93.0'
+    elif date >= datetime(2017, 10, 1) and date < datetime(2017, 12, 31):
+        database = f'GLBv0.08/expt_92.9'
+    elif date >= datetime(2017, 6, 1) and date < datetime(2017, 9, 30):
+        database = f'GLBv0.08/expt_57.7'
+    elif date >= datetime(2017, 2, 1) and date < datetime(2017, 5, 31):
+        database = f'GLBv0.08/expt_92.8'
+    elif date >= datetime(2016, 5, 1) and date < datetime(2017, 1, 31):
+        database = f'GLBv0.08/expt_57.2'
+    elif date >= datetime(2016, 1, 1) and date < datetime(2016, 4, 30):
+        database = f'GLBv0.08/expt_56.3'
+    elif date >= datetime(1994, 1, 1) and date < datetime(2015, 12, 31):
+        database = f'GLBv0.08/expt_53.X/data/{self.start_date.year}'
+    else:
+        print('No data for {self.start_date}')
+    return database
 
 class GofsHindcastDatasets(GofsDatasetCollection):
 
     @property
     def datasets(self):
-        raise NotImplementedError('Need to return the datasets.')
+        datasets = {}
+        for required_date in self.required_datevector:
+            database = get_database(required_date)
+            print(f'Database for {required_date} is {database}')
+            #baseurl = f'https://tds.hycom.org/thredds/dodsC/{database}?lat[0:1:3250],lon[0:1:4499],' + \
+            #    f'time[0:1:6127],depth[0:1:39]' 
+            #ds=Dataset(baseurl)
+            #time1=ds['time']
+            #times=nc4.num2date(time1,units=time1.units,only_use_cftime_datetimes=False)
+            #time_idx=np.where( required_date == times)[0].item()
+             
+            opendap_url = f'https://tds.hycom.org/thredds/dodsC/{database}?lat[0:-1],lon[0:-1],' + \
+                f'time[0:-1],surf_el[0:-1][0:-1][0:-1],depth[0:-1],' + \
+                f'water_temp[0:-1][0:-1][0:-1][0:1:-1],' + \
+                f'salinity[0:-1][0:-1][0:-1][0:-1],' + \
+                f'water_u[0:-1][0:-1][0:-1][0:-1],' + \
+                f'water_v[0:-1][0:-1][0:-1][0:-1]'
+            datasets.setdefault(
+                required_date,
+                Dataset(opendap_url)
+                    )
+        return datasets
+        #raise NotImplementedError('Need to return the datasets.')
+
+        
 
     def pad_datasets(self, datasets):
         for dataset in datasets.values():
@@ -143,13 +187,21 @@ class GofsHindcastDatasets(GofsDatasetCollection):
 class GofsDatasets:
 
     def __init__(self, start_date, run_days, output_interval):
-        self.forecast = GofsForecastDatasets(start_date, run_days, output_interval)
-        self.hindcast = GofsHindcastDatasets(start_date, run_days, output_interval)
+        print(f'start_date is {start_date}')
+        print(f'today is {datetime.now().strftime("%Y-%m-%d")}')
+        self.start_date = start_date
+        if start_date.strftime("%Y-%m-%d") < datetime.now().strftime("%Y-%m-%d"):
+            self.hindcast = GofsHindcastDatasets(start_date, run_days, output_interval)
+        else:
+            self.forecast = GofsForecastDatasets(start_date, run_days, output_interval)
 
     @property
     def datasets(self):
-        datasets = self.forecast.datasets
-        self.hindcast.pad_datasets(datasets)
+        if self.start_date.strftime("%Y-%m-%d") < datetime.now().strftime("%Y-%m-%d"):
+            datasets = self.hindcast.datasets
+        else:
+            datasets = self.forecast.datasets
+        #self.hindcast.pad_datasets(datasets)
         return datasets
 
 
@@ -190,11 +242,21 @@ class GOFSElevation(GOFSComponent):
                 output_interval
             ).items()
         ):
-            ds_base_date = datetime.strptime(
-                ''.join(dataset['time'].units.split()[2:-1]),
-                '%Y-%m-%d%H:%M:%S.%f')
+            if start_date.strftime("%Y-%m-%d") < datetime.now().strftime("%Y-%m-%d"):
+                ds_base_date = datetime.strptime(
+                    ''.join(dataset['time'].units.split()[2:]), 
+                    '%Y-%m-%d%H:%M:%S')
+                #time1 = dataset['time']
+                #ds_timevector = nc4.num2date(
+                #    time1,
+                #    units=time1.units,
+                #    only_use_cftime_datetimes=False) 
+            else:
+                ds_base_date = datetime.strptime(
+                    ''.join(dataset['time'].units.split()[2:-1]),
+                    '%Y-%m-%d%H:%M:%S.%f')
             ds_timevector = [ds_base_date + timedelta(hours=x)
-                             for x in dataset['time'][:]]
+                         for x in dataset['time'][:]]
             requested_date = dates.nearest_cycle(
                 start_date + i*output_interval,
                 period=3).replace(tzinfo=None)
@@ -221,18 +283,22 @@ class GOFSElevation(GOFSComponent):
                     dataset,
                     pixel_buffer
                 )
-            zi = np.full((len(lat_idxs), len(lon_idxs)), np.nan)
+            #zi = np.full((len(lat_idxs), len(lon_idxs)), np.nan)
             if progress_bar is True:
                 items_iter = tqdm.tqdm(lat_idxs)
                 with tqdm_logging_wrapper.wrap_logging_for_tqdm(
                         items_iter), items_iter:
-                    for k, lat_idx in enumerate(items_iter):
-                        zi[k, :] = dataset[self.ncvar][
-                                            time_idx, lat_idx, lon_idxs]
+                    #for k, lat_idx in enumerate(items_iter):
+                    #    zi[k, :] = dataset[self.ncvar][
+                    #                        time_idx, lat_idx, lon_idxs]
+                    zi = dataset[self.ncvar][time_idx, lat_idxs, lon_idxs]
             else:
-                for k, lat_idx in enumerate(lat_idxs):
-                    zi[k, :] = dataset[self.ncvar][
-                                        time_idx, lat_idx, lon_idxs]
+                #for k, lat_idx in enumerate(lat_idxs):
+                #    zi[k, :] = dataset[self.ncvar][
+                #                        time_idx, lat_idx, lon_idxs]
+                zi = dataset[self.ncvar][time_idx, lat_idxs, lon_idxs]
+            idxs = np.where(abs(zi) > 10000)
+            zi[idxs] = float('nan')
 
             xi = dataset['lon'][lon_idxs]
             for idx in range(len(xi)):
@@ -261,7 +327,8 @@ class GOFSElevation(GOFSComponent):
             )
             if np.any(np.isnan(zq)):
                 raise ValueError('Boundary contains NaNs.')
-            dst['time_series'][time_idx, offset:len(zq)] = zq
+            print(f'the shape of zq is {len(zq)}, max zq is {np.max(zq)}, min zq is {np.min(zq)}')
+            dst['time_series'][time_idx, offset:offset+len(zq)] = zq
 
 
 class GOFSVelocity(GOFSComponent):
@@ -292,9 +359,19 @@ class GOFSVelocity(GOFSComponent):
                 output_interval
             ).items()
         ):
-            ds_base_date = datetime.strptime(
-                ''.join(dataset['time'].units.split()[2:-1]),
-                '%Y-%m-%d%H:%M:%S.%f')
+            if start_date.strftime("%Y-%m-%d") < datetime.now().strftime("%Y-%m-%d"):
+                ds_base_date = datetime.strptime(
+                    ''.join(dataset['time'].units.split()[2:]),
+                    '%Y-%m-%d%H:%M:%S')
+                #time1 = dataset['time']
+                #ds_timevector = nc4.num2date(
+                #    time1,
+                #    units=time1.units,
+                #    only_use_cftime_datetimes=False) 
+            else:
+                ds_base_date = datetime.strptime(
+                    ''.join(dataset['time'].units.split()[2:-1]),
+                    '%Y-%m-%d%H:%M:%S.%f')
             ds_timevector = [ds_base_date + timedelta(hours=x)
                              for x in dataset['time'][:]]
             requested_date = dates.nearest_cycle(
@@ -326,19 +403,28 @@ class GOFSVelocity(GOFSComponent):
             uvar, vvar = self.ncvar
             # z_ui_idxs = list(range(dataset['depth'].shape[0]))
             z_idxs = list(range(dataset['depth'].shape[0]))  # TODO: subset?
-            ui = np.full((len(z_idxs), len(lat_idxs), len(lon_idxs)), np.nan)
-            vi = np.full((len(z_idxs), len(lat_idxs), len(lon_idxs)), np.nan)
+            #ui = np.full((len(z_idxs), len(lat_idxs), len(lon_idxs)), np.nan)
+            #vi = np.full((len(z_idxs), len(lat_idxs), len(lon_idxs)), np.nan)
             if progress_bar is True:
                 items_iter = tqdm.tqdm(lat_idxs)
                 with tqdm_logging_wrapper.wrap_logging_for_tqdm(
                         items_iter), items_iter:
-                    for k, lat_idx in enumerate(items_iter):
-                        ui[:, k, :] = dataset[uvar][time_idx, z_idxs, lat_idx, lon_idxs]
-                        vi[:, k, :] = dataset[vvar][time_idx, z_idxs, lat_idx, lon_idxs]
+                    #for k, lat_idx in enumerate(items_iter):
+                    #    ui[:, k, :] = dataset[uvar][time_idx, z_idxs, lat_idx, lon_idxs]
+                    #    vi[:, k, :] = dataset[vvar][time_idx, z_idxs, lat_idx, lon_idxs]
+                    ui = dataset[uvar][time_idx, :, lat_idxs, lon_idxs]
+                    vi = dataset[vvar][time_idx, :, lat_idxs, lon_idxs]
             else:
-                for k, lat_idx in enumerate(lat_idxs):
-                    ui[:, k, :] = dataset[uvar][time_idx, z_idxs, lat_idx, lon_idxs]
-                    vi[:, k, :] = dataset[vvar][time_idx, z_idxs, lat_idx, lon_idxs]
+                #for k, lat_idx in enumerate(lat_idxs):
+                #    ui[:, k, :] = dataset[uvar][time_idx, z_idxs, lat_idx, lon_idxs]
+                #    vi[:, k, :] = dataset[vvar][time_idx, z_idxs, lat_idx, lon_idxs]
+                ui = dataset[uvar][time_idx, :, lat_idxs, lon_idxs]
+                vi = dataset[vvar][time_idx, :, lat_idxs, lon_idxs]
+            #change missing value to nan
+            idxs = np.where(abs(ui) > 10000)
+            ui[idxs] = float('nan')
+            idxs = np.where(abs(vi) > 10000)
+            vi[idxs] = float('nan')
 
             xi = dataset['lon'][lon_idxs]
             for idx in range(len(xi)):
@@ -448,9 +534,19 @@ class GOFSTemperature(GOFSComponent):
                 output_interval
             ).items()
         ):
-            ds_base_date = datetime.strptime(
-                ''.join(dataset['time'].units.split()[2:-1]),
-                '%Y-%m-%d%H:%M:%S.%f')
+            if start_date.strftime("%Y-%m-%d") < datetime.now().strftime("%Y-%m-%d"):
+                ds_base_date = datetime.strptime(
+                    ''.join(dataset['time'].units.split()[2:]),
+                    '%Y-%m-%d%H:%M:%S')
+                #time1 = dataset['time']
+                #ds_timevector = nc4.num2date(
+                #    time1,
+                #    units=time1.units,
+                #    only_use_cftime_datetimes=False) 
+            else:
+                ds_base_date = datetime.strptime(
+                    ''.join(dataset['time'].units.split()[2:-1]),
+                    '%Y-%m-%d%H:%M:%S.%f')
             ds_timevector = [ds_base_date + timedelta(hours=x)
                              for x in dataset['time'][:]]
             requested_date = dates.nearest_cycle(
@@ -481,16 +577,34 @@ class GOFSTemperature(GOFSComponent):
                 )
             # z_ui_idxs = list(range(dataset['depth'].shape[0]))
             z_idxs = list(range(dataset['depth'].shape[0]))  # TODO: subset?
-            temp = np.full((len(z_idxs), len(lat_idxs), len(lon_idxs)), np.nan)
+            #temp = np.full((len(z_idxs), len(lat_idxs), len(lon_idxs)), np.nan)
             if progress_bar is True:
                 items_iter = tqdm.tqdm(lat_idxs)
                 with tqdm_logging_wrapper.wrap_logging_for_tqdm(
                         items_iter), items_iter:
-                    for k, lat_idx in enumerate(items_iter):
-                        temp[:, k, :] = dataset[self.ncvar][time_idx, z_idxs, lat_idx, lon_idxs]
+                    #for k, lat_idx in enumerate(items_iter):
+                    #    temp[:, k, :] = dataset[self.ncvar][time_idx, z_idxs, lat_idx, lon_idxs]
+                    temp = dataset[self.ncvar][time_idx, :, lat_idxs, lon_idxs]
+                    salt = dataset['salinity'][time_idx, :, lat_idxs, lon_idxs]
             else:
-                for k, lat_idx in enumerate(lat_idxs):
-                    temp[:, k, :] = dataset[self.ncvar][time_idx, z_idxs, lat_idx, lon_idxs]
+                #for k, lat_idx in enumerate(lat_idxs):
+                #    temp[:, k, :] = dataset[self.ncvar][time_idx, z_idxs, lat_idx, lon_idxs]
+                temp = dataset[self.ncvar][time_idx, :, lat_idxs, lon_idxs]
+                salt = dataset['salinity'][time_idx, :, lat_idxs, lon_idxs]
+
+            #convert in-situ temperature to potential temperature
+            print(f'The shape of temp is {temp.shape}')
+            nz = temp.shape[0]
+            ny = temp.shape[1]
+            nx = temp.shape[2]
+            dep = dataset['depth'][:]
+            pre = np.tile(dep, ny*nx).reshape(nz, ny, nx)
+            Pr = np.zeros(temp.shape)
+            ptemp = sw.ptmp(salt, temp, pre, Pr)*1.00024
+
+            #change missing value to nan
+            idxs = np.where(abs(ptemp) > 10000)
+            ptemp[idxs] = float('nan')
 
             xi = dataset['lon'][lon_idxs]
             for idx in range(len(xi)):
@@ -510,39 +624,36 @@ class GOFSTemperature(GOFSComponent):
             zi = dataset['depth'][z_idxs]
 
             # First try with RegularGridInterpolator
-            temp_fd = RegularGridInterpolator(
+            ptemp_fd = RegularGridInterpolator(
                 (zi, yi, xi),
-                temp,
+                ptemp,
                 method='linear',
                 bounds_error=False,
                 fill_value=np.nan
             )
-            temp_interp = temp_fd(bzyx)
+            ptemp_interp = ptemp_fd(bzyx)
 
             # the boundary and the data don't intersect
-            if np.all(np.isnan(temp_interp)):
-                temp_idxs = np.where(~np.isnan(temp))
+            if np.all(np.isnan(ptemp_interp)):
+                ptemp_idxs = np.where(~np.isnan(ptemp))
                 xyzi = np.vstack([
-                    np.tile(xi, temp.shape)[temp_idxs].flatten(),
-                    np.tile(yi, temp.shape)[temp_idxs].flatten(),
-                    np.tile(zi, temp.shape)[temp_idxs].flatten()
+                    np.tile(xi, ptemp.shape)[ptemp_idxs].flatten(),
+                    np.tile(yi, ptemp.shape)[ptemp_idxs].flatten(),
+                    np.tile(zi, ptemp.shape)[ptemp_idxs].flatten()
                 ]).T
-                temp_fd = NearestNDInterpolator(xyzi, temp[temp_idxs].flatten())
-                temp_interp = temp_fd(np.vstack([bx, by, -bz.flatten()]).T)
+                ptemp_fd = NearestNDInterpolator(xyzi, ptemp[ptemp_idxs].flatten())
+                ptemp_interp = ptemp_fd(np.vstack([bx, by, -bz.flatten()]).T)
             # the boundary and the data partially intersect
-            elif np.any(np.isnan(temp_interp)):
-                temp_idxs = np.where(~np.isnan(temp_interp))
-                temp_fd = NearestNDInterpolator(bzyx[temp_idxs], temp_interp[temp_idxs])
-                temp_idxs = np.where(np.isnan(temp_interp))
-                temp_interp[temp_idxs] = temp_fd(bzyx[temp_idxs])
+            elif np.any(np.isnan(ptemp_interp)):
+                ptemp_idxs = np.where(~np.isnan(ptemp_interp))
+                ptemp_fd = NearestNDInterpolator(bzyx[ptemp_idxs], ptemp_interp[ptemp_idxs])
+                ptemp_idxs = np.where(np.isnan(ptemp_interp))
+                ptemp_interp[ptemp_idxs] = ptemp_fd(bzyx[ptemp_idxs])
 
-            if np.any(np.isnan(temp_interp)):
+            if np.any(np.isnan(ptemp_interp)):
                 raise ValueError('No boundary  temperature data for GOFS. '
                                  'Try increasing pixel_buffer argument.')
-            pressure = height_to_pressure_std(units('meter')*bz.flatten())
-            temp_interp = units('degC')*temp_interp
-            temp_interp = potential_temperature(pressure, temp_interp).to('degC')
-            dst['time_series'][i, offset:offset+bz.shape[0], :, :] = temp_interp.reshape(bz.shape)
+            dst['time_series'][i, offset:offset+bz.shape[0], :, :] = ptemp_interp.reshape(bz.shape)
 
 
 class GOFSSalinity(GOFSComponent):
@@ -573,9 +684,19 @@ class GOFSSalinity(GOFSComponent):
                 output_interval
             ).items()
         ):
-            ds_base_date = datetime.strptime(
-                ''.join(dataset['time'].units.split()[2:-1]),
-                '%Y-%m-%d%H:%M:%S.%f')
+            if start_date.strftime("%Y-%m-%d") < datetime.now().strftime("%Y-%m-%d"):
+                ds_base_date = datetime.strptime(
+                    ''.join(dataset['time'].units.split()[2:]),
+                    '%Y-%m-%d%H:%M:%S')
+                #time1 = dataset['time']
+                #ds_timevector = nc4.num2date(
+                #    time1,
+                #    units=time1.units,
+                #    only_use_cftime_datetimes=False) 
+            else:
+                ds_base_date = datetime.strptime(
+                    ''.join(dataset['time'].units.split()[2:-1]),
+                    '%Y-%m-%d%H:%M:%S.%f')
             ds_timevector = [ds_base_date + timedelta(hours=x)
                              for x in dataset['time'][:]]
             requested_date = dates.nearest_cycle(
@@ -606,16 +727,21 @@ class GOFSSalinity(GOFSComponent):
                 )
             # z_ui_idxs = list(range(dataset['depth'].shape[0]))
             z_idxs = list(range(dataset['depth'].shape[0]))  # TODO: subset?
-            salt = np.full((len(z_idxs), len(lat_idxs), len(lon_idxs)), np.nan)
+            #salt = np.full((len(z_idxs), len(lat_idxs), len(lon_idxs)), np.nan)
             if progress_bar is True:
                 items_iter = tqdm.tqdm(lat_idxs)
                 with tqdm_logging_wrapper.wrap_logging_for_tqdm(
                         items_iter), items_iter:
-                    for k, lat_idx in enumerate(items_iter):
-                        salt[:, k, :] = dataset[self.ncvar][time_idx, z_idxs, lat_idx, lon_idxs]
+                    #for k, lat_idx in enumerate(items_iter):
+                    #    salt[:, k, :] = dataset[self.ncvar][time_idx, z_idxs, lat_idx, lon_idxs]
+                    salt = dataset[self.ncvar][time_idx, :, lat_idxs, lon_idxs]
             else:
-                for k, lat_idx in enumerate(lat_idxs):
-                    salt[:, k, :] = dataset[self.ncvar][time_idx, z_idxs, lat_idx, lon_idxs]
+                #for k, lat_idx in enumerate(lat_idxs):
+                #    salt[:, k, :] = dataset[self.ncvar][time_idx, z_idxs, lat_idx, lon_idxs]
+                salt = dataset[self.ncvar][time_idx, :, lat_idxs, lon_idxs]
+            #change missing value to nan
+            idxs = np.where(abs(salt) > 10000)
+            salt[idxs] = float('nan')
 
             xi = dataset['lon'][lon_idxs]
             for idx in range(len(xi)):
