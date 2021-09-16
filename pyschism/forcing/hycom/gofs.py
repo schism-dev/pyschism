@@ -433,7 +433,9 @@ class GOFSVelocity(GOFSComponent):
             yi = dataset['lat'][lat_idxs]
 
             if vgrid.ivcor == 1:
-                bz = (hgrid.values[:, None]*vgrid.sigma)[boundary.indexes, :]
+                bz = (-hgrid.values[:, None]*vgrid.sigma)[boundary.indexes, :]
+                idxs = np.where(bz > 5000.0)
+                bz[idxs] = 5000.0 - 1.0e-6 
             else:
                 raise NotImplementedError('vgrid.ivcor!=1')
 
@@ -613,7 +615,9 @@ class GOFSTemperature(GOFSComponent):
             yi = dataset['lat'][lat_idxs]
 
             if vgrid.ivcor == 1:
-                bz = (hgrid.values[:, None]*vgrid.sigma)[boundary.indexes, :]
+                bz = (-hgrid.values[:, None]*vgrid.sigma)[boundary.indexes, :]
+                idxs = np.where(bz > 5000.0)
+                bz[idxs] = 5000.0 - 1.0e-6
             else:
                 raise NotImplementedError('vgrid.ivcor!=1')
 
@@ -703,6 +707,7 @@ class GOFSSalinity(GOFSComponent):
                 start_date + i*output_interval,
                 period=3).replace(tzinfo=None)
             time_idx = ds_timevector.index(requested_date)
+            print(f'time_idx for {requested_date} is {time_idx}')
             logger.info(
                 'Saving GOFS salinity data for date: '
                 f'{start_date+i*output_interval} '
@@ -750,7 +755,9 @@ class GOFSSalinity(GOFSComponent):
             yi = dataset['lat'][lat_idxs]
 
             if vgrid.ivcor == 1:
-                bz = (hgrid.values[:, None]*vgrid.sigma)[boundary.indexes, :]
+                bz = (-hgrid.values[:, None]*vgrid.sigma)[boundary.indexes, :]
+                idxs = np.where(bz > 5000.0)
+                bz[idxs] = 5000.0 - 1.0e-6
             else:
                 raise NotImplementedError('vgrid.ivcor!=1')
 
