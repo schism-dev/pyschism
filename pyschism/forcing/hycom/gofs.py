@@ -755,16 +755,18 @@ class GOFSSalinity(GOFSComponent):
             yi = dataset['lat'][lat_idxs]
 
             if vgrid.ivcor == 1:
-                bz = (-hgrid.values[:, None]*vgrid.sigma)[boundary.indexes, :]
+                bz = (hgrid.values[:, None]*vgrid.sigma)[boundary.indexes, :]
+                print(f'zcor is {bz[200,:]}')
                 idxs = np.where(bz > 5000.0)
                 bz[idxs] = 5000.0 - 1.0e-6
             else:
                 raise NotImplementedError('vgrid.ivcor!=1')
 
             xy = hgrid.get_xy(crs='epsg:4326')
-            bx = np.tile(xy[boundary.indexes, 0], (bz.shape[1],))
-            by = np.tile(xy[boundary.indexes, 1], (bz.shape[1],))
-            bzyx = np.vstack([-bz.flatten(), by, bx]).T
+            bx = np.tile(xy[boundary.indexes, 0], (bz.shape[1],)).T
+            by = np.tile(xy[boundary.indexes, 1], (bz.shape[1],)).T
+            #bzyx = np.vstack([-bz.flatten(), by, bx]).T
+            bzyx = np.c_[bz.reshape(np.size(bz)), by.reshape(np.size(by)), bx.reshape(np.size(bx))]
             zi = dataset['depth'][z_idxs]
 
             # First try with RegularGridInterpolator
