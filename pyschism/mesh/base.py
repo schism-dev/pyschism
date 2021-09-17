@@ -81,6 +81,7 @@ class Nodes:
         y = [radius * latitude[i] for i in np.arange(len(latitude))]
         self._coords = np.vstack([x, y]).T
         self._crs = None
+        return x, y
 
     def get_xy(self, crs: Union[CRS, str] = None):
         if crs is not None:
