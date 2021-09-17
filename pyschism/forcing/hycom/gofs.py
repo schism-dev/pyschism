@@ -6,7 +6,6 @@ from typing import Dict, Union
 
 from matplotlib.transforms import Bbox
 import seawater as sw
-import netCDF4 as nc4
 from netCDF4 import Dataset
 import numpy as np
 import requests
