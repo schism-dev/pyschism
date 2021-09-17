@@ -341,7 +341,7 @@ class GOFSElevation(GOFSComponent):
             if np.any(np.isnan(zq)):
                 raise ValueError('Boundary contains NaNs.')
             print(f'the shape of zq is {len(zq)}, max zq is {np.max(zq)}, min zq is {np.min(zq)}')
-            dst['time_series'][time_idx, offset:offset+len(zq)] = zq
+            dst['time_series'][i, offset:offset+len(zq)] = zq
 
 
 class GOFSVelocity(GOFSComponent):
