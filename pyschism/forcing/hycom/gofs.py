@@ -216,6 +216,20 @@ class GOFSComponent(HycomComponent):
     ) -> Dict[datetime, Dataset]:
         return GofsDatasets(start_date, run_days, output_interval).datasets
 
+def transform_ll_to_cpp(lon, lat, lonc=-77.07, latc=24.0):
+    #lonc=(np.max(lon)+np.min(lon))/2.0
+    print(f'lonc is {lonc}')
+    #latc=(np.max(lat)+np.min(lat))/2.0
+    print(f'latc is {latc}')
+    longitude=lon/180*np.pi
+    latitude=lat/180*np.pi
+    radius=6378206.4
+    loncc=lonc/180*np.pi
+    latcc=latc/180*np.pi
+    lon_new=[radius*(longitude[i]-loncc)*np.cos(latcc) for i in np.arange(len(longitude))]
+    lat_new=[radius*latitude[i] for i in np.arange(len(latitude))]
+
+    return np.array(lon_new), np.array(lat_new)
 
 class GOFSElevation(GOFSComponent):
 
@@ -426,23 +440,27 @@ class GOFSVelocity(GOFSComponent):
             idxs = np.where(abs(vi) > 10000)
             vi[idxs] = float('nan')
 
-            xi = dataset['lon'][lon_idxs]
-            for idx in range(len(xi)):
-                if xi[idx] > 180:
-                    xi[idx] = xi[idx]-360.
-            yi = dataset['lat'][lat_idxs]
+            loni = dataset['lon'][lon_idxs]
+            for idx in range(len(loni)):
+                if loni[idx] > 180:
+                    loni[idx] = loni[idx]-360.
+            lati = dataset['lat'][lat_idxs]
+            xi, yi = transform_ll_to_cpp(loni, lati)
 
             if vgrid.ivcor == 1:
-                bz = (-hgrid.values[:, None]*vgrid.sigma)[boundary.indexes, :]
+                bz = (hgrid.values[:, None]*vgrid.sigma)[boundary.indexes, :]
                 idxs = np.where(bz > 5000.0)
                 bz[idxs] = 5000.0 - 1.0e-6 
             else:
                 raise NotImplementedError('vgrid.ivcor!=1')
 
             xy = hgrid.get_xy(crs='epsg:4326')
-            bx = np.tile(xy[boundary.indexes, 0], (bz.shape[1],))
-            by = np.tile(xy[boundary.indexes, 1], (bz.shape[1],))
-            bzyx = np.vstack([-bz.flatten(), by, bx]).T
+            lonb = xy[boundary.indexes, 0]
+            latb = xy[boundary.indexes, 1]
+            xb, yb = transform_ll_to_cpp(lonb, latb)
+            bx = np.tile(xb, [bz.shape[1],1]).T
+            by = np.tile(yb, [bz.shape[1],1]).T
+            bzyx = np.c_[bz.reshape(np.size(bz)), by.reshape(np.size(by)), bx.reshape(np.size(bx))]
             zi = dataset['depth'][z_idxs]
 
             # First try with RegularGridInterpolator
@@ -591,8 +609,8 @@ class GOFSTemperature(GOFSComponent):
             else:
                 #for k, lat_idx in enumerate(lat_idxs):
                 #    temp[:, k, :] = dataset[self.ncvar][time_idx, z_idxs, lat_idx, lon_idxs]
-                temp = dataset[self.ncvar][time_idx, :, lat_idxs, lon_idxs]
-                salt = dataset['salinity'][time_idx, :, lat_idxs, lon_idxs]
+                temp = np.squeeze(dataset[self.ncvar][time_idx, :, lat_idxs, lon_idxs])
+                salt = np.squeeze(dataset['salinity'][time_idx, :, lat_idxs, lon_idxs])
 
             #convert in-situ temperature to potential temperature
             print(f'The shape of temp is {temp.shape}')
@@ -608,23 +626,31 @@ class GOFSTemperature(GOFSComponent):
             idxs = np.where(abs(ptemp) > 10000)
             ptemp[idxs] = float('nan')
 
-            xi = dataset['lon'][lon_idxs]
-            for idx in range(len(xi)):
-                if xi[idx] > 180:
-                    xi[idx] = xi[idx]-360.
-            yi = dataset['lat'][lat_idxs]
+            loni = dataset['lon'][lon_idxs]
+            for idx in range(len(loni)):
+                if loni[idx] > 180:
+                    loni[idx] = loni[idx]-360.
+            lati = dataset['lat'][lat_idxs]
+            xi, yi = transform_ll_to_cpp(loni, lati)
 
             if vgrid.ivcor == 1:
-                bz = (-hgrid.values[:, None]*vgrid.sigma)[boundary.indexes, :]
+                bz = (hgrid.values[:, None]*vgrid.sigma)[boundary.indexes, :]
                 idxs = np.where(bz > 5000.0)
                 bz[idxs] = 5000.0 - 1.0e-6
+                print(f'zcor at 200 is {bz[200,:]}')
             else:
                 raise NotImplementedError('vgrid.ivcor!=1')
 
             xy = hgrid.get_xy(crs='epsg:4326')
-            bx = np.tile(xy[boundary.indexes, 0], (bz.shape[1],))
-            by = np.tile(xy[boundary.indexes, 1], (bz.shape[1],))
-            bzyx = np.vstack([-bz.flatten(), by, bx]).T
+            lonb = xy[boundary.indexes, 0]
+            latb = xy[boundary.indexes, 1]
+            xb, yb = transform_ll_to_cpp(lonb, latb)
+            #bx = np.tile(xy[boundary.indexes, 0], [bz.shape[1],1])
+            #by = np.tile(xy[boundary.indexes, 1], [bz.shape[1],1])
+            #bzyx = np.vstack([bz.flatten(), by, bx]).T
+            bx = np.tile(xb, [bz.shape[1],1]).T
+            by = np.tile(yb, [bz.shape[1],1]).T
+            bzyx = np.c_[bz.reshape(np.size(bz)), by.reshape(np.size(by)), bx.reshape(np.size(bx))]
             zi = dataset['depth'][z_idxs]
 
             # First try with RegularGridInterpolator
@@ -730,6 +756,9 @@ class GOFSSalinity(GOFSComponent):
                     dataset,
                     pixel_buffer
                 )
+            print(f'lon_idxs is {lon_idxs}')
+            print(f'lat_idxs is {lat_idxs}')
+
             # z_ui_idxs = list(range(dataset['depth'].shape[0]))
             z_idxs = list(range(dataset['depth'].shape[0]))  # TODO: subset?
             #salt = np.full((len(z_idxs), len(lat_idxs), len(lon_idxs)), np.nan)
@@ -748,11 +777,12 @@ class GOFSSalinity(GOFSComponent):
             idxs = np.where(abs(salt) > 10000)
             salt[idxs] = float('nan')
 
-            xi = dataset['lon'][lon_idxs]
-            for idx in range(len(xi)):
-                if xi[idx] > 180:
-                    xi[idx] = xi[idx]-360.
-            yi = dataset['lat'][lat_idxs]
+            loni = dataset['lon'][lon_idxs]
+            for idx in range(len(loni)):
+                if loni[idx] > 180:
+                    loni[idx] = loni[idx]-360.
+            lati = dataset['lat'][lat_idxs]
+            xi, yi = transform_ll_to_cpp(loni, lati)
 
             if vgrid.ivcor == 1:
                 bz = (hgrid.values[:, None]*vgrid.sigma)[boundary.indexes, :]
@@ -763,9 +793,11 @@ class GOFSSalinity(GOFSComponent):
                 raise NotImplementedError('vgrid.ivcor!=1')
 
             xy = hgrid.get_xy(crs='epsg:4326')
-            bx = np.tile(xy[boundary.indexes, 0], (bz.shape[1],)).T
-            by = np.tile(xy[boundary.indexes, 1], (bz.shape[1],)).T
-            #bzyx = np.vstack([-bz.flatten(), by, bx]).T
+            lonb = xy[boundary.indexes, 0]
+            latb = xy[boundary.indexes, 1]
+            xb, yb = transform_ll_to_cpp(lonb, latb)
+            bx = np.tile(xb, [bz.shape[1],1]).T
+            by = np.tile(yb, [bz.shape[1],1]).T
             bzyx = np.c_[bz.reshape(np.size(bz)), by.reshape(np.size(by)), bx.reshape(np.size(bx))]
             zi = dataset['depth'][z_idxs]
 
