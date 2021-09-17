@@ -309,7 +309,9 @@ class Nudge:
             #Convert temp to potential temp
             dep=ds['depth'][:]
             #In the ocean at 1m depth is approximately 1 dbar
-            pre=np.tile(dep, ny*nx).reshape(nz, ny, nx)
+            pr=np.ones(temp.shape)
+            print(pr.shape)
+            pre=pr*dep[:,None, None]
             Pr=np.zeros(temp.shape)
             ptemp=sw.ptmp(salt, temp, pre, Pr)*1.00024
 
@@ -493,7 +495,9 @@ class InitialTS():
         temp=np.squeeze(ds['water_temp'][:,:,:])
 
         #Convert temp to potential temp
-        pre=np.tile(dep, ny*nx).reshape(nz, ny, nx)
+        pr=np.ones(temp.shape)
+        print(pr.shape)
+        pre=pr*dep[:,None, None]
         Pr=np.zeros(temp.shape)
         ptemp=sw.ptmp(salt, temp, pre, Pr)*1.00024
 
@@ -885,7 +889,8 @@ class OpenBoundaryInventory():
             ny=temp.shape[1]
             nx=temp.shape[2]
             dep=ds['depth'][:]
-            pre=np.tile(dep, ny*nx).reshape(nz, ny, nx)
+            pr=np.ones(temp.shape)
+            pre=pr*dep[:,None, None]
             Pr=np.zeros(temp.shape)
             ptemp=sw.ptmp(salt, temp, pre, Pr)*1.00024
 

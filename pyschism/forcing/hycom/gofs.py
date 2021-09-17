@@ -618,7 +618,8 @@ class GOFSTemperature(GOFSComponent):
             ny = temp.shape[1]
             nx = temp.shape[2]
             dep = dataset['depth'][:]
-            pre = np.tile(dep, ny*nx).reshape(nz, ny, nx)
+            pr=np.ones(temp.shape)
+            pre = pr*dep[:,None, None]
             Pr = np.zeros(temp.shape)
             ptemp = sw.ptmp(salt, temp, pre, Pr)*1.00024
 
