@@ -29,8 +29,8 @@ class ERA5DataInventory:
         self.start_date = start_date
         self.rnday = rnday
         self.end_date = self.start_date+timedelta(self.rnday + 1)
-        self._bbox=bbox
         self.client=cdsapi.Client()
+        self._bbox = bbox
 
         r = self.client.retrieve(
             'reanalysis-era5-single-levels',
@@ -86,32 +86,32 @@ class ERA5DataInventory:
                 self._lon = Dataset(self.files[0]).variables['longitude'][:]
         return self._lat
 
-    def _modified_bbox(self, bbox=None):
-        if bbox is None:
-            return Bbox.from_extents(0, -90, 360, 90)
-        else:
-            xmin = bbox.xmin + 360 if bbox.xmin < 0 else bbox.xmin
-            xmax = bbox.xmax + 360 if bbox.xmax < 0 else bbox.xmax
-            return Bbox.from_extents(xmin, bbox.ymin, xmax, bbox.ymax)
-
-    def _modified_bbox_indexes(self):
-        lat_idxs = np.where((self.lat >= self._bbox.ymin)
-                            & (self.lat <= self._bbox.ymax))[0]
-        lon_idxs = np.where((self.lon >= self._bbox.xmin)
-                            & (self.lon <= self._bbox.xmax))[0]
-        return lon_idxs, lat_idxs
+    #def _modified_bbox(self, bbox=None):
+    #    if bbox is None:
+    #        return Bbox.from_extents(0, -90, 360, 90)
+    #    else:
+    #        xmin = self._bbox.xmin + 360 if self._bbox.xmin < 0 else self._bbox.xmin
+    #        xmax = self._bbox.xmax + 360 if self._bbox.xmax < 0 else self._bbox.xmax
+    #        return Bbox.from_extents(xmin-1.0, bbox.ymin-1.0, xmax+1.0, bbox.ymax+1.0)
+    #
+    #def _modified_bbox_indexes(self):
+    #    lat_idxs = np.where((self.lat >= self._bbox.ymin-1.0)
+    #                        & (self.lat <= self._bbox.ymax+1.0))[0]
+    #    lon_idxs = np.where((self.lon >= self._bbox.xmin-1.0)
+    #                        & (self.lon <= self._bbox.xmax+1.0))[0]
+    #    return lon_idxs, lat_idxs
 
     def xy_grid(self):
-        lon_idxs, lat_idxs = self._modified_bbox_indexes()
+        #lon_idxs, lat_idxs = self._modified_bbox_indexes()
         lon = []
-        for x in self.lon[lon_idxs]:
+        for x in self.lon:
             if x > 180:
                 lon.append(x-360)
             else:
                 lon.append(x)
-        return np.meshgrid(np.array(lon), self.lat[lat_idxs])
+        return np.meshgrid(np.array(lon), self.lat)
 
-def put_sflux_fields(iday, date, timevector, ds, nx_grid, ny_grid, lon_idxs, lat_idxs, air, rad, prc, OUTDIR):
+def put_sflux_fields(iday, date, timevector, ds, nx_grid, ny_grid, air, rad, prc, OUTDIR):
     #print(iday)
     #print(file)
     rt=pd.to_datetime(str(date))
@@ -152,7 +152,7 @@ def put_sflux_fields(iday, date, timevector, ds, nx_grid, ny_grid, lon_idxs, lat
             dst['prmsl'].long_name = "Pressure reduced to MSL"
             dst['prmsl'].standard_name = "air_pressure_at_sea_level"
             dst['prmsl'].units = "Pa"
-            dst['prmsl'][:,:,:]=ds['msl'][idx:idx+25,lat_idxs,lon_idxs]
+            dst['prmsl'][:,:,:]=ds['msl'][idx:idx+25,:,:]
 
             # spfh
             dst.createVariable('spfh', 'f4', ('time', 'ny_grid', 'nx_grid'))
@@ -160,14 +160,14 @@ def put_sflux_fields(iday, date, timevector, ds, nx_grid, ny_grid, lon_idxs, lat
                                     "(2m AGL)"
             dst['spfh'].standard_name = "specific_humidity"
             dst['spfh'].units = "1"
-            dst['spfh'][:,:,:]=ds['d2m'][idx:idx+25,lat_idxs,lon_idxs]
+            dst['spfh'][:,:,:]=ds['d2m'][idx:idx+25,:,:]
 
             # stmp
             dst.createVariable('stmp', 'f4', ('time', 'ny_grid', 'nx_grid'))
             dst['stmp'].long_name = "Surface Air Temperature (2m AGL)"
             dst['stmp'].standard_name = "air_temperature"
             dst['stmp'].units = "K"
-            dst['stmp'][:,:,:]=ds['t2m'][idx:idx+25,lat_idxs,lon_idxs]
+            dst['stmp'][:,:,:]=ds['t2m'][idx:idx+25,:,:]
 
             # uwind
             dst.createVariable('uwind', 'f4', ('time', 'ny_grid', 'nx_grid'))
@@ -175,7 +175,7 @@ def put_sflux_fields(iday, date, timevector, ds, nx_grid, ny_grid, lon_idxs, lat
                 "(10m AGL)"
             dst['uwind'].standard_name = "eastward_wind"
             dst['uwind'].units = "m/s"
-            dst['uwind'][:,:,:]=ds['u10'][idx:idx+25,lat_idxs,lon_idxs]
+            dst['uwind'][:,:,:]=ds['u10'][idx:idx+25,:,:]
 
             # vwind
             dst.createVariable('vwind', 'f4', ('time', 'ny_grid', 'nx_grid'))
@@ -183,7 +183,7 @@ def put_sflux_fields(iday, date, timevector, ds, nx_grid, ny_grid, lon_idxs, lat
                 "(10m AGL)"
             dst['vwind'].standard_name = "northward_wind"
             dst['vwind'].units = "m/s"
-            dst['vwind'][:,:,:]=ds['v10'][idx:idx+25,lat_idxs,lon_idxs]
+            dst['vwind'][:,:,:]=ds['v10'][idx:idx+25,:,:]
 
     if prc is True:
         with Dataset(OUTDIR / "sflux_prc_1.{:04}.nc".format(iday+1), 'w', format='NETCDF3_CLASSIC') as dst:
@@ -219,7 +219,7 @@ def put_sflux_fields(iday, date, timevector, ds, nx_grid, ny_grid, lon_idxs, lat
             dst['prate'].long_name = "Surface Precipitation Rate"
             dst['prate'].standard_name = "air_pressure_at_sea_level"
             dst['prate'].units = "kg/m^2/s"
-            dst['prate'][:,:,:]=ds['mtpr'][idx:idx+25,lat_idxs,lon_idxs]
+            dst['prate'][:,:,:]=ds['mtpr'][idx:idx+25,:,:]
 
     if rad is True:
         with Dataset(OUTDIR / "sflux_rad_1.{:04}.nc".format(iday+1), 'w', format='NETCDF3_CLASSIC') as dst:
@@ -255,14 +255,14 @@ def put_sflux_fields(iday, date, timevector, ds, nx_grid, ny_grid, lon_idxs, lat
             dst['dlwrf'].long_name = "Downward Long Wave Radiation Flux"
             dst['dlwrf'].standard_name = "surface_downwelling_longwave_flux_in_air"
             dst['dlwrf'].units = "W/m^2"
-            dst['dlwrf'][:,:,:]=ds['msdwlwrf'][idx:idx+25,lat_idxs,lon_idxs]
+            dst['dlwrf'][:,:,:]=ds['msdwlwrf'][idx:idx+25,:,:]
 
             # dwrf
             dst.createVariable('dswrf', 'f4', ('time', 'ny_grid', 'nx_grid'))
             dst['dswrf'].long_name = "Downward Long Wave Radiation Flux"
             dst['dswrf'].standard_name = "surface_downwelling_shortwave_flux_in_air"
             dst['dswrf'].units = "W/m^2"
-            dst['dswrf'][:,:,:]=ds['msdwswrf'][idx:idx+25,lat_idxs,lon_idxs]
+            dst['dswrf'][:,:,:]=ds['msdwswrf'][idx:idx+25,:,:]
 
 
 class ERA5(SfluxDataset):
@@ -309,7 +309,7 @@ class ERA5(SfluxDataset):
         )
     
         nx_grid, ny_grid = self.inventory.xy_grid()
-        lon_idxs, lat_idxs = self.inventory._modified_bbox_indexes()
+        #lon_idxs, lat_idxs = self.inventory._modified_bbox_indexes()
 
         ds=Dataset(self.inventory.files[0])
         time1=ds['time']
@@ -317,7 +317,7 @@ class ERA5(SfluxDataset):
 
         for iday, date in enumerate(dates):
             #put_sflux_fields(iday, date, times, ds, nx_grid, ny_grid, lon_idxs, lat_idxs, air=air, rad=rad, prc=prc, OUTDIR=self.tmpdir)
-            put_sflux_fields(iday, date, times, ds, nx_grid, ny_grid, lon_idxs, lat_idxs, air=air, rad=rad, prc=prc, OUTDIR=outdir)
+            put_sflux_fields(iday, date, times, ds, nx_grid, ny_grid, air=air, rad=rad, prc=prc, OUTDIR=outdir)
  
         #self.resource = list(self.tmpdir.glob("*.nc"))
         #if air is True:
