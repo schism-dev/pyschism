@@ -15,8 +15,6 @@ from numba import jit, prange
 import netCDF4 as nc
 from netCDF4 import Dataset
 from matplotlib.transforms import Bbox
-#from metpy.units import units
-#from metpy.calc import height_to_pressure_std
 import seawater as sw
 
 from pyschism.mesh.base import Nodes, Elements
@@ -553,7 +551,7 @@ class Nudge:
 
             print('****Interpolation starts****')
 
-            ndt[it]=it*24*3600.
+            ndt[it]=it
             #salt
             salt_int = interp_to_points_3d(dep, y2, x2, bxyz, salt)
             salt_int = salt_int.reshape(zcor2.shape)
