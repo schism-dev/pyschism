@@ -48,7 +48,7 @@ class ERA5DataInventory:
                 '12:00','13:00','14:00','15:00','16:00','17:00',
                 '18:00','19:00','20:00','21:00','22:00','23:00'
                 ],
-            'area': [self._bbox.ymax, self._bbox.xmin, self._bbox.ymin, self._bbox.xmax], # North, West, South, East. Default: global
+            'area': [self._bbox.ymax+1.0, self._bbox.xmin-1.0, self._bbox.ymin-1.0, self._bbox.xmax+1.0], # North, West, South, East. Default: global
             'format':'netcdf'
             })
  
