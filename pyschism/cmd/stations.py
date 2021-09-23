@@ -16,17 +16,17 @@ class StationsCli:
         else:
             raise NotImplementedError(f'Unhandled CLI action: {args.action}.')
 
+    @staticmethod
+    def add_subparser_action(subparsers):
+        add_stations(subparsers.add_parser('stations'))
 
-def stations_subparser(subparsers):
-    stations = subparsers.add_parser('stations')
+
+def add_stations(parser):
     # define subparser action
-    actions = stations.add_subparsers(dest='action')
+    actions = parser.add_subparsers(dest='action')
     # plotting action
     plot = actions.add_parser('plot')
     plot.add_argument('variable')
     plot.add_argument('station_index', type=int)
     plot.add_argument('outputs_directory')
     plot.add_argument('--stations-file')
-
-
-add_stations = stations_subparser

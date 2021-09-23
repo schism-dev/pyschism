@@ -1,15 +1,44 @@
 from enum import Enum
 
 
-class Stratification(Enum):
-    BAROCLINIC = 0
-    BAROTROPIC = 1
+class Stratification(Enum):                                                                                                                                                                                                          
+    BAROCLINIC = 0                                                                                                                                                                                                                   
+    BAROTROPIC = 1                                                                                                                                                                                                                   
+                                                                                                                                                                                                                                     
+    @staticmethod                                                                                                                                                                                                                    
+    def keys():                                                                                                                                                                                                                      
+        return list(map(lambda c: c.name, Stratification))                                                                                                                                                                           
+                                                                                                                                                                                                                                     
+    @classmethod                                                                                                                                                                                                                     
+    def _missing_(cls, name):                                                                                                                                                                                                        
+        if isinstance(name, str):
+            if name.upper() in cls.keys():
+                return cls[name.upper()]
+        raise ValueError(f'Argument {name} is not a valid Stratification type.')
 
 
 class Coriolis(Enum):
     AUTO = 1
     CORICOEFF = 0
     RLATITUDE = -1
+
+
+class IofWetdryVariables(Enum):
+    wetdry_node = "wetdry_node"
+    wetdry_elem = "wetdry_elem"
+    wetdry_side = "wetdry_side"
+
+    @classmethod
+    def _missing_(cls, name):
+        raise ValueError(f"{name} is not a valid WETDRY output variable.")
+
+
+class IofZcorVariables(Enum):
+    zcor = "zcor"
+
+    @classmethod
+    def _missing_(cls, name):
+        raise ValueError(f"{name} is not a valid ZCOR output variable.")
 
 
 class IofHydroVariables(Enum):
@@ -309,16 +338,17 @@ class IofAnaVariables(Enum):
 
 
 class StationOutputVariables(Enum):
-    """Enumeration for stations output variables """
-    ELEVATION = 'elev'
-    AIR_PRESSURE = 'air_pressure'
-    WINDX = 'windx'
-    WINDY = 'windy'
-    TEMPERATURE = 'T'
-    SALINITY = 'S'
-    U = 'u'
-    V = 'v'
-    W = 'w'
+    """Enumeration for stations output variables"""
+
+    ELEVATION = "elev"
+    AIR_PRESSURE = "air_pressure"
+    WINDX = "windx"
+    WINDY = "windy"
+    TEMPERATURE = "T"
+    SALINITY = "S"
+    U = "u"
+    V = "v"
+    W = "w"
 
     @classmethod
     def _missing_(cls, name):
@@ -326,7 +356,8 @@ class StationOutputVariables(Enum):
 
 
 class StationOutputIndex(Enum):
-    """Indexing for stations output variables """
+    """Indexing for stations output variables"""
+
     ELEVATION = 0
     AIR_PRESSURE = 1
     WINDX = 2
@@ -339,11 +370,12 @@ class StationOutputIndex(Enum):
 
 
 class OutputVariableUnit(Enum):
-    ELEVATION = 'meters'
+    ELEVATION = "meters"
 
 
 class NWSType(Enum):
     """Atmospheric forcing type required by param.nml"""
+
     TIME_HISTORY = 1
     CLIMATE_AND_FORECAST = 2
     HEAT_CONSERVATION = 3
@@ -354,57 +386,26 @@ class NWSType(Enum):
         raise ValueError(f"{name} is not a valid NWS type.")
 
 
-class ForecastProduct(Enum):
-    GDAS = 'gdas_0p25'
-    GDAS_0P25 = 'gdas_0p25'
-    GFS = 'gfs_0p25_1hr'
-    GFS_0P25 = 'gfs_0p25'
-    GFS_0P25_1HR = 'gfs_0p25_1hr'
-    GFS_0P50 = 'gfs_0p50'
-    GFS_1P00 = 'gfs_1p00'
+# class ForecastProduct(Enum):
+#     GDAS = 'gdas_0p25'
+#     GDAS_0P25 = 'gdas_0p25'
+#     GFS = 'gfs_0p25_1hr'
+#     GFS_0P25 = 'gfs_0p25'
+#     GFS_0P25_1HR = 'gfs_0p25_1hr'
+#     GFS_0P50 = 'gfs_0p50'
+#     GFS_1P00 = 'gfs_1p00'
 
-    @classmethod
-    def _missing_(self, name):
-        ValueError(f'{name} is not a known atmospheric forecast product for '
-                   'air.')
+#     @classmethod
+#     def _missing_(self, name):
+#         ValueError(f'{name} is not a known atmospheric forecast product for '
+#                    'air.')
 
 
 class GFSProduct(Enum):
-    GFS_0P25 = 'gfs_0p25'
-    GFS_0P25_1HR = 'gfs_0p25_1hr'
-    GFS_0P50 = 'gfs_0p50'
-    GFS_1P00 = 'gfs_1p00'
-
-
-class ForecastCycle(Enum):
-    z00 = '00z'
-    z01 = '01z'
-    z02 = '02z'
-    z03 = '03z'
-    z04 = '04z'
-    z05 = '05z'
-    z06 = '06z'
-    z07 = '07z'
-    z08 = '08z'
-    z09 = '09z'
-    z10 = '10z'
-    z11 = '11z'
-    z12 = '12z'
-    z13 = '13z'
-    z14 = '14z'
-    z15 = '15z'
-    z16 = '16z'
-    z17 = '17z'
-    z18 = '18z'
-    z19 = '19z'
-    z20 = '20z'
-    z21 = '21z'
-    z22 = '22z'
-    z23 = '23z'
-
-    @classmethod
-    def _missing_(self, name):
-        raise ValueError(f"{name} is not a valid cycle.")
+    GFS_0P25 = "gfs_0p25"
+    GFS_0P25_1HR = "gfs_0p25_1hr"
+    GFS_0P50 = "gfs_0p50"
+    GFS_1P00 = "gfs_1p00"
 
 
 class iof_hydro(Enum):
@@ -665,20 +666,20 @@ class SchoutType(Enum):
 
 
 class SchoutIofType(str, Enum):
-    iof_hydro = 'iof_hydro'
-    iof_dvd = 'iof_dvd'
-    iof_wwm = 'iof_wwm'
-    iof_gen = 'iof_gen'
-    iof_age = 'iof_age'
-    iof_sed = 'iof_sed'
-    iof_eco = 'iof_eco'
-    iof_icm = 'iof_icm'
-    iof_cos = 'iof_cos'
-    iof_fib = 'iof_fib'
-    iof_sed2d = 'iof_sed2d'
-    iof_marsh = 'iof_marsh'
-    iof_ice = 'iof_ice'
-    iof_ana = 'iof_ana'
+    iof_hydro = "iof_hydro"
+    iof_dvd = "iof_dvd"
+    iof_wwm = "iof_wwm"
+    iof_gen = "iof_gen"
+    iof_age = "iof_age"
+    iof_sed = "iof_sed"
+    iof_eco = "iof_eco"
+    iof_icm = "iof_icm"
+    iof_cos = "iof_cos"
+    iof_fib = "iof_fib"
+    iof_sed2d = "iof_sed2d"
+    iof_marsh = "iof_marsh"
+    iof_ice = "iof_ice"
+    iof_ana = "iof_ana"
 
     @classmethod
     def _missing_(self, name):
@@ -687,20 +688,56 @@ class SchoutIofType(str, Enum):
 
 class OutputVariableShortName(Enum):
 
-    ELEVATION = 'elev'
+    ELEVATION = "elev"
 
     @classmethod
     def _missing_(self, name):
-        raise ValueError(
-            f"{name} is not a valid SCHISM output variable short name")
+        raise ValueError(f"{name} is not a valid SCHISM output variable short name")
 
 
 class NationalWaterModelDataSource(Enum):
-    AWS = 'AWS'
-    FTP = 'FTP'
-    NOMADS = 'NOMADS'
+    AWS = "AWS"
+    FTP = "FTP"
+    NOMADS = "NOMADS"
 
     @classmethod
     def _missing_(self, name):
-        raise ValueError(
-            f"{name} is not a valid National Water Model data source.")
+        raise ValueError(f"{name} is not a valid National Water Model data source.")
+
+
+class Sflux1Types(Enum):
+
+    from pyschism.forcing import nws
+    # GDAS = GDAS
+    # GDAS_0P25 = GDAS
+    GFS = nws.GFS
+    GFS_0P25 = nws.GFS
+    GFS_0P25_1HR = nws.GFS
+    GFS_0P50 = nws.GFS
+    GFS_1P00 = nws.GFS
+
+    @classmethod
+    def _missing_(cls, name):
+        f = [
+            f"{name} is not a valid sflux_1 type. Valid values are: ",
+        ]
+        for sflux_type in cls:
+            f.append(sflux_type.name.lower())
+        f.append(".")
+        raise ValueError("".join(f))
+
+
+class Sflux2Types(Enum):
+
+    from pyschism.forcing import nws
+    HRRR = nws.HRRR
+
+    @classmethod
+    def _missing_(cls, name):
+        f = [
+            f"{name} is not a valid sflux_2 type. Valid values are: ",
+        ]
+        for sflux_type in cls:
+            f.append(sflux_type.name.lower())
+        f.append(".")
+        raise ValueError("".join(f))

@@ -2,7 +2,6 @@ from enum import Enum
 import os
 import pathlib
 from typing import Union
-from copy import deepcopy
 import numpy as np
 
 from pyproj import CRS  # type: ignore[import]
@@ -64,13 +63,14 @@ class Fgrid(Gr3):
         obj = cls(**{k: v for k, v in hgrid.to_dict().items() if k
                      in ['nodes', 'elements', 'description', 'crs']})
         obj.values[:] = value
+        obj.description = f'{cls.__name__.lower()} {obj.crs}'
         return obj
 
     def add_region(
             self,
             region: Union[Polygon, MultiPolygon],
             value
-    ):
+     ):
         # Assuming input polygons are in EPSG:4326
         if isinstance(region, Polygon):
             region = [region]
@@ -79,12 +79,41 @@ class Fgrid(Gr3):
 
         points = [Point(*coord) for coord in self.coords]
         gdf2 = gpd.GeoDataFrame(
-                {'geometry': points, 'index': list(range(len(points)))},
+                 {'geometry': points, 'index': list(range(len(points)))},
                 crs=self.crs)
         gdf_in = gpd.sjoin(gdf2, gdf1, op="within")
         picks = ([i.index for i in gdf_in.itertuples()])
         self.values[picks] = value
 
+    def modify_by_region(self, hgrid, fname, value, depth1, flag):
+        '''
+        reset (flag==0) or add (flag==1) value to a region
+        '''
+        lines=[line.strip().split() for line in open(fname, 'r').readlines()]
+        data=np.squeeze(np.array([lines[3:]])).astype('float')
+        x=data[:,0]
+        y=data[:,1]
+        coords = list( zip(x, y))
+        poly = Polygon(coords)
+
+        # Assuming input polygons are in EPSG:4326
+        #if isinstance(region, Polygon):
+        #    region = [region]
+        gdf1 = gpd.GeoDataFrame(
+                {'geometry': [poly]}, crs=self.crs)
+
+        points = [Point(*coord) for coord in self.coords]
+        gdf2 = gpd.GeoDataFrame(
+                 {'geometry': points, 'index': list(range(len(points)))},
+                crs=self.crs)
+        gdf_in = gpd.sjoin(gdf2, gdf1, op="within")
+        picks = [i.index for i in gdf_in.itertuples()]
+        if flag == 0:
+            self.values[picks] = value
+        else:
+            picks2 = np.where(-hgrid.values > depth1)
+            picks3 = np.intersect1d(picks, picks2)
+            self.values[picks3] = self.values[picks3] + value
 
 class ManningsN(Fgrid):
     """  Class for representing Manning's n values.  """
@@ -127,15 +156,36 @@ class ManningsN(Fgrid):
 class RoughnessLength(Fgrid):
 
     def __init__(self, *argv, **kwargs):
+        self.dzb_min = 0.5
+        self.dzb_decay = 0.
         super().__init__(NchiType.ROUGHNESS_LENGTH, *argv, **kwargs)
 
 
 class DragCoefficient(Fgrid):
 
     def __init__(self, *argv, **kwargs):
-        self.dzb_min = 0.5
-        self.dzb_decay = 0.
         super().__init__(NchiType.DRAG_COEFFICIENT, *argv, **kwargs)
+
+    @classmethod
+    def linear_with_depth(
+            cls,
+            hgrid: Union[str, os.PathLike, Gr3],
+            depth1: float = -1.0,  # Are depth1 and depth2 positive up or positive down?
+            depth2: float = -3.0,
+            bfric_river: float = 0.0025,
+            bfric_land: float = 0.025
+    ):
+
+        obj = cls.constant(hgrid, np.nan)
+
+        values = (bfric_river + (depth1 + hgrid.values) *
+                  (bfric_land - bfric_river) / (depth1-depth2))
+        values[values > bfric_land] = bfric_land
+        values[values < bfric_river] = bfric_river
+
+        obj.values[:] = values
+
+        return obj
 
 
 class FrictionDispatch(Enum):

@@ -33,24 +33,26 @@ class SlurmConfig(ServerConfig):
     """Configuration object for SLURM-enabled servers"""
 
     def __init__(
-            self,
-            account: str = None,
-            ntasks: int = None,
-            partition: str = None,
-            walltime: timedelta = None,
-            filename: str = None,
-            run_directory: str = None,
-            run_name: str = None,
-            mail_type: str = None,
-            mail_user: str = None,
-            log_filename: str = None,
-            modules: List[str] = None,
-            schism_binary: str = None,
-            extra_commands: List[str] = None,
-            launcher: str = None,
-            nodes: int = None,
-            symlink_outputs: str = None,
-            mpi_launcher: str = None,
+        self,
+        account: str = None,
+        ntasks: int = None,
+        partition: str = None,
+        walltime: timedelta = None,
+        filename: str = None,
+        run_directory: str = None,
+        run_name: str = None,
+        mail_type: str = None,
+        mail_user: str = None,
+        log_filename: str = None,
+        modules: List[str] = None,
+        modulepath=None,
+        modules_init=None,
+        schism_binary: str = None,
+        extra_commands: List[str] = None,
+        launcher: str = None,
+        nodes: int = None,
+        # symlink_outputs: str = None,
+        # mpi_launcher: str = None,
     ):
         """
         Instantiate a new Slurm shell script (`*.job`).
@@ -85,18 +87,20 @@ class SlurmConfig(ServerConfig):
         self.modules = modules
         self.schism_binary = schism_binary
         self.extra_commands = extra_commands
-        self.launcher = launcher
+        # self.launcher = launcher
         self.nodes = nodes
-        self.symlink_outputs = symlink_outputs
-        self.mpi_launcher = mpi_launcher
+        # self.symlink_outputs = symlink_outputs
+        self.mpi_launcher = launcher
+        self.modulepath = modulepath
+        self.modules_init = modules_init
 
     def __str__(self):
         f = [
             self.MPI_LAUNCHER,
             self.SCHISM_BINARY,
-            self.SYMLINK_OUTPUTS,
+            # self.SYMLINK_OUTPUTS,
             self.SLURM_NTASKS,
-            self.SYMLINK_OUTPUTS,
+            # self.SYMLINK_OUTPUTS,
             self.SLURM_ACCOUNT,
             self.SLURM_RUN_NAME,
             self.SLURM_PARTITION,
@@ -108,6 +112,19 @@ class SlurmConfig(ServerConfig):
             self.SLURM_JOB_FILE,
         ]
 
+        # if self.modules is not None:
+        #     f.extend([
+        #         '',
+        #         f'module load {" ".join(module for module in self._modules)}'
+        #         ])
+
+        # if self._path_prefix is not None:
+        #     f += f'\n' f'PATH={self._path_prefix}:$PATH\n'
+
+        # if self._extra_commands is not None:
+        #     f += '\n'
+        #     for command in self._extra_commands:
+        #         f += f'{command}\n'
         # self.modules = modules
         # self.path_prefix = path_prefix
         # self.extra_commands = extra_commands
@@ -125,16 +142,17 @@ class SlurmConfig(ServerConfig):
 
     @property
     def walltime(self):
-        if isinstance(self.__walltime, timedelta):
-            hours, remainder = divmod(self.__walltime, timedelta(hours=1))
+        if isinstance(self._walltime, timedelta):
+            hours, remainder = divmod(self._walltime, timedelta(hours=1))
             minutes, remainder = divmod(remainder, timedelta(minutes=1))
             seconds = round(remainder / timedelta(seconds=1))
-            return f'{hours:02}:{minutes:02}:{seconds:02}'
-        return self.__walltime
+            return f"{hours:02}:{minutes:02}:{seconds:02}"
+        return self._walltime
 
     @walltime.setter
-    def walltime(self, walltime: Union[timedelta, None]):
-        self.__walltime = walltime
+    def walltime(self, walltime: Union[timedelta, str, None]):
+        assert isinstance(walltime, (timedelta, str, type(None)))
+        self._walltime = walltime
 
     @property
     def filename(self):
@@ -143,7 +161,7 @@ class SlurmConfig(ServerConfig):
     @filename.setter
     def filename(self, filename):
         if filename is None:
-            filename = 'slurm.job'
+            filename = "slurm.job"
         self.__filename = filename
 
     @property
@@ -163,7 +181,7 @@ class SlurmConfig(ServerConfig):
     @run_directory.setter
     def run_directory(self, run_directory):
         if run_directory is None:
-            run_directory = '.'
+            run_directory = "."
         self.__run_directory = run_directory
 
     @property
@@ -182,8 +200,7 @@ class SlurmConfig(ServerConfig):
 
     @mpi_launcher.setter
     def mpi_launcher(self, mpi_launcher):
-        self.__mpi_launcher = "srun" if mpi_launcher is None \
-            else mpi_launcher
+        self.__mpi_launcher = "srun" if mpi_launcher is None else mpi_launcher
 
     @property
     def SLURM_NTASKS(self):

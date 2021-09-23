@@ -1,0 +1,9 @@
+.git
+forecast
+.pyschism_env
+.vscode
+build
+dist
+.eggs
+*.egg-info
+.gitignore

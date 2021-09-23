@@ -1,5 +1,5 @@
 # PySCHISM
-![coverage](tests/coverage.svg)
+[![codecov](https://codecov.io/gh/schism-dev/pyschism/branch/main/graph/badge.svg?token=VE9PHEACBZ)](https://codecov.io/gh/schism-dev/pyschism)
 
 ## A Python interface for SCHISM model runs.
 
@@ -61,3 +61,8 @@ hgrid.write("/path/to/output/file.2dm", fmt='2dm')
 Questions, comments and suggestions are welcome. Please follow the instructions on the `CONTRIBUTING.md` file for contributions. For bug reports and feature requests, please open an issue using the issue tracker.
 Author contact: jrcalzada@wm.edu
 
+
+---
+    “Marconi is a good fellow. Let him continue. He is using seventeen of my patents.”
+    Nikola Tesla
+---

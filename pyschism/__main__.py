@@ -1,77 +1,63 @@
 #! /usr/bin/env python
 import argparse
 from datetime import datetime
+import inspect
 import logging
+import sys
 
 from pytz import timezone
 
-from pyschism.cmd.forecast.forecast import ForecastCli, add_forecast
-from pyschism.cmd.bctides import BctidesCli, add_bctides
-from pyschism.cmd.stations import StationsCli, add_stations
-from pyschism.cmd.hgrid import HgridCli, add_hgrid
-from pyschism.cmd.sms2grd import Sms2grdCli, add_sms2grd
-# from pyschism.cmd.grd2sms import Grd2smsCli, add_grd2sms
-from pyschism.cmd.fgrid.entry import FgridCli, add_fgrid
+from pyschism.cmd import *
 
 
-def parse_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--log-level",
-        choices=['info', 'warning', 'debug'],
-        default='info'
-    )
-    subparsers = parser.add_subparsers(dest='mode')
-    add_forecast(subparsers)
-    add_bctides(subparsers)
-    add_stations(subparsers)
-    add_hgrid(subparsers)
-    add_fgrid(subparsers)
-    add_sms2grd(subparsers)
-    # add_grd2sms(subparsers)
-    return parser.parse_args()
+def init_logger():
+    tmp_parser = argparse.ArgumentParser(add_help=False)
+    parser_common.add_log_level_to_parser(tmp_parser)
+    tmp_args, _ = tmp_parser.parse_known_args()
+    if tmp_args.log_level is not None:
+        logging.basicConfig(
+            format="[%(asctime)s] %(name)s %(levelname)s: %(message)s",
+            force=True,
+        )
+
+        logging.getLogger("pyschism").setLevel({
+                "warning": logging.WARNING,
+                "info": logging.INFO,
+                "debug": logging.DEBUG,
+                "critical": logging.CRITICAL,
+                "notset": logging.NOTSET,
+            }[tmp_args.log_level])
+        logging.Formatter.converter = lambda *args: datetime.now(
+            tz=timezone("UTC")
+        ).timetuple()
+
+        logging.captureWarnings(True)
 
 
 def main():
-    args = parse_args()
 
-    logging.basicConfig(
-        level={
-            'warning': logging.WARNING,
-            'info': logging.INFO,
-            'debug': logging.DEBUG,
-        }[args.log_level],
-        format='[%(asctime)s] %(name)s %(levelname)s: %(message)s',
-        force=True,
-    )
+    init_logger()
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(dest="clitype")
 
-    logging.Formatter.converter = lambda *args: datetime.now(
-        tz=timezone('UTC')).timetuple()
+    clitypes = [
+        clitype
+        for cliname, clitype in inspect.getmembers(
+            sys.modules[__name__], inspect.isclass
+        )
+        if "Cli" in cliname
+    ]
 
-    if args.mode == 'forecast':
-        ForecastCli(args)
+    for clitype in clitypes:
+        clitype.add_subparser_action(subparsers)
 
-    elif args.mode == 'hgrid':
-        HgridCli(args)
+    args = parser.parse_args()
 
-    elif args.mode == 'fgrid':
-        FgridCli(args)
-
-    elif args.mode == 'bctides':
-        BctidesCli(args)
-
-    elif args.mode == 'stations':
-        StationsCli(args)
-
-    # elif args.mode == 'grd2sms':
-    #     Grd2smsCli(args)
-
-    elif args.mode == 'sms2grd':
-        Sms2grdCli(args)
-
-    else:
-        raise NotImplementedError(f'Unhandled CLI mode: {args.mode}')
+    for clitype in clitypes:
+        if args.clitype.replace("_", "") == f"{clitype.__name__.lower()[:-3]}":
+            clitype(args)
+            break
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

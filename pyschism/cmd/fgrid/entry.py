@@ -13,13 +13,11 @@ class FgridCli:
         else:
             raise NotImplementedError(f'Unhandled CLI action: {args.action}.')
 
+    @staticmethod
+    def add_subparser_action(subparsers):
+        add_fgrid_options_to_parser(subparsers.add_parser('fgrid'))
 
-def fgrid_subparser(subparsers):
-    fgrid = subparsers.add_parser('fgrid')
-    # define subparser action
-    actions = fgrid.add_subparsers(dest='action')
-    # creating manning
+
+def add_fgrid_options_to_parser(parser):
+    actions = parser.add_subparsers(dest='action')
     manning.add_manning(actions)
-
-
-add_fgrid = fgrid_subparser

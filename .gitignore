@@ -1,3 +1,4 @@
+tests/data
 examples/example_1/staging
 build/
 dist/
@@ -9,6 +10,6 @@ forecast
 .vscode
 *.swp
 *.nc
-hgrid.*
-fgrid.*
-vgrid.*
+*.gr3
+*.ll
+.idea
