@@ -48,7 +48,7 @@ class ERA5DataInventory:
                 '12:00','13:00','14:00','15:00','16:00','17:00',
                 '18:00','19:00','20:00','21:00','22:00','23:00'
                 ],
-            'area': [self._bbox.ymax+1.0, self._bbox.xmin-1.0, self._bbox.ymin-1.0, self._bbox.xmax+1.0], # North, West, South, East. Default: global
+            'area': [self._bbox.ymax+0.5, self._bbox.xmin-0.5, self._bbox.ymin-0.5, self._bbox.xmax+0.5], # North, West, South, East. Default: global
             'format':'netcdf'
             })
  
@@ -116,7 +116,7 @@ def put_sflux_fields(iday, date, timevector, ds, nx_grid, ny_grid, air, rad, prc
     #print(file)
     rt=pd.to_datetime(str(date))
     idx=np.where(rt == timevector)[0].item()
-    times=[i/24 for i in np.arange(24)]
+    times=[i/24 for i in np.arange(25)]
 
     if air is True:
         with Dataset(OUTDIR / "sflux_air_1.{:04}.nc".format(iday+1), 'w', format='NETCDF3_CLASSIC') as dst:
@@ -307,6 +307,8 @@ class ERA5(SfluxDataset):
             self.rnday,
             bbox,
         )
+        #print(f'inventory.lon is {self.inventory.lon}')
+        #print(f'inventory.lat is {self.inventory.lat}')
     
         nx_grid, ny_grid = self.inventory.xy_grid()
         #lon_idxs, lat_idxs = self.inventory._modified_bbox_indexes()
