@@ -45,8 +45,8 @@ class Vgrid(ABC):
         raise NotImplementedError
 
     @staticmethod
-    def default():
-        return SZ.default()
+    def default(h_s, ztot, h_c, theta_b, theta_f, sigma):
+        return SZ.default(h_s, ztot, h_c, theta_b, theta_f, sigma)
 
     @classmethod
     def from_binary(cls, hgrid, binary='gen_vqs'):
@@ -233,9 +233,10 @@ class SZ(Vgrid):
         return cls(h_s, ztot, h_c, theta_b, theta_f, sigma)
 
     @classmethod
-    def default(cls):
+    def default(cls, h_s, ztot, h_c, theta_b, theta_f, sigma):
         # h_s, ztot, h_c, theta_b, theta_f, sigma
-        return cls(1.e6, [-1.e6], 40., 1., 1.e-4, [-1, 0.])
+        #return cls(1.e6, [-1.e6], 40., 1., 1.e-4, [-1, 0.])
+        return cls(h_s, ztot, h_c, theta_b, theta_f, sigma)
 
     @property
     def kz(self):

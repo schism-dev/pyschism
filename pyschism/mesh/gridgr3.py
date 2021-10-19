@@ -209,6 +209,44 @@ class ElevIc(IcField):
         obj.values[idxs] = hgrid.values[idxs] + offset
         return obj
 
+    @classmethod
+    def modify_by_region(cls, hgrid, region, lonc = -77.07, latc = 24.0, offset=0.1):
+        #convert hgrid from lon/lat to cpp
+        hgrid = hgrid.copy()
+        hgrid.nodes.transform_to_cpp(lonc, latc)
+        #xy = hgrid.nodes.coords
+        #x = xy[:, 0]
+        #y = xy[:, 1]
+
+        lines=[line.strip().split() for line in open(region, 'r').readlines()]
+        data=np.squeeze(np.array([lines[3:]])).astype('float')
+        x=data[:,0]
+        y=data[:,1]
+        coords = list( zip(x, y))
+        poly = Polygon(coords)
+
+        #region is in cpp projection 
+        gdf1 = gpd.GeoDataFrame(
+                {'geometry': [poly]})
+
+        points = [Point(*coord) for coord in hgrid.nodes.coords]
+        gdf2 = gpd.GeoDataFrame(
+                 {'geometry': points, 'index': list(range(len(points)))})
+        gdf_in = gpd.sjoin(gdf2, gdf1, op="within")
+        picks = [i.index for i in gdf_in.itertuples()]
+
+        #generate include.gr3
+        obj = cls.constant(hgrid, 0)
+        obj.values[picks] = 1
+        obj.description = 'include.reg, in: 1, out: 0'
+        obj.write('include.gr3', overwrite=True)
+
+        elevic = hgrid.copy()
+        idxs = np.where(obj.values == 0)
+        elevic.nodes.values[idxs] = np.maximum(0, -elevic.nodes.values[idxs])
+        idxs = np.where(obj.values == 1)
+        elevic.nodes.values[idxs] = np.maximum(0, -elevic.nodes.values[idxs]-offset)
+        return elevic 
 
 class TempIc(IcField):
     @classmethod
