@@ -27,19 +27,19 @@ logger = logging.getLogger(__name__)
 def get_database(date, Bbox=None):
     if date >= datetime(2018, 12, 4):
         database = f'GLBy0.08/expt_93.0'
-    elif date >= datetime(2018, 1, 1) and date < datetime(2020, 2, 18):
+    elif date >= datetime(2018, 1, 1) and date < datetime(2018, 12, 4):
         database = f'GLBv0.08/expt_93.0'
-    elif date >= datetime(2017, 10, 1) and date < datetime(2017, 12, 31):
+    elif date >= datetime(2017, 10, 1) and date < datetime(2018, 1, 1):
         database = f'GLBv0.08/expt_92.9'
-    elif date >= datetime(2017, 6, 1) and date < datetime(2017, 9, 30):
+    elif date >= datetime(2017, 6, 1) and date < datetime(2017, 10, 1):
         database = f'GLBv0.08/expt_57.7'
-    elif date >= datetime(2017, 2, 1) and date < datetime(2017, 5, 31):
+    elif date >= datetime(2017, 2, 1) and date < datetime(2017, 6, 1):
         database = f'GLBv0.08/expt_92.8'
-    elif date >= datetime(2016, 5, 1) and date < datetime(2017, 1, 31):
+    elif date >= datetime(2016, 5, 1) and date < datetime(2017, 2, 1):
         database = f'GLBv0.08/expt_57.2'
-    elif date >= datetime(2016, 1, 1) and date < datetime(2016, 4, 30):
+    elif date >= datetime(2016, 1, 1) and date < datetime(2016, 5, 1):
         database = f'GLBv0.08/expt_56.3'
-    elif date >= datetime(1994, 1, 1) and date < datetime(2015, 12, 31):
+    elif date >= datetime(1994, 1, 1) and date < datetime(2016, 1, 1):
         database = f'GLBv0.08/expt_53.X/data/{date.year}'
     else:
         print('No data for {date}')
@@ -68,24 +68,40 @@ def get_idxs(date, database, bbox):
     #print(lat_idxs)
     lon_idx1=lon_idxs[0].item()
     lon_idx2=lon_idxs[-1].item()
-    print(f'lon_idx1 is {lon_idx1}, lon_idx2 is {lon_idx2}')
+    #print(f'lon_idx1 is {lon_idx1}, lon_idx2 is {lon_idx2}')
     lat_idx1=lat_idxs[0].item()
     lat_idx2=lat_idxs[-1].item()
-    print(f'lat_idx1 is {lat_idx1}, lat_idx2 is {lat_idx2}')
+    #print(f'lat_idx1 is {lat_idx1}, lat_idx2 is {lat_idx2}')
     
     for ilon in np.arange(len(lon)):
         if lon[ilon] > 180:
             lon[ilon] = lon[ilon]-360.
     x2, y2=transform_ll_to_cpp(lon, lat)
 
-    time_idx=np.where( date == times)[0].item()
+    idxs=np.where( date == times)[0]
+    #check if time_idx is empty
+    if len(idxs) == 0:
+        #If there is missing data, use the data from the previous days, the maximum searching days is 3. Otherwise, stop.
+        for i in np.arange(0,3):
+            date_before=(date - timedelta(days=int(i)+1)) #.astype(datetime)
+            print(f'Try replacing the missing data from {date_before}')
+            idxs=np.where(date_before == times)[0]
+            if len(idxs) == 0:
+                continue
+            else:
+                break
+    if len(idxs) ==0:
+        print(f'No date for date {date}')
+        sys.exit()
+    time_idx=idxs.item()  
+
     return time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2
 
 def transform_ll_to_cpp(lon, lat, lonc=-77.07, latc=24.0):
     #lonc=(np.max(lon)+np.min(lon))/2.0
-    print(f'lonc is {lonc}')
+    #print(f'lonc is {lonc}')
     #latc=(np.max(lat)+np.min(lat))/2.0
-    print(f'latc is {latc}')
+    #print(f'latc is {latc}')
     longitude=lon/180*np.pi
     latitude=lat/180*np.pi
     radius=6378206.4
@@ -196,9 +212,9 @@ class OpenBoundaryInventory():
             t0=time()
 
             database=get_database(date)
-            print(database)
+            print(f'Fetching data for {date} from database {database}')
 
-            if date.strftime("%Y-%m-%d") >= datetime(2018, 1, 1).strftime("%Y-%m-%d"):
+            if date.strftime("%Y-%m-%d") >= datetime(2017, 10, 1).strftime("%Y-%m-%d"):
                 xmin = xmin + 360. if xmin < 0 else xmin
                 xmax = xmax + 360. if xmax < 0 else xmax
                 bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
@@ -234,7 +250,7 @@ class OpenBoundaryInventory():
             uvel=np.squeeze(ds['water_u'][:,:,:])
             vvel=np.squeeze(ds['water_v'][:,:,:])
             ssh=np.squeeze(ds['surf_el'][:,:])
-            print(f'The shape of temp is {temp.shape}')
+            #print(f'The shape of temp is {temp.shape}')
 
             #Convert temp to potential temp
             nz=temp.shape[0]
@@ -510,7 +526,7 @@ class Nudge:
             database=get_database(date)
             print(database)
 
-            if date.strftime("%Y-%m-%d") >= datetime(2018, 1, 1).strftime("%Y-%m-%d"):
+            if date.strftime("%Y-%m-%d") >= datetime(2017, 10, 1).strftime("%Y-%m-%d"):
                 xmin = xmin + 360. if xmin < 0 else xmin
                 xmax = xmax + 360. if xmax < 0 else xmax
                 bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)

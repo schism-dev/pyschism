@@ -128,19 +128,19 @@ class GofsForecastDatasets(GofsDatasetCollection):
 def get_database(date, Bbox=None):
     if date >= datetime(2018, 12, 4):
         database = f'GLBy0.08/expt_93.0'
-    elif date >= datetime(2018, 1, 1) and date < datetime(2018, 12, 3):
+    elif date >= datetime(2018, 1, 1) and date < datetime(2018, 12, 4):
         database = f'GLBv0.08/expt_93.0'
-    elif date >= datetime(2017, 10, 1) and date < datetime(2017, 12, 31):
+    elif date >= datetime(2017, 10, 1) and date < datetime(2018, 1, 1):
         database = f'GLBv0.08/expt_92.9'
-    elif date >= datetime(2017, 6, 1) and date < datetime(2017, 9, 30):
+    elif date >= datetime(2017, 6, 1) and date < datetime(2017, 10, 1):
         database = f'GLBv0.08/expt_57.7'
-    elif date >= datetime(2017, 2, 1) and date < datetime(2017, 5, 31):
+    elif date >= datetime(2017, 2, 1) and date < datetime(2017, 6, 1):
         database = f'GLBv0.08/expt_92.8'
-    elif date >= datetime(2016, 5, 1) and date < datetime(2017, 1, 31):
+    elif date >= datetime(2016, 5, 1) and date < datetime(2017, 2, 1):
         database = f'GLBv0.08/expt_57.2'
-    elif date >= datetime(2016, 1, 1) and date < datetime(2016, 4, 30):
+    elif date >= datetime(2016, 1, 1) and date < datetime(2016, 5, 1):
         database = f'GLBv0.08/expt_56.3'
-    elif date >= datetime(1994, 1, 1) and date < datetime(2015, 12, 31):
+    elif date >= datetime(1994, 1, 1) and date < datetime(2016, 1, 3):
         database = f'GLBv0.08/expt_53.X/data/{self.start_date.year}'
     else:
         print('No data for {self.start_date}')

@@ -6,6 +6,7 @@ import logging
 from multiprocessing import Pool, cpu_count
 import os
 import pathlib
+import posixpath
 import shutil
 
 import tarfile
@@ -323,6 +324,24 @@ class NWMElementPairings:
                 raise Exception("Found more than 1 NWM hydrofabric file.")
         self.__nwm_file = nwm_file
 
+def get_aggregated_features(nc_feature_id, features):
+    aggregated_features = []
+    for source_feats in features:
+        aggregated_features.extend(list(source_feats))
+
+    in_file=[]
+    for feature in aggregated_features:
+        idx=np.where(nc_feature_id == int(feature))[0]
+        in_file.append(idx.item())
+
+    in_file_2 = []
+    sidx = 0
+    for source_feats in features:
+        eidx = sidx + len(source_feats)
+        #in_file_2.append(in_file[sidx:eidx].tolist())
+        in_file_2.append(in_file[sidx:eidx])
+        sidx = eidx
+    return in_file_2
 
 def streamflow_lookup(file, indexes, threshold=-1e-5):
     nc = Dataset(file)
@@ -333,7 +352,6 @@ def streamflow_lookup(file, indexes, threshold=-1e-5):
         # Note: Dataset already consideres scale factor and offset.
         data.append(np.sum(streamflow[indxs]))
     return data
-
 
 class AWSDataInventory(ABC):
     def __new__(
@@ -347,6 +365,12 @@ class AWSDataInventory(ABC):
         ):
             return AWSHindcastInventory.__new__(cls)
 
+        # GOOGLEHindcastInventory -> January 2019 through 30 days earlier than today
+        elif start_date >= dates.localize_datetime(
+            datetime(2019, 1, 1, 0, 0)
+        ) and start_date + rnday < dates.nearest_zulu() - timedelta(days=30):
+            return GOOGLEHindcastInventory.__new__(cls)
+
         elif start_date >= dates.nearest_zulu() - timedelta(days=30):
             return AWSForecastInventory.__new__(cls)
 
@@ -355,50 +379,50 @@ class AWSDataInventory(ABC):
                 f"No NWM model data for start_date {start_date} and end_date {start_date+rnday}."
             )
 
-    @abstractmethod
-    def request_data(self, request_time):
+    #@abstractmethod
+    #def request_data(self, request_time):
+    #    raise NotImplementedError
+
+    #@property
+    #@abstractmethod
+    #def bucket(self):
         raise NotImplementedError
 
-    @property
-    @abstractmethod
-    def bucket(self):
-        raise NotImplementedError
+    #def get_nc_pairing_indexes(self, pairings: NWMElementPairings):
+    #    nc_feature_id = Dataset(list(self.files.values())[0])["feature_id"][:]
 
-    def get_nc_pairing_indexes(self, pairings: NWMElementPairings):
-        nc_feature_id = Dataset(list(self.files.values())[0])["feature_id"][:]
+    #    def get_aggregated_features(features):
+    #        aggregated_features = []
+    #        for source_feats in features:
+    #            aggregated_features.extend(list(source_feats))
+    #        in_file = []
+    #        for feature in aggregated_features:
+    #            idx = np.where(nc_feature_id == int(feature))[0]
+    #            in_file.append(idx.item())
+    #        in_file_2 = []
+    #        sidx = 0
+    #        for source_feats in features:
+    #            eidx = sidx + len(source_feats)
+    #            in_file_2.append(in_file[sidx:eidx])
+    #            sidx = eidx
+    #        return in_file_2
 
-        def get_aggregated_features(features):
-            aggregated_features = []
-            for source_feats in features:
-                aggregated_features.extend(list(source_feats))
-            in_file = []
-            for feature in aggregated_features:
-                idx = np.where(nc_feature_id == int(feature))[0]
-                in_file.append(idx.item())
-            in_file_2 = []
-            sidx = 0
-            for source_feats in features:
-                eidx = sidx + len(source_feats)
-                in_file_2.append(in_file[sidx:eidx])
-                sidx = eidx
-            return in_file_2
-
-        sources = get_aggregated_features(pairings.sources.values())
-        sinks = get_aggregated_features(pairings.sinks.values())
-        return sources, sinks
+    #    sources = get_aggregated_features(pairings.sources.values())
+    #    sinks = get_aggregated_features(pairings.sinks.values())
+    #    return sources, sinks
 
     @property
     def nearest_cycle(self) -> datetime:
         return dates.nearest_cycle(self.start_date)
 
-    @property
-    def s3(self):
-        try:
-            return self._s3
-        except AttributeError:
-            self._s3 = boto3.client(
-                "s3", config=Config(signature_version=UNSIGNED))
-            return self._s3
+    #@property
+    #def s3(self):
+    #    try:
+    #        return self._s3
+    #    except AttributeError:
+    #        self._s3 = boto3.client(
+    #            "s3", config=Config(signature_version=UNSIGNED))
+    #        return self._s3
 
     @property
     def tmpdir(self):
@@ -492,6 +516,7 @@ class AWSHindcastInventory(AWSDataInventory):
             cached_file = list(self.tmpdir.glob(f'**/{filename.name}'))
             if len(cached_file) == 1:
                 filename = cached_file[0]
+                logger.info(f"Using cached file {filename}, ")
             else:
                 filename.parent.mkdir(parents=True, exist_ok=True)
                 tmpfile = tempfile.NamedTemporaryFile().name
@@ -504,6 +529,15 @@ class AWSHindcastInventory(AWSDataInventory):
     @property
     def bucket(self):
         return "noaa-nwm-retro-v2.0-pds"
+
+    @property
+    def s3(self):
+        try:
+            return self._s3
+        except AttributeError:
+            self._s3 = boto3.client(
+                "s3", config=Config(signature_version=UNSIGNED))
+            return self._s3
 
     @property
     def output_interval(self) -> timedelta:
@@ -537,6 +571,101 @@ class AWSHindcastInventory(AWSDataInventory):
             raise TypeError(
                 f"Unhandled argument cache={cache} of type {type(cache)}.")
 
+class GOOGLEHindcastInventory(AWSDataInventory):
+    def __new__(cls):
+        return object.__new__(GOOGLEHindcastInventory)
+
+    def __init__(
+        self,
+        start_date: datetime = None,
+        rnday: Union[int, float, timedelta] = timedelta(days=5.0),
+        product='analysis_assim.channel_rt',
+        verbose=False,
+        fallback=True,
+        cache=None,
+    ):
+
+        self.start_date = dates.nearest_cycle() if start_date is None \
+            else dates.nearest_cycle(dates.localize_datetime(start_date))
+        # self.start_date = self.start_date.replace(tzinfo=None)
+        self.rnday = rnday if isinstance(rnday, timedelta) \
+            else timedelta(days=rnday)
+        self.product = product
+        self.verbose = verbose
+        self.fallback = fallback
+        self.cache = cache
+        self._files = {_: None for _ in np.arange(
+            self.start_date,
+            self.start_date + self.rnday + self.output_interval,
+            self.output_interval
+        ).astype(datetime)}
+
+        timevector=np.arange(datetime(self.start_date.year, 1, 1),
+            datetime(self.start_date.year+1,1, 1),
+            np.timedelta64(1, 'h'),
+            dtype='datetime64')
+
+        for requested_time, _ in self._files.items():
+            #print(f'Requesting NWM data for time {requested_time}')
+            print(f'Requesting NWM data for time {requested_time}')
+            logger.info(f'Requesting NWM data for time {requested_time}')
+
+            self._files[requested_time] = self.request_data(requested_time)
+
+    def request_data(self, request_time):
+
+        fname = self.tmpdir / f'{request_time.strftime("%Y%m%d%H")}00.CHRTOUT_DOMAIN1.comp'
+        if fname.is_file():
+            cached_file = list(self.tmpdir.glob(f'**/{fname.name}'))
+            if len(cached_file) == 1:
+                fname = cached_file[0]
+                logger.info(f'Use cached file {fname}')
+            else:
+          
+                fname = f'./analysis_assim/{request_time.strftime("%Y%m%d%H")}00.CHRTOUT_DOMAIN1.comp'
+
+                logger.info(f'Downloading file {request_time}, ')
+        #nwm.20180917/forcing_medium_range/nwm.t12z.medium_range.forcing.f160.conus.nc
+        #https://storage.googleapis.com/national-water-model/nwm.20210409/analysis_assim/nwm.t00z.analysis_assim.channel_rt.tm01.conus.nc
+                url=f'https://storage.googleapis.com/national-water-model/nwm.{request_time.strftime("%Y%m%d")}' \
+                    f'/analysis_assim/nwm.t{request_time.strftime("%H")}z.analysis_assim.channel_rt.tm00.conus.nc'
+                logger.info(f'{url}')
+                wget.download(url, fname)
+        return fname
+
+    @property
+    def output_interval(self) -> timedelta:
+        return {
+            'analysis_assim.channel_rt': timedelta(hours=1)
+        }[self.product]
+
+    @property
+    def cached_files(self):
+        return sorted(list(self.tmpdir.glob("**/*.comp")))
+
+    @property
+    def cache(self):
+        return self._cache
+
+    @cache.setter
+    def cache(self, cache: Union[str, os.PathLike, None, bool]):
+        if cache is None or cache is False:
+            self._cache = False
+        elif cache is True:
+            self._cache = pathlib.Path(
+                appdirs.user_cache_dir(
+                    f"pyschism/nwm/hindcast_data/{self.product}")
+            )
+            self._cache.mkdir(exist_ok=True, parents=True)
+            self._tmpdir = self._cache
+
+        elif isinstance(cache, (str, os.PathLike)):
+            self._cache = pathlib.Path(cache)
+            self._cache.mkdir(exist_ok=True, parents=True)
+            self._tmpdir = self._cache
+        else:
+            raise TypeError(
+                f"Unhandled argument cache={cache} of type {type(cache)}.")
 
 class AWSForecastInventory(AWSDataInventory):
     def __new__(cls):
@@ -585,7 +714,7 @@ class AWSForecastInventory(AWSDataInventory):
         for requested_time, _ in self._files.items():
             logger.info(f"Requesting NWM data for time {requested_time}")
             self._files[requested_time] = self.request_data(requested_time)
-
+        
     def request_data(self, request_time):
 
         file_metadata = list(
@@ -626,6 +755,15 @@ class AWSForecastInventory(AWSDataInventory):
     @property
     def bucket(self):
         return "noaa-nwm-pds"
+    
+    @property
+    def s3(self):
+        try:
+            return self._s3
+        except AttributeError:
+            self._s3 = boto3.client(
+                "s3", config=Config(signature_version=UNSIGNED))
+            return self._s3
 
     @property
     def output_interval(self) -> timedelta:
@@ -715,20 +853,40 @@ class NationalWaterModel(SourceSink):
             dates.localize_datetime(d) for d in self.inventory.files.keys()
         ]
 
-        src_idxs, snk_idxs = self.inventory.get_nc_pairing_indexes(
-            self.pairings)
-        logger.info(f'Start aggregating NWM timeseries using nprocs={nprocs}')
-        start = datetime.now()
-        with Pool(processes=nprocs) as pool:
-            sources = pool.starmap(
-                streamflow_lookup,
-                [(file, src_idxs) for file in self.inventory.files.values()],
-            )
-            sinks = pool.starmap(
-                streamflow_lookup,
-                [(file, snk_idxs) for file in self.inventory.files.values()],
-            )
-        pool.join()
+        #src_idxs, snk_idxs = self.inventory.get_nc_pairing_indexes(
+        #    self.pairings)
+        #logger.info(f'Start aggregating NWM timeseries using nprocs={nprocs}')
+        start0 = datetime.now()
+        #with Pool(processes=nprocs) as pool:
+        #    sources = pool.starmap(
+        #        streamflow_lookup,
+        #        [(file, self.pairings.sources) for file in self.inventory.files.values()],
+        #    )
+        #    sinks = pool.starmap(
+        #        streamflow_lookup,
+        #        [(file, self.pairings.sinks) for file in self.inventory.files.values()],
+        #    )
+        #pool.join()
+
+        sources = []
+        sinks = []
+        nc_fid0 = Dataset(list(self.inventory.files.values())[0])["feature_id"][:]
+        src_idxs = get_aggregated_features(nc_fid0, self.pairings.sources.values())
+        snk_idxs = get_aggregated_features(nc_fid0, self.pairings.sinks.values())
+        for file in self.inventory.files.values():
+            start = datetime.now()
+            nc = Dataset(file)
+            ncfeatureid=nc['feature_id'][:]
+            if not np.all(ncfeatureid == nc_fid0):
+                logger.info(f'Indexes of feature_id are changed in  {file}')
+                src_idxs=get_aggregated_features(ncfeatureid, self.pairings.sources.values())
+                snk_idxs=get_aggregated_features(ncfeatureid, self.pairings.sinks.values())
+                nc_fid0 = ncfeatureid
+
+            sources.append(streamflow_lookup(file, src_idxs))
+            sinks.append(streamflow_lookup(file, snk_idxs))
+            logger.info(f'Processing file {file} took {datetime.now() - start}')
+
         source_data = {}
         sink_data = {}
         for i, file in enumerate(self.inventory.files.values()):
@@ -748,7 +906,7 @@ class NationalWaterModel(SourceSink):
                 sink_data.setdefault(_time, {})[element_id] = {
                     "flow": -sinks[i][k],
                 }
-        logger.info(f'Timeseries aggregation took {datetime.now() - start}')
+        logger.info(f'Timeseries aggregation took {datetime.now() - start0}')
         self._sources = Sources(source_data)
         self._sinks = Sinks(sink_data)
         self._data = {**source_data, **sink_data}

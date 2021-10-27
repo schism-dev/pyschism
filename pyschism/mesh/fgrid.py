@@ -133,13 +133,13 @@ class ManningsN(Fgrid):
 
         # Inspired by https://github.com/schism-dev/schism/blob/master/src/Utility/Pre-Processing/NWM/Manning/write_manning.py
         obj = cls.constant(hgrid, np.nan)
-        min_depth = np.min(hgrid.values) if min_depth is None \
+        min_depth = np.min(-hgrid.values) if min_depth is None \
             else float(min_depth)
-        max_depth = np.max(hgrid.values) if max_depth is None \
+        max_depth = np.max(-hgrid.values) if max_depth is None \
             else float(max_depth)
 
         values = (
-                min_value + (hgrid.values - min_depth)
+                min_value + (-hgrid.values - min_depth)
                 * (max_value - min_value) / (max_depth - min_depth))
 
         if min_value is not None:
