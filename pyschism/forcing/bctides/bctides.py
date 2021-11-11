@@ -230,10 +230,14 @@ class Bctides(metaclass=BctidesMeta):
             for job in jobs:
                 job.join()
         else:
-            write_elev2D()
-            write_uv3D()
-            write_tem3D()
-            write_sal3D()
+            if elev2D:
+                write_elev2D()
+            if uv3D:
+                write_uv3D()
+            if tem3D:
+                write_tem3D()
+            if sal3D:
+                write_sal3D()
 
         # def write_tracer(tracer):
         #     tracer.write()

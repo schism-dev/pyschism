@@ -141,9 +141,9 @@ def get_database(date, Bbox=None):
     elif date >= datetime(2016, 1, 1) and date < datetime(2016, 5, 1):
         database = f'GLBv0.08/expt_56.3'
     elif date >= datetime(1994, 1, 1) and date < datetime(2016, 1, 3):
-        database = f'GLBv0.08/expt_53.X/data/{self.start_date.year}'
+        database = f'GLBv0.08/expt_53.X/data/{date.year}'
     else:
-        print('No data for {self.start_date}')
+        print('No data for {date}')
     return database
 
 class GofsHindcastDatasets(GofsDatasetCollection):

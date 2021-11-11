@@ -43,10 +43,14 @@ class Vgrid(ABC):
     @abstractmethod
     def __str__(self):
         raise NotImplementedError
+    
+    @staticmethod
+    def default():
+        return SZ.default() 
 
     @staticmethod
-    def default(h_s, ztot, h_c, theta_b, theta_f, sigma):
-        return SZ.default(h_s, ztot, h_c, theta_b, theta_f, sigma)
+    def v2d(h_s, ztot, h_c, theta_b, theta_f, sigma):
+        return SZ._v2d(h_s, ztot, h_c, theta_b, theta_f, sigma)
 
     @classmethod
     def from_binary(cls, hgrid, binary='gen_vqs'):
@@ -233,9 +237,13 @@ class SZ(Vgrid):
         return cls(h_s, ztot, h_c, theta_b, theta_f, sigma)
 
     @classmethod
-    def default(cls, h_s, ztot, h_c, theta_b, theta_f, sigma):
+    def default(cls):
         # h_s, ztot, h_c, theta_b, theta_f, sigma
-        #return cls(1.e6, [-1.e6], 40., 1., 1.e-4, [-1, 0.])
+        return cls(1.e6, [-1.e6], 40., 1., 1.e-4, [-1, 0.])
+        #return cls(h_s, ztot, h_c, theta_b, theta_f, sigma)
+
+    @classmethod
+    def _v2d(cls, h_s, ztot, h_c, theta_b, theta_f, sigma):
         return cls(h_s, ztot, h_c, theta_b, theta_f, sigma)
 
     @property
