@@ -388,29 +388,6 @@ class AWSDataInventory(ABC):
     #def bucket(self):
         raise NotImplementedError
 
-    #def get_nc_pairing_indexes(self, pairings: NWMElementPairings):
-    #    nc_feature_id = Dataset(list(self.files.values())[0])["feature_id"][:]
-
-    #    def get_aggregated_features(features):
-    #        aggregated_features = []
-    #        for source_feats in features:
-    #            aggregated_features.extend(list(source_feats))
-    #        in_file = []
-    #        for feature in aggregated_features:
-    #            idx = np.where(nc_feature_id == int(feature))[0]
-    #            in_file.append(idx.item())
-    #        in_file_2 = []
-    #        sidx = 0
-    #        for source_feats in features:
-    #            eidx = sidx + len(source_feats)
-    #            in_file_2.append(in_file[sidx:eidx])
-    #            sidx = eidx
-    #        return in_file_2
-
-    #    sources = get_aggregated_features(pairings.sources.values())
-    #    sinks = get_aggregated_features(pairings.sinks.values())
-    #    return sources, sinks
-
     @property
     def nearest_cycle(self) -> datetime:
         return dates.nearest_cycle(self.start_date)
@@ -700,7 +677,7 @@ class AWSForecastInventory(AWSDataInventory):
         self._files = {
             _: None
             for _ in np.arange(
-                self.start_date,
+                self.start_date + timedelta(hours=3),
                 self.start_date + self.rnday + self.output_interval,
                 self.output_interval,
             ).astype(datetime)
@@ -718,7 +695,7 @@ class AWSForecastInventory(AWSDataInventory):
     def request_data(self, request_time):
 
         file_metadata = list(
-            reversed(
+#            reversed(
                 sorted(
                     [
                         _["Key"]
@@ -727,9 +704,9 @@ class AWSForecastInventory(AWSDataInventory):
                     ]
                 )
             )
-        )
+#        )
 
-        for key in file_metadata[0:240:3]:
+        for key in file_metadata[0:240]:
             if request_time != self.key2date(key):
                 continue
             filename = self.tmpdir / key
@@ -777,9 +754,9 @@ class AWSForecastInventory(AWSDataInventory):
             self.output_interval,
         ).astype(datetime)
 
-    @property
-    def files(self):
-        return sorted(list(self.tmpdir.glob("**/*.nc")))
+    #@property
+    #def files(self):
+    #    return sorted(list(self.tmpdir.glob("**/*.nc")))
 
     @property
     def requested_product(self):
