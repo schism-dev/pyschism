@@ -60,7 +60,7 @@ def get_idxs(date, database, bbox):
     lon=ds['lon'][:]
     lat=ds['lat'][:]
     dep=ds['depth'][:]
-    lat_idxs=np.where((lat>=bbox.ymin)&(lat<=bbox.ymax))[0]
+    lat_idxs=np.where((lat>=bbox.ymin-2.0)&(lat<=bbox.ymax+2.0))[0]
     lon_idxs=np.where((lon>=bbox.xmin-2.0) & (lon<=bbox.xmax+2.0))[0]
     lon=lon[lon_idxs]
     lat=lat[lat_idxs]
@@ -76,6 +76,10 @@ def get_idxs(date, database, bbox):
     for ilon in np.arange(len(lon)):
         if lon[ilon] > 180:
             lon[ilon] = lon[ilon]-360.
+    #lonc=(np.max(lon)+np.min(lon))/2.0
+    #print(f'lonc is {lonc}')
+    #latc=(np.max(lat)+np.min(lat))/2.0
+    #print(f'latc is {latc}')
     x2, y2=transform_ll_to_cpp(lon, lat)
 
     idxs=np.where( date == times)[0]
@@ -142,14 +146,13 @@ def interp_to_points_2d(y2, x2, bxy, val):
         sys.exit()
     return val_int
 
-class OpenBoundaryInventory():
+class OpenBoundaryInventory:
 
-    def __init__(self):
+    def __init__(self, hgrid, vgrid=None):
+        self.hgrid = hgrid
+        self.vgrid = Vgrid.default() if vgrid is None else vgrid
 
-        pass
-
-    def fetch_data(self, outdir: Union[str, os.PathLike], hgrid, vgrid, start_date, rnday):
-
+    def fetch_data(self, outdir: Union[str, os.PathLike], start_date, rnday, elev2D=True, TS=True, UV=True, adjust2D=False, lats=None, msl_shifts=None): 
         outdir = pathlib.Path(outdir)
 
         self.start_date = start_date
@@ -159,53 +162,121 @@ class OpenBoundaryInventory():
             self.start_date + timedelta(days=self.rnday+1),
             timedelta(days=1)).astype(datetime)
 
-        vd=Vgrid.open(vgrid)
-        sigma=vd.sigma
-
-        #get bathymetry
-        depth = hgrid.values
-
-        #compute zcor
-        zcor = depth[:,None]*sigma
-        nvrt=zcor.shape[1]
-        #print(f'zcor at node 1098677 is {zcor[1098676,:]}')
-
         #Get open boundary 
-        gdf=hgrid.boundaries.open.copy()
+        gdf=self.hgrid.boundaries.open.copy()
         opbd=[]
         for boundary in gdf.itertuples():
             opbd.extend(list(boundary.indexes))
-        blon = hgrid.coords[opbd,0]
-        blat = hgrid.coords[opbd,1]
-        
+        blon = self.hgrid.coords[opbd,0]
+        blat = self.hgrid.coords[opbd,1]
         NOP = len(blon)
-        xi,yi = transform_ll_to_cpp(blon, blat)
-        bxy = np.c_[yi, xi]
 
-        zcor2=zcor[opbd,:]
-        idxs=np.where(zcor2 > 5000)
-        #print(idxs)
-        zcor2[idxs]=5000.0-1.0e-6
-        print(f'zcor2 at node 200 is {zcor2[199,:]}')
+        #calculate zcor for 3D
+        if TS or UV:
+            vd=Vgrid.open(self.vgrid)
+            sigma=vd.sigma
 
-        xmin, xmax = np.min(blon), np.max(blon)
-        ymin, ymax = np.min(blat), np.max(blat)
+            #get bathymetry
+            depth = self.hgrid.values
 
-        #construct schism grid
-        x2i=np.tile(xi,[nvrt,1]).T
-        y2i=np.tile(yi,[nvrt,1]).T
-        bxyz=np.c_[zcor2.reshape(np.size(zcor2)),y2i.reshape(np.size(y2i)),x2i.reshape(np.size(x2i))]
-        print('Computing SCHISM zcor is done!')
+            #compute zcor
+            zcor = depth[:,None]*sigma
+            nvrt=zcor.shape[1]
 
+            #zcor2=zcor[opbd,:]
+            #idxs=np.where(zcor2 > 5000)
+            #zcor2[idxs]=5000.0-1.0e-6
+
+            #construct schism grid
+            #x2i=np.tile(xi,[nvrt,1]).T
+            #y2i=np.tile(yi,[nvrt,1]).T
+            #bxyz=np.c_[zcor2.reshape(np.size(zcor2)),y2i.reshape(np.size(y2i)),x2i.reshape(np.size(x2i))]
+            #print('Computing SCHISM zcor is done!')
+
+        #create netcdf
         ntimes=self.rnday+1
         nComp1=1
         nComp2=2
         one=1
-        timeseries_s=np.zeros([ntimes,NOP,nvrt,nComp1])
-        timeseries_t=np.zeros([ntimes,NOP,nvrt,nComp1])
-        timeseries_el=np.zeros([ntimes,NOP,nComp1])
-        timeseries_uv=np.zeros([ntimes,NOP,nvrt,nComp2])
         ndt=np.zeros([ntimes])
+
+        if elev2D:
+            timeseries_el=np.zeros([ntimes,NOP,nComp1])
+            #create netcdf 
+            dst_elev = Dataset(outdir / 'elev2D.th.nc', 'w', format='NETCDF4')
+            #dimensions
+            dst_elev.createDimension('nOpenBndNodes', NOP)
+            dst_elev.createDimension('one', one)
+            dst_elev.createDimension('time', None)
+            dst_elev.createDimension('nLevels', one)
+            dst_elev.createDimension('nComponents', nComp1)
+
+            #variables
+            dst_elev.createVariable('time_step', 'f', ('one',))
+            dst_elev['time_step'][:] = 86400
+
+            dst_elev.createVariable('time', 'f', ('time',))
+            dst_elev['time'][:] = ndt
+
+            dst_elev.createVariable('time_series', 'f', ('time', 'nOpenBndNodes', 'nLevels', 'nComponents'))
+            dst_elev['time_series'][:,:,:,:] = timeseries_el
+
+        if TS:
+            #timeseries_s=np.zeros([ntimes,NOP,nvrt,nComp1])
+            dst_salt = Dataset(outdir / 'SAL_3D.th.nc', 'w', format='NETCDF4')
+            #dimensions
+            dst_salt.createDimension('nOpenBndNodes', NOP)
+            dst_salt.createDimension('one', one)
+            dst_salt.createDimension('time', None)
+            dst_salt.createDimension('nLevels', nvrt)
+            dst_salt.createDimension('nComponents', nComp1)
+            #variables
+            dst_salt.createVariable('time_step', 'f', ('one',))
+            dst_salt['time_step'][:] = 86400
+
+            dst_salt.createVariable('time', 'f', ('time',))
+            dst_salt['time'][:] = ndt
+
+            dst_salt.createVariable('time_series', 'f', ('time', 'nOpenBndNodes', 'nLevels', 'nComponents'))
+
+            #temp
+            timeseries_t=np.zeros([ntimes,NOP,nvrt,nComp1])
+
+            dst_temp =  Dataset(outdir / 'TEM_3D.th.nc', 'w', format='NETCDF4')
+            #dimensions
+            dst_temp.createDimension('nOpenBndNodes', NOP)
+            dst_temp.createDimension('one', one)
+            dst_temp.createDimension('time', None)
+            dst_temp.createDimension('nLevels', nvrt)
+            dst_temp.createDimension('nComponents', nComp1)
+            #variables
+            dst_temp.createVariable('time_step', 'f', ('one',))
+            dst_temp['time_step'][:] = 86400
+
+            dst_temp.createVariable('time', 'f', ('time',))
+            dst_temp['time'][:] = ndt
+
+            dst_temp.createVariable('time_series', 'f', ('time', 'nOpenBndNodes', 'nLevels', 'nComponents'))
+            dst_temp['time_series'][:,:,:,:] = timeseries_t
+
+        if UV:
+            #timeseries_uv=np.zeros([ntimes,NOP,nvrt,nComp2])
+            dst_uv = Dataset(outdir / 'uv3D.th.nc', 'w', format='NETCDF4')
+            #dimensions
+            dst_uv.createDimension('nOpenBndNodes', NOP)
+            dst_uv.createDimension('one', one)
+            dst_uv.createDimension('time', None)
+            dst_uv.createDimension('nLevels', nvrt)
+            dst_uv.createDimension('nComponents', nComp2)
+            #variables
+            dst_uv.createVariable('time_step', 'f', ('one',))
+            dst_uv['time_step'][:] = 86400
+
+            dst_uv.createVariable('time', 'f', ('time',))
+            #dst_uv['time'][:] = ndt
+            
+            dst_uv.createVariable('time_series', 'f', ('time', 'nOpenBndNodes', 'nLevels', 'nComponents'))
+            #dst_uv['time_series'][:,:,:,:] = timeseries_uv
 
         print('**** Accessing GOFS data*****')
         for it, date in enumerate(self.timevector):
@@ -214,153 +285,126 @@ class OpenBoundaryInventory():
             database=get_database(date)
             print(f'Fetching data for {date} from database {database}')
 
-            if date.strftime("%Y-%m-%d") >= datetime(2017, 10, 1).strftime("%Y-%m-%d"):
-                xmin = xmin + 360. if xmin < 0 else xmin
-                xmax = xmax + 360. if xmax < 0 else xmax
-                bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
-            else:
-                bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
+            #loop over each open boundary
+            ind1 = 0
+            ind2 = 0
+            for boundary in gdf.itertuples():
 
-            time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2 = get_idxs(date, database, bbox)
+                opbd = list(boundary.indexes)
+                ind1 = ind2
+                ind2 = ind1 + len(opbd)
+                print(f'ind1 = {ind1}, ind2 = {ind2}')
+                blon = self.hgrid.coords[opbd,0]
+                blat = self.hgrid.coords[opbd,1]
+                xi,yi = transform_ll_to_cpp(blon, blat)
+                bxy = np.c_[yi, xi]
 
-            if date.strftime("%Y-%m-%d") >= datetime.now().strftime("%Y-%m-%d"):
-                date2 = datetime.now() - timedelta(days=1)
-                url = f'https://tds.hycom.org/thredds/dodsC/{database}/FMRC/runs/GLBy0.08_930_FMRC_RUN_' + \
-                    f'{date2.strftime("%Y-%m-%dT12:00:00Z")}?depth[0:1:-1],lat[{lat_idx1}:1:{lat_idx2}],' + \
-                    f'lon[{lon_idx1}:1:{lon_idx2}],time[{time_idx}],' + \
-                    f'surf_el[{time_idx}][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
-                    f'water_temp[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
-                    f'salinity[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
-                    f'water_u[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
-                    f'water_v[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
-                    
-            else:
-                url=f'https://tds.hycom.org/thredds/dodsC/{database}?lat[{lat_idx1}:1:{lat_idx2}],' + \
-                    f'lon[{lon_idx1}:1:{lon_idx2}],depth[0:1:-1],time[{time_idx}],' + \
-                    f'surf_el[{time_idx}][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
-                    f'water_temp[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
-                    f'salinity[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
-                    f'water_u[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
-                    f'water_v[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
-            print(url)
-             
-            ds=Dataset(url)
-            salt=np.squeeze(ds['salinity'][:,:,:])
-            temp=np.squeeze(ds['water_temp'][:,:,:])
-            uvel=np.squeeze(ds['water_u'][:,:,:])
-            vvel=np.squeeze(ds['water_v'][:,:,:])
-            ssh=np.squeeze(ds['surf_el'][:,:])
-            #print(f'The shape of temp is {temp.shape}')
+                if TS or UV:
+                    zcor2=zcor[opbd,:]
+                    idxs=np.where(zcor2 > 5000)
+                    zcor2[idxs]=5000.0-1.0e-6
 
-            #Convert temp to potential temp
-            nz=temp.shape[0]
-            ny=temp.shape[1]
-            nx=temp.shape[2]
-            dep=ds['depth'][:]
-            pr=np.ones(temp.shape)
-            pre=pr*dep[:,None, None]
-            Pr=np.zeros(temp.shape)
-            ptemp=sw.ptmp(salt, temp, pre, Pr)*1.00024
+                    #construct schism grid
+                    x2i=np.tile(xi,[nvrt,1]).T
+                    y2i=np.tile(yi,[nvrt,1]).T
+                    bxyz=np.c_[zcor2.reshape(np.size(zcor2)),y2i.reshape(np.size(y2i)),x2i.reshape(np.size(x2i))]
 
-            print('****Interpolation starts****')
+                xmin, xmax = np.min(blon), np.max(blon)
+                ymin, ymax = np.min(blat), np.max(blat)
 
-            ndt[it]=it*24*3600.
-            #salt
-            salt_int = interp_to_points_3d(dep, y2, x2, bxyz, salt)
-            salt_int = salt_int.reshape(zcor2.shape)
-            timeseries_s[it,:,:,0]=salt_int
+                if date.strftime("%Y-%m-%d") >= datetime(2017, 10, 1).strftime("%Y-%m-%d"):
+                    xmin = xmin + 360. if xmin < 0 else xmin
+                    xmax = xmax + 360. if xmax < 0 else xmax
+                    bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
+                else:
+                    bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
+                print(f'xmin is {xmin}, xmax is {xmax}')
 
-            #temp
-            temp_int = interp_to_points_3d(dep, y2, x2, bxyz, ptemp)
-            temp_int = temp_int.reshape(zcor2.shape)
-            timeseries_t[it,:,:,0]=temp_int
+                time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2 = get_idxs(date, database, bbox)
 
-            #uvel
-            uvel_int = interp_to_points_3d(dep, y2, x2, bxyz, uvel)
-            uvel_int = uvel_int.reshape(zcor2.shape)
-            timeseries_uv[it,:,:,0]=uvel_int
+                if date.strftime("%Y-%m-%d") >= datetime.now().strftime("%Y-%m-%d"):
+                    date2 = datetime.now() - timedelta(days=1)
+                    url = f'https://tds.hycom.org/thredds/dodsC/{database}/FMRC/runs/GLBy0.08_930_FMRC_RUN_' + \
+                        f'{date2.strftime("%Y-%m-%dT12:00:00Z")}?depth[0:1:-1],lat[{lat_idx1}:1:{lat_idx2}],' + \
+                        f'lon[{lon_idx1}:1:{lon_idx2}],time[{time_idx}],' + \
+                        f'surf_el[{time_idx}][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
+                        f'water_temp[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
+                        f'salinity[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
+                        f'water_u[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
+                        f'water_v[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
+                        
+                else:
+                    url=f'https://tds.hycom.org/thredds/dodsC/{database}?lat[{lat_idx1}:1:{lat_idx2}],' + \
+                        f'lon[{lon_idx1}:1:{lon_idx2}],depth[0:1:-1],time[{time_idx}],' + \
+                        f'surf_el[{time_idx}][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
+                        f'water_temp[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
+                        f'salinity[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
+                        f'water_u[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
+                        f'water_v[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
+                print(url)
+                 
+                ds=Dataset(url)
 
-            #vvel
-            vvel_int = interp_to_points_3d(dep, y2, x2, bxyz, vvel)
-            vvel_int = vvel_int.reshape(zcor2.shape)
-            timeseries_uv[it,:,:,1]=vvel_int
+                print('****Interpolation starts****')
 
-            #ssh
-            ssh_int = interp_to_points_2d(y2, x2, bxy, ssh)
-            timeseries_el[it,:,0]=ssh_int
+                #ndt[it]=it*24*3600.
 
-            print(f'Interpolation takes {time()-t0} seconds')
+                if elev2D:
+                    #ssh
+                    ssh=np.squeeze(ds['surf_el'][:,:])
 
-        #Write to files
-        t0=time()
+                    ssh_int = interp_to_points_2d(y2, x2, bxy, ssh)
+                    dst_elev['time'][:] = it*24*3600.
+                    if adjust2D:
+                        elev_adjust = np.interp(blat, lats, msl_shifts)
+                        dst_elev['time_series'][it,ind1:ind2,0,0] = ssh_int + elev_adjust
+                    else:
+                        dst_elev['time_series'][it,ind1:ind2,0,0] = ssh_int 
 
-        with Dataset(outdir / 'SAL_3D.th.nc', 'w', format='NETCDF4') as dst:
-        #dimensions
-            dst.createDimension('nOpenBndNodes', NOP)
-            dst.createDimension('one', one)
-            dst.createDimension('time', None)
-            dst.createDimension('nLevels', nvrt)
-            dst.createDimension('nComponents', nComp1)
-        #variables
-            dst.createVariable('time_step', 'f', ('one',))
-            dst['time_step'][:] = 86400
+                if TS:
+                    #salt
+                    salt = np.squeeze(ds['salinity'][:,:,:])
 
-            dst.createVariable('time', 'f', ('time',))
-            dst['time'][:] = ndt
+                    salt_int = interp_to_points_3d(dep, y2, x2, bxyz, salt)
+                    salt_int = salt_int.reshape(zcor2.shape)
+                    #timeseries_s[it,:,:,0]=salt_int
+                    dst_salt['time'][:] = it*24*3600.
+                    dst_salt['time_series'][it,ind1:ind2,:,0] = salt_int
 
-            dst.createVariable('time_series', 'f', ('time', 'nOpenBndNodes', 'nLevels', 'nComponents'))
-            dst['time_series'][:,:,:,:] = timeseries_s
+                    #temp
+                    temp = np.squeeze(ds['water_temp'][:,:,:])
 
-        with Dataset(outdir / 'TEM_3D.th.nc', 'w', format='NETCDF4') as dst:
-            #dimensions
-            dst.createDimension('nOpenBndNodes', NOP)
-            dst.createDimension('one', one)
-            dst.createDimension('time', None)
-            dst.createDimension('nLevels', nvrt)
-            dst.createDimension('nComponents', nComp1)
-            #variables
-            dst.createVariable('time_step', 'f', ('one',))
-            dst['time_step'][:] = 86400
+                    #Convert temp to potential temp
+                    nz=temp.shape[0]
+                    ny=temp.shape[1]
+                    nx=temp.shape[2]
+                    dep=ds['depth'][:]
+                    pr=np.ones(temp.shape)
+                    pre=pr*dep[:,None, None]
+                    Pr=np.zeros(temp.shape)
+                    ptemp=sw.ptmp(salt, temp, pre, Pr)*1.00024
 
-            dst.createVariable('time', 'f', ('time',))
-            dst['time'][:] = ndt
+                    temp_int = interp_to_points_3d(dep, y2, x2, bxyz, ptemp)
+                    temp_int = temp_int.reshape(zcor2.shape)
+                    #timeseries_t[it,:,:,0]=temp_int
+                    dst_temp['time'][:] = it*24*3600.
+                    dst_temp['time_series'][it,ind1:ind2,:,0] = temp_int
 
-            dst.createVariable('time_series', 'f', ('time', 'nOpenBndNodes', 'nLevels', 'nComponents'))
-            dst['time_series'][:,:,:,:] = timeseries_t
+                if UV:
+                    uvel=np.squeeze(ds['water_u'][:,:,:])
+                    vvel=np.squeeze(ds['water_v'][:,:,:])
 
-        with Dataset(outdir / 'uv3D.th.nc', 'w', format='NETCDF4') as dst:
-            #dimensions
-            dst.createDimension('nOpenBndNodes', NOP)
-            dst.createDimension('one', one)
-            dst.createDimension('time', None)
-            dst.createDimension('nLevels', nvrt)
-            dst.createDimension('nComponents', nComp2)
-            #variables
-            dst.createVariable('time_step', 'f', ('one',))
-            dst['time_step'][:] = 86400
+                    dst_uv['time'][:] = it*24*3600.
+                    #uvel
+                    uvel_int = interp_to_points_3d(dep, y2, x2, bxyz, uvel)
+                    uvel_int = uvel_int.reshape(zcor2.shape)
+                    dst_uv['time_series'][it,ind1:ind2,:,0] = uvel_int
 
-            dst.createVariable('time', 'f', ('time',))
-            dst['time'][:] = ndt
-            
-            dst.createVariable('time_series', 'f', ('time', 'nOpenBndNodes', 'nLevels', 'nComponents'))
-            dst['time_series'][:,:,:,:] = timeseries_uv
-
-        with Dataset(outdir / 'elev2D.th.nc', 'w', format='NETCDF4') as dst:
-            #dimensions
-            dst.createDimension('nOpenBndNodes', NOP)
-            dst.createDimension('one', one)
-            dst.createDimension('time', None)
-            dst.createDimension('nLevels', one)
-            dst.createDimension('nComponents', nComp1)
-            #variables
-            dst.createVariable('time_step', 'f', ('one',))
-            dst['time_step'][:] = 86400
-
-            dst.createVariable('time', 'f', ('time',))
-            dst['time'][:] = ndt
-
-            dst.createVariable('time_series', 'f', ('time', 'nOpenBndNodes', 'nLevels', 'nComponents'))
-            dst['time_series'][:,:,:,:] = timeseries_el
+                    #vvel
+                    vvel_int = interp_to_points_3d(dep, y2, x2, bxyz, vvel)
+                    vvel_int = vvel_int.reshape(zcor2.shape)
+                    dst_uv['time_series'][it,ind1:ind2,:,1] = vvel_int
+                    #timeseries_uv[it,:,:,1]=vvel_int
 
         print(f'Writing *th.nc takes {time()-t0} seconds')
 
