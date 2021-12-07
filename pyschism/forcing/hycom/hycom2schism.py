@@ -58,17 +58,18 @@ def get_idxs(date, database, bbox):
     times=nc.num2date(time1,units=time1.units,only_use_cftime_datetimes=False)
     
     lon=ds['lon'][:]
+    print(f'hycom min lon {np.min(lon)}, max lon {np.max(lon)}')
     lat=ds['lat'][:]
     dep=ds['depth'][:]
     lat_idxs=np.where((lat>=bbox.ymin-2.0)&(lat<=bbox.ymax+2.0))[0]
     lon_idxs=np.where((lon>=bbox.xmin-2.0) & (lon<=bbox.xmax+2.0))[0]
     lon=lon[lon_idxs]
     lat=lat[lat_idxs]
-    #print(lon_idxs)
+    print(lon_idxs)
     #print(lat_idxs)
     lon_idx1=lon_idxs[0].item()
     lon_idx2=lon_idxs[-1].item()
-    #print(f'lon_idx1 is {lon_idx1}, lon_idx2 is {lon_idx2}')
+    print(f'lon_idx1 is {lon_idx1}, lon_idx2 is {lon_idx2}')
     lat_idx1=lat_idxs[0].item()
     lat_idx2=lat_idxs[-1].item()
     #print(f'lat_idx1 is {lat_idx1}, lat_idx2 is {lat_idx2}')
@@ -85,9 +86,9 @@ def get_idxs(date, database, bbox):
     idxs=np.where( date == times)[0]
     #check if time_idx is empty
     if len(idxs) == 0:
-        #If there is missing data, use the data from the previous days, the maximum searching days is 3. Otherwise, stop.
+        #If there is missing data, use the data from the next days, the maximum searching days is 3. Otherwise, stop.
         for i in np.arange(0,3):
-            date_before=(date - timedelta(days=int(i)+1)) #.astype(datetime)
+            date_before=(date + timedelta(days=int(i)+1)) #.astype(datetime)
             print(f'Try replacing the missing data from {date_before}')
             idxs=np.where(date_before == times)[0]
             if len(idxs) == 0:
@@ -169,6 +170,7 @@ class OpenBoundaryInventory:
             opbd.extend(list(boundary.indexes))
         blon = self.hgrid.coords[opbd,0]
         blat = self.hgrid.coords[opbd,1]
+        print(f'blon min {np.min(blon)}, max {np.max(blon)}')
         NOP = len(blon)
 
         #calculate zcor for 3D
@@ -312,7 +314,9 @@ class OpenBoundaryInventory:
                 xmin, xmax = np.min(blon), np.max(blon)
                 ymin, ymax = np.min(blat), np.max(blat)
 
-                if date.strftime("%Y-%m-%d") >= datetime(2017, 10, 1).strftime("%Y-%m-%d"):
+                if date.strftime("%Y-%m-%d") >= datetime(2017, 2, 1).strftime("%Y-%m-%d") and  \
+                    date.strftime("%Y-%m-%d") < datetime(2017, 6, 1).strftime("%Y-%m-%d") or \
+                    date.strftime("%Y-%m-%d") >= datetime(2017, 10, 1).strftime("%Y-%m-%d"):
                     xmin = xmin + 360. if xmin < 0 else xmin
                     xmax = xmax + 360. if xmax < 0 else xmax
                     bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
@@ -344,6 +348,7 @@ class OpenBoundaryInventory:
                 print(url)
                  
                 ds=Dataset(url)
+                dep=ds['depth'][:]
 
                 print('****Interpolation starts****')
 
@@ -378,7 +383,6 @@ class OpenBoundaryInventory:
                     nz=temp.shape[0]
                     ny=temp.shape[1]
                     nx=temp.shape[2]
-                    dep=ds['depth'][:]
                     pr=np.ones(temp.shape)
                     pre=pr*dep[:,None, None]
                     Pr=np.zeros(temp.shape)
@@ -545,9 +549,6 @@ class Nudge:
         zcor2[idxs]=5000.0-1.0e-6
         print(f'zcor2 at node 200 is {zcor2[199,:]}')
 
-        xmin, xmax = np.min(nlon), np.max(nlon)
-        ymin, ymax = np.min(nlat), np.max(nlat)
-
         #construct schism grid
         x2i=np.tile(xi,[nvrt,1]).T
         y2i=np.tile(yi,[nvrt,1]).T
@@ -568,14 +569,21 @@ class Nudge:
             t0=time()
 
             database=get_database(date)
-            print(database)
+            print(f'Fetching data for {date} from database {database}')
 
-            if date.strftime("%Y-%m-%d") >= datetime(2017, 10, 1).strftime("%Y-%m-%d"):
+            xmin, xmax = np.min(nlon), np.max(nlon)
+            ymin, ymax = np.min(nlat), np.max(nlat)
+
+            if date.strftime("%Y-%m-%d") >= datetime(2017, 2, 1).strftime("%Y-%m-%d") and  \
+                date.strftime("%Y-%m-%d") < datetime(2017, 6, 1).strftime("%Y-%m-%d") or \
+                date.strftime("%Y-%m-%d") >= datetime(2017, 10, 1).strftime("%Y-%m-%d"):
+                print('Convert xmin and xmax')
                 xmin = xmin + 360. if xmin < 0 else xmin
                 xmax = xmax + 360. if xmax < 0 else xmax
                 bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
             else:
                 bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
+            print(f'xmin is {xmin}, xmax is {xmax}')
 
             time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2 = get_idxs(date, database, bbox)
 

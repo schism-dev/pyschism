@@ -347,10 +347,13 @@ def streamflow_lookup(file, indexes, threshold=-1e-5):
     nc = Dataset(file)
     streamflow = nc["streamflow"][:]
     streamflow[np.where(streamflow < threshold)] = 0.0
+    #change masked value to zero
+    streamflow[np.where(streamflow.mask)] = 0.0
     data = []
     for indxs in indexes:
         # Note: Dataset already consideres scale factor and offset.
         data.append(np.sum(streamflow[indxs]))
+    nc.close()
     return data
 
 class AWSDataInventory(ABC):
@@ -863,6 +866,7 @@ class NationalWaterModel(SourceSink):
             sources.append(streamflow_lookup(file, src_idxs))
             sinks.append(streamflow_lookup(file, snk_idxs))
             logger.info(f'Processing file {file} took {datetime.now() - start}')
+            nc.close()
 
         source_data = {}
         sink_data = {}
@@ -883,6 +887,7 @@ class NationalWaterModel(SourceSink):
                 sink_data.setdefault(_time, {})[element_id] = {
                     "flow": -sinks[i][k],
                 }
+            nc.close()
         logger.info(f'Timeseries aggregation took {datetime.now() - start0}')
         self._sources = Sources(source_data)
         self._sinks = Sinks(sink_data)
