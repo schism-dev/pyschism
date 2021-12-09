@@ -19,8 +19,6 @@ import seawater as sw
 
 from pyschism.mesh.base import Nodes, Elements
 from pyschism.mesh.vgrid import Vgrid
-from pyschism.mesh.gridgr3 import Gr3Field
-
 
 logger = logging.getLogger(__name__)
 
@@ -203,7 +201,7 @@ class OpenBoundaryInventory:
         ndt=np.zeros([ntimes])
 
         if elev2D:
-            timeseries_el=np.zeros([ntimes,NOP,nComp1])
+            #timeseries_el=np.zeros([ntimes,NOP,nComp1])
             #create netcdf 
             dst_elev = Dataset(outdir / 'elev2D.th.nc', 'w', format='NETCDF4')
             #dimensions
@@ -221,7 +219,7 @@ class OpenBoundaryInventory:
             dst_elev['time'][:] = ndt
 
             dst_elev.createVariable('time_series', 'f', ('time', 'nOpenBndNodes', 'nLevels', 'nComponents'))
-            dst_elev['time_series'][:,:,:,:] = timeseries_el
+            #dst_elev['time_series'][:,:,:,:] = timeseries_el
 
         if TS:
             #timeseries_s=np.zeros([ntimes,NOP,nvrt,nComp1])
@@ -242,7 +240,7 @@ class OpenBoundaryInventory:
             dst_salt.createVariable('time_series', 'f', ('time', 'nOpenBndNodes', 'nLevels', 'nComponents'))
 
             #temp
-            timeseries_t=np.zeros([ntimes,NOP,nvrt,nComp1])
+            #timeseries_t=np.zeros([ntimes,NOP,nvrt,nComp1])
 
             dst_temp =  Dataset(outdir / 'TEM_3D.th.nc', 'w', format='NETCDF4')
             #dimensions
@@ -259,7 +257,7 @@ class OpenBoundaryInventory:
             dst_temp['time'][:] = ndt
 
             dst_temp.createVariable('time_series', 'f', ('time', 'nOpenBndNodes', 'nLevels', 'nComponents'))
-            dst_temp['time_series'][:,:,:,:] = timeseries_t
+            #dst_temp['time_series'][:,:,:,:] = timeseries_t
 
         if UV:
             #timeseries_uv=np.zeros([ntimes,NOP,nvrt,nComp2])

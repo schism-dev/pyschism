@@ -16,7 +16,7 @@ SFLUX_DEFAULTS = f90nml.read(pathlib.Path(__file__).parent / "sflux_inputs.txt")
 class NWS2(NWS):
     def __init__(
         self,
-        sflux_1: SfluxDataset,
+        sflux_1: SfluxDataset = None,
         sflux_2: SfluxDataset = None,
         windrot: gridgr3.Windrot = None,
     ):
@@ -61,17 +61,18 @@ class NWS2(NWS):
         with open(path / "sflux_inputs.txt", "w") as f:
             f.write(str(self))
         # write sflux data
-        self.sflux_1.write(
-            path,
-            1,
-            start_date=start_date,
-            rnday=end_date,
-            air=air,
-            rad=rad,
-            prc=prc,
-            bbox=bbox,
-            overwrite=overwrite,
-        )
+        if self.sflux_1 is not None:
+            self.sflux_1.write(
+                path,
+                1,
+                start_date=start_date,
+                rnday=end_date,
+                air=air,
+                rad=rad,
+                prc=prc,
+                bbox=bbox,
+                overwrite=overwrite,
+            )
         if self.sflux_2 is not None:
             self.sflux_2.write(
                 path,

@@ -136,13 +136,13 @@ class Variable:
 
         end_date = start_date + rnday  # type: ignore[operator]
 
-        if end_date <= np.min(self.datetime_array) or \
-                end_date >= np.max(self.datetime_array):
-            rnday = end_date - start_date
-            raise ValueError(f'Requested rnday {rnday} has an end date of '
-                             f'{end_date} which is out of range with '
-                             f'start_date={np.min(self.datetime_array)} and '
-                             f'end_date={np.max(self.datetime_array)}')
+        #if end_date <= np.min(self.datetime_array) or \
+        #        end_date >= np.max(self.datetime_array):
+        #    rnday = end_date - start_date
+        #    raise ValueError(f'Requested rnday {rnday} has an end date of '
+        #                     f'{end_date} which is out of range with '
+        #                     f'start_date={np.min(self.datetime_array)} and '
+        #                     f'end_date={np.max(self.datetime_array)}')
         fields = []
         for i, datetime_array in reversed(
                 list(enumerate(self.datetime_arrays))):

@@ -19,8 +19,7 @@ import seawater as sw
 
 from pyschism.mesh.base import Nodes, Elements
 from pyschism.mesh.vgrid import Vgrid
-from pyschism.mesh.gridgr3 import Gr3Field
-
+from pyschism.forcing.hycom.hycom2schism import Nudge
 
 logger = logging.getLogger(__name__)
 
@@ -252,7 +251,7 @@ class OpenBoundaryInventory:
             dst_uv.createVariable('time_series', 'f', ('time', 'nOpenBndNodes', 'nLevels', 'nComponents'))
             #dst_uv['time_series'][:,:,:,:] = timeseries_uv
 
-        print('**** Accessing GOFS data*****')
+        print('**** Accessing RTOFS data*****')
         baseurl = f'http://nomads.ncep.noaa.gov:80/dods/rtofs/rtofs_global'
         for it, date in enumerate(self.timevector):
             t0=time()
@@ -376,7 +375,146 @@ class OpenBoundaryInventory:
 
         print(f'Writing *th.nc takes {time()-t0} seconds')
 
-class Nudge:
+class NudgeTS:
 
     def __init__(self):
+        pass
 
+    def fetch_data(self, outdir: Union[str, os.PathLike], hgrid, vgrid, start_date, rnday, include):
+
+        outdir = pathlib.Path(outdir)
+
+        timevector = np.arange(start_date, start_date + timedelta(days=rnday+1), \
+            timedelta(days=1)).astype(datetime)
+
+        vd = Vgrid.open(vgrid)
+        sigma = vd.sigma
+
+        #get coords of SCHISM
+        loni=hgrid.nodes.coords[:,0]
+        lati=hgrid.nodes.coords[:,1]
+
+        #get bathymetry
+        depth = hgrid.values
+
+        #compute zcor
+        zcor = depth[:,None]*sigma
+        nvrt=zcor.shape[1]
+        #print(f'zcor at node 1098677 is {zcor[1098676,:]}')
+
+        #Get open nudge array 
+        print(len(include))
+        nlon = hgrid.coords[include, 0]
+        nlat = hgrid.coords[include, 1]
+        xi,yi = transform_ll_to_cpp(nlon, nlat)
+        bxy = np.c_[yi, xi]
+
+        zcor2=zcor[include,:]
+        idxs=np.where(zcor2 > 5500)
+        zcor2[idxs]=5500.0-1.0e-6
+        #print(f'zcor2 at node 200 is {zcor2[199,:]}')
+
+        #construct schism grid
+        x2i=np.tile(xi,[nvrt,1]).T
+        y2i=np.tile(yi,[nvrt,1]).T
+        bxyz=np.c_[zcor2.reshape(np.size(zcor2)),y2i.reshape(np.size(y2i)),x2i.reshape(np.size(x2i))]
+        print('Computing SCHISM zcor is done!')
+
+        #allocate output variables
+        nNode=len(include)
+        one=1
+        ntimes=rnday+1
+
+        timeseries_s=np.zeros([ntimes,nNode,nvrt,one])
+        timeseries_t=np.zeros([ntimes,nNode,nvrt,one])
+        ndt=np.zeros([ntimes])
+
+        print('**** Accessing RTOFS data*****')
+
+        xmin, xmax = np.min(nlon), np.max(nlon)
+        ymin, ymax = np.min(nlat), np.max(nlat)
+
+        # convert hgrid lon [180, 180) to [0, 360)
+        xmin = xmin + 360. if xmin < 0 else xmin
+        xmax = xmax + 360. if xmax < 0 else xmax
+        bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
+        print(f'xmin is {xmin}, xmax is {xmax}')
+
+        baseurl = f'http://nomads.ncep.noaa.gov:80/dods/rtofs/rtofs_global'
+        for it, date in enumerate(timevector):
+            t0=time()
+
+            ndt[it]=it
+             
+            if start_date.strftime("%Y-%m-%d") >= datetime.now().strftime("%Y-%m-%d"):
+                date2 = datetime.now() - timedelta(days=1)
+                ssh_url = f'{baseurl}{date2.strftime("%Y%m%d")}/rtofs_glo_2ds_forecast_3hrly_diag'
+                salt_url = f'{baseurl}{date2.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_salt'
+                temp_url = f'{baseurl}{date2.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_temp'
+                uvel_url = f'{baseurl}{date2.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_uvel'
+                vvel_url = f'{baseurl}{date2.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_vvel'
+            else:
+                ssh_url = f'{baseurl}{date.strftime("%Y%m%d")}/rtofs_glo_2ds_forecast_3hrly_diag'
+                salt_url = f'{baseurl}{date.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_salt'
+                temp_url = f'{baseurl}{date.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_temp'
+                uvel_url = f'{baseurl}{date.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_uvel'
+                vvel_url = f'{baseurl}{date.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_vvel'
+
+            #salt
+            ds = Dataset(salt_url)
+            time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2 = get_idxs(date, ds, bbox)
+            dep = ds['lev'][:]
+            print(f'max depth is {np.max(dep)}')
+            salt = np.squeeze(ds['salinity'][time_idx,:,lat_idx1:lat_idx2+1,lon_idx1:lon_idx2+1])
+
+            salt_int = interp_to_points_3d(dep, y2, x2, bxyz, salt)
+            salt_int = salt_int.reshape(zcor2.shape)
+            #timeseries_s[it,:,:,0]=salt_int
+            timeseries_s[it,:,:,0] = salt_int
+
+            ds.close()
+
+            #temp
+            ds = Dataset(temp_url)
+            dep = ds['lev'][:]
+            temp = np.squeeze(ds['temperature'][time_idx,:,lat_idx1:lat_idx2+1,lon_idx1:lon_idx2+1])
+
+            temp_int = interp_to_points_3d(dep, y2, x2, bxyz, temp)
+            temp_int = temp_int.reshape(zcor2.shape)
+            #timeseries_t[it,:,:,0]=temp_int
+            timeseries_s[it,:,:,0] = temp_int
+            ds.close()
+
+        with Dataset(outdir / 'SAL_nu.nc', 'w', format='NETCDF4') as dst:
+        #dimensions
+            dst.createDimension('node', nNode)
+            dst.createDimension('nLevels', nvrt)
+            dst.createDimension('one', one)
+            dst.createDimension('time', None)
+        #variables
+            dst.createVariable('time', 'f', ('time',))
+            dst['time'][:] = ndt
+
+            dst.createVariable('map_to_global_node', 'i4', ('node',))
+            dst['map_to_global_node'][:] = include+1
+
+            dst.createVariable('tracer_concentration', 'f', ('time', 'node', 'nLevels', 'one'))
+            dst['tracer_concentration'][:,:,:,:] = timeseries_s
+
+        with Dataset(outdir / 'TEM_nu.nc', 'w', format='NETCDF4') as dst:
+        #dimensions
+            dst.createDimension('node', nNode)
+            dst.createDimension('nLevels', nvrt)
+            dst.createDimension('one', one)
+            dst.createDimension('time', None)
+        #variables
+            dst.createVariable('time', 'f', ('time',))
+            dst['time'][:] = ndt
+
+            dst.createVariable('map_to_global_node', 'i4', ('node',))
+            dst['map_to_global_node'][:] = include+1
+
+            dst.createVariable('tracer_concentration', 'f', ('time', 'node', 'nLevels', 'one'))
+            dst['tracer_concentration'][:,:,:,:] = timeseries_t
+
+        print(f'Writing *_nu.nc takes {time()-t0} seconds')

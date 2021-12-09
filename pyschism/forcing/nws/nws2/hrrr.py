@@ -27,13 +27,14 @@ class HRRRInventory:
     def __init__(self, file_interval=timedelta(hours=1)):
         self.file_interval = file_interval
 
-    def __call__(self, start_date=None, rnday=2, bbox=None):
+    def __call__(self, start_date=None, rnday=3, bbox=None):
         self.start_date = (
             nearest_cycle()
             if start_date is None
             else localize_datetime(start_date).astimezone(pytz.utc)
         )
         self.rnday = rnday if isinstance(rnday, timedelta) else timedelta(days=rnday)
+        #self.rnday = timedelta(days=3)
         # if self.rnday > timedelta(days=2) - timedelta(hours=1):
         #     raise ValueError(
         #         'Maximum run days for HRRR is '
@@ -52,7 +53,7 @@ class HRRRInventory:
             _: None
             for _ in np.arange(
                 self.start_date,
-                self.start_date + self.rnday + self.output_interval,
+                self.start_date + self.rnday, # + self.output_interval,
                 self.output_interval,
             ).astype(datetime)
         }
@@ -67,24 +68,26 @@ class HRRRInventory:
                 + f'/hrrr{nearest_zulu(dt).strftime("%Y%m%d")}'
             )
             # cycle
-            for cycle in reversed(
-                range(0, 24, int(self.file_interval / timedelta(hours=1)))
+            #for cycle in reversed(
+            #    range(0, 24, int(self.file_interval / timedelta(hours=1)))
+            #):
+            cycle = 0
+            if np.datetime64(dt + timedelta(hours=cycle)) > np.datetime64(
+                nearest_end_date
             ):
-                if np.datetime64(dt + timedelta(hours=cycle)) > np.datetime64(
-                    nearest_end_date
-                ):
-                    continue
-                test_url = f"{base_url}/" + f"hrrr_sfc.t{cycle:02d}z"
-                nc = self.fetch_nc_by_url(test_url)
-                if nc is None:
-                    continue
-                file_dates = self.get_nc_datevector(nc)
-                for _datetime in reversed(list(self._files.keys())):
-                    if _datetime in file_dates:
-                        if self._files[_datetime] is None:
-                            self._files[_datetime] = nc
-                if not any(nc is None for nc in self._files.values()):
-                    break
+                continue
+            test_url = f"{base_url}/" + f"hrrr_sfc.t{cycle:02d}z"
+            #test_url = f"{base_url}/" + f"hrrr_sfc.t00z"
+            nc = self.fetch_nc_by_url(test_url)
+            if nc is None:
+                continue
+            file_dates = self.get_nc_datevector(nc)
+            for _datetime in reversed(list(self._files.keys())):
+                if _datetime in file_dates:
+                    if self._files[_datetime] is None:
+                        self._files[_datetime] = nc
+            if not any(nc is None for nc in self._files.values()):
+                break
 
         missing_records = [dt for dt, nc in self._files.items() if nc is None]
         if len(missing_records) > 0:
@@ -112,13 +115,13 @@ class HRRRInventory:
             nc = self.fetch_nc_by_url(test_url)
             i += 1
         datevec = self.get_nc_datevector(nc)
-        if np.datetime64(np.max(datevec)) < np.datetime64(
-            end_date - 2 * self.output_interval
-        ):
-            raise IOError(
-                f"Requested end date at {end_date - self.output_interval} is larger than the max allowed HRRR end_date "
-                f" {np.max(datevec) - self.output_interval}"
-            )
+        #if np.datetime64(np.max(datevec)) < np.datetime64(
+        #    end_date - 2 * self.output_interval
+        #):
+        #    raise IOError(
+        #        f"Requested end date at {end_date - self.output_interval} is larger than the max allowed HRRR end_date "
+        #        f" {np.max(datevec) - self.output_interval}"
+        #    )
 
     @staticmethod
     def fetch_nc_by_url(url):
@@ -192,7 +195,7 @@ class HRRRInventory:
                 datetime.strptime(nc["time"].minimum.split("z")[-1], "%d%b%Y")
             ) + timedelta(hours=float(nc["time"].minimum.split("z")[0]))
             return np.arange(
-                base_date + self.output_interval,
+                base_date, #+ self.output_interval,
                 base_date + len(nc["time"][:]) * self.output_interval,
                 self.output_interval,
             ).astype(datetime)
@@ -294,7 +297,7 @@ class HRRR(SfluxDataset):
         outdir,
         level,
         start_date: datetime = None,
-        rnday: Union[float, timedelta] = 4,
+        rnday: Union[float, timedelta] = 2,
         air: bool = True,
         prc: bool = True,
         rad: bool = True,
@@ -314,7 +317,7 @@ class HRRR(SfluxDataset):
         if air is True:
             with Dataset(
                 self.tmpdir / f"air_{self.inventory.product}_"
-                f"{str(self.start_date)}.nc",
+                f"{str(self.start_date.strftime('%Y%m%d'))}.nc",
                 "w",
                 format="NETCDF3_CLASSIC",
             ) as dst:
@@ -386,7 +389,7 @@ class HRRR(SfluxDataset):
         if prc is True:
             with Dataset(
                 self.tmpdir / f"prc_{self.inventory.product}_"
-                f"{str(self.start_date)}.nc",
+                f"{str(self.start_date.strftime('%Y%m%d'))}.nc",
                 "w",
                 format="NETCDF3_CLASSIC",
             ) as dst:
@@ -436,7 +439,7 @@ class HRRR(SfluxDataset):
         if rad is True:
             with Dataset(
                 self.tmpdir / f"rad_{self.inventory.product}_"
-                f"{str(self.start_date)}.nc",
+                f"{str(self.start_date.strftime('%Y%m%d'))}.nc",
                 "w",
                 format="NETCDF3_CLASSIC",
             ) as dst:
@@ -515,9 +518,11 @@ class HRRR(SfluxDataset):
     @property
     def tmpdir(self):
         if not hasattr(self, "_tmpdir"):
-            self._tmpdir = tempfile.TemporaryDirectory(
-                prefix=appdirs.user_cache_dir()
-            )
+            #self._tmpdir = tempfile.TemporaryDirectory(
+            #    prefix=appdirs.user_cache_dir()
+            #)
+            self._tmpdir = pathlib.Path('./hrrr')
+            self._tmpdir.mkdir(exist_ok = True, parents = True)
         return pathlib.Path(self._tmpdir.name)
 
     @property

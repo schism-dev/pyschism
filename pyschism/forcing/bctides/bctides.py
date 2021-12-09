@@ -152,25 +152,25 @@ class Bctides(metaclass=BctidesMeta):
             raise IOError("path exists and overwrite is False")
         with open(bctides, "w") as f:
             f.write(str(self))
-        # write nudge
-        for bctype, tracer in {"itetype": "TEM", "isatype": "SAL"}.items():
-            for boundary in self.gdf.itertuples():
-                data_source = getattr(boundary, bctype)
-                if data_source is not None:
+        ## write nudge
+        #for bctype, tracer in {"itetype": "TEM", "isatype": "SAL"}.items():
+        #    for boundary in self.gdf.itertuples():
+        #        data_source = getattr(boundary, bctype)
+        #        if data_source is not None:
 
-                    # I admit this exec is hacky.
-                    # pros: works well, it's simple, we don't need a return value
-                    # cons: might be confusing to read.
-                    # This generates all the nudges and writes the nudge files.
-                    exec(
-                        f"from pyschism.forcing.bctides.nudge import {tracer}_Nudge;"
-                        f"_tracer = output_directory / f'{tracer}_nudge.gr3' if {tracer.lower()}3D is True else {tracer};"
-                        f"_tr={tracer}_Nudge(self, data_source, rlmax=data_source.rlmax, rnu_day=data_source.rnu_day);"
-                        f'logger.info(f"Writing {tracer} nudge to file '
-                        + r'{_tracer}");'
-                        "_tr.write(_tracer, overwrite=overwrite)"
-                    )
-                    break
+        #            # I admit this exec is hacky.
+        #            # pros: works well, it's simple, we don't need a return value
+        #            # cons: might be confusing to read.
+        #            # This generates all the nudges and writes the nudge files.
+        #            exec(
+        #                f"from pyschism.forcing.bctides.nudge import {tracer}_Nudge;"
+        #                f"_tracer = output_directory / f'{tracer}_nudge.gr3' if {tracer.lower()}3D is True else {tracer};"
+        #                f"_tr={tracer}_Nudge(self, data_source, rlmax=data_source.rlmax, rnu_day=data_source.rnu_day);"
+        #                f'logger.info(f"Writing {tracer} nudge to file '
+        #                + r'{_tracer}");'
+        #                "_tr.write(_tracer, overwrite=overwrite)"
+        #            )
+        #            break
 
         def write_elev2D():
             _elev2D = output_directory / "elev2D.th.nc" if elev2D is True else elev2D

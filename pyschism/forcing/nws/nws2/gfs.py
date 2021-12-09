@@ -85,7 +85,7 @@ class GFSInventory:
             _: None
             for _ in np.arange(
                 self.start_date,
-                end_date + self.output_interval,
+                end_date, # + self.output_interval,
                 self.output_interval,
             ).astype(datetime)
         }
@@ -226,7 +226,7 @@ class GFSInventory:
                 datetime.strptime(nc["time"].minimum.split("z")[-1], "%d%b%Y")
             ) + timedelta(hours=float(nc["time"].minimum.split("z")[0]))
             return np.arange(
-                base_date + self.output_interval,
+                base_date, # + self.output_interval,
                 base_date + len(nc["time"][:]) * self.output_interval,
                 self.output_interval,
             ).astype(datetime)
