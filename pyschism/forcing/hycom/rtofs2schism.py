@@ -289,19 +289,11 @@ class OpenBoundaryInventory:
                 bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
                 print(f'xmin is {xmin}, xmax is {xmax}')
 
-                if self.start_date.strftime("%Y-%m-%d") >= datetime.now().strftime("%Y-%m-%d"):
-                    date2 = datetime.now() - timedelta(days=1)
-                    ssh_url = f'{baseurl}{date2.strftime("%Y%m%d")}/rtofs_glo_2ds_forecast_3hrly_diag'
-                    salt_url = f'{baseurl}{date2.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_salt'
-                    temp_url = f'{baseurl}{date2.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_temp'
-                    uvel_url = f'{baseurl}{date2.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_uvel'
-                    vvel_url = f'{baseurl}{date2.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_vvel'
-                else:
-                    ssh_url = f'{baseurl}{date.strftime("%Y%m%d")}/rtofs_glo_2ds_forecast_3hrly_diag'
-                    salt_url = f'{baseurl}{date.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_salt'
-                    temp_url = f'{baseurl}{date.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_temp'
-                    uvel_url = f'{baseurl}{date.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_uvel'
-                    vvel_url = f'{baseurl}{date.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_vvel'
+                ssh_url = f'{baseurl}{date.strftime("%Y%m%d")}/rtofs_glo_2ds_forecast_3hrly_diag'
+                salt_url = f'{baseurl}{date.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_salt'
+                temp_url = f'{baseurl}{date.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_temp'
+                uvel_url = f'{baseurl}{date.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_uvel'
+                vvel_url = f'{baseurl}{date.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_vvel'
 
                 print('****Interpolation starts****')
 
@@ -446,19 +438,11 @@ class NudgeTS:
 
             ndt[it]=it
              
-            if start_date.strftime("%Y-%m-%d") >= datetime.now().strftime("%Y-%m-%d"):
-                date2 = datetime.now() - timedelta(days=1)
-                ssh_url = f'{baseurl}{date2.strftime("%Y%m%d")}/rtofs_glo_2ds_forecast_3hrly_diag'
-                salt_url = f'{baseurl}{date2.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_salt'
-                temp_url = f'{baseurl}{date2.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_temp'
-                uvel_url = f'{baseurl}{date2.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_uvel'
-                vvel_url = f'{baseurl}{date2.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_vvel'
-            else:
-                ssh_url = f'{baseurl}{date.strftime("%Y%m%d")}/rtofs_glo_2ds_forecast_3hrly_diag'
-                salt_url = f'{baseurl}{date.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_salt'
-                temp_url = f'{baseurl}{date.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_temp'
-                uvel_url = f'{baseurl}{date.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_uvel'
-                vvel_url = f'{baseurl}{date.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_vvel'
+            ssh_url = f'{baseurl}{date.strftime("%Y%m%d")}/rtofs_glo_2ds_forecast_3hrly_diag'
+            salt_url = f'{baseurl}{date.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_salt'
+            temp_url = f'{baseurl}{date.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_temp'
+            uvel_url = f'{baseurl}{date.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_uvel'
+            vvel_url = f'{baseurl}{date.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_vvel'
 
             #salt
             ds = Dataset(salt_url)

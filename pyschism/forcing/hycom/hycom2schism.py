@@ -198,7 +198,7 @@ class OpenBoundaryInventory:
         nComp1=1
         nComp2=2
         one=1
-        ndt=np.zeros([ntimes])
+        #ndt=np.zeros([ntimes])
 
         if elev2D:
             #timeseries_el=np.zeros([ntimes,NOP,nComp1])
@@ -216,7 +216,7 @@ class OpenBoundaryInventory:
             dst_elev['time_step'][:] = 86400
 
             dst_elev.createVariable('time', 'f', ('time',))
-            dst_elev['time'][:] = ndt
+            #dst_elev['time'][:] = ndt
 
             dst_elev.createVariable('time_series', 'f', ('time', 'nOpenBndNodes', 'nLevels', 'nComponents'))
             #dst_elev['time_series'][:,:,:,:] = timeseries_el
@@ -235,7 +235,7 @@ class OpenBoundaryInventory:
             dst_salt['time_step'][:] = 86400
 
             dst_salt.createVariable('time', 'f', ('time',))
-            dst_salt['time'][:] = ndt
+            #dst_salt['time'][:] = ndt
 
             dst_salt.createVariable('time_series', 'f', ('time', 'nOpenBndNodes', 'nLevels', 'nComponents'))
 
@@ -254,7 +254,7 @@ class OpenBoundaryInventory:
             dst_temp['time_step'][:] = 86400
 
             dst_temp.createVariable('time', 'f', ('time',))
-            dst_temp['time'][:] = ndt
+            #dst_temp['time'][:] = ndt
 
             dst_temp.createVariable('time_series', 'f', ('time', 'nOpenBndNodes', 'nLevels', 'nComponents'))
             #dst_temp['time_series'][:,:,:,:] = timeseries_t
@@ -625,9 +625,25 @@ class Nudge:
 
             #temp
             temp_int = interp_to_points_3d(dep, y2, x2, bxyz, ptemp)
-            temp_int = salt_int.reshape(zcor2.shape)
+            temp_int = temp_int.reshape(zcor2.shape)
             timeseries_t[it,:,:,0]=temp_int
  
+        with Dataset(outdir / 'TEM_nu.nc', 'w', format='NETCDF4') as dst:
+        #dimensions
+            dst.createDimension('node', nNode)
+            dst.createDimension('nLevels', nvrt)
+            dst.createDimension('one', one)
+            dst.createDimension('time', None)
+        #variables
+            dst.createVariable('time', 'f', ('time',))
+            dst['time'][:] = ndt
+
+            dst.createVariable('map_to_global_node', 'i4', ('node',))
+            dst['map_to_global_node'][:] = include+1
+
+            dst.createVariable('tracer_concentration', 'f', ('time', 'node', 'nLevels', 'one'))
+            dst['tracer_concentration'][:,:,:,:] = timeseries_t
+
         with Dataset(outdir / 'SAL_nu.nc', 'w', format='NETCDF4') as dst:
         #dimensions
             dst.createDimension('node', nNode)
@@ -644,20 +660,5 @@ class Nudge:
             dst.createVariable('tracer_concentration', 'f', ('time', 'node', 'nLevels', 'one'))
             dst['tracer_concentration'][:,:,:,:] = timeseries_s
 
-        with Dataset(outdir / 'TEM_nu.nc', 'w', format='NETCDF4') as dst:
-        #dimensions
-            dst.createDimension('node', nNode)
-            dst.createDimension('nLevels', nvrt)
-            dst.createDimension('one', one)
-            dst.createDimension('time', None)
-        #variables
-            dst.createVariable('time', 'f', ('time',))
-            dst['time'][:] = ndt
-
-            dst.createVariable('map_to_global_node', 'i4', ('node',))
-            dst['map_to_global_node'][:] = include+1
-
-            dst.createVariable('tracer_concentration', 'f', ('time', 'node', 'nLevels', 'one'))
-            dst['tracer_concentration'][:,:,:,:] = timeseries_t
 
         print(f'Writing *_nu.nc takes {time()-t0} seconds')
