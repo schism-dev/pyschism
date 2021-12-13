@@ -216,7 +216,7 @@ class Variable:
             #     vmax=vmax
             #     )
             # print(fields[index].array)
-            print(self.datetime_array[index], arrays[index])
+            #print(self.datetime_array[index], arrays[index])
             ax.contourf(arrays[index])
 
             # ax.set_ylim(ymin, ymax, auto=True)
@@ -445,6 +445,7 @@ class SfluxDataset:
             prc=True,
             bbox=None,
     ):
+
         outdir = pathlib.Path(outdir)
         if outdir.name != 'sflux':
             outdir /= 'sflux'
@@ -498,6 +499,7 @@ class SfluxDataset:
             lons = fields.select_by_ncvar('lon')
             _logger.info(f'fields.select_by_var() returned {lons}')
             for i in range(len(lons) - 1):
+                breakpoint()
                 if not (lon.array == lons[i+1].array).all():
                     raise ValueError(
                         "Invalid sflux dataset. Found two different 'lon' "

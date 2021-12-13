@@ -77,7 +77,6 @@ class HRRRInventory:
             ):
                 continue
             test_url = f"{base_url}/" + f"hrrr_sfc.t{cycle:02d}z"
-            #test_url = f"{base_url}/" + f"hrrr_sfc.t00z"
             nc = self.fetch_nc_by_url(test_url)
             if nc is None:
                 continue
@@ -314,6 +313,7 @@ class HRRR(SfluxDataset):
         self.rnday = rnday if isinstance(rnday, timedelta) else timedelta(days=rnday)
         self.inventory(self.start_date, self.rnday + self.output_interval, bbox)
         nx_grid, ny_grid = self.inventory.xy_grid()
+
         if air is True:
             with Dataset(
                 self.tmpdir / f"air_{self.inventory.product}_"

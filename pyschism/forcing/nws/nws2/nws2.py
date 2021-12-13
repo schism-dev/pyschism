@@ -82,6 +82,7 @@ class NWS2(NWS):
                 air=air,
                 rad=rad,
                 prc=prc,
+                bbox=bbox,
                 overwrite=overwrite,
             )
         # # write windrot data
