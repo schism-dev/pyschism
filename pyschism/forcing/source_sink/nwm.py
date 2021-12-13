@@ -691,6 +691,7 @@ class AWSForecastInventory(AWSDataInventory):
             Prefix=f'nwm.{self.start_date.strftime("%Y%m%d")}' f"/{self.product}/",
         )
 
+        #self._files[self.start_date.strftime("%Y-%m-%d %H:%M:%S")] = '20211212/nwm.20211212/medium_range_mem1/nwm.t00z.medium_range.channel_rt_1.f000.conus.nc'
         for requested_time, _ in self._files.items():
             logger.info(f"Requesting NWM data for time {requested_time}")
             self._files[requested_time] = self.request_data(requested_time)

@@ -356,7 +356,7 @@ class OpenBoundaryInventory:
                     ssh=np.squeeze(ds['surf_el'][:,:])
 
                     ssh_int = interp_to_points_2d(y2, x2, bxy, ssh)
-                    dst_elev['time'][:] = it*24*3600.
+                    dst_elev['time'][it] = it*24*3600.
                     if adjust2D:
                         elev_adjust = np.interp(blat, lats, msl_shifts)
                         dst_elev['time_series'][it,ind1:ind2,0,0] = ssh_int + elev_adjust
@@ -370,7 +370,7 @@ class OpenBoundaryInventory:
                     salt_int = interp_to_points_3d(dep, y2, x2, bxyz, salt)
                     salt_int = salt_int.reshape(zcor2.shape)
                     #timeseries_s[it,:,:,0]=salt_int
-                    dst_salt['time'][:] = it*24*3600.
+                    dst_salt['time'][it] = it*24*3600.
                     dst_salt['time_series'][it,ind1:ind2,:,0] = salt_int
 
                     #temp
@@ -388,14 +388,14 @@ class OpenBoundaryInventory:
                     temp_int = interp_to_points_3d(dep, y2, x2, bxyz, ptemp)
                     temp_int = temp_int.reshape(zcor2.shape)
                     #timeseries_t[it,:,:,0]=temp_int
-                    dst_temp['time'][:] = it*24*3600.
+                    dst_temp['time'][it] = it*24*3600.
                     dst_temp['time_series'][it,ind1:ind2,:,0] = temp_int
 
                 if UV:
                     uvel=np.squeeze(ds['water_u'][:,:,:])
                     vvel=np.squeeze(ds['water_v'][:,:,:])
 
-                    dst_uv['time'][:] = it*24*3600.
+                    dst_uv['time'][it] = it*24*3600.
                     #uvel
                     uvel_int = interp_to_points_3d(dep, y2, x2, bxyz, uvel)
                     uvel_int = uvel_int.reshape(zcor2.shape)
