@@ -53,10 +53,7 @@ class ERA5DataInventory:
             })
  
         filename = self.tmpdir / f"era5_{self.start_date.strftime('%Y%m%d')}.nc"
-        #r.download(self.tmpdir / f"era5_{requested_time.strftime('%Y%m%d')}.nc")
         r.download(filename)
-        #self.nc=Dataset(self.tmpdir / f"era5_{start_date.strftime('%Y%m%d')}.nc")
-        #return filename 
         
     @property
     def tmpdir(self):
@@ -67,12 +64,10 @@ class ERA5DataInventory:
     @property
     def files(self):
         return sorted(list(self.tmpdir.glob('**/era5_*.nc')))
-        #return self._files
 
     @property
     def lon(self):
         if not hasattr(self, '_lon'):
-            #nc = self._files[list(self._files.keys())[0]]
             self._lon = Dataset(self.files[0]).variables['longitude'][:]
             if not hasattr(self, '_lat'):
                 self._lat = Dataset(self.files[0]).variables['latitude'][::-1]
@@ -86,23 +81,7 @@ class ERA5DataInventory:
                 self._lon = Dataset(self.files[0]).variables['longitude'][:]
         return self._lat
 
-    #def _modified_bbox(self, bbox=None):
-    #    if bbox is None:
-    #        return Bbox.from_extents(0, -90, 360, 90)
-    #    else:
-    #        xmin = self._bbox.xmin + 360 if self._bbox.xmin < 0 else self._bbox.xmin
-    #        xmax = self._bbox.xmax + 360 if self._bbox.xmax < 0 else self._bbox.xmax
-    #        return Bbox.from_extents(xmin-1.0, bbox.ymin-1.0, xmax+1.0, bbox.ymax+1.0)
-    #
-    #def _modified_bbox_indexes(self):
-    #    lat_idxs = np.where((self.lat >= self._bbox.ymin-1.0)
-    #                        & (self.lat <= self._bbox.ymax+1.0))[0]
-    #    lon_idxs = np.where((self.lon >= self._bbox.xmin-1.0)
-    #                        & (self.lon <= self._bbox.xmax+1.0))[0]
-    #    return lon_idxs, lat_idxs
-
     def xy_grid(self):
-        #lon_idxs, lat_idxs = self._modified_bbox_indexes()
         lon = []
         for x in self.lon:
             if x > 180:
@@ -112,8 +91,6 @@ class ERA5DataInventory:
         return np.meshgrid(np.array(lon), self.lat)
 
 def put_sflux_fields(iday, date, timevector, ds, nx_grid, ny_grid, air, rad, prc, OUTDIR):
-    #print(iday)
-    #print(file)
     rt=pd.to_datetime(str(date))
     idx=np.where(rt == timevector)[0].item()
     times=[i/24 for i in np.arange(0, 25, 3)]
@@ -166,7 +143,6 @@ def put_sflux_fields(iday, date, timevector, ds, nx_grid, ny_grid, air, rad, prc
             Td = d2m - 273.15
             e1 = 6.112*np.exp((17.67*Td)/(Td + 243.5))
             spfh = (0.622*e1)/(msl*0.01 - (0.378*e1))
-            #dst['spfh'][:,:,:]=spfh[idx:idx+26:3,::-1,:]
             dst['spfh'][:,:,:]=spfh
 
             # stmp
@@ -314,44 +290,12 @@ class ERA5(SfluxDataset):
             self.rnday,
             bbox,
         )
-        #print(f'inventory.lon is {self.inventory.lon}')
-        #print(f'inventory.lat is {self.inventory.lat}')
     
         nx_grid, ny_grid = self.inventory.xy_grid()
-        #lon_idxs, lat_idxs = self.inventory._modified_bbox_indexes()
 
         ds=Dataset(self.inventory.files[0])
         time1=ds['time']
         times=nc4.num2date(time1,units=time1.units,only_use_cftime_datetimes=False)
 
         for iday, date in enumerate(dates):
-            #put_sflux_fields(iday, date, times, ds, nx_grid, ny_grid, lon_idxs, lat_idxs, air=air, rad=rad, prc=prc, OUTDIR=self.tmpdir)
             put_sflux_fields(iday, date, times, ds, nx_grid, ny_grid, air=air, rad=rad, prc=prc, OUTDIR=outdir)
- 
-        #self.resource = list(self.tmpdir.glob("*.nc"))
-        #if air is True:
-        #    self.air = AirComponent(self.fields)
-        #if prc is True:
-        #    self.prc = PrcComponent(self.fields)
-        #if rad is True:
-        #    self.rad = RadComponent(self.fields)
-
-        #super().write(
-        #    outdir,
-        #    level,
-        #    overwrite=overwrite,
-        #    start_date=start_date,
-        #    rnday=rnday,
-        #    air=air,
-        #    rad=rad,
-        #    prc=prc,
-        #)
-        #del self._tmpdir
-
-    #@property
-    #def tmpdir(self):
-    #    if not hasattr(self, "_tmpdir"):
-    #        self._tmpdir = tempfile.TemporaryDirectory(
-    #            prefix=appdirs.user_cache_dir()
-    #        )
-    #    return pathlib.Path(self._tmpdir.name)

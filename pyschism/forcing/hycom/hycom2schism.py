@@ -56,18 +56,17 @@ def get_idxs(date, database, bbox):
     times=nc.num2date(time1,units=time1.units,only_use_cftime_datetimes=False)
     
     lon=ds['lon'][:]
-    print(f'hycom min lon {np.min(lon)}, max lon {np.max(lon)}')
     lat=ds['lat'][:]
     dep=ds['depth'][:]
     lat_idxs=np.where((lat>=bbox.ymin-2.0)&(lat<=bbox.ymax+2.0))[0]
     lon_idxs=np.where((lon>=bbox.xmin-2.0) & (lon<=bbox.xmax+2.0))[0]
     lon=lon[lon_idxs]
     lat=lat[lat_idxs]
-    print(lon_idxs)
+    #print(lon_idxs)
     #print(lat_idxs)
     lon_idx1=lon_idxs[0].item()
     lon_idx2=lon_idxs[-1].item()
-    print(f'lon_idx1 is {lon_idx1}, lon_idx2 is {lon_idx2}')
+    #print(f'lon_idx1 is {lon_idx1}, lon_idx2 is {lon_idx2}')
     lat_idx1=lat_idxs[0].item()
     lat_idx2=lat_idxs[-1].item()
     #print(f'lat_idx1 is {lat_idx1}, lat_idx2 is {lat_idx2}')
@@ -168,7 +167,7 @@ class OpenBoundaryInventory:
             opbd.extend(list(boundary.indexes))
         blon = self.hgrid.coords[opbd,0]
         blat = self.hgrid.coords[opbd,1]
-        print(f'blon min {np.min(blon)}, max {np.max(blon)}')
+        #print(f'blon min {np.min(blon)}, max {np.max(blon)}')
         NOP = len(blon)
 
         #calculate zcor for 3D
@@ -293,7 +292,7 @@ class OpenBoundaryInventory:
                 opbd = list(boundary.indexes)
                 ind1 = ind2
                 ind2 = ind1 + len(opbd)
-                print(f'ind1 = {ind1}, ind2 = {ind2}')
+                #print(f'ind1 = {ind1}, ind2 = {ind2}')
                 blon = self.hgrid.coords[opbd,0]
                 blat = self.hgrid.coords[opbd,1]
                 xi,yi = transform_ll_to_cpp(blon, blat)
@@ -320,7 +319,7 @@ class OpenBoundaryInventory:
                     bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
                 else:
                     bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
-                print(f'xmin is {xmin}, xmax is {xmax}')
+                #print(f'xmin is {xmin}, xmax is {xmax}')
 
                 time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2 = get_idxs(date, database, bbox)
 
@@ -343,7 +342,7 @@ class OpenBoundaryInventory:
                         f'salinity[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
                         f'water_u[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
                         f'water_v[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
-                print(url)
+                #print(url)
                  
                 ds=Dataset(url)
                 dep=ds['depth'][:]
@@ -475,7 +474,7 @@ class Nudge:
         #idxs_nudge=np.delete(idxs_nudge, np.where(idxs_nudge == -99))
         idxs=np.where(idxs_nudge == 1)[0]
         self.include=idxs
-        print(f'len of nudge idxs is {len(idxs)}')
+        #print(f'len of nudge idxs is {len(idxs)}')
         print(f'It took {time() -t0} sencods to calcuate nudge coefficient')
 
         nudge = [f"{rlmax}, {rnu_day}"]
@@ -545,7 +544,7 @@ class Nudge:
         idxs=np.where(zcor2 > 5000)
         #print(idxs)
         zcor2[idxs]=5000.0-1.0e-6
-        print(f'zcor2 at node 200 is {zcor2[199,:]}')
+        #print(f'zcor2 at node 200 is {zcor2[199,:]}')
 
         #construct schism grid
         x2i=np.tile(xi,[nvrt,1]).T
@@ -581,7 +580,7 @@ class Nudge:
                 bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
             else:
                 bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
-            print(f'xmin is {xmin}, xmax is {xmax}')
+            #print(f'xmin is {xmin}, xmax is {xmax}')
 
             time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2 = get_idxs(date, database, bbox)
 
@@ -598,12 +597,12 @@ class Nudge:
                     f'lon[{lon_idx1}:1:{lon_idx2}],depth[0:1:-1],time[{time_idx}],' + \
                     f'water_temp[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
                     f'salinity[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
-            print(url)
+            #print(url)
 
             ds=Dataset(url)
             salt=np.squeeze(ds['salinity'][:,:,:])
             temp=np.squeeze(ds['water_temp'][:,:,:])
-            print(f'The shape of temp is {temp.shape}')
+            #print(f'The shape of temp is {temp.shape}')
 
             #Convert temp to potential temp
             nz=temp.shape[0]

@@ -499,7 +499,6 @@ class SfluxDataset:
             lons = fields.select_by_ncvar('lon')
             _logger.info(f'fields.select_by_var() returned {lons}')
             for i in range(len(lons) - 1):
-                breakpoint()
                 if not (lon.array == lons[i+1].array).all():
                     raise ValueError(
                         "Invalid sflux dataset. Found two different 'lon' "
