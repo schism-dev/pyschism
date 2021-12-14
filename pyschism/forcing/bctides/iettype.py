@@ -74,7 +74,7 @@ class TidalElevation(Iettype):
 
 class SpatiallyVaryingTimeHistoryElevation(Iettype):
     class BaroclinicDatabases(Enum):
-        RTOFS = hycom.RTOFS
+        #RTOFS = hycom.RTOFS
         GOFS = hycom.GOFS
 
     def __init__(self, data_source="gofs"):

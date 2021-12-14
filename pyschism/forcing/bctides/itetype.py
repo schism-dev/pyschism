@@ -51,7 +51,7 @@ class TemperatureInitialConditions(Itetype):
 
 class SpatiallyVaryingTimeHistoryTemperature(Itetype):
     class BaroclinicDatabases(Enum):
-        RTOFS = hycom.RTOFS
+        #RTOFS = hycom.RTOFS
         GOFS = hycom.GOFS
 
     def __init__(

@@ -43,7 +43,7 @@ class SalinityInitialConditions(Isatype):
 
 class SpatiallyVaryingTimeHistorySalinity(Isatype):
     class BaroclinicDatabases(Enum):
-        RTOFS = hycom.RTOFS
+        #RTOFS = hycom.RTOFS
         GOFS = hycom.GOFS
 
     def __init__(
