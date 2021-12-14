@@ -680,7 +680,7 @@ class AWSForecastInventory(AWSDataInventory):
         self._files = {
             _: None
             for _ in np.arange(
-                self.start_date + timedelta(hours=3),
+                self.start_date, # + timedelta(hours=3),
                 self.start_date + self.rnday + self.output_interval,
                 self.output_interval,
             ).astype(datetime)
@@ -691,8 +691,13 @@ class AWSForecastInventory(AWSDataInventory):
             Prefix=f'nwm.{self.start_date.strftime("%Y%m%d")}' f"/{self.product}/",
         )
 
-        #self._files[self.start_date.strftime("%Y-%m-%d %H:%M:%S")] = '20211212/nwm.20211212/medium_range_mem1/nwm.t00z.medium_range.channel_rt_1.f000.conus.nc'
-        for requested_time, _ in self._files.items():
+        for it, (requested_time, _) in enumerate(self._files.items()):
+            if it == 0 and requested_time.hour == 0:
+                logger.info(f'set it=0 {requested_time}')
+                yesterday = (self.start_date - timedelta(days=1)).strftime("%Y%m%d")
+                self.files[requested_time] = f'{yesterday}/nwm.{yesterday}/medium_range' \
+                + '_mem1/nwm.t00z.medium_range.channel_rt_1.f024.conus.nc'
+                continue
             logger.info(f"Requesting NWM data for time {requested_time}")
             self._files[requested_time] = self.request_data(requested_time)
         
