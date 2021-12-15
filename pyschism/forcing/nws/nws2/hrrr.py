@@ -521,7 +521,7 @@ class HRRR(SfluxDataset):
             #self._tmpdir = tempfile.TemporaryDirectory(
             #    prefix=appdirs.user_cache_dir()
             #)
-            self._tmpdir = pathlib.Path('./hrrr')
+            self._tmpdir = pathlib.Path(f"./{self.start_date.strftime('%Y%m%d')}")
             self._tmpdir.mkdir(exist_ok = True, parents = True)
         return pathlib.Path(self._tmpdir.name)
 

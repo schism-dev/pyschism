@@ -76,9 +76,8 @@ class CombineOutputs:
                     self.start_hour, self.utc_start = line
                 nrec, dtout, nspool, nvrt, kz, h0, h_s, h_c, theta_b, \
                     theta_f, ics = f.readline().split()
-                f.readline()  # (ztot(k),k=1,kz-1),(sigma(k),k=1,nvrt-kz+1)
-                f.readline()  # (ztot(k),k=1,kz-1),(sigma(k),k=1,nvrt-kz+1)
-                f.readline()  # repeat ne_local, np_local
+                for i in np.arange(nvrt):
+                    f.readline()  # (ztot(k),k=1,kz-1),(sigma(k),k=1,nvrt-kz+1)
                 #_ne_local = None
                 #_np_local = None
                 #while _ne_local != ne_local and _np_local != np_local:
