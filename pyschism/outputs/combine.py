@@ -1,4 +1,5 @@
 import os
+from time import time
 import pathlib
 from typing import Dict, Union
 import glob
@@ -76,8 +77,10 @@ class CombineOutputs:
                     self.start_hour, self.utc_start = line
                 nrec, dtout, nspool, nvrt, kz, h0, h_s, h_c, theta_b, \
                     theta_f, ics = f.readline().split()
-                for i in np.arange(nvrt):
+                for i in np.arange(int(nvrt)):
                     f.readline()  # (ztot(k),k=1,kz-1),(sigma(k),k=1,nvrt-kz+1)
+                f.readline()  # (ztot(k),k=1,kz-1),(sigma(k),k=1,nvrt-kz+1)
+                
                 #_ne_local = None
                 #_np_local = None
                 #while _ne_local != ne_local and _np_local != np_local:
@@ -117,6 +120,7 @@ class CombineOutputs:
         #variables = ['eta2', 'we', 'su2', 'tr_el', 'time', 'it', 'ifile', 'nsteps_from_cold']
         #for var in variables:
         for var in dst[0].variables:
+            t0 = time()
             shape = []
             if 'nResident_elem' in dst[0][var].dims:
                 shape.append(self.hgrid.elements.array.shape[0])
@@ -150,6 +154,7 @@ class CombineOutputs:
                 side.append(r)
             else:
                 one.append(dst[0][var])
+            print(f'It took {time()-t0} seconds to combine var {var} in file[{i}]')
 
         side = xr.merge(side).rename({'nResident_side': 'side'})
         elem = xr.merge(elem).rename({'nResident_elem': 'elem'})

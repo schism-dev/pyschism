@@ -85,10 +85,11 @@ class GFSInventory:
             _: None
             for _ in np.arange(
                 self.start_date,
-                end_date, # + self.output_interval,
+                end_date + self.output_interval,
                 self.output_interval,
             ).astype(datetime)
         }
+        
         nearest_end_date = nearest_cycle(datetime.utcnow(), period=6)
         nearest_end_date.replace(tzinfo=None)
         for dt in self.nearest_zulus:
@@ -116,6 +117,7 @@ class GFSInventory:
                 if not any(nc is None for nc in self._files.values()):
                     break
 
+        breakpoint()
         missing_records = [dt for dt, nc in self._files.items() if nc is None]
         if len(missing_records) > 0:
             raise ValueError(f"No GFS data for dates: {missing_records}.")
@@ -226,7 +228,7 @@ class GFSInventory:
                 datetime.strptime(nc["time"].minimum.split("z")[-1], "%d%b%Y")
             ) + timedelta(hours=float(nc["time"].minimum.split("z")[0]))
             return np.arange(
-                base_date, # + self.output_interval,
+                base_date + self.output_interval,
                 base_date + len(nc["time"][:]) * self.output_interval,
                 self.output_interval,
             ).astype(datetime)
