@@ -117,7 +117,6 @@ class GFSInventory:
                 if not any(nc is None for nc in self._files.values()):
                     break
 
-        breakpoint()
         missing_records = [dt for dt, nc in self._files.items() if nc is None]
         if len(missing_records) > 0:
             raise ValueError(f"No GFS data for dates: {missing_records}.")
@@ -195,6 +194,8 @@ class GFSInventory:
         lon_idxs, lat_idxs = self._modified_bbox_indexes(self._bbox)
         for i, (dt, nc) in enumerate(self._files.items()):
             time_index = self.get_nc_time_index(nc, dt)
+            if time_index == 0:
+                time_index += 1
             logger.info(
                 f"Putting GFS field {gfs_varname} for time {dt} as "
                 f"{sflux_varname} from file "
@@ -228,8 +229,8 @@ class GFSInventory:
                 datetime.strptime(nc["time"].minimum.split("z")[-1], "%d%b%Y")
             ) + timedelta(hours=float(nc["time"].minimum.split("z")[0]))
             return np.arange(
-                base_date + self.output_interval,
-                base_date + len(nc["time"][:]) * self.output_interval,
+                base_date,
+                base_date + timedelta(len(nc["time"][:])),
                 self.output_interval,
             ).astype(datetime)
         except RuntimeError:
@@ -299,8 +300,8 @@ class GFSInventory:
             return Bbox.from_extents(xmin, bbox.ymin, xmax, bbox.ymax)
 
     def _modified_bbox_indexes(self, bbox):
-        lat_idxs = np.where((self.lat >= bbox.ymin) & (self.lat <= bbox.ymax))[0]
-        lon_idxs = np.where((self.lon >= bbox.xmin) & (self.lon <= bbox.xmax))[0]
+        lat_idxs = np.where((self.lat >= bbox.ymin-1.0) & (self.lat <= bbox.ymax+1.0))[0]
+        lon_idxs = np.where((self.lon >= bbox.xmin-1.0) & (self.lon <= bbox.xmax+1.0))[0]
         return lon_idxs, lat_idxs
 
 

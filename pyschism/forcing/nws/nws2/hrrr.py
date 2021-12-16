@@ -68,25 +68,22 @@ class HRRRInventory:
                 + f'/hrrr{nearest_zulu(dt).strftime("%Y%m%d")}'
             )
             # cycle
-            #for cycle in reversed(
-            #    range(0, 24, int(self.file_interval / timedelta(hours=1)))
-            #):
-            cycle = 0
-            if np.datetime64(dt + timedelta(hours=cycle)) > np.datetime64(
-                nearest_end_date
-            ):
-                continue
-            test_url = f"{base_url}/" + f"hrrr_sfc.t{cycle:02d}z"
-            nc = self.fetch_nc_by_url(test_url)
-            if nc is None:
-                continue
-            file_dates = self.get_nc_datevector(nc)
-            for _datetime in reversed(list(self._files.keys())):
-                if _datetime in file_dates:
-                    if self._files[_datetime] is None:
-                        self._files[_datetime] = nc
-            if not any(nc is None for nc in self._files.values()):
-                break
+            for cycle in reversed(range(0, 24, 6)):
+                if np.datetime64(dt + timedelta(hours=cycle)) > np.datetime64(
+                    nearest_end_date
+                ):
+                    continue
+                test_url = f"{base_url}/" + f"hrrr_sfc.t{cycle:02d}z"
+                nc = self.fetch_nc_by_url(test_url)
+                if nc is None:
+                    continue
+                file_dates = self.get_nc_datevector(nc)
+                for _datetime in reversed(list(self._files.keys())):
+                    if _datetime in file_dates:
+                        if self._files[_datetime] is None:
+                            self._files[_datetime] = nc
+                if not any(nc is None for nc in self._files.values()):
+                    break
 
         missing_records = [dt for dt, nc in self._files.items() if nc is None]
         if len(missing_records) > 0:
@@ -164,6 +161,8 @@ class HRRRInventory:
         lon_idxs, lat_idxs = self._bbox_indexes(self._bbox)
         for i, (dt, nc) in enumerate(self._files.items()):
             time_index = self.get_nc_time_index(nc, dt)
+            if time_index == 0:
+                time_index += 1
             logger.info(
                 f"Putting HRRR field {hrrr_varname} for time {dt} as "
                 f"{sflux_varname} from file "
@@ -194,8 +193,8 @@ class HRRRInventory:
                 datetime.strptime(nc["time"].minimum.split("z")[-1], "%d%b%Y")
             ) + timedelta(hours=float(nc["time"].minimum.split("z")[0]))
             return np.arange(
-                base_date, #+ self.output_interval,
-                base_date + len(nc["time"][:]) * self.output_interval,
+                base_date,
+                base_date + timedelta(hours=len(nc["time"][:])),
                 self.output_interval,
             ).astype(datetime)
         except RuntimeError:
@@ -260,8 +259,8 @@ class HRRRInventory:
         return bbox
 
     def _bbox_indexes(self, bbox):
-        lat_idxs = np.where((self.lat >= bbox.ymin) & (self.lat <= bbox.ymax))[0]
-        lon_idxs = np.where((self.lon >= bbox.xmin) & (self.lon <= bbox.xmax))[0]
+        lat_idxs = np.where((self.lat >= bbox.ymin-0.5) & (self.lat <= bbox.ymax+2.0))[0]
+        lon_idxs = np.where((self.lon >= bbox.xmin-0.5) & (self.lon <= bbox.xmax+0.5))[0]
         return lon_idxs, lat_idxs
 
     @property
@@ -449,6 +448,7 @@ class HRRR(SfluxDataset):
                 dst.createDimension("nx_grid", nx_grid.shape[1])
                 dst.createDimension("ny_grid", ny_grid.shape[0])
                 dst.createDimension("time", None)
+
                 # lon
                 dst.createVariable("lon", "f4", ("ny_grid", "nx_grid"))
                 dst["lon"].long_name = "Longitude"

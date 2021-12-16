@@ -77,6 +77,7 @@ class CombineOutputs:
                     self.start_hour, self.utc_start = line
                 nrec, dtout, nspool, nvrt, kz, h0, h_s, h_c, theta_b, \
                     theta_f, ics = f.readline().split()
+                #In the old version of schism, ztot was written to nvrt lines
                 for i in np.arange(int(nvrt)):
                     f.readline()  # (ztot(k),k=1,kz-1),(sigma(k),k=1,nvrt-kz+1)
                 f.readline()  # (ztot(k),k=1,kz-1),(sigma(k),k=1,nvrt-kz+1)
