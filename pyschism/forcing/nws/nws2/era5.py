@@ -160,7 +160,13 @@ def put_sflux_fields(iday, date, timevector, ds, nx_grid, ny_grid, air, rad, prc
                                     "(2m AGL)"
             dst['spfh'].standard_name = "specific_humidity"
             dst['spfh'].units = "1"
-            dst['spfh'][:,:,:]=ds['d2m'][idx:idx+26:3,::-1,:]
+            #convert dewpoint to specific humidity
+            d2m = ds['d2m'][idx:idx+26:3,::-1,:]
+            msl = ds['msl'][idx:idx+26:3,::-1,:]
+            Td = d2m - 273.15
+            e1 = 6.112*np.exp((17.67*Td)/(Td + 243.5))
+            spfh = (0.622*e1)/(msl*0.01 - (0.378*e1))
+            dst['spfh'][:,:,:]=spfh
 
             # stmp
             dst.createVariable('stmp', 'f4', ('time', 'ny_grid', 'nx_grid'))
