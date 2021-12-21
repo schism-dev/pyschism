@@ -11,7 +11,14 @@ import zarr
 
 from pyschism.dates import nearest_cycle
 
-class AWSDataInventory:
+class AWSZarrInventory:
+    '''
+    12/21/2021, L. Cui
+    There is an issue with DSWRF in this dataset. After communicating with 
+    MesoWest group, it is confirmed that they are unable to successfully 
+    generate zarr-formatted output for this vaiable for the zarr-formatted
+    forecast files. At this point, I'll keep this script in the repo. 
+    '''
 
     def __init__(self, bbox=None):
         self.bbox = bbox
