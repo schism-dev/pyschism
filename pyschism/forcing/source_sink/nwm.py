@@ -360,17 +360,18 @@ class AWSDataInventory(ABC):
     def __new__(
         cls, start_date, rnday, product=None, verbose=False, fallback=True, cache=None
     ):
-        # AWSHindcastInventory -> January 1993 through December 2018
+        # AWSHindcastInventory
+        # The latest(12/21/2021) AWSHindcast dataset covers from Feb 1979 through Dec 2020
         if start_date >= dates.localize_datetime(
-            datetime(1993, 1, 1, 0, 0)
+            datetime(1979, 2, 1, 0, 0)
         ) and start_date + rnday <= dates.localize_datetime(
-            datetime(2018, 12, 31, 23, 59)
+            datetime(2020, 12, 31, 23, 59)
         ):
             return AWSHindcastInventory.__new__(cls)
 
         # GOOGLEHindcastInventory -> January 2019 through 30 days earlier than today
         elif start_date >= dates.localize_datetime(
-            datetime(2019, 1, 1, 0, 0)
+            datetime(2021, 1, 1, 0, 0)
         ) and start_date + rnday < dates.nearest_zulu() - timedelta(days=30):
             return GOOGLEHindcastInventory.__new__(cls)
 

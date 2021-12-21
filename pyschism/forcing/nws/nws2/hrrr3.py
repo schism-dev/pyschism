@@ -16,12 +16,6 @@ import pandas as pd
 
 from pyschism.dates import nearest_cycle
 
-#DATADIR = pathlib.Path(user_data_dir('HRRR'))
-DATADIR = pathlib.Path(__file__).parent.absolute()
-DATADIR /= 'HRRR'
-
-DATADIR.mkdir(exist_ok=True, parents=True)
-
 
 class AWSGrib2Inventory:
 
@@ -50,9 +44,8 @@ class AWSGrib2Inventory:
             _['Key'] for _ in data if 'wrfsfcf' in _['Key'] and tz in _['Key'] and not 'idx' in _['Key']
         ]))
 
-
         for key in self.file_metadata[1:25]:
-            filename = pathlib.Path(DATADIR) / key
+            filename = pathlib.Path(self.tmpdir) / key
             filename.parent.mkdir(parents=True, exist_ok=True)
 
             with open(filename, 'wb') as f:
@@ -83,8 +76,14 @@ class AWSGrib2Inventory:
             return self._s3
 
     @property
+    def tmpdir(self):
+        if not hasattr(self, "_tmpdir"):
+            self._tmpdir = tempfile.TemporaryDirectory()
+        return pathlib.Path(self._tmpdir.name)
+
+    @property
     def files(self):
-        grbfiles=glob.glob(f'HRRR/hrrr.{self.forecast_cycle.strftime("%Y%m%d")}/conus/hrrr.t{self.cycle:02d}z.wrfsfcf*.grib2')
+        grbfiles=glob.glob(f'{self.tmpdir}/hrrr.{self.forecast_cycle.strftime("%Y%m%d")}/conus/hrrr.t{self.cycle:02d}z.wrfsfcf*.grib2')
         grbfiles.sort()
         return grbfiles
 
@@ -93,13 +92,14 @@ class HRRR:
     def __init__(self, bbox=None):
         self.bbox = bbox
         
-    def gen_sflux(self, outdir: Union[str, os.PathLike], start_date):
+    def gen_sflux(self, start_date=None):
 
+        start_date = nearest_cycle() if start_date is None else start_date
         inventory = AWSGrib2Inventory(start_date)
         grbfiles = inventory.files
         cycle = start_date.hour
 
-        path = pathlib.Path(outdir)
+        path = pathlib.Path(start_date.strftime("%Y%m%d"))
         path.mkdir(parents=True, exist_ok=True)
 
         prate = []; dlwrf = []; dswrf = []; stmp = []; spfh = []
@@ -155,7 +155,7 @@ class HRRR:
             'dswrf': (['time', 'ny_grid', 'nx_grid'], np.array(dswrf)),
             },
             coords={
-                'time': np.arange(1, len(grbfiles)+1)/24,
+                'time': np.round(np.arange(1, len(grbfiles)+1)/24, 4),
                 'lon': (['ny_grid', 'nx_grid'], lon),
                 'lat': (['ny_grid', 'nx_grid'], lat)})
 
