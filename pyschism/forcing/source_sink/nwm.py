@@ -361,7 +361,7 @@ class AWSDataInventory(ABC):
         cls, start_date, rnday, product=None, verbose=False, fallback=True, cache=None
     ):
         # AWSHindcastInventory
-        # The latest(12/21/2021) AWSHindcast dataset covers from Feb 1979 through Dec 2020
+        # The latest(as of 12/21/2021) AWSHindcast dataset covers from Feb 1979 through Dec 2020
         if start_date >= dates.localize_datetime(
             datetime(1979, 2, 1, 0, 0)
         ) and start_date + rnday <= dates.localize_datetime(
@@ -431,10 +431,8 @@ class AWSHindcastInventory(AWSDataInventory):
         cache=None,
     ):
         """This will download the National Water Model retro data.
-        A 26-year (January 1993 through December 2018) retrospective
-        simulation using version 2.0 of the NWM.
-
-        NetCDF files are saved to the system's temporary directory.
+        A 42-year (February 1979 through December 2020) retrospective
+        simulation using version 2.1 of the NWM.
         """
         self.product = "CHRTOUT_DOMAIN1.comp" if product is None else product
         self.cache = cache
@@ -456,32 +454,34 @@ class AWSHindcastInventory(AWSDataInventory):
             ).astype(datetime)
         }
 
-        paginator = self.s3.get_paginator("list_objects_v2")
-        pages = paginator.paginate(
-            Bucket=self.bucket, Prefix=f"full_physics/{self.start_date.year}"
-        )
+        end_date = self.start_date + self.rnday
 
-        # TODO: If end_date.year != start_date.year, we must append to pagination.
+        years = range(self.start_date.year, end_date.year+1)
+        
+        file_metadata = [] 
+        for it, year in enumerate(years):
+            paginator = self.s3.get_paginator("list_objects_v2")
+            pages = paginator.paginate(
+                Bucket=self.bucket, Prefix=f"model_output/{year}"
+            )
 
-        self.data = []
-        for page in pages:
-            for obj in page["Contents"]:
-                self.data.append(obj)
+            self.data = []
+            for page in pages:
+                for obj in page["Contents"]:
+                    self.data.append(obj)
 
-        self.file_metadata = list(
-            sorted([_["Key"]
-                   for _ in self.data if "CHRTOUT_DOMAIN1.comp" in _["Key"]])
-        )
+            metadata = sorted([_["Key"] for _ in self.data if "CHRTOUT_DOMAIN1.comp" in _["Key"]])
+            [file_metadata.append(i) for i in metadata] 
 
         timevector = np.arange(
             datetime(self.start_date.year, 1, 1),
-            datetime(self.start_date.year + 1, 1, 1),
+            datetime(end_date.year + 1, 1, 1),
             np.timedelta64(1, "h"),
             dtype="datetime64",
         )
 
         timefile = {
-            pd.to_datetime(str(timevector[i])): self.file_metadata[i]
+            pd.to_datetime(str(timevector[i])): file_metadata[i]
             for i in range(len(timevector))
         }
 
@@ -509,7 +509,8 @@ class AWSHindcastInventory(AWSDataInventory):
 
     @property
     def bucket(self):
-        return "noaa-nwm-retro-v2.0-pds"
+        #return "noaa-nwm-retro-v2.0-pds"
+        return "noaa-nwm-retrospective-2-1-pds"
 
     @property
     def s3(self):
