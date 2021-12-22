@@ -44,7 +44,7 @@ class AWSGrib2Inventory:
             _['Key'] for _ in data if 'wrfsfcf' in _['Key'] and tz in _['Key'] and not 'idx' in _['Key']
         ]))
 
-        for key in self.file_metadata[1:25]:
+        for key in self.file_metadata[1:]:
             filename = pathlib.Path(self.tmpdir) / key
             filename.parent.mkdir(parents=True, exist_ok=True)
 
