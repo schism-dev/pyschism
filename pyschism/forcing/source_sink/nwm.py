@@ -456,7 +456,7 @@ class AWSHindcastInventory(AWSDataInventory):
 
         end_date = self.start_date + self.rnday
 
-        years = range(self.start_date.year, end_date.year+1)
+        years = np.arange(self.start_date.year, end_date.year+1)
         
         file_metadata = [] 
         for it, year in enumerate(years):
