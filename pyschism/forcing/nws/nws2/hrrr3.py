@@ -155,7 +155,7 @@ class HRRR:
             'dswrf': (['time', 'ny_grid', 'nx_grid'], np.array(dswrf)),
             },
             coords={
-                'time': np.round(np.arange(1, len(grbfiles)+1)/24, 4),
+                'time': np.round(np.arange(1, len(grbfiles)+1)/24, 4).astype('float32'),
                 'lon': (['ny_grid', 'nx_grid'], lon),
                 'lat': (['ny_grid', 'nx_grid'], lat)})
 
@@ -225,7 +225,7 @@ class HRRR:
             'long_name': 'Downward long-wave radiation flux'
         }
                          
-        fout.to_netcdf(path / f'hrrr_{start_date.strftime("%Y%m%d")}{cycle:02d}.nc','w', unlimited_dims='time')
+        fout.to_netcdf(path / f'hrrr_{start_date.strftime("%Y%m%d")}{cycle:02d}.nc','w', 'NETCDF3_CLASSIC', unlimited_dims='time')
 
     def modified_latlon(self, grbfile):
 
