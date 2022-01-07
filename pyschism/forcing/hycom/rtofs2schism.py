@@ -300,7 +300,7 @@ class OpenBoundaryInventory:
                     ds=Dataset(ssh_url)
                     print(f'ssh_url is {ssh_url}')
                     time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2 = get_idxs(date, ds, bbox)
-                    ssh=np.squeeze(ds['ssh'][time_idx,0,lat_idx1:lat_idx2+1,lon_idx1:lon_idx2+1])
+                    ssh=np.squeeze(ds['ssh'][time_idx+1,0,lat_idx1:lat_idx2+1,lon_idx1:lon_idx2+1])
 
                     ssh_int = interp_to_points_2d(y2, x2, bxy, ssh)
                     dst_elev['time'][it] = it*24*3600.
