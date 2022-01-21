@@ -3,7 +3,6 @@ import tempfile
 import pathlib
 from typing import Union
 import logging
-#from multiprocessing import Pool
 
 import appdirs
 import numpy as np
@@ -285,11 +284,14 @@ class ERA5(SfluxDataset):
             np.timedelta64(1, 'D'),
             dtype='datetime64')}
 
+        logger.info('Start downloading ERA5')
         self.inventory = ERA5DataInventory(
             self.start_date,
             self.rnday,
             bbox,
         )
+
+        logger.info('Finished downloading ERA5')
     
         nx_grid, ny_grid = self.inventory.xy_grid()
 

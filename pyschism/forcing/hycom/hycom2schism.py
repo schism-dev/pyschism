@@ -40,7 +40,7 @@ def get_database(date, Bbox=None):
     elif date >= datetime(1994, 1, 1) and date < datetime(2016, 1, 1):
         database = f'GLBv0.08/expt_53.X/data/{date.year}'
     else:
-        print('No data for {date}')
+        logger.info('No data for {date}')
     return database
 
 def get_idxs(date, database, bbox):
@@ -62,22 +62,22 @@ def get_idxs(date, database, bbox):
     lon_idxs=np.where((lon>=bbox.xmin-2.0) & (lon<=bbox.xmax+2.0))[0]
     lon=lon[lon_idxs]
     lat=lat[lat_idxs]
-    #print(lon_idxs)
-    #print(lat_idxs)
+    #logger.info(lon_idxs)
+    #logger.info(lat_idxs)
     lon_idx1=lon_idxs[0].item()
     lon_idx2=lon_idxs[-1].item()
-    #print(f'lon_idx1 is {lon_idx1}, lon_idx2 is {lon_idx2}')
+    #logger.info(f'lon_idx1 is {lon_idx1}, lon_idx2 is {lon_idx2}')
     lat_idx1=lat_idxs[0].item()
     lat_idx2=lat_idxs[-1].item()
-    #print(f'lat_idx1 is {lat_idx1}, lat_idx2 is {lat_idx2}')
+    #logger.info(f'lat_idx1 is {lat_idx1}, lat_idx2 is {lat_idx2}')
     
     for ilon in np.arange(len(lon)):
         if lon[ilon] > 180:
             lon[ilon] = lon[ilon]-360.
     #lonc=(np.max(lon)+np.min(lon))/2.0
-    #print(f'lonc is {lonc}')
+    #logger.info(f'lonc is {lonc}')
     #latc=(np.max(lat)+np.min(lat))/2.0
-    #print(f'latc is {latc}')
+    #logger.info(f'latc is {latc}')
     x2, y2=transform_ll_to_cpp(lon, lat)
 
     idxs=np.where( date == times)[0]
@@ -86,14 +86,14 @@ def get_idxs(date, database, bbox):
         #If there is missing data, use the data from the next days, the maximum searching days is 3. Otherwise, stop.
         for i in np.arange(0,3):
             date_before=(date + timedelta(days=int(i)+1)) #.astype(datetime)
-            print(f'Try replacing the missing data from {date_before}')
+            logger.info(f'Try replacing the missing data from {date_before}')
             idxs=np.where(date_before == times)[0]
             if len(idxs) == 0:
                 continue
             else:
                 break
     if len(idxs) ==0:
-        print(f'No date for date {date}')
+        logger.info(f'No date for date {date}')
         sys.exit()
     time_idx=idxs.item()  
 
@@ -101,9 +101,9 @@ def get_idxs(date, database, bbox):
 
 def transform_ll_to_cpp(lon, lat, lonc=-77.07, latc=24.0):
     #lonc=(np.max(lon)+np.min(lon))/2.0
-    #print(f'lonc is {lonc}')
+    #logger.info(f'lonc is {lonc}')
     #latc=(np.max(lat)+np.min(lat))/2.0
-    #print(f'latc is {latc}')
+    #logger.info(f'latc is {latc}')
     longitude=lon/180*np.pi
     latitude=lat/180*np.pi
     radius=6378206.4
@@ -125,7 +125,7 @@ def interp_to_points_3d(dep, y2, x2, bxyz, val):
         val_int[idxs] = sp.interpolate.griddata(bxyz[~idxs,:], val_int[~idxs], bxyz[idxs,:],'nearest')
     idxs = np.isnan(val_int)
     if np.sum(idxs) != 0:
-        print(f'There is still missing value for {val}')
+        logger.info(f'There is still missing value for {val}')
         sys.exit()
     return val_int
 
@@ -140,7 +140,7 @@ def interp_to_points_2d(y2, x2, bxy, val):
         val_int[idxs] = sp.interpolate.griddata(bxy[~idxs,:], val_int[~idxs], bxy[idxs,:],'nearest')
     idxs = np.isnan(val_int)
     if np.sum(idxs) != 0:
-        print(f'There is still missing value for {val}')
+        logger.info(f'There is still missing value for {val}')
         sys.exit()
     return val_int
 
@@ -167,7 +167,7 @@ class OpenBoundaryInventory:
             opbd.extend(list(boundary.indexes))
         blon = self.hgrid.coords[opbd,0]
         blat = self.hgrid.coords[opbd,1]
-        #print(f'blon min {np.min(blon)}, max {np.max(blon)}')
+        #logger.info(f'blon min {np.min(blon)}, max {np.max(blon)}')
         NOP = len(blon)
 
         #calculate zcor for 3D
@@ -190,7 +190,7 @@ class OpenBoundaryInventory:
             #x2i=np.tile(xi,[nvrt,1]).T
             #y2i=np.tile(yi,[nvrt,1]).T
             #bxyz=np.c_[zcor2.reshape(np.size(zcor2)),y2i.reshape(np.size(y2i)),x2i.reshape(np.size(x2i))]
-            #print('Computing SCHISM zcor is done!')
+            #logger.info('Computing SCHISM zcor is done!')
 
         #create netcdf
         ntimes=self.rnday+1
@@ -277,12 +277,12 @@ class OpenBoundaryInventory:
             dst_uv.createVariable('time_series', 'f', ('time', 'nOpenBndNodes', 'nLevels', 'nComponents'))
             #dst_uv['time_series'][:,:,:,:] = timeseries_uv
 
-        print('**** Accessing GOFS data*****')
+        logger.info('**** Accessing GOFS data*****')
+        t0=time()
         for it, date in enumerate(self.timevector):
-            t0=time()
 
             database=get_database(date)
-            print(f'Fetching data for {date} from database {database}')
+            logger.info(f'Fetching data for {date} from database {database}')
 
             #loop over each open boundary
             ind1 = 0
@@ -292,7 +292,7 @@ class OpenBoundaryInventory:
                 opbd = list(boundary.indexes)
                 ind1 = ind2
                 ind2 = ind1 + len(opbd)
-                #print(f'ind1 = {ind1}, ind2 = {ind2}')
+                #logger.info(f'ind1 = {ind1}, ind2 = {ind2}')
                 blon = self.hgrid.coords[opbd,0]
                 blat = self.hgrid.coords[opbd,1]
                 xi,yi = transform_ll_to_cpp(blon, blat)
@@ -319,7 +319,7 @@ class OpenBoundaryInventory:
                     bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
                 else:
                     bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
-                #print(f'xmin is {xmin}, xmax is {xmax}')
+                #logger.info(f'xmin is {xmin}, xmax is {xmax}')
 
                 time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2 = get_idxs(date, database, bbox)
 
@@ -342,12 +342,12 @@ class OpenBoundaryInventory:
                         f'salinity[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
                         f'water_u[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
                         f'water_v[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
-                #print(url)
+                #logger.info(url)
                  
                 ds=Dataset(url)
                 dep=ds['depth'][:]
 
-                print('****Interpolation starts****')
+                logger.info('****Interpolation starts****')
 
                 #ndt[it]=it*24*3600.
 
@@ -407,7 +407,7 @@ class OpenBoundaryInventory:
                     dst_uv['time_series'][it,ind1:ind2,:,1] = vvel_int
                     #timeseries_uv[it,:,:,1]=vvel_int
 
-        print(f'Writing *th.nc takes {time()-t0} seconds')
+        logger.info(f'Writing *th.nc takes {time()-t0} seconds')
 
 class Nudge:
 
@@ -474,8 +474,8 @@ class Nudge:
         #idxs_nudge=np.delete(idxs_nudge, np.where(idxs_nudge == -99))
         idxs=np.where(idxs_nudge == 1)[0]
         self.include=idxs
-        #print(f'len of nudge idxs is {len(idxs)}')
-        print(f'It took {time() -t0} sencods to calcuate nudge coefficient')
+        #logger.info(f'len of nudge idxs is {len(idxs)}')
+        logger.info(f'It took {time() -t0} sencods to calcuate nudge coefficient')
 
         nudge = [f"{rlmax}, {rnu_day}"]
         nudge.extend("\n")
@@ -532,7 +532,7 @@ class Nudge:
         #compute zcor
         zcor = depth[:,None]*sigma
         nvrt=zcor.shape[1]
-        #print(f'zcor at node 1098677 is {zcor[1098676,:]}')
+        #logger.info(f'zcor at node 1098677 is {zcor[1098676,:]}')
 
         #Get open nudge array 
         nlon = hgrid.coords[include, 0]
@@ -542,15 +542,15 @@ class Nudge:
 
         zcor2=zcor[include,:]
         idxs=np.where(zcor2 > 5000)
-        #print(idxs)
+        #logger.info(idxs)
         zcor2[idxs]=5000.0-1.0e-6
-        #print(f'zcor2 at node 200 is {zcor2[199,:]}')
+        #logger.info(f'zcor2 at node 200 is {zcor2[199,:]}')
 
         #construct schism grid
         x2i=np.tile(xi,[nvrt,1]).T
         y2i=np.tile(yi,[nvrt,1]).T
         bxyz=np.c_[zcor2.reshape(np.size(zcor2)),y2i.reshape(np.size(y2i)),x2i.reshape(np.size(x2i))]
-        print('Computing SCHISM zcor is done!')
+        logger.info('Computing SCHISM zcor is done!')
 
         #allocate output variables
         nNode=len(include)
@@ -561,12 +561,12 @@ class Nudge:
         timeseries_t=np.zeros([ntimes,nNode,nvrt,one])
         ndt=np.zeros([ntimes])
 
-        print('**** Accessing GOFS data*****')
+        logger.info('**** Accessing GOFS data*****')
+        t0=time()
         for it, date in enumerate(self.timevector):
-            t0=time()
 
             database=get_database(date)
-            print(f'Fetching data for {date} from database {database}')
+            logger.info(f'Fetching data for {date} from database {database}')
 
             xmin, xmax = np.min(nlon), np.max(nlon)
             ymin, ymax = np.min(nlat), np.max(nlat)
@@ -574,13 +574,13 @@ class Nudge:
             if date.strftime("%Y-%m-%d") >= datetime(2017, 2, 1).strftime("%Y-%m-%d") and  \
                 date.strftime("%Y-%m-%d") < datetime(2017, 6, 1).strftime("%Y-%m-%d") or \
                 date.strftime("%Y-%m-%d") >= datetime(2017, 10, 1).strftime("%Y-%m-%d"):
-                print('Convert xmin and xmax')
+                logger.info('Convert xmin and xmax')
                 xmin = xmin + 360. if xmin < 0 else xmin
                 xmax = xmax + 360. if xmax < 0 else xmax
                 bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
             else:
                 bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
-            #print(f'xmin is {xmin}, xmax is {xmax}')
+            #logger.info(f'xmin is {xmin}, xmax is {xmax}')
 
             time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2 = get_idxs(date, database, bbox)
 
@@ -597,12 +597,12 @@ class Nudge:
                     f'lon[{lon_idx1}:1:{lon_idx2}],depth[0:1:-1],time[{time_idx}],' + \
                     f'water_temp[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
                     f'salinity[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
-            #print(url)
+            #logger.info(url)
 
             ds=Dataset(url)
             salt=np.squeeze(ds['salinity'][:,:,:])
             temp=np.squeeze(ds['water_temp'][:,:,:])
-            #print(f'The shape of temp is {temp.shape}')
+            #logger.info(f'The shape of temp is {temp.shape}')
 
             #Convert temp to potential temp
             nz=temp.shape[0]
@@ -614,7 +614,7 @@ class Nudge:
             Pr=np.zeros(temp.shape)
             ptemp=sw.ptmp(salt, temp, pre, Pr)*1.00024
 
-            print('****Interpolation starts****')
+            logger.info('****Interpolation starts****')
 
             ndt[it]=it
             #salt
@@ -660,4 +660,4 @@ class Nudge:
             dst['tracer_concentration'][:,:,:,:] = timeseries_s
 
 
-        print(f'Writing *_nu.nc takes {time()-t0} seconds')
+        logger.info(f'Writing *_nu.nc takes {time()-t0} seconds')
