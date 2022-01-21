@@ -124,8 +124,11 @@ class Shapiro(Gr3Field):
         dp = -hgrid.nodes.values
         elnode = hgrid.elements.array
 
-        fp = np.any(elnode.mask, axis=1)
-        fpn = ~fp
+        #breakpoint()
+        #fp = np.any(elnode.mask, axis=1)
+        fp = np.any(elnode.mask)
+        if fp:
+            fpn = ~fp
         x1 = x[elnode[:, 0]]
         y1 = y[elnode[:, 0]]
         v1 = dp[elnode[:, 0]]
@@ -135,14 +138,16 @@ class Shapiro(Gr3Field):
         x3 = x[elnode[:, 2]]
         y3 = y[elnode[:, 2]]
         v3 = dp[elnode[:, 2]]
-        x4 = x[elnode[:, 3]]
-        y4 = y[elnode[:, 3]]
-        v4 = dp[elnode[:, 3]]
-        x4[fp] = x1[fp]
-        y4[fp] = y1[fp]
-        v4[fp] = v1[fp]
         a1 = ((x2-x1)*(y3-y1)-(x3-x1)*(y2-y1))/2
-        a2 = ((x3-x1)*(y4-y1)-(x4-x1)*(y3-y1))/2
+        if fp:
+            mask = np.any(elnode.mask, axis=1)
+            x4 = x[elnode[:, 3]]
+            y4 = y[elnode[:, 3]]
+            v4 = dp[elnode[:, 3]]
+            x4[mask] = x1[mask]
+            y4[mask] = y1[mask]
+            v4[mask] = v1[mask]
+            a2 = ((x3-x1)*(y4-y1)-(x4-x1)*(y3-y1))/2
 
         # compute gradients
         dpedx = (v1*(y2-y3)+v2*(y3-y1)+v3*(y1-y2))/(2*a1)
@@ -150,13 +155,16 @@ class Shapiro(Gr3Field):
         dpedxy = np.sqrt(dpedx**2+dpedy**2)
 
         # modify quads
-        dpedx2 = (v1[fpn]*(y3[fpn]-y4[fpn])+v3[fpn]*(y4[fpn]-y1[fpn])+v4[fpn]*(y1[fpn]-y3[fpn]))/(2*a2[fpn])
-        dpedy2 = ((x4[fpn]-x3[fpn])*v1[fpn]+(x1[fpn]-x4[fpn])*v3[fpn]+(x3[fpn]-x1[fpn])*v4[fpn])/(2*a2[fpn])
-        dpedxy2 = np.sqrt(dpedx2**2+dpedy2**2)
-        
-        dpedx[fpn] = (dpedx[fpn]+dpedx2)/2
-        dpedy[fpn] = (dpedy[fpn]+dpedy2)/2
-        dpedxy[fpn] = (dpedxy[fpn]+dpedxy2)/2
+        if fp:
+            mask = np.any(elnode.mask, axis=1)
+            fpn = ~mask
+            dpedx2 = (v1[fpn]*(y3[fpn]-y4[fpn])+v3[fpn]*(y4[fpn]-y1[fpn])+v4[fpn]*(y1[fpn]-y3[fpn]))/(2*a2[fpn])
+            dpedy2 = ((x4[fpn]-x3[fpn])*v1[fpn]+(x1[fpn]-x4[fpn])*v3[fpn]+(x3[fpn]-x1[fpn])*v4[fpn])/(2*a2[fpn])
+            dpedxy2 = np.sqrt(dpedx2**2+dpedy2**2)
+            
+            dpedx[fpn] = (dpedx[fpn]+dpedx2)/2
+            dpedy[fpn] = (dpedy[fpn]+dpedy2)/2
+            dpedxy[fpn] = (dpedxy[fpn]+dpedxy2)/2
 
         # get node ball information
         nne, ine = hgrid.elements.get_node_ball()
