@@ -64,6 +64,22 @@ def get_idxs(date, ds, bbox):
 
     return time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2
 
+def get_idxs2(date, ds):
+
+    time1=ds['time']
+    times=nc.num2date(time1,units=time1.units,only_use_cftime_datetimes=False)
+    idxs=np.where( date == times)[0]
+    time_idx=idxs.item()  
+
+    lon=ds['lon'][:]
+    lat=ds['lat'][:]
+    for ilon in np.arange(len(lon)):
+        if lon[ilon] > 180:
+            lon[ilon] = lon[ilon]-360.
+    x2, y2=transform_ll_to_cpp(lon, lat)
+
+    return time_idx, x2, y2
+
 def transform_ll_to_cpp(lon, lat, lonc=-77.07, latc=24.0):
     longitude=lon/180*np.pi
     latitude=lat/180*np.pi
@@ -111,7 +127,7 @@ class OpenBoundaryInventory:
         self.hgrid = hgrid
         self.vgrid = Vgrid.default() if vgrid is None else vgrid
 
-    def fetch_data(self, outdir: Union[str, os.PathLike], start_date, rnday, elev2D=True, TS=True, UV=True, adjust2D=False, lats=None, msl_shifts=None): 
+    def fetch_data(self, outdir: Union[str, os.PathLike], start_date, rnday, elev2D=True, TS=True, UV=True, adjust2D=False, lats=None, msl_shifts=None, cached=False): 
         outdir = pathlib.Path(outdir)
 
         self.start_date = start_date
@@ -227,8 +243,12 @@ class OpenBoundaryInventory:
             dst_uv.createVariable('time_series', 'f', ('time', 'nOpenBndNodes', 'nLevels', 'nComponents'))
             #dst_uv['time_series'][:,:,:,:] = timeseries_uv
 
-        logger.info('**** Accessing RTOFS data*****')
-        baseurl = f'http://nomads.ncep.noaa.gov:80/dods/rtofs/rtofs_global'
+        if cached:
+            logger.info('**** Use cached data*****')
+        else:
+            logger.info('**** Accessing RTOFS data*****')
+            baseurl = f'http://nomads.ncep.noaa.gov:80/dods/rtofs/rtofs_global'
+
         t0=time()
         for it, date in enumerate(self.timevector):
             logger.info(f'Fetching data for {date}')
@@ -271,11 +291,17 @@ class OpenBoundaryInventory:
 
                 if elev2D:
                     #ssh
-                    ssh_url = f'{baseurl}{self.start_date.strftime("%Y%m%d")}/rtofs_glo_2ds_forecast_3hrly_diag'
-                    ds=Dataset(ssh_url)
-                    logger.info(f'ssh_url is {ssh_url}')
-                    time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2 = get_idxs(date, ds, bbox)
-                    ssh=np.squeeze(ds['ssh'][time_idx+1,0,lat_idx1:lat_idx2+1,lon_idx1:lon_idx2+1])
+                    if cached:
+                        ds = Dataset(f'rtofs_{self.start_date.strftime("%Y%m%d")}.nc')
+                        time_idx, x2, y2 = get_idxs2(date, ds)
+                        ssh=np.squeeze(ds['ssh'][time_idx,:,:])
+
+                    else:
+                        ssh_url = f'{baseurl}{self.start_date.strftime("%Y%m%d")}/rtofs_glo_2ds_forecast_3hrly_diag'
+                        ds=Dataset(ssh_url)
+                        logger.info(f'ssh_url is {ssh_url}')
+                        time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2 = get_idxs(date, ds, bbox)
+                        ssh=np.squeeze(ds['ssh'][time_idx+1,0,lat_idx1:lat_idx2+1,lon_idx1:lon_idx2+1])
 
                     ssh_int = interp_to_points_2d(y2, x2, bxy, ssh)
                     dst_elev['time'][it] = it*24*3600.
@@ -288,14 +314,18 @@ class OpenBoundaryInventory:
 
                 if TS:
                     #salt
-                    salt_url = f'{baseurl}{self.start_date.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_salt'
-                    ds = Dataset(salt_url)
-                    logger.info(f'salt_url is {salt_url}')
-                    time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2 = get_idxs(date, ds, bbox)
+                    if cached:
+                        ds = Dataset(f'rtofs_{self.start_date.strftime("%Y%m%d")}.nc')
+                        time_idx, x2, y2 = get_idxs2(date, ds)
+                        salt=np.squeeze(ds['salinity'][time_idx,:,:,:])
+                    else:
+                        salt_url = f'{baseurl}{self.start_date.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_salt'
+                        ds = Dataset(salt_url)
+                        logger.info(f'salt_url is {salt_url}')
+                        time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2 = get_idxs(date, ds, bbox)
+                        salt = np.squeeze(ds['salinity'][time_idx+1,:,lat_idx1:lat_idx2+1,lon_idx1:lon_idx2+1])
                     dep = ds['lev'][:]
-                    salt = np.squeeze(ds['salinity'][time_idx+1,:,lat_idx1:lat_idx2+1,lon_idx1:lon_idx2+1])
 
-                    #breakpoint()
                     salt_int = interp_to_points_3d(dep, y2, x2, bxyz, salt)
                     salt_int = salt_int.reshape(zcor2.shape)
                     #timeseries_s[it,:,:,0]=salt_int
@@ -305,11 +335,16 @@ class OpenBoundaryInventory:
                     ds.close()
 
                     #temp
-                    temp_url = f'{baseurl}{self.start_date.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_temp'
-                    ds = Dataset(temp_url)
-                    logger.info(f'temp_url is {temp_url}')
+                    if cached:
+                        ds = Dataset(f'rtofs_{self.start_date.strftime("%Y%m%d")}.nc')
+                        time_idx, x2, y2 = get_idxs2(date, ds)
+                        temp = np.squeeze(ds['temperature'][time_idx,:,:,:])
+                    else:
+                        temp_url = f'{baseurl}{self.start_date.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_temp'
+                        ds = Dataset(temp_url)
+                        logger.info(f'temp_url is {temp_url}')
+                        temp = np.squeeze(ds['temperature'][time_idx+1,:,lat_idx1:lat_idx2+1,lon_idx1:lon_idx2+1])
                     dep = ds['lev'][:]
-                    temp = np.squeeze(ds['temperature'][time_idx+1,:,lat_idx1:lat_idx2+1,lon_idx1:lon_idx2+1])
 
                     temp_int = interp_to_points_3d(dep, y2, x2, bxyz, temp)
                     temp_int = temp_int.reshape(zcor2.shape)
@@ -318,13 +353,19 @@ class OpenBoundaryInventory:
                     dst_temp['time_series'][it,ind1:ind2,:,0] = temp_int
 
                     ds.close()
+
                 if UV:
-                    uvel_url = f'{baseurl}{self.start_date.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_uvel'
-                    ds = Dataset(uvel_url)
-                    logger.info(f'uvel_url is {uvel_url}')
-                    time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2 = get_idxs(date, ds, bbox)
+                    if cached:
+                        ds = Dataset(f'rtofs_{self.start_date.strftime("%Y%m%d")}.nc')
+                        time_idx, x2, y2 = get_idxs2(date, ds)
+                        uvel = np.squeeze(ds['u'][time_idx,:,:,:])
+                    else:
+                        uvel_url = f'{baseurl}{self.start_date.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_uvel'
+                        ds = Dataset(uvel_url)
+                        logger.info(f'uvel_url is {uvel_url}')
+                        time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2 = get_idxs(date, ds, bbox)
+                        uvel = np.squeeze(ds['u'][time_idx+1,:,lat_idx1:lat_idx2+1,lon_idx1:lon_idx2+1])
                     dep = ds['lev'][:]
-                    uvel = np.squeeze(ds['u'][time_idx+1,:,lat_idx1:lat_idx2+1,lon_idx1:lon_idx2+1])
 
                     dst_uv['time'][it] = it*24*3600.
                     #uvel
@@ -334,11 +375,16 @@ class OpenBoundaryInventory:
                     ds.close()
 
                     #vvel
-                    vvel_url = f'{baseurl}{self.start_date.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_vvel'
-                    ds = Dataset(vvel_url)
-                    logger.info(f'vvel_url is {vvel_url}')
+                    if cached:
+                        ds = Dataset(f'rtofs_{self.start_date.strftime("%Y%m%d")}.nc')
+                        time_idx, x2, y2 = get_idxs2(date, ds)
+                        vvel = np.squeeze(ds['v'][time_idx,:,:,:])
+                    else:
+                        vvel_url = f'{baseurl}{self.start_date.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_vvel'
+                        ds = Dataset(vvel_url)
+                        logger.info(f'vvel_url is {vvel_url}')
+                        vvel = np.squeeze(ds['v'][time_idx+1,:,lat_idx1:lat_idx2+1,lon_idx1:lon_idx2+1])
                     dep = ds['lev'][:]
-                    vvel = np.squeeze(ds['v'][time_idx+1,:,lat_idx1:lat_idx2+1,lon_idx1:lon_idx2+1])
 
                     vvel_int = interp_to_points_3d(dep, y2, x2, bxyz, vvel)
                     vvel_int = vvel_int.reshape(zcor2.shape)
@@ -352,7 +398,7 @@ class NudgeTS:
     def __init__(self):
         pass
 
-    def fetch_data(self, outdir: Union[str, os.PathLike], hgrid, vgrid, start_date, rnday, include):
+    def fetch_data(self, outdir: Union[str, os.PathLike], hgrid, vgrid, start_date, rnday, include, cached=False):
 
         outdir = pathlib.Path(outdir)
 
@@ -398,7 +444,6 @@ class NudgeTS:
         timeseries_t=np.zeros([ntimes,nNode,nvrt,one])
         ndt=np.zeros([ntimes])
 
-        logger.info('**** Accessing RTOFS data*****')
 
         xmin, xmax = np.min(nlon), np.max(nlon)
         ymin, ymax = np.min(nlat), np.max(nlat)
@@ -409,7 +454,12 @@ class NudgeTS:
         bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
         logger.info(f'xmin is {xmin}, xmax is {xmax}')
 
-        baseurl = f'http://nomads.ncep.noaa.gov:80/dods/rtofs/rtofs_global'
+        if cached:
+            logger.info('**** Use cached data*****')
+        else:
+            logger.info('**** Accessing RTOFS data*****')
+            baseurl = f'http://nomads.ncep.noaa.gov:80/dods/rtofs/rtofs_global'
+
         t0=time()
         for it, date in enumerate(timevector):
 
@@ -418,12 +468,17 @@ class NudgeTS:
             ndt[it]=it
              
             #salt
-            salt_url = f'{baseurl}{start_date.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_salt'
-            ds = Dataset(salt_url)
-            time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2 = get_idxs(date, ds, bbox)
+            if cached:
+                ds = Dataset(f'rtofs_{start_date.strftime("%Y%m%d")}.nc')
+                time_idx, x2, y2 = get_idxs2(date, ds)
+                salt = np.squeeze(ds['salinity'][time_idx,:,:,:])
+            else:
+                salt_url = f'{baseurl}{start_date.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_salt'
+                ds = Dataset(salt_url)
+                time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2 = get_idxs(date, ds, bbox)
+                #It seems that salt=0 at time_idx=0 in rtofs 
+                salt = np.squeeze(ds['salinity'][time_idx+1,:,lat_idx1:lat_idx2+1,lon_idx1:lon_idx2+1])
             dep = ds['lev'][:]
-            #It seems that salt=0 at time_idx=0 in rtofs 
-            salt = np.squeeze(ds['salinity'][time_idx+1,:,lat_idx1:lat_idx2+1,lon_idx1:lon_idx2+1])
 
             salt_int = interp_to_points_3d(dep, y2, x2, bxyz, salt)
             salt_int = salt_int.reshape(zcor2.shape)
@@ -433,10 +488,15 @@ class NudgeTS:
             ds.close()
 
             #temp
-            temp_url = f'{baseurl}{start_date.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_temp'
-            ds = Dataset(temp_url)
+            if cached:
+                ds = Dataset(f'rtofs_{start_date.strftime("%Y%m%d")}.nc')
+                time_idx, x2, y2 = get_idxs2(date, ds)
+                temp = np.squeeze(ds['temperature'][time_idx,:,:,:])
+            else:
+                temp_url = f'{baseurl}{start_date.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_temp'
+                ds = Dataset(temp_url)
+                temp = np.squeeze(ds['temperature'][time_idx+1,:,lat_idx1:lat_idx2+1,lon_idx1:lon_idx2+1])
             dep = ds['lev'][:]
-            temp = np.squeeze(ds['temperature'][time_idx+1,:,lat_idx1:lat_idx2+1,lon_idx1:lon_idx2+1])
 
             temp_int = interp_to_points_3d(dep, y2, x2, bxyz, temp)
             temp_int = temp_int.reshape(zcor2.shape)
