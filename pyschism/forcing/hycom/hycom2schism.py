@@ -16,6 +16,7 @@ import netCDF4 as nc
 from netCDF4 import Dataset
 from matplotlib.transforms import Bbox
 import seawater as sw
+import xarray as xr
 
 from pyschism.mesh.base import Nodes, Elements
 from pyschism.mesh.vgrid import Vgrid
@@ -96,6 +97,8 @@ def get_idxs(date, database, bbox):
         logger.info(f'No date for date {date}')
         sys.exit()
     time_idx=idxs.item()  
+
+    ds.close()
 
     return time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2
 
@@ -661,3 +664,96 @@ class Nudge:
 
 
         logger.info(f'Writing *_nu.nc takes {time()-t0} seconds')
+
+class DownloadHycom:
+
+    def __init__(self, hgrid):
+
+        self.bbox = hgrid.bbox
+
+    def fetch_data(self, date):
+
+        database=get_database(date)
+        logger.info(f'Fetching data for {date} from database {database}')
+
+        time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2 = get_idxs(date, database, self.bbox)
+
+        url_ssh = f'https://tds.hycom.org/thredds/dodsC/{database}?lat[{lat_idx1}:1:{lat_idx2}],' + \
+            f'lon[{lon_idx1}:1:{lon_idx2}],depth[0:1:-1],time[{time_idx}],' + \
+            f'surf_el[{time_idx}][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
+        foutname = f'SSH_{date.strftime("%Y%m%d")}.nc'
+        logger.info(f'filename is {foutname}')
+        ds = xr.open_dataset(url_ssh)
+        ds1 = ds.rename_dims({'lon':'xlon'})
+        ds2 = ds1.rename_dims({'lat':'ylat'})
+        ds3 = ds2.rename_vars({'lat':'ylat'})
+        ds4 = ds3.rename_vars({'lon':'xlon'})
+        ds4.to_netcdf(foutname, 'w', unlimited_dims='time')
+        ds.close()
+        ds1.close()
+        ds2.close()
+        ds3.close()
+        ds4.close()
+
+        url_uv = f'https://tds.hycom.org/thredds/dodsC/{database}?lat[{lat_idx1}:1:{lat_idx2}],' + \
+            f'lon[{lon_idx1}:1:{lon_idx2}],depth[0:1:-1],time[{time_idx}],' + \
+            f'water_u[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
+            f'water_v[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
+
+        foutname = f'UV_{date.strftime("%Y%m%d")}.nc'
+        logger.info(f'filename is {foutname}')
+        ds = xr.open_dataset(url_uv)
+        ds1 = ds.rename_dims({'lon':'xlon'})
+        ds2 = ds1.rename_dims({'lat':'ylat'})
+        ds3 = ds2.rename_vars({'lat':'ylat'})
+        ds4 = ds3.rename_vars({'lon':'xlon'})
+        ds4.to_netcdf(foutname, 'w', unlimited_dims='time')
+        ds.close()
+        ds1.close()
+        ds2.close()
+        ds3.close()
+        ds4.close()
+
+        url_ts = f'https://tds.hycom.org/thredds/dodsC/{database}?lat[{lat_idx1}:1:{lat_idx2}],' + \
+            f'lon[{lon_idx1}:1:{lon_idx2}],depth[0:1:-1],time[{time_idx}],' + \
+            f'water_temp[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
+            f'salinity[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
+
+        foutname = f'ST_{date.strftime("%Y%m%d")}.nc'
+        logger.info(f'filename is {foutname}')
+
+        ds = xr.open_dataset(url_ts)
+
+        #convert in-situ temperature to potential temperature
+        temp = ds.water_temp.values
+        salt = ds.salinity.values
+        dep = ds.depth.values
+        nz = temp.shape[0]
+        ny = temp.shape[1]
+        nx = temp.shape[2]
+        pr = np.ones(temp.shape)
+        pre = pr*dep[:,None, None]
+        Pr = np.zeros(temp.shape)
+        ptemp = sw.ptmp(salt, temp, pre, Pr)*1.00024
+        ds1 = ds.drop('water_temp')
+        ds1['temperature']=(['time','depth','lat','lon'], ptemp)
+        ds1.temperature.attrs = {
+            'long_name': 'Sea water potential temperature',
+            'standard_name': 'sea_water_potential_temperature',
+            'units': 'degC'
+        }
+
+        #ds.assign(water_temp2=ptemp)
+        #ds.assign.attrs = ds.water_temp.attrs
+
+        ds2 = ds1.rename_dims({'lon':'xlon'})
+        ds3 = ds2.rename_dims({'lat':'ylat'})
+        ds4 = ds3.rename_vars({'lat':'ylat'})
+        ds5 = ds4.rename_vars({'lon':'xlon'})
+        ds5.to_netcdf(foutname, 'w', unlimited_dims='time', encoding={'salinity': {'dtype': 'f4'},'temperature':{'dtype': 'f4','scale_factor': 0.001, 'add_offset': 20., 'missing_value': -30000.}})
+        ds.close()
+        ds1.close()
+        ds2.close()
+        ds3.close()
+        ds4.close()
+        ds5.close()
