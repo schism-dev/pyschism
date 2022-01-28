@@ -750,7 +750,7 @@ class DownloadHycom:
         ds3 = ds2.rename_dims({'lat':'ylat'})
         ds4 = ds3.rename_vars({'lat':'ylat'})
         ds5 = ds4.rename_vars({'lon':'xlon'})
-        ds5.to_netcdf(foutname, 'w', unlimited_dims='time', encoding={'salinity': {'dtype': 'f4'},'temperature':{'dtype': 'f4','scale_factor': 0.001, 'add_offset': 20., 'missing_value': -30000.}})
+        ds5.to_netcdf(foutname, 'w', unlimited_dims='time', encoding={'temperature':{'_FillValue': -30000.,'scale_factor': 0.001, 'add_offset': 20., 'missing_value': -30000.}})
         ds.close()
         ds1.close()
         ds2.close()
