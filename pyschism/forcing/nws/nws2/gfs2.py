@@ -278,7 +278,8 @@ class GFS:
         idxs = np.where(lon2 > 180)
         lon2[idxs] -= 360
         logger.info(f'idx_ymin is {idx_ymin}, idx_ymax is {idx_ymax}, idx_xmin is {idx_xmin}, idx_xmax is {idx_xmax}')
-        nx_grid, ny_grid=np.meshgrid(lon2, lat2)
+        #make sure lat is in ascending order
+        nx_grid, ny_grid=np.meshgrid(lon2, lat2[::-1])
 
         ds.close()
 

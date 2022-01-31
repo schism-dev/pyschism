@@ -147,6 +147,16 @@ def interp_to_points_2d(y2, x2, bxy, val):
         sys.exit()
     return val_int
 
+def ConvertTemp(salt, temp, dep):
+    nz = temp.shape[0]
+    ny = temp.shape[1]
+    nx = temp.shape[2]
+    pr = np.ones(temp.shape)
+    pre = pr*dep[:,None, None]
+    Pr = np.zeros(temp.shape)
+    ptemp = sw.ptmp(salt, temp, pre, Pr)*1.00024
+    return ptemp
+
 class OpenBoundaryInventory:
 
     def __init__(self, hgrid, vgrid=None):
@@ -380,13 +390,14 @@ class OpenBoundaryInventory:
                     temp = np.squeeze(ds['water_temp'][:,:,:])
 
                     #Convert temp to potential temp
-                    nz=temp.shape[0]
-                    ny=temp.shape[1]
-                    nx=temp.shape[2]
-                    pr=np.ones(temp.shape)
-                    pre=pr*dep[:,None, None]
-                    Pr=np.zeros(temp.shape)
-                    ptemp=sw.ptmp(salt, temp, pre, Pr)*1.00024
+                    ptemp = ConvertTemp(salt, temp, dep)
+                    #nz=temp.shape[0]
+                    #ny=temp.shape[1]
+                    #nx=temp.shape[2]
+                    #pr=np.ones(temp.shape)
+                    #pre=pr*dep[:,None, None]
+                    #Pr=np.zeros(temp.shape)
+                    #ptemp=sw.ptmp(salt, temp, pre, Pr)*1.00024
 
                     temp_int = interp_to_points_3d(dep, y2, x2, bxyz, ptemp)
                     temp_int = temp_int.reshape(zcor2.shape)
@@ -608,14 +619,15 @@ class Nudge:
             #logger.info(f'The shape of temp is {temp.shape}')
 
             #Convert temp to potential temp
-            nz=temp.shape[0]
-            ny=temp.shape[1]
-            nx=temp.shape[2]
-            dep=ds['depth'][:]
-            pr=np.ones(temp.shape)
-            pre=pr*dep[:,None, None]
-            Pr=np.zeros(temp.shape)
-            ptemp=sw.ptmp(salt, temp, pre, Pr)*1.00024
+            #nz=temp.shape[0]
+            #ny=temp.shape[1]
+            #nx=temp.shape[2]
+            #dep=ds['depth'][:]
+            #pr=np.ones(temp.shape)
+            #pre=pr*dep[:,None, None]
+            #Pr=np.zeros(temp.shape)
+            #ptemp=sw.ptmp(salt, temp, pre, Pr)*1.00024
+            ptemp = ConvertTemp(salt, temp, dep)
 
             logger.info('****Interpolation starts****')
 
@@ -688,7 +700,7 @@ class DownloadHycom:
         ds2 = ds1.rename_dims({'lat':'ylat'})
         ds3 = ds2.rename_vars({'lat':'ylat'})
         ds4 = ds3.rename_vars({'lon':'xlon'})
-        ds4.to_netcdf(foutname, 'w', unlimited_dims='time')
+        ds4.to_netcdf(foutname, 'w', 'NETCDF3_CLASSIC', unlimited_dims='time')
         ds.close()
         ds1.close()
         ds2.close()
@@ -707,7 +719,7 @@ class DownloadHycom:
         ds2 = ds1.rename_dims({'lat':'ylat'})
         ds3 = ds2.rename_vars({'lat':'ylat'})
         ds4 = ds3.rename_vars({'lon':'xlon'})
-        ds4.to_netcdf(foutname, 'w', unlimited_dims='time')
+        ds4.to_netcdf(foutname, 'w', 'NETCDF3_CLASSIC', unlimited_dims='time')
         ds.close()
         ds1.close()
         ds2.close()
@@ -723,18 +735,14 @@ class DownloadHycom:
         logger.info(f'filename is {foutname}')
 
         ds = xr.open_dataset(url_ts)
-
-        #convert in-situ temperature to potential temperature
         temp = ds.water_temp.values
         salt = ds.salinity.values
         dep = ds.depth.values
-        nz = temp.shape[0]
-        ny = temp.shape[1]
-        nx = temp.shape[2]
-        pr = np.ones(temp.shape)
-        pre = pr*dep[:,None, None]
-        Pr = np.zeros(temp.shape)
-        ptemp = sw.ptmp(salt, temp, pre, Pr)*1.00024
+
+        #convert in-situ temperature to potential temperature
+        ptemp = ConvertTemp(salt, temp, dep)
+
+        #drop water_temp variable and add new temperature variable
         ds1 = ds.drop('water_temp')
         ds1['temperature']=(['time','depth','lat','lon'], ptemp)
         ds1.temperature.attrs = {
@@ -750,7 +758,7 @@ class DownloadHycom:
         ds3 = ds2.rename_dims({'lat':'ylat'})
         ds4 = ds3.rename_vars({'lat':'ylat'})
         ds5 = ds4.rename_vars({'lon':'xlon'})
-        ds5.to_netcdf(foutname, 'w', unlimited_dims='time', encoding={'temperature':{'_FillValue': -30000.,'scale_factor': 0.001, 'add_offset': 20., 'missing_value': -30000.}})
+        ds5.to_netcdf(foutname, 'w', unlimited_dims='time', encoding={'temperature':{'dtype': 'h', '_FillValue': -30000.,'scale_factor': 0.001, 'add_offset': 20., 'missing_value': -30000.}})
         ds.close()
         ds1.close()
         ds2.close()
