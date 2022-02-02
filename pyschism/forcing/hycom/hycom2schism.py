@@ -391,13 +391,6 @@ class OpenBoundaryInventory:
 
                     #Convert temp to potential temp
                     ptemp = ConvertTemp(salt, temp, dep)
-                    #nz=temp.shape[0]
-                    #ny=temp.shape[1]
-                    #nx=temp.shape[2]
-                    #pr=np.ones(temp.shape)
-                    #pre=pr*dep[:,None, None]
-                    #Pr=np.zeros(temp.shape)
-                    #ptemp=sw.ptmp(salt, temp, pre, Pr)*1.00024
 
                     temp_int = interp_to_points_3d(dep, y2, x2, bxyz, ptemp)
                     temp_int = temp_int.reshape(zcor2.shape)
@@ -619,14 +612,7 @@ class Nudge:
             #logger.info(f'The shape of temp is {temp.shape}')
 
             #Convert temp to potential temp
-            #nz=temp.shape[0]
-            #ny=temp.shape[1]
-            #nx=temp.shape[2]
-            #dep=ds['depth'][:]
-            #pr=np.ones(temp.shape)
-            #pre=pr*dep[:,None, None]
-            #Pr=np.zeros(temp.shape)
-            #ptemp=sw.ptmp(salt, temp, pre, Pr)*1.00024
+            dep=ds['depth'][:]
             ptemp = ConvertTemp(salt, temp, dep)
 
             logger.info('****Interpolation starts****')

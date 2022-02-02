@@ -142,34 +142,38 @@ class GFS:
             for key, value in Vars.items():
                 if key == 'group1':
                     for key2, value2 in value.items():
-                        ds=xr.open_dataset(file,
+                        ds = xr.open_dataset(file,
                                 engine='cfgrib',
                                 backend_kwargs=dict(filter_by_keys={'paramId':int(value2[0])}))
-                        value2[1].append(ds[key2][idx_ymin:idx_ymax+1, idx_xmin:idx_xmax+1].astype('float32'))
+                        tmp = ds[key2][idx_ymin:idx_ymax+1, idx_xmin:idx_xmax+1].astype('float32')
+                        value2[1].append(tmp[::-1,:])
                         ds.close()
 
                 elif key == 'group2':
-                    ds=xr.open_dataset(file,
+                    ds = xr.open_dataset(file,
                             engine='cfgrib',
                             backend_kwargs=dict(filter_by_keys={'typeOfLevel':'meanSea'}))
                     for key2, value2 in value.items():
-                        value2[1].append(ds[key2][idx_ymin:idx_ymax+1, idx_xmin:idx_xmax+1].astype('float32'))
+                        tmp = ds[key2][idx_ymin:idx_ymax+1, idx_xmin:idx_xmax+1].astype('float32')
+                        value2[1].append(tmp[::-1,:])
                     ds.close()
 
                 elif key == 'group3':
-                    ds=xr.open_dataset(file,
+                    ds = xr.open_dataset(file,
                             engine='cfgrib',
                             backend_kwargs=dict(filter_by_keys={'stepType': 'instant','typeOfLevel': 'surface'}))
                     for key2, value2 in value.items():
-                        value2[1].append(ds[key2][idx_ymin:idx_ymax+1, idx_xmin:idx_xmax+1].astype('float32'))
+                        tmp = ds[key2][idx_ymin:idx_ymax+1, idx_xmin:idx_xmax+1].astype('float32')
+                        value2[1].append(tmp[::-1, :])
                     ds.close()
 
                 else:
-                    ds=xr.open_dataset(file,
+                    ds = xr.open_dataset(file,
                             engine='cfgrib',
                             backend_kwargs=dict(filter_by_keys={'stepType': 'avg','typeOfLevel': 'surface'}))
                     for key2, value2 in value.items():
-                        value2[1].append(ds[key2][idx_ymin:idx_ymax+1, idx_xmin:idx_xmax+1].astype('float32'))
+                        tmp = ds[key2][idx_ymin:idx_ymax+1, idx_xmin:idx_xmax+1].astype('float32')
+                        value2[1].append(tmp[::-1, :])
                     ds.close()
 
         fout = xr.Dataset({'stmp': (['time', 'ny_grid', 'nx_grid'], np.array(stmp)),
