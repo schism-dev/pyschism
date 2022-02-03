@@ -8,12 +8,15 @@ import subprocess
 import shutil
 from typing import Union
 from time import time
+import glob
 
 import numpy as np
 import scipy as sp
 from numba import jit, prange
 import netCDF4 as nc
 from netCDF4 import Dataset
+import pandas as pd
+import xarray as xr
 from matplotlib.transforms import Bbox
 import seawater as sw
 
@@ -66,13 +69,15 @@ def get_idxs(date, ds, bbox):
 
 def get_idxs2(date, ds):
 
-    time1=ds['time']
-    times=nc.num2date(time1,units=time1.units,only_use_cftime_datetimes=False)
+    times = pd.to_datetime(ds['time'])
+    #times=nc.num2date(time1,units=time1.units,only_use_cftime_datetimes=False)
     idxs=np.where( date == times)[0]
     time_idx=idxs.item()  
 
-    lon=ds['lon'][:]
-    lat=ds['lat'][:]
+    #lon=ds['lon'][:]
+    #lat=ds['lat'][:]
+    lon=ds.lon.values
+    lat=ds.lat.values
     for ilon in np.arange(len(lon)):
         if lon[ilon] > 180:
             lon[ilon] = lon[ilon]-360.
@@ -245,6 +250,11 @@ class OpenBoundaryInventory:
 
         if cached:
             logger.info('**** Use cached data*****')
+            files = glob.glob('rtofs_*.nc')
+            files.sort()
+            ncfiles = files[-9:]
+            logger.info(f'files are {ncfiles}')
+
         else:
             logger.info('**** Accessing RTOFS data*****')
             baseurl = f'http://nomads.ncep.noaa.gov:80/dods/rtofs/rtofs_global'
@@ -292,16 +302,17 @@ class OpenBoundaryInventory:
                 if elev2D:
                     #ssh
                     if cached:
-                        ds = Dataset(f'rtofs_{self.start_date.strftime("%Y%m%d")}.nc')
+                        ds = xr.open_mfdataset(ncfiles, decode_timedelta=True)
                         time_idx, x2, y2 = get_idxs2(date, ds)
-                        ssh=np.squeeze(ds['ssh'][time_idx,:,:])
+                        logger.info(f'ssh: time_idx for {date} is {time_idx}')
+                        ssh = ds.ssh.values[time_idx, :, :]
 
                     else:
                         ssh_url = f'{baseurl}{self.start_date.strftime("%Y%m%d")}/rtofs_glo_2ds_forecast_3hrly_diag'
-                        ds=Dataset(ssh_url)
+                        ds = Dataset(ssh_url)
                         logger.info(f'ssh_url is {ssh_url}')
                         time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2 = get_idxs(date, ds, bbox)
-                        ssh=np.squeeze(ds['ssh'][time_idx+1,0,lat_idx1:lat_idx2+1,lon_idx1:lon_idx2+1])
+                        ssh = np.squeeze(ds['ssh'][time_idx+1,0,lat_idx1:lat_idx2+1,lon_idx1:lon_idx2+1])
 
                     ssh_int = interp_to_points_2d(y2, x2, bxy, ssh)
                     dst_elev['time'][it] = it*24*3600.
@@ -315,9 +326,10 @@ class OpenBoundaryInventory:
                 if TS:
                     #salt
                     if cached:
-                        ds = Dataset(f'rtofs_{self.start_date.strftime("%Y%m%d")}.nc')
+                        ds = xr.open_mfdataset(ncfiles, decode_timedelta=True)
                         time_idx, x2, y2 = get_idxs2(date, ds)
-                        salt=np.squeeze(ds['salinity'][time_idx,:,:,:])
+                        logger.info(f'salinity: time_idx for {date} is {time_idx}')
+                        salt = ds.salinity.values[time_idx,:,:,:]
                     else:
                         salt_url = f'{baseurl}{self.start_date.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_salt'
                         ds = Dataset(salt_url)
@@ -336,9 +348,10 @@ class OpenBoundaryInventory:
 
                     #temp
                     if cached:
-                        ds = Dataset(f'rtofs_{self.start_date.strftime("%Y%m%d")}.nc')
+                        ds = xr.open_mfdataset(ncfiles, decode_timedelta=True)
                         time_idx, x2, y2 = get_idxs2(date, ds)
-                        temp = np.squeeze(ds['temperature'][time_idx,:,:,:])
+                        logger.info(f'temperature: time_idx for {date} is {time_idx}')
+                        temp = ds.temperature.values[time_idx,:,:,:]
                     else:
                         temp_url = f'{baseurl}{self.start_date.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_temp'
                         ds = Dataset(temp_url)
@@ -356,9 +369,10 @@ class OpenBoundaryInventory:
 
                 if UV:
                     if cached:
-                        ds = Dataset(f'rtofs_{self.start_date.strftime("%Y%m%d")}.nc')
+                        ds = xr.open_mfdataset(ncfiles, decode_timedelta=True)
                         time_idx, x2, y2 = get_idxs2(date, ds)
-                        uvel = np.squeeze(ds['u'][time_idx,:,:,:])
+                        logger.info(f'uvel: time_idx for {date} is {time_idx}')
+                        uvel = ds.u.values[time_idx,:,:,:]
                     else:
                         uvel_url = f'{baseurl}{self.start_date.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_uvel'
                         ds = Dataset(uvel_url)
@@ -376,9 +390,10 @@ class OpenBoundaryInventory:
 
                     #vvel
                     if cached:
-                        ds = Dataset(f'rtofs_{self.start_date.strftime("%Y%m%d")}.nc')
+                        ds = xr.open_mfdataset(ncfiles, decode_timedelta=True)
                         time_idx, x2, y2 = get_idxs2(date, ds)
-                        vvel = np.squeeze(ds['v'][time_idx,:,:,:])
+                        logger.info(f'vvel: time_idx for {date} is {time_idx}')
+                        vvel = ds.v.values[time_idx,:,:,:]
                     else:
                         vvel_url = f'{baseurl}{self.start_date.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_vvel'
                         ds = Dataset(vvel_url)
@@ -456,6 +471,10 @@ class NudgeTS:
 
         if cached:
             logger.info('**** Use cached data*****')
+            files = glob.glob('rtofs_*.nc')
+            files.sort()
+            ncfiles = files[-9:]
+            logger.info(f'files are {ncfiles}')
         else:
             logger.info('**** Accessing RTOFS data*****')
             baseurl = f'http://nomads.ncep.noaa.gov:80/dods/rtofs/rtofs_global'
@@ -469,9 +488,9 @@ class NudgeTS:
              
             #salt
             if cached:
-                ds = Dataset(f'rtofs_{start_date.strftime("%Y%m%d")}.nc')
+                ds = xr.open_mfdataset(ncfiles, decode_timedelta=True)
                 time_idx, x2, y2 = get_idxs2(date, ds)
-                salt = np.squeeze(ds['salinity'][time_idx,:,:,:])
+                salt = ds.salinity.values[time_idx,:,:,:]
             else:
                 salt_url = f'{baseurl}{start_date.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_salt'
                 ds = Dataset(salt_url)
@@ -489,9 +508,9 @@ class NudgeTS:
 
             #temp
             if cached:
-                ds = Dataset(f'rtofs_{start_date.strftime("%Y%m%d")}.nc')
+                ds = xr.open_mfdataset(ncfiles, decode_timedelta=True)
                 time_idx, x2, y2 = get_idxs2(date, ds)
-                temp = np.squeeze(ds['temperature'][time_idx,:,:,:])
+                temp = ds.temperature.values[time_idx,:,:,:]
             else:
                 temp_url = f'{baseurl}{start_date.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_temp'
                 ds = Dataset(temp_url)
@@ -537,3 +556,81 @@ class NudgeTS:
             dst['tracer_concentration'][:,:,:,:] = timeseries_t
 
         logger.info(f'Writing *_nu.nc takes {time()-t0} seconds')
+
+class DownloadRTOFS:
+
+    def __init__(self):
+        pass
+
+    def fetch_data(self, startdate, rnday=9):
+        logger.info(f'startdate is {startdate}')
+        idx_x1 = 2687
+        idx_x2 = 2714
+        idx_y1 = 1181
+        idx_y2 = 1634
+        logger.info(f'idx_x1 is {idx_x1}, idx_x2 is {idx_x2}, idx_y1 is {idx_y1}, idx_y2 is {idx_y2}')
+        enddate = startdate + timedelta(days=rnday)
+        datevector = np.arange(startdate, enddate, np.timedelta64(1, 'D'),dtype='datetime64')
+        logger.info(datevector)
+        datevector = pd.to_datetime(datevector)
+
+        url_2d = f'http://nomads.ncep.noaa.gov:80/dods/rtofs/rtofs_global{startdate.strftime("%Y%m%d")}/rtofs_glo_2ds_forecast_3hrly_diag'
+        url_3d = f'http://nomads.ncep.noaa.gov:80/dods/rtofs/rtofs_global{startdate.strftime("%Y%m%d")}/rtofs_glo_3dz_forecast_daily_'
+
+        for it, date in enumerate(datevector):
+            if it == 0:
+                continue
+
+            salt = []
+            temp = []
+            uvel = []
+            vvel = []
+            ssh = []
+            vars = {'salt': ['salinity', salt], 'temp': ['temperature', temp], 'uvel': ['u', uvel], 'vvel': ['v', vvel],'ssh': ['ssh', ssh]}
+
+            foutname = f'rtofs_{date.strftime("%Y%m%d")}.nc'
+            logger.info(f'filename is {foutname}')
+
+            attrs = {}
+            for ivar, (key, var) in enumerate(vars.items()):
+                if key == 'ssh':
+                    url = url_2d
+                else:
+                    url = url_3d + key
+                logger.info(f'url is {url}')
+                ds = xr.open_dataset(url)
+                if ivar == 0:
+                    time=ds['time'][it].values
+                    lon = ds['lon'][idx_x1:idx_x2+1].astype('float32')
+                    lat = ds['lat'][idx_y1:idx_y2+1].astype('float32')
+                    depth = ds['lev'][:].astype('float32')
+                values = ds[var[0]]
+
+                if key == 'ssh':
+                    var[1].append(values[it+8, 0, idx_y1:idx_y2+1, idx_x1:idx_x2+1].astype('float32'))
+                else: 
+                    var[1].append(values[it, :, idx_y1:idx_y2+1, idx_x1:idx_x2+1].astype('float32'))
+                attrs[key] = ds[var[0]].attrs
+                #print(attrs)
+
+            fout = xr.Dataset({
+                    'salinity': (['time','lev', 'lat', 'lon'], np.array(salt)),
+                    'temperature': (['time','lev', 'lat', 'lon'], np.array(temp)),
+                    'u': (['time','lev', 'lat', 'lon'], np.array(uvel)),
+                    'v': (['time','lev', 'lat', 'lon'], np.array(vvel)),
+                    'ssh': (['time','lat', 'lon'], np.array(ssh)),
+                    },
+                    coords = {
+                        'time': np.atleast_1d(time),
+                        'lev': depth,
+                        'lat': lat,
+                        'lon': lon,
+                    })
+            fout.salinity.attrs = attrs['salt']
+            fout.temperature.attrs = attrs['temp']
+            fout.u.attrs = attrs['uvel']
+            fout.v.attrs = attrs['vvel']
+            fout.ssh.attrs = attrs['ssh']
+            fout.time.encoding['units'] = 'days since 0001-01-01 00:00:00'
+            
+            fout.to_netcdf(foutname, 'w', unlimited_dims='time')
