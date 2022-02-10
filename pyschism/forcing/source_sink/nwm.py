@@ -592,14 +592,14 @@ class GOOGLEHindcastInventory(AWSDataInventory):
     def request_data(self, request_time):
 
         fname = self.tmpdir / f'{request_time.strftime("%Y%m%d%H")}00.CHRTOUT_DOMAIN1.comp'
-        if fname.is_file():
+        if not fname.is_file():
             cached_file = list(self.tmpdir.glob(f'**/{fname.name}'))
             if len(cached_file) == 1:
                 fname = cached_file[0]
                 logger.info(f'Use cached file {fname}')
             else:
           
-                fname = f'./analysis_assim/{request_time.strftime("%Y%m%d%H")}00.CHRTOUT_DOMAIN1.comp'
+#                fname = f'./analysis_assim/{request_time.strftime("%Y%m%d%H")}00.CHRTOUT_DOMAIN1.comp'
 
                 logger.info(f'Downloading file {request_time}, ')
         #nwm.20180917/forcing_medium_range/nwm.t12z.medium_range.forcing.f160.conus.nc
@@ -607,7 +607,7 @@ class GOOGLEHindcastInventory(AWSDataInventory):
                 url=f'https://storage.googleapis.com/national-water-model/nwm.{request_time.strftime("%Y%m%d")}' \
                     f'/analysis_assim/nwm.t{request_time.strftime("%H")}z.analysis_assim.channel_rt.tm00.conus.nc'
                 logger.info(f'{url}')
-                wget.download(url, fname)
+                wget.download(url, str(fname))
         return fname
 
     @property
