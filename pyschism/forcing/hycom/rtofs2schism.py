@@ -607,7 +607,7 @@ class DownloadRTOFS:
                 values = ds[var[0]]
 
                 if key == 'ssh':
-                    var[1].append(values[it+8, 0, idx_y1:idx_y2+1, idx_x1:idx_x2+1].astype('float32'))
+                    var[1].append(values[it*8, 0, idx_y1:idx_y2+1, idx_x1:idx_x2+1].astype('float32'))
                 else: 
                     var[1].append(values[it, :, idx_y1:idx_y2+1, idx_x1:idx_x2+1].astype('float32'))
                 attrs[key] = ds[var[0]].attrs
