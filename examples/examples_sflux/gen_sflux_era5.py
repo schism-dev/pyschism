@@ -16,10 +16,10 @@ logging.captureWarnings(True)
 log_level = logging.DEBUG
 logging.getLogger('pyschism').setLevel(log_level)
 
-if __name__ = '__main__':
+if __name__ == '__main__':
 
     startdate=datetime(2017, 4, 26)
-    rnday=180
+    rnday=18
 
     t0=time()
     hgrid=Hgrid.open('./hgrid.gr3',crs='EPSG:4326')
