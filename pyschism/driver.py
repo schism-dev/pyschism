@@ -529,7 +529,7 @@ class ModelDriver:
         obj_write(temp_ic, self.temp_ic, "temp.ic", overwrite)
         obj_write(salt_ic, self.salt_ic, "salt.ic", overwrite)
         obj_write(elev_ic, self.elev_ic, "elev.ic", overwrite)
-        obj_write(stations, self.stations, "stations.in", overwrite)
+        obj_write(stations, self.stations, "station.in", overwrite)
 
         self.config.forcings.write(
             self, output_directory, overwrite, parallel_download, progress_bar

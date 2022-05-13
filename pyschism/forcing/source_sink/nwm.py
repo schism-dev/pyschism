@@ -347,27 +347,31 @@ def streamflow_lookup(file, indexes, threshold=-1e-5):
     nc = Dataset(file)
     streamflow = nc["streamflow"][:]
     streamflow[np.where(streamflow < threshold)] = 0.0
+    #change masked value to zero
+    streamflow[np.where(streamflow.mask)] = 0.0
     data = []
     for indxs in indexes:
         # Note: Dataset already consideres scale factor and offset.
         data.append(np.sum(streamflow[indxs]))
+    nc.close()
     return data
 
 class AWSDataInventory(ABC):
     def __new__(
         cls, start_date, rnday, product=None, verbose=False, fallback=True, cache=None
     ):
-        # AWSHindcastInventory -> January 1993 through December 2018
+        # AWSHindcastInventory
+        # The latest(as of 12/21/2021) AWSHindcast dataset covers from Feb 1979 through Dec 2020
         if start_date >= dates.localize_datetime(
-            datetime(1993, 1, 1, 0, 0)
+            datetime(1979, 2, 1, 0, 0)
         ) and start_date + rnday <= dates.localize_datetime(
-            datetime(2018, 12, 31, 23, 59)
+            datetime(2020, 12, 31, 23, 59)
         ):
             return AWSHindcastInventory.__new__(cls)
 
         # GOOGLEHindcastInventory -> January 2019 through 30 days earlier than today
         elif start_date >= dates.localize_datetime(
-            datetime(2019, 1, 1, 0, 0)
+            datetime(2021, 1, 1, 0, 0)
         ) and start_date + rnday < dates.nearest_zulu() - timedelta(days=30):
             return GOOGLEHindcastInventory.__new__(cls)
 
@@ -427,10 +431,8 @@ class AWSHindcastInventory(AWSDataInventory):
         cache=None,
     ):
         """This will download the National Water Model retro data.
-        A 26-year (January 1993 through December 2018) retrospective
-        simulation using version 2.0 of the NWM.
-
-        NetCDF files are saved to the system's temporary directory.
+        A 42-year (February 1979 through December 2020) retrospective
+        simulation using version 2.1 of the NWM.
         """
         self.product = "CHRTOUT_DOMAIN1.comp" if product is None else product
         self.cache = cache
@@ -452,32 +454,34 @@ class AWSHindcastInventory(AWSDataInventory):
             ).astype(datetime)
         }
 
-        paginator = self.s3.get_paginator("list_objects_v2")
-        pages = paginator.paginate(
-            Bucket=self.bucket, Prefix=f"full_physics/{self.start_date.year}"
-        )
+        end_date = self.start_date + self.rnday
 
-        # TODO: If end_date.year != start_date.year, we must append to pagination.
+        years = np.arange(self.start_date.year, end_date.year+1)
+        
+        file_metadata = [] 
+        for it, year in enumerate(years):
+            paginator = self.s3.get_paginator("list_objects_v2")
+            pages = paginator.paginate(
+                Bucket=self.bucket, Prefix=f"model_output/{year}"
+            )
 
-        self.data = []
-        for page in pages:
-            for obj in page["Contents"]:
-                self.data.append(obj)
+            self.data = []
+            for page in pages:
+                for obj in page["Contents"]:
+                    self.data.append(obj)
 
-        self.file_metadata = list(
-            sorted([_["Key"]
-                   for _ in self.data if "CHRTOUT_DOMAIN1.comp" in _["Key"]])
-        )
+            metadata = sorted([_["Key"] for _ in self.data if "CHRTOUT_DOMAIN1.comp" in _["Key"]])
+            [file_metadata.append(i) for i in metadata] 
 
         timevector = np.arange(
             datetime(self.start_date.year, 1, 1),
-            datetime(self.start_date.year + 1, 1, 1),
+            datetime(end_date.year + 1, 1, 1),
             np.timedelta64(1, "h"),
             dtype="datetime64",
         )
 
         timefile = {
-            pd.to_datetime(str(timevector[i])): self.file_metadata[i]
+            pd.to_datetime(str(timevector[i])): file_metadata[i]
             for i in range(len(timevector))
         }
 
@@ -505,7 +509,8 @@ class AWSHindcastInventory(AWSDataInventory):
 
     @property
     def bucket(self):
-        return "noaa-nwm-retro-v2.0-pds"
+        #return "noaa-nwm-retro-v2.0-pds"
+        return "noaa-nwm-retrospective-2-1-pds"
 
     @property
     def s3(self):
@@ -677,7 +682,7 @@ class AWSForecastInventory(AWSDataInventory):
         self._files = {
             _: None
             for _ in np.arange(
-                self.start_date + timedelta(hours=3),
+                self.start_date, # + timedelta(hours=3),
                 self.start_date + self.rnday + self.output_interval,
                 self.output_interval,
             ).astype(datetime)
@@ -688,7 +693,13 @@ class AWSForecastInventory(AWSDataInventory):
             Prefix=f'nwm.{self.start_date.strftime("%Y%m%d")}' f"/{self.product}/",
         )
 
-        for requested_time, _ in self._files.items():
+        for it, (requested_time, _) in enumerate(self._files.items()):
+            if it == 0 and requested_time.hour == 0:
+                logger.info(f'set it=0 {requested_time}')
+                yesterday = (self.start_date - timedelta(days=1)).strftime("%Y%m%d")
+                self.files[requested_time] = f'{yesterday}/nwm.{yesterday}/medium_range' \
+                + '_mem1/nwm.t00z.medium_range.channel_rt_1.f024.conus.nc'
+                continue
             logger.info(f"Requesting NWM data for time {requested_time}")
             self._files[requested_time] = self.request_data(requested_time)
         
@@ -863,6 +874,7 @@ class NationalWaterModel(SourceSink):
             sources.append(streamflow_lookup(file, src_idxs))
             sinks.append(streamflow_lookup(file, snk_idxs))
             logger.info(f'Processing file {file} took {datetime.now() - start}')
+            nc.close()
 
         source_data = {}
         sink_data = {}
@@ -883,6 +895,7 @@ class NationalWaterModel(SourceSink):
                 sink_data.setdefault(_time, {})[element_id] = {
                     "flow": -sinks[i][k],
                 }
+            nc.close()
         logger.info(f'Timeseries aggregation took {datetime.now() - start0}')
         self._sources = Sources(source_data)
         self._sinks = Sinks(sink_data)

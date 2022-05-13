@@ -255,9 +255,13 @@ class Elements:
         NP = len(self.nodes.values)
         nne = np.zeros(NP).astype('int')
         ine = [[] for i in np.arange(NP)]
+        mask = np.any(elnode.mask)
         for i, element in enumerate(elnode):
             ele = element[~element.mask]
-            i34 = len(ele)
+            if mask:
+                i34 = len(ele)
+            else:
+                i34 = len(ele[0])
             inds = elnode[i, :i34]
             nne[inds] = nne[inds]+1
             [ine[indi].append(i) for indi in inds]

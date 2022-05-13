@@ -136,13 +136,13 @@ class Variable:
 
         end_date = start_date + rnday  # type: ignore[operator]
 
-        if end_date <= np.min(self.datetime_array) or \
-                end_date >= np.max(self.datetime_array):
-            rnday = end_date - start_date
-            raise ValueError(f'Requested rnday {rnday} has an end date of '
-                             f'{end_date} which is out of range with '
-                             f'start_date={np.min(self.datetime_array)} and '
-                             f'end_date={np.max(self.datetime_array)}')
+        #if end_date <= np.min(self.datetime_array) or \
+        #        end_date >= np.max(self.datetime_array):
+        #    rnday = end_date - start_date
+        #    raise ValueError(f'Requested rnday {rnday} has an end date of '
+        #                     f'{end_date} which is out of range with '
+        #                     f'start_date={np.min(self.datetime_array)} and '
+        #                     f'end_date={np.max(self.datetime_array)}')
         fields = []
         for i, datetime_array in reversed(
                 list(enumerate(self.datetime_arrays))):
@@ -216,7 +216,7 @@ class Variable:
             #     vmax=vmax
             #     )
             # print(fields[index].array)
-            print(self.datetime_array[index], arrays[index])
+            #print(self.datetime_array[index], arrays[index])
             ax.contourf(arrays[index])
 
             # ax.set_ylim(ymin, ymax, auto=True)
@@ -445,6 +445,7 @@ class SfluxDataset:
             prc=True,
             bbox=None,
     ):
+
         outdir = pathlib.Path(outdir)
         if outdir.name != 'sflux':
             outdir /= 'sflux'
