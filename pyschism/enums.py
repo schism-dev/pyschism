@@ -1,16 +1,14 @@
 from enum import Enum
 
 
-class Stratification(Enum):                                                                                                                                                                                                          
-    BAROCLINIC = 0                                                                                                                                                                                                                   
-    BAROTROPIC = 1                                                                                                                                                                                                                   
-                                                                                                                                                                                                                                     
-    @staticmethod                                                                                                                                                                                                                    
-    def keys():                                                                                                                                                                                                                      
-        return list(map(lambda c: c.name, Stratification))                                                                                                                                                                           
-                                                                                                                                                                                                                                     
-    @classmethod                                                                                                                                                                                                                     
-    def _missing_(cls, name):                                                                                                                                                                                                        
+class Stratification(Enum):
+    BAROCLINIC = 0
+    BAROTROPIC = 1
+    @staticmethod
+    def keys():
+        return list(map(lambda c: c.name, Stratification))
+    @classmethod
+    def _missing_(cls, name):
         if isinstance(name, str):
             if name.upper() in cls.keys():
                 return cls[name.upper()]
@@ -376,6 +374,7 @@ class OutputVariableUnit(Enum):
 class NWSType(Enum):
     """Atmospheric forcing type required by param.nml"""
 
+    PARAMETRIC = -1
     TIME_HISTORY = 1
     CLIMATE_AND_FORECAST = 2
     HEAT_CONSERVATION = 3
