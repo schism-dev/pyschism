@@ -61,7 +61,7 @@ class ModelForcings:
             )
 
         if self.nws is not None:
-            if isinstance(self.config.forcings.nws, NWS2):
+            if isinstance(self.nws, NWS2):
                 self.nws.write(
                     output_directory,
                     start_date=driver.param.opt.start_date,
@@ -71,7 +71,7 @@ class ModelForcings:
                     prc=True if driver.config.vgrid.is3D() is True else False,
                     rad=True if driver.config.vgrid.is3D() is True else False,
                 )
-            elif isinstance(self.config.forcings.nws, BestTrackForcing):
+            elif isinstance(self.nws, BestTrackForcing):
                 self.nws.write(
                     output_directory,
                     overwrite=overwrite,

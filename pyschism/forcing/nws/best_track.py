@@ -41,8 +41,7 @@ class BestTrackForcing(VortexTrack, NWS):
             start_date=start_date,
             end_date=end_date,
             file_deck='b',
-            mode=mode,
-            record_type='BEST',
+            advisories=['BEST'],
         )
 
 
@@ -55,7 +54,6 @@ class BestTrackForcing(VortexTrack, NWS):
     def from_nhc_bdeck(
         cls,
         nhc_bdeck: PathLike,
-        nws: int = None,
         start_date: datetime = None,
         end_date: datetime = None,
     ) -> 'NWS':
