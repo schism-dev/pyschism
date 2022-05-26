@@ -16,6 +16,7 @@ from pyschism.hotstart import Hotstart
 from pyschism.forcing.source_sink import SourceSink
 from pyschism.forcing.nws.base import NWS
 from pyschism.forcing.nws.nws2 import NWS2
+from pyschism.forcing.nws.best_track import BestTrackForcing
 
 # from pyschism.forcing.baroclinic import BaroclinicForcing
 from pyschism.forcing.bctides import Bctides, iettype, ifltype, isatype, itetype
@@ -60,15 +61,21 @@ class ModelForcings:
             )
 
         if self.nws is not None:
-            self.nws.write(
-                output_directory,
-                start_date=driver.param.opt.start_date,
-                end_date=driver.param.core.rnday,
-                overwrite=overwrite,
-                bbox=driver.config.hgrid.get_bbox(output_type="bbox"),
-                prc=True if driver.config.vgrid.is3D() is True else False,
-                rad=True if driver.config.vgrid.is3D() is True else False,
-            )
+            if isinstance(self.nws, NWS2):
+                self.nws.write(
+                    output_directory,
+                    start_date=driver.param.opt.start_date,
+                    end_date=driver.param.core.rnday,
+                    overwrite=overwrite,
+                    bbox=driver.config.hgrid.get_bbox(output_type="bbox"),
+                    prc=True if driver.config.vgrid.is3D() is True else False,
+                    rad=True if driver.config.vgrid.is3D() is True else False,
+                )
+            elif isinstance(self.nws, BestTrackForcing):
+                self.nws.write(
+                    output_directory,
+                    overwrite=overwrite,
+                )
 
         if self.source_sink is not None:
             self.source_sink.write(
@@ -351,6 +358,13 @@ class ModelDriver:
                     self.config.forcings.nws.windrot = gridgr3.Windrot.default(
                         self.config.hgrid
                     )
+            elif isinstance(self.config.forcings.nws, BestTrackForcing):
+                # Writing the rotation file is still needed, but it's
+                # not meaningful for BestTrackForcing
+                self.config.forcings.nws.windrot = gridgr3.Windrot.default(
+                    self.config.hgrid
+                )
+
             self.param.opt.wtiminc = self.param.core.dt
             self.param.opt.nws = self.config.forcings.nws.dtype.value
 
