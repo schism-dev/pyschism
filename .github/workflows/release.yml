@@ -1,0 +1,67 @@
+name: build
+
+on:
+  release:
+    types:
+      - published
+
+jobs:
+  build_wheels:
+    name: build wheel
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ ubuntu-latest ]
+        python-version: [ '3.7', '3.8', '3.9', '3.x' ]
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v2
+      - name: install Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: load cached Python installation
+        id: cache
+        uses: actions/cache@v2
+        with:
+          path: ${{ env.pythonLocation }}
+          key: build-${{ runner.os }}-${{ env.pythonLocation }}-${{ hashFiles('pyproject.toml', 'setup.*') }}
+      - name: build wheel
+        run: pip wheel . -w dist --no-deps
+      - name: save wheel
+        uses: actions/upload-artifact@v2
+        with:
+          name: build
+          path: ./dist/*.whl
+  build_sdist:
+    name: package source
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v2
+      - name: install Python
+        uses: actions/setup-python@v2
+      - name: install dependencies
+        run: pip install dunamai
+      - name: package source
+        run: python setup.py sdist
+      - name: save source package
+        uses: actions/upload-artifact@v2
+        with:
+          name: build
+          path: ./dist/*.tar.gz
+  upload_pypi:
+    name: publish to PyPI
+    needs: [ build_wheels, build_sdist ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: retrieve wheel(s) and source
+        uses: actions/download-artifact@v2
+        with:
+          name: build
+          path: dist
+      - name: upload wheel(s) and source
+        uses: pypa/gh-action-pypi-publish@v1.5.0
+        with:
+          user: __token__
+          password: ${{ secrets.PYPI_TOKEN }}
