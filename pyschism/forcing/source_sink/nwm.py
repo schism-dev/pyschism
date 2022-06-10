@@ -113,6 +113,8 @@ class NWMElementPairings:
             raise IOError(
                 "No National Water model intersections found on the mesh.")
         intersection = gpd.GeoDataFrame(data, crs=hgrid.crs)
+        #TODO: add exporting intersection as an option
+        #intersection.to_file('intersections.shp')
         del data
 
         # 2) Generate element centroid KDTree
