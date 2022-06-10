@@ -414,6 +414,8 @@ class OpenBoundaryInventory:
                     dst_uv['time_series'][it,ind1:ind2,:,1] = vvel_int
                     #timeseries_uv[it,:,:,1]=vvel_int
 
+                ds.close()
+
         logger.info(f'Writing *th.nc takes {time()-t0} seconds')
 
 class Nudge:
@@ -627,6 +629,8 @@ class Nudge:
             temp_int = interp_to_points_3d(dep, y2, x2, bxyz, ptemp)
             temp_int = temp_int.reshape(zcor2.shape)
             timeseries_t[it,:,:,0]=temp_int
+
+            ds.close()
  
         with Dataset(outdir / 'TEM_nu.nc', 'w', format='NETCDF4') as dst:
         #dimensions

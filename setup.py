@@ -122,7 +122,8 @@ setuptools.setup(
         'cfgrib',
         'zarr',
         'fsspec',
-        'stormevents'
+        'stormevents',
+        'utm',
         # 'dask_geopandas @ git+git://github.com/geopandas/dask-geopandas.git@master',
     ],
     entry_points={'console_scripts': ['pyschism = pyschism.__main__:main']},
