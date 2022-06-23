@@ -21,7 +21,11 @@ try:
     version = Version.from_any_vcs().serialize()
 except RuntimeError:
     version = '0.0.0'
-
+except ValueError as e:
+    if "time data '%cI' does not match format '%Y-%m-%dT%H:%M:%S%z'" in str(e):
+        version = '0.0.0'
+    else:
+        raise
 
 class BuildSchism(setuptools.Command):
 
