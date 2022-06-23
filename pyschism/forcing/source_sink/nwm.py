@@ -372,6 +372,7 @@ class AWSDataInventory(ABC):
             return AWSHindcastInventory.__new__(cls)
 
         # GOOGLEHindcastInventory -> January 2019 through 30 days earlier than today
+        # data before April 20, 2021 (including Apirl 20) is 3-hr interval, after that is hourly
         elif start_date >= dates.localize_datetime(
             datetime(2021, 1, 1, 0, 0)
         ) and start_date + rnday < dates.nearest_zulu() - timedelta(days=10):
@@ -629,14 +630,14 @@ class GOOGLEHindcastInventory(AWSDataInventory):
             try:
                 wget.download(url, fname)
             except:
-                logger.info('No data for {request_time}!')
+                logger.info(f'No data for {request_time}!')
                 
         return fname
 
     @property
     def output_interval(self) -> timedelta:
         return {
-            'medium_range_mem1': timedelta(hours=1)
+            'medium_range_mem1': timedelta(hours=3)
         }[self.product]
 
     @property
