@@ -9,18 +9,19 @@ subprocess.check_call(
 
 subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'wheel'])
 
-try:
-    from dunamai import Version
-except ImportError:
-    subprocess.check_call(
-            [sys.executable, '-m', 'pip', 'install', 'dunamai']
-    )
-    from dunamai import Version  # type: ignore[import]
+#try:
+#    from dunamai import Version
+#except ImportError:
+#    subprocess.check_call(
+#            [sys.executable, '-m', 'pip', 'install', 'dunamai']
+#    )
+#    from dunamai import Version  # type: ignore[import]
 
-try:
-    version = Version.from_any_vcs().serialize()
-except RuntimeError:
-    version = '0.0.0'
+#try:
+#    print(Version.from_any_vcs().serialize())
+#    version = Version.from_any_vcs().serialize()
+#except RuntimeError:
+#    version = '0.0.0'
 
 
 class BuildSchism(setuptools.Command):
@@ -81,7 +82,7 @@ conf = setuptools.config.read_configuration(parent / 'setup.cfg')
 meta = conf['metadata']
 setuptools.setup(
     name=meta['name'],
-    version=version,
+    version=meta['version'],
     author=meta['author'],
     author_email=meta['author_email'],
     description=meta['description'],
