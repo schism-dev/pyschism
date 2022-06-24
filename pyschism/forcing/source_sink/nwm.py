@@ -113,6 +113,8 @@ class NWMElementPairings:
             raise IOError(
                 "No National Water model intersections found on the mesh.")
         intersection = gpd.GeoDataFrame(data, crs=hgrid.crs)
+        #TODO: add exporting intersection as an option
+        #intersection.to_file('intersections.shp')
         del data
 
         # 2) Generate element centroid KDTree
@@ -370,12 +372,14 @@ class AWSDataInventory(ABC):
             return AWSHindcastInventory.__new__(cls)
 
         # GOOGLEHindcastInventory -> January 2019 through 30 days earlier than today
+        # data before April 20, 2021 (including Apirl 20) is 3-hr interval, after that is hourly
+        # Missing data 20211231, 20220101, 20220102, 20220103
         elif start_date >= dates.localize_datetime(
             datetime(2021, 1, 1, 0, 0)
-        ) and start_date + rnday < dates.nearest_zulu() - timedelta(days=30):
+        ) and start_date + rnday < dates.nearest_zulu() - timedelta(days=2):
             return GOOGLEHindcastInventory.__new__(cls)
 
-        elif start_date >= dates.nearest_zulu() - timedelta(days=30):
+        elif start_date >= dates.nearest_zulu() - timedelta(days=2):
             return AWSForecastInventory.__new__(cls)
 
         else:
@@ -561,7 +565,7 @@ class GOOGLEHindcastInventory(AWSDataInventory):
         self,
         start_date: datetime = None,
         rnday: Union[int, float, timedelta] = timedelta(days=5.0),
-        product='analysis_assim.channel_rt',
+        product='medium_range_mem1',
         verbose=False,
         fallback=True,
         cache=None,
@@ -569,7 +573,6 @@ class GOOGLEHindcastInventory(AWSDataInventory):
 
         self.start_date = dates.nearest_cycle() if start_date is None \
             else dates.nearest_cycle(dates.localize_datetime(start_date))
-        # self.start_date = self.start_date.replace(tzinfo=None)
         self.rnday = rnday if isinstance(rnday, timedelta) \
             else timedelta(days=rnday)
         self.product = product
@@ -588,37 +591,54 @@ class GOOGLEHindcastInventory(AWSDataInventory):
             dtype='datetime64')
 
         for requested_time, _ in self._files.items():
-            #print(f'Requesting NWM data for time {requested_time}')
-            print(f'Requesting NWM data for time {requested_time}')
+
             logger.info(f'Requesting NWM data for time {requested_time}')
 
-            self._files[requested_time] = self.request_data(requested_time)
+            if requested_time.hour == 0:
+                requested_time2 = requested_time - timedelta(days=1)
+            else:
+                requested_time2 = requested_time
 
-    def request_data(self, request_time):
+            self._files[requested_time] = self.request_data(requested_time, requested_time2)
 
-        fname = self.tmpdir / f'{request_time.strftime("%Y%m%d%H")}00.CHRTOUT_DOMAIN1.comp'
+    def request_data(self, request_time, request_time2):
+
+        fname = self.tmpdir / f'nwm.t00z.{self.product[:12]}.channel_rt_1.' \
+            f'{request_time.strftime("%Y%m%d%H")}.conus.nc'
+        #logger.info(f'fname is {fname}')
+
         if fname.is_file():
             cached_file = list(self.tmpdir.glob(f'**/{fname.name}'))
             if len(cached_file) == 1:
                 fname = cached_file[0]
                 logger.info(f'Use cached file {fname}')
-            else:
-          
-                fname = f'./analysis_assim/{request_time.strftime("%Y%m%d%H")}00.CHRTOUT_DOMAIN1.comp'
+        else:
+        
+            fname = f'{self.start_date.strftime("%Y%m%d")}/nwm.t00z.' \
+                f'{self.product[:12]}.channel_rt_1.{request_time.strftime("%Y%m%d%H")}.conus.nc'
 
-                logger.info(f'Downloading file {request_time}, ')
-        #nwm.20180917/forcing_medium_range/nwm.t12z.medium_range.forcing.f160.conus.nc
-        #https://storage.googleapis.com/national-water-model/nwm.20210409/analysis_assim/nwm.t00z.analysis_assim.channel_rt.tm01.conus.nc
-                url=f'https://storage.googleapis.com/national-water-model/nwm.{request_time.strftime("%Y%m%d")}' \
-                    f'/analysis_assim/nwm.t{request_time.strftime("%H")}z.analysis_assim.channel_rt.tm00.conus.nc'
-                logger.info(f'{url}')
+            logger.info(f'Downloading file {request_time}, ')
+
+            it = request_time.strftime("%H")
+            if it == '00':
+                logger.info(f'Requesting data at 00Z from yesterday!')
+                it = str(int(it) + 24)
+            it = it.zfill(3)
+
+            url = f'https://storage.googleapis.com/national-water-model/nwm.{request_time2.strftime("%Y%m%d")}' \
+                f'/{self.product}/nwm.t00z.{self.product[:12]}.channel_rt_1.f{it}.conus.nc'
+            logger.info(f'{url}')
+            try:
                 wget.download(url, fname)
+            except:
+                logger.info(f'No data for {request_time}!')
+                
         return fname
 
     @property
     def output_interval(self) -> timedelta:
         return {
-            'analysis_assim.channel_rt': timedelta(hours=1)
+            'medium_range_mem1': timedelta(hours=1)
         }[self.product]
 
     @property
@@ -694,6 +714,7 @@ class AWSForecastInventory(AWSDataInventory):
         )
 
         for it, (requested_time, _) in enumerate(self._files.items()):
+
             if it == 0 and requested_time.hour == 0:
                 logger.info(f'set it=0 {requested_time}')
                 yesterday = (self.start_date - timedelta(days=1)).strftime("%Y%m%d")
