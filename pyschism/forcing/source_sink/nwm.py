@@ -638,7 +638,7 @@ class GOOGLEHindcastInventory(AWSDataInventory):
     @property
     def output_interval(self) -> timedelta:
         return {
-            'medium_range_mem1': timedelta(hours=1)
+            'medium_range_mem1': timedelta(hours=3)
         }[self.product]
 
     @property
