@@ -285,6 +285,10 @@ class ERA5(SfluxDataset):
             np.timedelta64(1, 'D'),
             dtype='datetime64')}
 
+        #write sflux_inputs.txt
+        with open(f'{outdir}/sflux_inputs.txt', 'w') as f:
+            f.write('&sflux_inputs\n/\n')
+
         logger.info('Start downloading ERA5')
         self.inventory = ERA5DataInventory(
             self.start_date,
@@ -302,3 +306,4 @@ class ERA5(SfluxDataset):
 
         for iday, date in enumerate(dates):
             put_sflux_fields(iday, date, times, ds, nx_grid, ny_grid, air=air, rad=rad, prc=prc, output_interval=output_interval, OUTDIR=outdir)
+
