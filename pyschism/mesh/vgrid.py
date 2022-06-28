@@ -151,13 +151,24 @@ class LSC2(Vgrid):
 
         nvrt = int(lines[1].strip().split()[0])
 
-        kbp = np.array([int(i.split()[1])-1 for i in lines[2:]])
+        sline = np.array(lines[2].split()).astype('float')        
+        if sline.min() < 0:
+            #old version
+            kbp = np.array([int(i.split()[1])-1 for i in lines[2:]])
+            sigma = -np.ones((len(kbp), nvrt))
 
-        sigma = -np.ones((len(kbp), nvrt))
+            for i, line in enumerate(lines[2:]):
+                sigma[i, kbp[i]:] = np.array(
+                    line.strip().split()[2:]).astype('float')
 
-        for i, line in enumerate(lines[2:]):
-            sigma[i, kbp[i]:] = np.array(
-                line.strip().split()[2:]).astype('float')
+        else:
+            #new version
+            sline = sline.astype('int')
+            kbp = sline-1
+            sigma = np.array([line.split()[1:] for line in lines[3:]]).T.astype('float')
+            #replace -9. with -1.
+            fpm = sigma<-1
+            sigma[fpm] = -1
 
         return cls(sigma)
 

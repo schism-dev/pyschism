@@ -89,10 +89,10 @@ class ERA5DataInventory:
                 lon.append(x)
         return np.meshgrid(np.array(lon), self.lat)
 
-def put_sflux_fields(iday, date, timevector, ds, nx_grid, ny_grid, air, rad, prc, OUTDIR):
+def put_sflux_fields(iday, date, timevector, ds, nx_grid, ny_grid, air, rad, prc, output_interval, OUTDIR):
     rt=pd.to_datetime(str(date))
     idx=np.where(rt == timevector)[0].item()
-    times=[i/24 for i in np.arange(0, 25, 3)]
+    times=[i/24 for i in np.arange(0, 25, output_interval)]
 
     if air is True:
         with Dataset(OUTDIR / "sflux_air_1.{:04}.nc".format(iday+1), 'w', format='NETCDF3_CLASSIC') as dst:
@@ -128,7 +128,7 @@ def put_sflux_fields(iday, date, timevector, ds, nx_grid, ny_grid, air, rad, prc
             dst['prmsl'].long_name = "Pressure reduced to MSL"
             dst['prmsl'].standard_name = "air_pressure_at_sea_level"
             dst['prmsl'].units = "Pa"
-            dst['prmsl'][:,:,:]=ds['msl'][idx:idx+26:3,::-1,:]
+            dst['prmsl'][:,:,:]=ds['msl'][idx:idx+25:output_interval, ::-1, :]
 
             # spfh
             dst.createVariable('spfh', 'f4', ('time', 'ny_grid', 'nx_grid'))
@@ -137,8 +137,8 @@ def put_sflux_fields(iday, date, timevector, ds, nx_grid, ny_grid, air, rad, prc
             dst['spfh'].standard_name = "specific_humidity"
             dst['spfh'].units = "1"
             #convert dewpoint to specific humidity
-            d2m = ds['d2m'][idx:idx+26:3,::-1,:]
-            msl = ds['msl'][idx:idx+26:3,::-1,:]
+            d2m = ds['d2m'][idx:idx+25:output_interval, ::-1, :]
+            msl = ds['msl'][idx:idx+25:output_interval, ::-1, :]
             Td = d2m - 273.15
             e1 = 6.112*np.exp((17.67*Td)/(Td + 243.5))
             spfh = (0.622*e1)/(msl*0.01 - (0.378*e1))
@@ -149,7 +149,7 @@ def put_sflux_fields(iday, date, timevector, ds, nx_grid, ny_grid, air, rad, prc
             dst['stmp'].long_name = "Surface Air Temperature (2m AGL)"
             dst['stmp'].standard_name = "air_temperature"
             dst['stmp'].units = "K"
-            dst['stmp'][:,:,:]=ds['t2m'][idx:idx+26:3,::-1,:]
+            dst['stmp'][:,:,:]=ds['t2m'][idx:idx+25:output_interval, ::-1, :]
 
             # uwind
             dst.createVariable('uwind', 'f4', ('time', 'ny_grid', 'nx_grid'))
@@ -157,7 +157,7 @@ def put_sflux_fields(iday, date, timevector, ds, nx_grid, ny_grid, air, rad, prc
                 "(10m AGL)"
             dst['uwind'].standard_name = "eastward_wind"
             dst['uwind'].units = "m/s"
-            dst['uwind'][:,:,:]=ds['u10'][idx:idx+26:3,::-1,:]
+            dst['uwind'][:,:,:]=ds['u10'][idx:idx+25:output_interval, ::-1, :]
 
             # vwind
             dst.createVariable('vwind', 'f4', ('time', 'ny_grid', 'nx_grid'))
@@ -165,7 +165,7 @@ def put_sflux_fields(iday, date, timevector, ds, nx_grid, ny_grid, air, rad, prc
                 "(10m AGL)"
             dst['vwind'].standard_name = "northward_wind"
             dst['vwind'].units = "m/s"
-            dst['vwind'][:,:,:]=ds['v10'][idx:idx+26:3,::-1,:]
+            dst['vwind'][:,:,:]=ds['v10'][idx:idx+25:output_interval, ::-1, :]
 
     if prc is True:
         with Dataset(OUTDIR / "sflux_prc_1.{:04}.nc".format(iday+1), 'w', format='NETCDF3_CLASSIC') as dst:
@@ -201,7 +201,7 @@ def put_sflux_fields(iday, date, timevector, ds, nx_grid, ny_grid, air, rad, prc
             dst['prate'].long_name = "Surface Precipitation Rate"
             dst['prate'].standard_name = "air_pressure_at_sea_level"
             dst['prate'].units = "kg/m^2/s"
-            dst['prate'][:,:,:]=ds['mtpr'][idx:idx+26:3,::-1,:]
+            dst['prate'][:,:,:]=ds['mtpr'][idx:idx+25:output_interval, ::-1, :]
 
     if rad is True:
         with Dataset(OUTDIR / "sflux_rad_1.{:04}.nc".format(iday+1), 'w', format='NETCDF3_CLASSIC') as dst:
@@ -237,14 +237,14 @@ def put_sflux_fields(iday, date, timevector, ds, nx_grid, ny_grid, air, rad, prc
             dst['dlwrf'].long_name = "Downward Long Wave Radiation Flux"
             dst['dlwrf'].standard_name = "surface_downwelling_longwave_flux_in_air"
             dst['dlwrf'].units = "W/m^2"
-            dst['dlwrf'][:,:,:]=ds['msdwlwrf'][idx:idx+26:3,::-1,:]
+            dst['dlwrf'][:,:,:]=ds['msdwlwrf'][idx:idx+25:output_interval, ::-1, :]
 
             # dwrf
             dst.createVariable('dswrf', 'f4', ('time', 'ny_grid', 'nx_grid'))
             dst['dswrf'].long_name = "Downward Long Wave Radiation Flux"
             dst['dswrf'].standard_name = "surface_downwelling_shortwave_flux_in_air"
             dst['dswrf'].units = "W/m^2"
-            dst['dswrf'][:,:,:]=ds['msdwswrf'][idx:idx+26:3,::-1,:]
+            dst['dswrf'][:,:,:]=ds['msdwswrf'][idx:idx+25:output_interval, ::-1, :]
 
 
 class ERA5(SfluxDataset):
@@ -273,6 +273,7 @@ class ERA5(SfluxDataset):
         rad: bool = True,
         bbox: Bbox = None,
         overwrite: bool=False,
+        output_interval: int = 1,
     ):
         self.start_date=start_date
         self.rnday=rnday
@@ -283,6 +284,10 @@ class ERA5(SfluxDataset):
             self.end_date,
             np.timedelta64(1, 'D'),
             dtype='datetime64')}
+
+        #write sflux_inputs.txt
+        with open(f'{outdir}/sflux_inputs.txt', 'w') as f:
+            f.write('&sflux_inputs\n/\n')
 
         logger.info('Start downloading ERA5')
         self.inventory = ERA5DataInventory(
@@ -300,4 +305,5 @@ class ERA5(SfluxDataset):
         times=nc4.num2date(time1,units=time1.units,only_use_cftime_datetimes=False)
 
         for iday, date in enumerate(dates):
-            put_sflux_fields(iday, date, times, ds, nx_grid, ny_grid, air=air, rad=rad, prc=prc, OUTDIR=outdir)
+            put_sflux_fields(iday, date, times, ds, nx_grid, ny_grid, air=air, rad=rad, prc=prc, output_interval=output_interval, OUTDIR=outdir)
+

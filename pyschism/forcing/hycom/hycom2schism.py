@@ -23,6 +23,20 @@ from pyschism.mesh.vgrid import Vgrid
 
 logger = logging.getLogger(__name__)
 
+def convert_longitude(ds):
+    lon_name = 'lon'
+    ds['_lon_adjusted'] = xr.where(
+        ds[lon_name] > 180,
+        ds[lon_name] - 360,
+        ds[lon_name])
+    ds = (
+        ds.swap_dims({lon_name: '_lon_adjusted'})
+        .sel(**{'_lon_adjusted': sorted(ds._lon_adjusted)})
+        .drop(lon_name)
+    )
+    ds = ds.rename({'_lon_adjusted': lon_name})
+    return ds
+
 def get_database(date, Bbox=None):
     if date >= datetime(2018, 12, 4):
         database = f'GLBy0.08/expt_93.0'
@@ -415,7 +429,6 @@ class OpenBoundaryInventory:
                     #timeseries_uv[it,:,:,1]=vvel_int
 
                 ds.close()
-
         logger.info(f'Writing *th.nc takes {time()-t0} seconds')
 
 class Nudge:
@@ -671,7 +684,11 @@ class DownloadHycom:
 
     def __init__(self, hgrid):
 
-        self.bbox = hgrid.bbox
+        xmin, xmax = hgrid.coords[:, 0].min(), hgrid.coords[:, 0].max()
+        ymin, ymax = hgrid.coords[:, 1].min(), hgrid.coords[:, 1].max()
+        xmin = xmin + 360. if xmin < 0 else xmin
+        xmax = xmax + 360. if xmax < 0 else xmax
+        self.bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
 
     def fetch_data(self, date):
 
@@ -686,16 +703,13 @@ class DownloadHycom:
         foutname = f'SSH_{date.strftime("%Y%m%d")}.nc'
         logger.info(f'filename is {foutname}')
         ds = xr.open_dataset(url_ssh)
-        ds1 = ds.rename_dims({'lon':'xlon'})
-        ds2 = ds1.rename_dims({'lat':'ylat'})
-        ds3 = ds2.rename_vars({'lat':'ylat'})
-        ds4 = ds3.rename_vars({'lon':'xlon'})
-        ds4.to_netcdf(foutname, 'w', 'NETCDF3_CLASSIC', unlimited_dims='time')
+        ds = convert_longitude(ds)
+        ds = ds.rename_dims({'lon':'xlon'})
+        ds = ds.rename_dims({'lat':'ylat'})
+        ds = ds.rename_vars({'lat':'ylat'})
+        ds = ds.rename_vars({'lon':'xlon'})
+        ds.to_netcdf(foutname, 'w', 'NETCDF3_CLASSIC', unlimited_dims='time')
         ds.close()
-        ds1.close()
-        ds2.close()
-        ds3.close()
-        ds4.close()
 
         url_uv = f'https://tds.hycom.org/thredds/dodsC/{database}?lat[{lat_idx1}:1:{lat_idx2}],' + \
             f'lon[{lon_idx1}:1:{lon_idx2}],depth[0:1:-1],time[{time_idx}],' + \
@@ -705,16 +719,13 @@ class DownloadHycom:
         foutname = f'UV_{date.strftime("%Y%m%d")}.nc'
         logger.info(f'filename is {foutname}')
         ds = xr.open_dataset(url_uv)
-        ds1 = ds.rename_dims({'lon':'xlon'})
-        ds2 = ds1.rename_dims({'lat':'ylat'})
-        ds3 = ds2.rename_vars({'lat':'ylat'})
-        ds4 = ds3.rename_vars({'lon':'xlon'})
-        ds4.to_netcdf(foutname, 'w', 'NETCDF3_CLASSIC', unlimited_dims='time')
+        ds = convert_longitude(ds)
+        ds = ds.rename_dims({'lon':'xlon'})
+        ds = ds.rename_dims({'lat':'ylat'})
+        ds = ds.rename_vars({'lat':'ylat'})
+        ds = ds.rename_vars({'lon':'xlon'})
+        ds.to_netcdf(foutname, 'w', 'NETCDF3_CLASSIC', unlimited_dims='time')
         ds.close()
-        ds1.close()
-        ds2.close()
-        ds3.close()
-        ds4.close()
 
         url_ts = f'https://tds.hycom.org/thredds/dodsC/{database}?lat[{lat_idx1}:1:{lat_idx2}],' + \
             f'lon[{lon_idx1}:1:{lon_idx2}],depth[0:1:-1],time[{time_idx}],' + \
@@ -725,6 +736,7 @@ class DownloadHycom:
         logger.info(f'filename is {foutname}')
 
         ds = xr.open_dataset(url_ts)
+        
         temp = ds.water_temp.values
         salt = ds.salinity.values
         dep = ds.depth.values
@@ -733,9 +745,9 @@ class DownloadHycom:
         ptemp = ConvertTemp(salt, temp, dep)
 
         #drop water_temp variable and add new temperature variable
-        ds1 = ds.drop('water_temp')
-        ds1['temperature']=(['time','depth','lat','lon'], ptemp)
-        ds1.temperature.attrs = {
+        ds = ds.drop('water_temp')
+        ds['temperature']=(['time','depth','lat','lon'], ptemp)
+        ds.temperature.attrs = {
             'long_name': 'Sea water potential temperature',
             'standard_name': 'sea_water_potential_temperature',
             'units': 'degC'
@@ -744,14 +756,10 @@ class DownloadHycom:
         #ds.assign(water_temp2=ptemp)
         #ds.assign.attrs = ds.water_temp.attrs
 
-        ds2 = ds1.rename_dims({'lon':'xlon'})
-        ds3 = ds2.rename_dims({'lat':'ylat'})
-        ds4 = ds3.rename_vars({'lat':'ylat'})
-        ds5 = ds4.rename_vars({'lon':'xlon'})
-        ds5.to_netcdf(foutname, 'w', unlimited_dims='time', encoding={'temperature':{'dtype': 'h', '_FillValue': -30000.,'scale_factor': 0.001, 'add_offset': 20., 'missing_value': -30000.}})
+        ds = convert_longitude(ds)
+        ds = ds.rename_dims({'lon':'xlon'})
+        ds = ds.rename_dims({'lat':'ylat'})
+        ds = ds.rename_vars({'lat':'ylat'})
+        ds = ds.rename_vars({'lon':'xlon'})
+        ds.to_netcdf(foutname, 'w', unlimited_dims='time', encoding={'temperature':{'dtype': 'h', '_FillValue': -30000.,'scale_factor': 0.001, 'add_offset': 20., 'missing_value': -30000.}})
         ds.close()
-        ds1.close()
-        ds2.close()
-        ds3.close()
-        ds4.close()
-        ds5.close()
