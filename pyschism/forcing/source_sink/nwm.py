@@ -715,15 +715,31 @@ class AWSForecastInventory(AWSDataInventory):
 
         for it, (requested_time, _) in enumerate(self._files.items()):
 
+            logger.info(f"Requesting NWM data for time {requested_time}")
+
             if it == 0 and requested_time.hour == 0:
                 logger.info(f'set it=0 {requested_time}')
                 yesterday = (self.start_date - timedelta(days=1)).strftime("%Y%m%d")
-                self.files[requested_time] = f'{yesterday}/nwm.{yesterday}/medium_range' \
-                + '_mem1/nwm.t00z.medium_range.channel_rt_1.f024.conus.nc'
+                key = (
+                    f'nwm.{yesterday}/medium_range_mem1/'
+                    + 'nwm.t00z.medium_range.channel_rt_1.f024.conus.nc'
+                )
+                self.files[requested_time] = self._download_forecast_ifneeded(key)
                 continue
-            logger.info(f"Requesting NWM data for time {requested_time}")
             self._files[requested_time] = self.request_data(requested_time)
         
+    def _download_forecast_ifneeded(self, s3_key):
+        filename = self.tmpdir / s3_key
+        filename.parent.mkdir(parents=True, exist_ok=True)
+        if filename.is_file() is False:
+            tmpfile = tempfile.NamedTemporaryFile().name
+            with open(tmpfile, "wb") as f:
+                logger.info(f"Downloading file {s3_key}, ")
+                self.s3.download_fileobj(self.bucket, s3_key, f)
+            shutil.move(tmpfile, filename)
+        return filename
+
+
     def request_data(self, request_time):
 
         file_metadata = list(
@@ -741,15 +757,7 @@ class AWSForecastInventory(AWSDataInventory):
         for key in file_metadata[0:240]:
             if request_time != self.key2date(key):
                 continue
-            filename = self.tmpdir / key
-            filename.parent.mkdir(parents=True, exist_ok=True)
-            if filename.is_file() is False:
-                tmpfile = tempfile.NamedTemporaryFile().name
-                with open(tmpfile, "wb") as f:
-                    logger.info(f"Downloading file {key}, ")
-                    self.s3.download_fileobj(self.bucket, key, f)
-                shutil.move(tmpfile, filename)
-            return filename
+            return self._download_forecast_ifneeded(key)
 
     def key2date(self, key):
         base_date_str = f'{key.split("/")[0].split(".")[-1]}'
