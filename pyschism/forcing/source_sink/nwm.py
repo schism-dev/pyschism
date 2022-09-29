@@ -394,7 +394,7 @@ class AWSDataInventory(ABC):
     #@property
     #@abstractmethod
     #def bucket(self):
-        raise NotImplementedError
+    #    raise NotImplementedError
 
     @property
     def nearest_cycle(self) -> datetime:
@@ -638,7 +638,7 @@ class GOOGLEHindcastInventory(AWSDataInventory):
     @property
     def output_interval(self) -> timedelta:
         return {
-            'medium_range_mem1': timedelta(hours=3)
+            'medium_range_mem1': timedelta(hours=1)
         }[self.product]
 
     @property
@@ -695,6 +695,16 @@ class AWSForecastInventory(AWSDataInventory):
             if start_date is None
             else dates.nearest_cycle(dates.localize_datetime(start_date))
         )
+
+        yesterday = self.start_date - timedelta(days=1)
+       
+        #check if previous day's data folder exists
+        if not os.path.exists(yesterday.strftime("%Y%m%d")):
+            logger.info(f"Downloading NWM data for {yesterday}")
+            _ = self.download(yesterday, days=1)
+        
+        filemaps = self.download(self.start_date, days=rnday.days)
+
         # self.start_date = self.start_date.replace(tzinfo=None)
         self.rnday = rnday if isinstance(
             rnday, timedelta) else timedelta(days=rnday)
@@ -707,27 +717,29 @@ class AWSForecastInventory(AWSDataInventory):
                 self.output_interval,
             ).astype(datetime)
         }
-        self.data = self.s3.list_objects_v2(
-            Bucket=self.bucket,
-            Delimiter="/",
-            Prefix=f'nwm.{self.start_date.strftime("%Y%m%d")}' f"/{self.product}/",
-        )
 
         for it, (requested_time, _) in enumerate(self._files.items()):
 
-            if it == 0 and requested_time.hour == 0:
-                logger.info(f'set it=0 {requested_time}')
-                yesterday = (self.start_date - timedelta(days=1)).strftime("%Y%m%d")
-                self.files[requested_time] = f'{yesterday}/nwm.{yesterday}/medium_range' \
-                + '_mem1/nwm.t00z.medium_range.channel_rt_1.f024.conus.nc'
-                continue
             logger.info(f"Requesting NWM data for time {requested_time}")
-            self._files[requested_time] = self.request_data(requested_time)
-        
-    def request_data(self, request_time):
+            if it == 0 and requested_time.hour == 0:
+                f0 = f'{yesterday.strftime("%Y%m%d")}/nwm.' \
+                    + yesterday.strftime("%Y%m%d") \
+                    + '/medium_range_mem1/nwm.t00z.medium_range.channel_rt_1.f024.conus.nc'
+                logger.info(f'Using data {f0}')
+                self.files[requested_time] = f0
+                continue
+
+            logger.info(f"Using data {filemaps[requested_time]}")
+            self._files[requested_time] = filemaps[requested_time]
+
+    def download(self, nwmdate, days):
+        self.data = self.s3.list_objects_v2(
+            Bucket=self.bucket,
+            Delimiter="/",
+            Prefix=f'nwm.{nwmdate.strftime("%Y%m%d")}' f"/{self.product}/",
+        )
 
         file_metadata = list(
-#            reversed(
                 sorted(
                     [
                         _["Key"]
@@ -736,20 +748,22 @@ class AWSForecastInventory(AWSDataInventory):
                     ]
                 )
             )
-#        )
 
-        for key in file_metadata[0:240]:
-            if request_time != self.key2date(key):
-                continue
-            filename = self.tmpdir / key
-            filename.parent.mkdir(parents=True, exist_ok=True)
-            if filename.is_file() is False:
-                tmpfile = tempfile.NamedTemporaryFile().name
-                with open(tmpfile, "wb") as f:
-                    logger.info(f"Downloading file {key}, ")
-                    self.s3.download_fileobj(self.bucket, key, f)
-                shutil.move(tmpfile, filename)
-            return filename
+        filedir = pathlib.Path(nwmdate.strftime("%Y%m%d"))
+        filedir.mkdir(exist_ok=True, parents=True)
+
+        filedict = {}
+        for key in file_metadata[0:days*24+1]:
+            filetime = self.key2date(key)
+            filename = nwmdate.strftime("%Y%m%d") + '/' + key
+            filesubdir = pathlib.Path(filename)
+            filesubdir.parent.mkdir(parents=True, exist_ok=True)
+
+            logger.info(f"Downloading file {key}, ")
+            self.s3.download_file(self.bucket, key, filename)
+            filedict[filetime] = filename
+       
+        return filedict
 
     def key2date(self, key):
         base_date_str = f'{key.split("/")[0].split(".")[-1]}'
@@ -776,7 +790,7 @@ class AWSForecastInventory(AWSDataInventory):
 
     @property
     def output_interval(self) -> timedelta:
-        return {"medium_range_mem1": timedelta(hours=3)}[self.product]
+        return {"medium_range_mem1": timedelta(hours=1)}[self.product]
 
     @property
     def timevector(self):
