@@ -285,7 +285,7 @@ class Elements:
             #centroid for quads
             x_centr[~mask] = self.nodes.coords[elnode[~mask, :], 0].mean(axis=1)
             y_centr[~mask] = self.nodes.coords[elnode[~mask, :], 1].mean(axis=1)
-            dp_centr[~mask] = depth[elnode[mask, :]].mean(axis=1)
+            dp_centr[~mask] = depth[elnode[~mask, :]].mean(axis=1)
         else:
             x_centr = self.nodes.coords[elnode, 0].mean(axis=1)
             y_centr = self.nodes.coords[elnode, 1].mean(axis=1)
