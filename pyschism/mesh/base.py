@@ -268,6 +268,66 @@ class Elements:
         ine = np.array([np.array(ine[i]) for i in np.arange(NP)], dtype='O') 
         return nne, ine
 
+    def compute_centroid(self):
+        elnode = self.array
+        NE = self.elements.__len__()
+        depth = self.nodes.values
+
+        x_centr, y_centr, dp_centr = np.zeros([3, NE])
+
+        if np.any(elnode.mask):
+            mask = elnode.mask[:, -1]
+            #centroid for tris 
+            x_centr[mask] = self.nodes.coords[elnode[mask, :3], 0].mean(axis=1)
+            y_centr[mask] = self.nodes.coords[elnode[mask, :3], 1].mean(axis=1)
+            dp_centr[mask] = depth[elnode[mask, :3]].mean(axis=1)
+
+            #centroid for quads
+            x_centr[~mask] = self.nodes.coords[elnode[~mask, :], 0].mean(axis=1)
+            y_centr[~mask] = self.nodes.coords[elnode[~mask, :], 1].mean(axis=1)
+            dp_centr[~mask] = depth[elnode[mask, :]].mean(axis=1)
+        else:
+            x_centr = self.nodes.coords[elnode, 0].mean(axis=1)
+            y_centr = self.nodes.coords[elnode, 1].mean(axis=1)
+            dp_centr = depth[elnode].mean(axis=1)
+
+        return x_centr, y_centr, dp_centr
+
+    def get_areas(self, crs: Union[CRS, str] = None):
+        xy = self.nodes.get_xy(crs)
+        x = xy[:, 0]
+        y = xy[:, 1]
+
+        elnode = self.array
+        x1 = x[elnode[:, 0]]; y1 = y[elnode[:, 0]]
+        x2 = x[elnode[:, 1]]; y2 = y[elnode[:, 1]]
+        x3 = x[elnode[:, 2]]; y3 = y[elnode[:, 2]]
+        if np.any(elnode.mask):
+            x4 = x[elnode[:, 3]]; y4 = y[elnode[:, 3]]
+            mask = elnode.mask[:, -1]
+            x4[mask] = x1[mask]; y4[mask] = y1[mask]
+        else:
+            x4 = x1; y4 = y1
+        area=((x2-x1)*(y3-y1)-(x3-x1)*(y2-y1)+(x3-x1)*(y4-y1)-(x4-x1)*(y3-y1))/2
+      
+        return area
+        
+        ##self.gdf method is very slow
+        #if self.nodes.crs.is_geographic:
+        #    elements = []
+        #    for row in self.gdf.itertuples():
+        #        aeqd = CRS.from_user_input(
+        #            f"+proj=aeqd +R=6371000 +units=m "
+        #            f"+lat_0={row.geometry.centroid.y} +lon_0={row.geometry.centroid.x}"
+        #        )
+        #        current_to_aeqd = Transformer.from_crs(
+        #            self.nodes.crs, aeqd, always_xy=True
+        #        ).transform
+        #        elements.append(ops.transform(current_to_aeqd, row.geometry))
+        #    return [element.area for element in elements]
+        #else:
+        #    return [row.geometry.area for row in self.gdf.itertuples()]
+
     def get_triangulation_mask(self, element_mask):
 
         triangulation_mask = []
@@ -288,21 +348,6 @@ class Elements:
 
         return np.array(triangulation_mask)
 
-    def get_areas(self):
-        if self.nodes.crs.is_geographic:
-            elements = []
-            for row in self.gdf.itertuples():
-                aeqd = CRS.from_user_input(
-                    f"+proj=aeqd +R=6371000 +units=m "
-                    f"+lat_0={row.geometry.centroid.y} +lon_0={row.geometry.centroid.x}"
-                )
-                current_to_aeqd = Transformer.from_crs(
-                    self.nodes.crs, aeqd, always_xy=True
-                ).transform
-                elements.append(ops.transform(current_to_aeqd, row.geometry))
-            return [element.area for element in elements]
-        else:
-            return [row.geometry.area for row in self.gdf.itertuples()]
 
     @property
     def array(self):
