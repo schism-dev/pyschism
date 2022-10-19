@@ -1,0 +1,40 @@
+generate_sourcesink_nc.py
+The script will combine two sources (NWM + sflux_prc) and write vsource/msource/vsink  to one netcdf file.
+
+Required inputs:
+1. path to the run directory:
+    rundir = "/sciclone/schism10/lcui01/schism20/ICOGS/ICOGS2D/GA_RUN02"
+
+2. model start time:
+    model_start_time_str = ""2018-08-01 00:00:00"
+
+The script assumes the following files are in the rundir/:
+    hgrid.gr3
+    
+    source_sink.in   # These four 
+    vsource.th
+    vsink.th
+    msource.th 
+
+    sflux/flux_prc_1.****.nc (precipitation will be interpolated to elements and converted to volume source)
+   
+Finally, the script will write one netcdf file into rundir/Orignial+sflux_source_sink/source.nc, which looks like this:
+netcdf source {
+dimensions:
+	nsources = 1283607 ;
+	nsinks = 34 ;
+	ntracers = 2 ;
+	time_msource = 2 ;
+	time_vsource = 1489 ;
+	time_vsink = 1489 ;
+	one = 1 ;
+variables:
+	int source_elem(nsources) ;
+	float vsource(time_vsource, nsources) ;
+	float msource(time_msource, ntracers, nsources) ;
+	int sink_elem(nsinks) ;
+	float vsink(time_vsink, nsinks) ;
+	float time_step_vsource(one) ;
+	float time_step_msource(one) ;
+	float time_step_vsink(one) ;
+}
