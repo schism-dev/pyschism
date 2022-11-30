@@ -112,7 +112,8 @@ def transform_to_cpp(coords, lonc, latc):
 class Shapiro(Gr3Field):
 
     @classmethod
-    def slope_filter(cls, hgrid, shapiro_vals1, depths, shapiro_max, threshold_slope, regions, shapiro_vals2, flags, lonc, latc):
+    def slope_filter(cls, hgrid, shapiro_vals1, depths, shapiro_max, threshold_slope, 
+        regions=None, shapiro_vals2=None, flags=None, lonc=None, latc=None):
         """
         https://github.com/wzhengui/pylibs/blob/1ee35efaa2d52fa682113126d84846ba33318f99/Utility/schism_file.py#L265
         """

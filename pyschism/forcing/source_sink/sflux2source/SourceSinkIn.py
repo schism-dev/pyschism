@@ -176,6 +176,7 @@ class source_sink():
         A = copy.deepcopy(self)
         B = other
         for i, source_sink in enumerate(['vsource', 'vsink']):  # 0: source; 1: sink
+            if i == 1 and len(A.source_sink_in.ip_group[i]) <= 1: continue
             [_, new_eles_inds] = BinA(A.source_sink_in.ip_group[i],
                                       B.source_sink_in.ip_group[i])
             [existing_eles_inds, _] = BinA(B.source_sink_in.ip_group[i],
@@ -211,7 +212,6 @@ class source_sink():
             raise Exception("dirname is required.")
         os.makedirs(dirname, exist_ok=True)
 
-        #breakpoint()
         msource_data = self.msource.data.reshape([self.msource.n_time, self.ntracers, self.nsource])
         fout = Dataset(f'{dirname}/source.nc', 'w', format='NETCDF4')
         fout.createDimension('nsources', self.nsource)
