@@ -177,7 +177,7 @@ class OpenBoundaryInventory:
         self.hgrid = hgrid
         self.vgrid = Vgrid.default() if vgrid is None else vgrid
 
-    def fetch_data(self, outdir: Union[str, os.PathLike], start_date, rnday, elev2D=True, TS=True, UV=True, adjust2D=False, lats=None, msl_shifts=None): 
+    def fetch_data(self, outdir: Union[str, os.PathLike], start_date, rnday, elev2D=True, TS=True, UV=True, restart=False, adjust2D=False, lats=None, msl_shifts=None): 
         outdir = pathlib.Path(outdir)
 
         self.start_date = start_date
@@ -226,7 +226,7 @@ class OpenBoundaryInventory:
         one=1
         #ndt=np.zeros([ntimes])
 
-        if elev2D:
+        if elev2D and restart == False:
             #timeseries_el=np.zeros([ntimes,NOP,nComp1])
             #create netcdf 
             dst_elev = Dataset(outdir / 'elev2D.th.nc', 'w', format='NETCDF4')
@@ -246,8 +246,11 @@ class OpenBoundaryInventory:
 
             dst_elev.createVariable('time_series', 'f', ('time', 'nOpenBndNodes', 'nLevels', 'nComponents'))
             #dst_elev['time_series'][:,:,:,:] = timeseries_el
+        elif restart:
+            dst_elev = Dataset(outdir / 'elev2D.th.nc', 'a', format='NETCDF4')
+            time_idx_restart = dst_elev['time'][:].shape[0]
 
-        if TS:
+        if TS and restart == False:
             #timeseries_s=np.zeros([ntimes,NOP,nvrt,nComp1])
             dst_salt = Dataset(outdir / 'SAL_3D.th.nc', 'w', format='NETCDF4')
             #dimensions
@@ -268,7 +271,7 @@ class OpenBoundaryInventory:
             #temp
             #timeseries_t=np.zeros([ntimes,NOP,nvrt,nComp1])
 
-            dst_temp =  Dataset(outdir / 'TEM_3D.th.nc', 'w', format='NETCDF4')
+            dst_temp = Dataset(outdir / 'TEM_3D.th.nc', 'w', format='NETCDF4')
             #dimensions
             dst_temp.createDimension('nOpenBndNodes', NOP)
             dst_temp.createDimension('one', one)
@@ -284,8 +287,11 @@ class OpenBoundaryInventory:
 
             dst_temp.createVariable('time_series', 'f', ('time', 'nOpenBndNodes', 'nLevels', 'nComponents'))
             #dst_temp['time_series'][:,:,:,:] = timeseries_t
+        elif restart:
+            dst_salt = Dataset(outdir / 'SAL_3D.th.nc', 'a', format='NETCDF4')
+            dst_temp = Dataset(outdir / 'TEM_3D.th.nc', 'a', format='NETCDF4')
 
-        if UV:
+        if UV and restart == False:
             #timeseries_uv=np.zeros([ntimes,NOP,nvrt,nComp2])
             dst_uv = Dataset(outdir / 'uv3D.th.nc', 'w', format='NETCDF4')
             #dimensions
@@ -304,12 +310,25 @@ class OpenBoundaryInventory:
             dst_uv.createVariable('time_series', 'f', ('time', 'nOpenBndNodes', 'nLevels', 'nComponents'))
             #dst_uv['time_series'][:,:,:,:] = timeseries_uv
 
+        elif restart:
+            dst_uv = Dataset(outdir / 'uv3D.th.nc', 'a', format='NETCDF4')
+
         logger.info('**** Accessing GOFS data*****')
         t0=time()
-        for it, date in enumerate(self.timevector):
 
+        if restart == False: 
+            timevector = self.timevector
+            it0 = 0
+        elif restart:
+            timevector = self.timevector[time_idx_restart+1:]
+            it0 = time_idx_restart+1
+
+        for it1, date in enumerate(timevector):
+            
+            it = it0 + it1
+        
             database=get_database(date)
-            logger.info(f'Fetching data for {date} from database {database}')
+            logger.info(f'Fetching data for {it}, {date} from database {database}')
 
             #loop over each open boundary
             ind1 = 0
@@ -527,7 +546,7 @@ class Nudge:
 
         return self.include
 
-    def fetch_data(self, outdir: Union[str, os.PathLike], hgrid, vgrid, start_date, rnday):
+    def fetch_data(self, outdir: Union[str, os.PathLike], hgrid, vgrid, start_date, rnday, restart = False):
 
         outdir = pathlib.Path(outdir)
 
@@ -579,13 +598,60 @@ class Nudge:
         one=1
         ntimes=self.rnday+1
 
-        timeseries_s=np.zeros([ntimes,nNode,nvrt,one])
-        timeseries_t=np.zeros([ntimes,nNode,nvrt,one])
-        ndt=np.zeros([ntimes])
+        #timeseries_s=np.zeros([ntimes,nNode,nvrt,one])
+        #timeseries_t=np.zeros([ntimes,nNode,nvrt,one])
+        #ndt=np.zeros([ntimes])
+        if restart:
+            dst_temp = Dataset(outdir / 'TEM_nu.nc', 'a', format='NETCDF4')
+            dst_salt = Dataset(outdir / 'SAL_nu.nc', 'a', format='NETCDF4')
+            time_idx_restart = dst_temp['time'][:].shape[0]
+        else:
+            dst_temp = Dataset(outdir / 'TEM_nu.nc', 'w', format='NETCDF4')
+            #dimensions
+            dst_temp.createDimension('node', nNode)
+            dst_temp.createDimension('nLevels', nvrt)
+            dst_temp.createDimension('one', one)
+            dst_temp.createDimension('time', None)
+            #variables
+            dst_temp.createVariable('time', 'f', ('time',))
+            #dst_temp['time'][:] = ndt
+
+            dst_temp.createVariable('map_to_global_node', 'i4', ('node',))
+            dst_temp['map_to_global_node'][:] = include+0 
+
+            dst_temp.createVariable('tracer_concentration', 'f', ('time', 'node', 'nLevels', 'one'))
+            #dst_temp['tracer_concentration'][:,:,:,:] = timeseries_t
+
+            #salinity
+            dst_salt = Dataset(outdir / 'SAL_nu.nc', 'w', format='NETCDF4')
+            #dimensions
+            dst_salt.createDimension('node', nNode)
+            dst_salt.createDimension('nLevels', nvrt)
+            dst_salt.createDimension('one', one)
+            dst_salt.createDimension('time', None)
+            #variables
+            dst_salt.createVariable('time', 'f', ('time',))
+            #dst_salt['time'][:] = ndt
+
+            dst_salt.createVariable('map_to_global_node', 'i4', ('node',))
+            dst_salt['map_to_global_node'][:] = include+0  
+
+            dst_salt.createVariable('tracer_concentration', 'f', ('time', 'node', 'nLevels', 'one'))
+            #dst_salt['tracer_concentration'][:,:,:,:] = timeseries_s
+        
 
         logger.info('**** Accessing GOFS data*****')
+        if restart:
+            timevector = self.timevector[time_idx_restart+1:]
+            it0 = time_idx_restart
+        else:
+            timevector = self.timevector
+            it0 = 0
+
         t0=time()
-        for it, date in enumerate(self.timevector):
+        for it1, date in enumerate(timevector):
+
+            it = it0 + it1
 
             database=get_database(date)
             logger.info(f'Fetching data for {date} from database {database}')
@@ -632,52 +698,26 @@ class Nudge:
 
             logger.info('****Interpolation starts****')
 
-            ndt[it]=it
+            #ndt[it]=it
             #salt
+            dst_salt['time'][it] = it
             salt_int = interp_to_points_3d(dep, y2, x2, bxyz, salt)
             salt_int = salt_int.reshape(zcor2.shape)
-            timeseries_s[it,:,:,0]=salt_int
+            #timeseries_s[it,:,:,0]=salt_int
+            dst_salt['tracer_concentration'][it,:,:,0] = salt_int
 
             #temp
+            dst_temp['time'][it] = it
             temp_int = interp_to_points_3d(dep, y2, x2, bxyz, ptemp)
             temp_int = temp_int.reshape(zcor2.shape)
-            timeseries_t[it,:,:,0]=temp_int
+            #timeseries_t[it,:,:,0]=temp_int
+            dst_temp['tracer_concentration'][it,:,:,0] = temp_int
 
             ds.close()
  
-        with Dataset(outdir / 'TEM_nu.nc', 'w', format='NETCDF4') as dst:
-        #dimensions
-            dst.createDimension('node', nNode)
-            dst.createDimension('nLevels', nvrt)
-            dst.createDimension('one', one)
-            dst.createDimension('time', None)
-        #variables
-            dst.createVariable('time', 'f', ('time',))
-            dst['time'][:] = ndt
-
-            dst.createVariable('map_to_global_node', 'i4', ('node',))
-            dst['map_to_global_node'][:] = include+1
-
-            dst.createVariable('tracer_concentration', 'f', ('time', 'node', 'nLevels', 'one'))
-            dst['tracer_concentration'][:,:,:,:] = timeseries_t
-
-        with Dataset(outdir / 'SAL_nu.nc', 'w', format='NETCDF4') as dst:
-        #dimensions
-            dst.createDimension('node', nNode)
-            dst.createDimension('nLevels', nvrt)
-            dst.createDimension('one', one)
-            dst.createDimension('time', None)
-        #variables
-            dst.createVariable('time', 'f', ('time',))
-            dst['time'][:] = ndt
-
-            dst.createVariable('map_to_global_node', 'i4', ('node',))
-            dst['map_to_global_node'][:] = include+1
-
-            dst.createVariable('tracer_concentration', 'f', ('time', 'node', 'nLevels', 'one'))
-            dst['tracer_concentration'][:,:,:,:] = timeseries_s
-
-
+        #dst_temp.close()
+        #dst_salt.close()
+        
         logger.info(f'Writing *_nu.nc takes {time()-t0} seconds')
 
 class DownloadHycom:
@@ -690,76 +730,96 @@ class DownloadHycom:
         xmax = xmax + 360. if xmax < 0 else xmax
         self.bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
 
-    def fetch_data(self, date):
+    def fetch_data(self, date, fmt='schism'):
+        '''
+        date: datetime.datetime
+        fmt: 'schism' - for Fortran code; 'hycom' - raw netCDF from HYCOM
+        '''
 
         database=get_database(date)
         logger.info(f'Fetching data for {date} from database {database}')
 
         time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2 = get_idxs(date, database, self.bbox)
 
-        url_ssh = f'https://tds.hycom.org/thredds/dodsC/{database}?lat[{lat_idx1}:1:{lat_idx2}],' + \
-            f'lon[{lon_idx1}:1:{lon_idx2}],depth[0:1:-1],time[{time_idx}],' + \
-            f'surf_el[{time_idx}][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
-        foutname = f'SSH_{date.strftime("%Y%m%d")}.nc'
-        logger.info(f'filename is {foutname}')
-        ds = xr.open_dataset(url_ssh)
-        ds = convert_longitude(ds)
-        ds = ds.rename_dims({'lon':'xlon'})
-        ds = ds.rename_dims({'lat':'ylat'})
-        ds = ds.rename_vars({'lat':'ylat'})
-        ds = ds.rename_vars({'lon':'xlon'})
-        ds.to_netcdf(foutname, 'w', 'NETCDF3_CLASSIC', unlimited_dims='time')
-        ds.close()
+        if fmt == 'schism':
+            url_ssh = f'https://tds.hycom.org/thredds/dodsC/{database}?lat[{lat_idx1}:1:{lat_idx2}],' + \
+                f'lon[{lon_idx1}:1:{lon_idx2}],depth[0:1:-1],time[{time_idx}],' + \
+                f'surf_el[{time_idx}][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
+            foutname = f'SSH_{date.strftime("%Y%m%d")}.nc'
+            logger.info(f'filename is {foutname}')
+            ds = xr.open_dataset(url_ssh)
+            ds = convert_longitude(ds)
+            ds = ds.rename_dims({'lon':'xlon'})
+            ds = ds.rename_dims({'lat':'ylat'})
+            ds = ds.rename_vars({'lat':'ylat'})
+            ds = ds.rename_vars({'lon':'xlon'})
+            ds.to_netcdf(foutname, 'w', 'NETCDF3_CLASSIC', unlimited_dims='time')
+            ds.close()
 
-        url_uv = f'https://tds.hycom.org/thredds/dodsC/{database}?lat[{lat_idx1}:1:{lat_idx2}],' + \
-            f'lon[{lon_idx1}:1:{lon_idx2}],depth[0:1:-1],time[{time_idx}],' + \
-            f'water_u[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
-            f'water_v[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
+            url_uv = f'https://tds.hycom.org/thredds/dodsC/{database}?lat[{lat_idx1}:1:{lat_idx2}],' + \
+                f'lon[{lon_idx1}:1:{lon_idx2}],depth[0:1:-1],time[{time_idx}],' + \
+                f'water_u[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
+                f'water_v[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
 
-        foutname = f'UV_{date.strftime("%Y%m%d")}.nc'
-        logger.info(f'filename is {foutname}')
-        ds = xr.open_dataset(url_uv)
-        ds = convert_longitude(ds)
-        ds = ds.rename_dims({'lon':'xlon'})
-        ds = ds.rename_dims({'lat':'ylat'})
-        ds = ds.rename_vars({'lat':'ylat'})
-        ds = ds.rename_vars({'lon':'xlon'})
-        ds.to_netcdf(foutname, 'w', 'NETCDF3_CLASSIC', unlimited_dims='time')
-        ds.close()
+            foutname = f'UV_{date.strftime("%Y%m%d")}.nc'
+            logger.info(f'filename is {foutname}')
+            ds = xr.open_dataset(url_uv)
+            ds = convert_longitude(ds)
+            ds = ds.rename_dims({'lon':'xlon'})
+            ds = ds.rename_dims({'lat':'ylat'})
+            ds = ds.rename_vars({'lat':'ylat'})
+            ds = ds.rename_vars({'lon':'xlon'})
+            ds.to_netcdf(foutname, 'w', 'NETCDF3_CLASSIC', unlimited_dims='time')
+            ds.close()
 
-        url_ts = f'https://tds.hycom.org/thredds/dodsC/{database}?lat[{lat_idx1}:1:{lat_idx2}],' + \
-            f'lon[{lon_idx1}:1:{lon_idx2}],depth[0:1:-1],time[{time_idx}],' + \
-            f'water_temp[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
-            f'salinity[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
+            url_ts = f'https://tds.hycom.org/thredds/dodsC/{database}?lat[{lat_idx1}:1:{lat_idx2}],' + \
+                f'lon[{lon_idx1}:1:{lon_idx2}],depth[0:1:-1],time[{time_idx}],' + \
+                f'water_temp[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
+                f'salinity[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
 
-        foutname = f'ST_{date.strftime("%Y%m%d")}.nc'
-        logger.info(f'filename is {foutname}')
+            foutname = f'ST_{date.strftime("%Y%m%d")}.nc'
+            logger.info(f'filename is {foutname}')
 
-        ds = xr.open_dataset(url_ts)
-        
-        temp = ds.water_temp.values
-        salt = ds.salinity.values
-        dep = ds.depth.values
+            ds = xr.open_dataset(url_ts)
+            
+            temp = ds.water_temp.values
+            salt = ds.salinity.values
+            dep = ds.depth.values
 
-        #convert in-situ temperature to potential temperature
-        ptemp = ConvertTemp(salt, temp, dep)
+            #convert in-situ temperature to potential temperature
+            ptemp = ConvertTemp(salt, temp, dep)
 
-        #drop water_temp variable and add new temperature variable
-        ds = ds.drop('water_temp')
-        ds['temperature']=(['time','depth','lat','lon'], ptemp)
-        ds.temperature.attrs = {
-            'long_name': 'Sea water potential temperature',
-            'standard_name': 'sea_water_potential_temperature',
-            'units': 'degC'
-        }
+            #drop water_temp variable and add new temperature variable
+            ds = ds.drop('water_temp')
+            ds['temperature']=(['time','depth','lat','lon'], ptemp)
+            ds.temperature.attrs = {
+                'long_name': 'Sea water potential temperature',
+                'standard_name': 'sea_water_potential_temperature',
+                'units': 'degC'
+            }
 
-        #ds.assign(water_temp2=ptemp)
-        #ds.assign.attrs = ds.water_temp.attrs
+            #ds.assign(water_temp2=ptemp)
+            #ds.assign.attrs = ds.water_temp.attrs
 
-        ds = convert_longitude(ds)
-        ds = ds.rename_dims({'lon':'xlon'})
-        ds = ds.rename_dims({'lat':'ylat'})
-        ds = ds.rename_vars({'lat':'ylat'})
-        ds = ds.rename_vars({'lon':'xlon'})
-        ds.to_netcdf(foutname, 'w', unlimited_dims='time', encoding={'temperature':{'dtype': 'h', '_FillValue': -30000.,'scale_factor': 0.001, 'add_offset': 20., 'missing_value': -30000.}})
-        ds.close()
+            ds = convert_longitude(ds)
+            ds = ds.rename_dims({'lon':'xlon'})
+            ds = ds.rename_dims({'lat':'ylat'})
+            ds = ds.rename_vars({'lat':'ylat'})
+            ds = ds.rename_vars({'lon':'xlon'})
+            ds.to_netcdf(foutname, 'w', unlimited_dims='time', encoding={'temperature':{'dtype': 'h', '_FillValue': -30000.,'scale_factor': 0.001, 'add_offset': 20., 'missing_value': -30000.}})
+            ds.close()
+
+        elif fmt == 'hycom':
+            url=f'https://tds.hycom.org/thredds/dodsC/{database}?lat[{lat_idx1}:1:{lat_idx2}],' + \
+                f'lon[{lon_idx1}:1:{lon_idx2}],depth[0:1:-1],time[{time_idx}],' + \
+                f'surf_el[{time_idx}][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
+                f'water_temp[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
+                f'salinity[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
+                f'water_u[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
+                f'water_v[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
+
+            foutname = f'hycom_{date.strftime("%Y%m%d")}.nc' 
+            ds = xr.open_dataset(url)
+            ds.to_netcdf(foutname, 'w')
+
+            ds.close()

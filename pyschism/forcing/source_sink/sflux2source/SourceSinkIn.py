@@ -176,6 +176,8 @@ class source_sink():
         A = copy.deepcopy(self)
         B = other
         for i, source_sink in enumerate(['vsource', 'vsink']):  # 0: source; 1: sink
+            print(f'Adding type {i}:')
+            #if vsink only contains dummy sink, then skip interpolation (todo: remove dummy sinks)
             if i == 1 and len(A.source_sink_in.ip_group[i]) <= 1: continue
             [_, new_eles_inds] = BinA(A.source_sink_in.ip_group[i],
                                       B.source_sink_in.ip_group[i])
@@ -189,23 +191,38 @@ class source_sink():
             B_ss = eval(f"B.{source_sink}")
             A_ss = eval(f"A.{source_sink}")
 
-            f_interp = interpolate.interp1d(B_ss.time, B_ss.df.iloc[:, 1:].to_numpy().T)
+            #use A's time orgin
+            time_diff = (B_ss.df.iloc[0, 0] - A_ss.df.iloc[0, 0]).total_seconds()
+
+            f_interp = interpolate.interp1d(B_ss.time + time_diff, B_ss.df.iloc[:, 1:].to_numpy().T)
             B_df_interp = pd.DataFrame(data=f_interp(A_ss.time).T, columns=B_ss.df.columns[1:])
 
+            # clip the values in case of small negative/positive values due to trunction error during interpolation
+ 
+            if i == 0:  # source
+                B_df_interp = B_df_interp.clip(0.0, None)
+            else:
+                B_df_interp = B_df_interp.clip(None, 0.0)
+ 
             A_ss.df = copy.deepcopy(A_ss.df.join(B_df_interp[new_eles.astype(str)]))
             A_ss.df[existing_eles.astype('str')] += B_df_interp[existing_eles.astype('str')]
 
-            A.msource = TimeHistory(file_name=None,
-                                    data_array=np.c_[np.array([0.0, 86400*365*100]),
-                                                     -9999*np.ones([2, len(A.vsource.df.columns)-1]),
-                                                     np.zeros([2, len(A.vsource.df.columns)-1])],
-                                    columns=['datetime']+A.vsource.df.columns[1:].tolist()+A.vsource.df.columns[1:].tolist())
             A_ss.n_time = A_ss.df.shape[0]
             A_ss.n_station = A_ss.df.shape[1] - 1
 
-            A.update_vars()
+        A.msource = TimeHistory(
+            file_name=None,
+            data_array=np.c_[np.array([0.0, 86400*365*100]), -9999*np.ones([2, len(A.vsource.df.columns)-1]), np.zeros([2, len(A.vsource.df.columns)-1])],
+            columns=['datetime']+A.vsource.df.columns[1:].tolist()+A.vsource.df.columns[1:].tolist())
+
+        A.update_vars()
 
         return A
+
+    def writer(self, dirname=None):
+        if dirname is None:
+            raise Exception("dirname is required.")
+        os.makedirs(dirname, exist_ok=True)
 
     def nc_writer(self, dirname=None):
         if dirname is None:
