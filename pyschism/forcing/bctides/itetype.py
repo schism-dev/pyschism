@@ -16,6 +16,10 @@ class Itetype(Bctype):
     def itetype(self) -> int:
         pass
 
+    @property
+    def forcing_digit(self):
+        return self.itetype
+
 
 class UniformTimeHistoryTemperature(Itetype):
 

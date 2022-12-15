@@ -8,10 +8,15 @@ from pyschism.forcing import hycom
 
 
 class Iettype(Bctype):
+
     @property
     @abstractmethod
     def iettype(self) -> int:
         pass
+
+    @property
+    def forcing_digit(self):
+        return self.iettype
 
 
 class UniformTimeHistoryElevation(Iettype):

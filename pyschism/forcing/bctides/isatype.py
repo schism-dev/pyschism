@@ -1,16 +1,20 @@
 from abc import abstractmethod
 from enum import Enum
-from matplotlib.pyplot import new_figure_manager
 
 from pyschism.forcing.bctides.bctypes import Bctype
 from pyschism.forcing import hycom
 
 
 class Isatype(Bctype):
+
     @property
     @abstractmethod
     def isatype(self) -> int:
         pass
+
+    @property
+    def forcing_digit(self):
+        return self.isatype
 
 
 class UniformTimeHistorySalinity(Isatype):

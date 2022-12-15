@@ -55,7 +55,7 @@ class Tides:
             'elevation': {},
             'velocity': {},
         }
-    
+
     _phases = {
         'elevation': {},
         'velocity': {},
@@ -100,9 +100,6 @@ class Tides:
         else:
             for constituent in constituents:
                 self.use_constituent(constituent)
-
-        
-
 
     def __iter__(self):
         for constituent in self.active_constituents:

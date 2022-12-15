@@ -7,6 +7,10 @@ class Itrtype(Bctype):
     def itrtype(self) -> int:
         '''Returns integer representig SCHISM itrtype code for bctides.in'''
 
+    @property
+    def forcing_digit(self):
+        return self.itrtype
+
     def get_boundary_string(self, hgrid, boundary):
         return ''
 

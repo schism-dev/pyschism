@@ -7,10 +7,15 @@ from pyschism.forcing import hycom
 
 
 class Ifltype(Bctype):
+
     @property
     @abstractmethod
     def ifltype(self) -> int:
         """Returns integer representig SCHISM ifltype code for bctides.in"""
+
+    @property
+    def forcing_digit(self):
+        return self.ifltype
 
 
 class UniformTimeHistoryVelocity(Ifltype):

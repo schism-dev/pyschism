@@ -61,7 +61,7 @@ class Bctides(metaclass=BctidesMeta):
 
     start_date = dates.StartDate()
     end_date = dates.EndDate()
-    rnday = dates.RunDays()
+    run_days = dates.RunDays()
 
     def __init__(
         self,
@@ -140,7 +140,7 @@ class Bctides(metaclass=BctidesMeta):
         if start_date is not None:
             self.start_date = start_date
         if end_date is not None:
-            self.end_date = end_date
+            self.run_days = end_date
         # self.tidal_database.write(path, )
         output_directory = pathlib.Path(output_directory)
         output_directory.mkdir(exist_ok=overwrite, parents=True)
@@ -154,57 +154,18 @@ class Bctides(metaclass=BctidesMeta):
             for boundary in self.gdf.itertuples():
                 data_source = getattr(boundary, bctype)
                 if data_source is not None:
+                    import importlib
                     if hasattr(data_source, 'rlmax'):
-                        # I admit this exec is hacky.
-                        # pros: works well, it's simple, we don't need a return value
-                        # cons: might be confusing to read.
                         # This generates all the nudges and writes the nudge files.
-                        exec(
-                            f"from pyschism.forcing.bctides.nudge import {tracer}_Nudge;"
-                            f"_tracer = output_directory / f'{tracer}_nudge.gr3' if {tracer.lower()}3D is True else {tracer};"
-                            f"_tr={tracer}_Nudge(self, data_source, rlmax=data_source.rlmax, rnu_day=data_source.rnu_day);"
-                            f'logger.info(f"Writing {tracer} nudge to file '
-                            + r'{_tracer}");'
-                            "_tr.write(_tracer, overwrite=overwrite)"
-                        )
-                        break
-        ## write nudge
-        #for bctype, tracer in {"itetype": "TEM", "isatype": "SAL"}.items():
-        #    for boundary in self.gdf.itertuples():
-        #        data_source = getattr(boundary, bctype)
-        #        if data_source is not None:
-
-        #            # I admit this exec is hacky.
-        #            # pros: works well, it's simple, we don't need a return value
-        #            # cons: might be confusing to read.
-        #            # This generates all the nudges and writes the nudge files.
-        #            exec(
-        #                f"from pyschism.forcing.bctides.nudge import {tracer}_Nudge;"
-        #                f"_tracer = output_directory / f'{tracer}_nudge.gr3' if {tracer.lower()}3D is True else {tracer};"
-        #                f"_tr={tracer}_Nudge(self, data_source, rlmax=data_source.rlmax, rnu_day=data_source.rnu_day);"
-        #                f'logger.info(f"Writing {tracer} nudge to file '
-        #                + r'{_tracer}");'
-        #                "_tr.write(_tracer, overwrite=overwrite)"
-        #            )
-        #            break
-        # write nudge
-        for bctype, tracer in {"itetype": "TEM", "isatype": "SAL"}.items():
-            for boundary in self.gdf.itertuples():
-                data_source = getattr(boundary, bctype)
-                if data_source is not None:
-                    if hasattr(data_source, 'rlmax'):
-                        # I admit this exec is hacky.
-                        # pros: works well, it's simple, we don't need a return value
-                        # cons: might be confusing to read.
-                        # This generates all the nudges and writes the nudge files.
-                        exec(
-                            f"from pyschism.forcing.bctides.nudge import {tracer}_Nudge;"
-                            f"_tracer = output_directory / f'{tracer}_nudge.gr3' if {tracer.lower()}3D is True else {tracer};"
-                            f"_tr={tracer}_Nudge(self, data_source, rlmax=data_source.rlmax, rnu_day=data_source.rnu_day);"
-                            f'logger.info(f"Writing {tracer} nudge to file '
-                            + r'{_tracer}");'
-                            "_tr.write(_tracer, overwrite=overwrite)"
-                        )
+                        nudgemod = importlib.import_module('pyschism.forcing.bctides.nudge')
+                        nudgeclass = getattr(nudgemod, f'{tracer}_Nudge')
+                        _tracerfile = locals()[f'{tracer.lower()}3D']
+                        if _tracerfile is False:
+                            continue
+                        elif _tracerfile is True:
+                            _tracerfile = output_directory / f'{tracer}_nudge.gr3'
+                        nudgeclass(self, data_source, rlmax=data_source.rlmax, rnu_day=data_source.rnu_day
+                                   ).write(_tracerfile, overwrite=overwrite)
                         break
 
         def write_elev2D():
@@ -292,17 +253,13 @@ class Bctides(metaclass=BctidesMeta):
 
         def get_focing_digit(bctype):
             if bctype is not None:
-                # sensitive to MRO.
-                return str(
-                    getattr(bctype, f"{bctype.__class__.__bases__[0].__name__.lower()}")
-                )
+                return bctype.forcing_digit
             return "0"
 
         line = [
             f"{len(boundary.indexes)}",
-            *[digit for digit in map(get_focing_digit, bctypes)],
+            *[str(digit) for digit in map(get_focing_digit, bctypes)],
         ]
-
         f = [" ".join(line)]
         for bctype in bctypes:
             if bctype is not None:
@@ -312,6 +269,10 @@ class Bctides(metaclass=BctidesMeta):
                     )
                 )
         return "\n".join(f)
+
+    @property
+    def rnday(self):
+        return self.run_days
 
     @cached_property
     def gdf(self):
@@ -396,3 +357,35 @@ class TidalConstituentCombiner(Tides):
                 )
             )
         )
+
+
+def test():
+    from datetime import datetime
+    import logging
+
+    from pyschism.mesh import Hgrid
+    from pyschism.forcing.bctides import Bctides, iettype, ifltype, isatype, itetype
+
+    # setup logging
+    logging.basicConfig(
+        format="[%(asctime)s] %(name)s %(levelname)s: %(message)s",
+        force=True,
+    )
+    logging.getLogger("pyschism").setLevel(logging.DEBUG)
+
+    startdate = datetime(2018, 8, 17)
+    print(startdate)
+    rnday = 61
+    hgrid = Hgrid.open("./hgrid.gr3", crs="epsg:4326")
+
+    # Bctides
+    iet3 = iettype.Iettype3(constituents='major', database='tpxo')
+    iet4 = iettype.Iettype4()
+    iet5 = iettype.Iettype5(iettype3=iet3, iettype4=iet4)
+    ifl3 = ifltype.Ifltype3(constituents='major', database='tpxo')
+    ifl4 = ifltype.Ifltype4()
+    ifl5 = ifltype.Ifltype5(ifltype3=ifl3, ifltype4=ifl4)
+    isa3 = isatype.Isatype4()
+    ite3 = itetype.Itetype4()
+    bctides = Bctides(hgrid, iettype={'1': iet5}, ifltype={'1': ifl5}, isatype=isa3, itetype=ite3)
+    bctides.write('./', startdate, rnday, bctides=True, elev2D=False, uv3D=True, tem3D=True, sal3D=False, overwrite=True)
