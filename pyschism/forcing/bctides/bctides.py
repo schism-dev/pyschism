@@ -295,7 +295,7 @@ class Bctides(metaclass=BctidesMeta):
     @cached_property
     def tides(self):
         return TidalConstituentCombiner(self.gdf)
-   
+
 
 class TidalConstituentCombiner(Tides):
     def __init__(self, gdf):
@@ -359,7 +359,7 @@ class TidalConstituentCombiner(Tides):
         )
 
 
-def test():
+def ad_hoc_test():
     from datetime import datetime
     import logging
 
@@ -386,6 +386,23 @@ def test():
     ifl4 = ifltype.Ifltype4()
     ifl5 = ifltype.Ifltype5(ifltype3=ifl3, ifltype4=ifl4)
     isa3 = isatype.Isatype4()
-    ite3 = itetype.Itetype4()
-    bctides = Bctides(hgrid, iettype={'1': iet5}, ifltype={'1': ifl5}, isatype=isa3, itetype=ite3)
-    bctides.write('./', startdate, rnday, bctides=True, elev2D=False, uv3D=True, tem3D=True, sal3D=False, overwrite=True)
+    # ite3 = itetype.Itetype4()
+    bctides = Bctides(hgrid, iettype={'1': iet5}, ifltype={'1': ifl5},
+                      isatype=isa3,
+                      itetype={'1': itetype.Itetype2(10, 1)}
+                      )
+    bctides.write(
+            './',
+            startdate,
+            rnday,
+            bctides=True,
+            elev2D=False,
+            uv3D=False,
+            tem3D=False,
+            sal3D=False,
+            overwrite=True
+            )
+
+
+if __name__ == "__main__":
+    ad_hoc_test()
