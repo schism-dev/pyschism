@@ -86,8 +86,21 @@ class SpatiallyVaryingTimeHistoryTemperature(Itetype):
         return 4
 
 
-Itetype0 = Itetype
-Itetype1 = UniformTimeHistoryTemperature
-Itetype2 = ConstantTemperature
-Itetype3 = TemperatureInitialConditions
-Itetype4 = SpatiallyVaryingTimeHistoryTemperature
+class Itetype0(Itetype):
+    pass
+
+
+class Itetype1(UniformTimeHistoryTemperature):
+    pass
+
+
+class Itetype2(ConstantTemperature):
+    pass
+
+
+class Itetype3(TemperatureInitialConditions):
+    pass
+
+
+class Itetype4(SpatiallyVaryingTimeHistoryTemperature):
+    pass

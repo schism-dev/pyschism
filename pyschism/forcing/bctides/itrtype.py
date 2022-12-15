@@ -53,7 +53,17 @@ class SpatiallyVaryingTimeHistoryTracer(Itrtype):
         return 4
 
 
-Itrtype1 = UniformTimeHistoryTracer
-Itrtype2 = ConstantTracer
-Itrtype3 = TracerInitialConditions
-Itrtype4 = SpatiallyVaryingTimeHistoryTracer
+class Itrtype1(UniformTimeHistoryTracer):
+    pass
+
+
+class Itrtype2(ConstantTracer):
+    pass
+
+
+class Itrtype3(TracerInitialConditions):
+    pass
+
+
+class Itrtype4(SpatiallyVaryingTimeHistoryTracer):
+    pass
