@@ -177,7 +177,7 @@ class OpenBoundaryInventory:
         self.hgrid = hgrid
         self.vgrid = Vgrid.default() if vgrid is None else vgrid
 
-    def fetch_data(self, outdir: Union[str, os.PathLike], start_date, rnday, elev2D=True, TS=True, UV=True, restart=False, adjust2D=False, lats=None, msl_shifts=None): 
+    def fetch_data(self, outdir: Union[str, os.PathLike], start_date, rnday, ocean_bnd_ids = [0], elev2D=True, TS=True, UV=True, restart=False, adjust2D=False, lats=None, msl_shifts=None): 
         outdir = pathlib.Path(outdir)
 
         self.start_date = start_date
@@ -190,8 +190,10 @@ class OpenBoundaryInventory:
         #Get open boundary 
         gdf=self.hgrid.boundaries.open.copy()
         opbd=[]
-        for boundary in gdf.itertuples():
-            opbd.extend(list(boundary.indexes))
+        #for boundary in gdf.itertuples():
+        #    opbd.extend(list(boundary.indexes))
+        for ibnd in ocean_bnd_ids:
+            opbd.extend(list(gdf.iloc[ibnd].indexes))
         blon = self.hgrid.coords[opbd,0]
         blat = self.hgrid.coords[opbd,1]
         #logger.info(f'blon min {np.min(blon)}, max {np.max(blon)}')
@@ -328,14 +330,15 @@ class OpenBoundaryInventory:
             it = it0 + it1
         
             database=get_database(date)
-            logger.info(f'Fetching data for {it}, {date} from database {database}')
+            logger.info(f'Fetching data for {date} from database {database}')
 
             #loop over each open boundary
             ind1 = 0
             ind2 = 0
-            for boundary in gdf.itertuples():
-
-                opbd = list(boundary.indexes)
+            #for boundary in gdf.itertuples():
+            for ibnd in ocean_bnd_ids:
+                #opbd = list(boundary.indexes)
+                opbd = list(gdf.iloc[ibnd].indexes)
                 ind1 = ind2
                 ind2 = ind1 + len(opbd)
                 #logger.info(f'ind1 = {ind1}, ind2 = {ind2}')
@@ -452,9 +455,10 @@ class OpenBoundaryInventory:
 
 class Nudge:
 
-    def __init__(self):
+    def __init__(self, ocean_bnd_ids=[0]):
 
         self.include = None
+        self.ocean_bnd_ids = ocean_bnd_ids
 
 
     def gen_nudge(self, outdir: Union[str, os.PathLike], hgrid, rlmax = 1.5, rnu_day=0.25):
@@ -491,8 +495,9 @@ class Nudge:
         #Get open boundary 
         gdf=hgrid.boundaries.open.copy()
         opbd=[]
-        for boundary in gdf.itertuples():
-            opbd.extend(list(boundary.indexes))
+        #for boundary in gdf.itertuples():
+        for ibnd in self.ocean_bnd_ids:
+            opbd.extend(list(gdf.iloc[ibnd].indexes))
         opbd = np.array(opbd)
 
         elnode=hgrid.elements.array
