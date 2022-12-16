@@ -11,14 +11,14 @@ class StartDate:
         self.start_date = None
 
     def __set__(self, obj, start_date: datetime):
-        start_date = nearest_cycle() if start_date is None else \
-                     localize_datetime(start_date).astimezone(pytz.utc)
+        if start_date is not None:
+            start_date = localize_datetime(start_date).astimezone(pytz.utc)
 
-        if obj.end_date is not None:
-            if start_date > obj.end_date:
-                raise ValueError(
-                    'start_date is greater than end_date. '
-                    'Try clearing end_date first.')
+            if obj.end_date is not None:
+                if start_date > obj.end_date:
+                    raise ValueError(
+                        'start_date is greater than end_date. '
+                        'Try clearing end_date first.')
         self.start_date = start_date
 
     def __get__(self, obj, val) -> datetime:
@@ -37,9 +37,13 @@ class RunDays:
 
         if isinstance(run_days, (int, float)):
             run_days = timedelta(days=float(run_days))
+        
+        elif isinstance(run_days, datetime):
+            run_days = localize_datetime(run_days) - obj.start_date
+            
         elif not isinstance(run_days, timedelta):
             raise TypeError(
-                f'Argument run_days must be {timedelta} or float.')
+                f'Argument run_days must be {timedelta} or float, not {run_days}.')
         
         if obj.start_date is not None:
             obj.end_date = obj.start_date + run_days
@@ -60,14 +64,20 @@ class EndDate:
 
     def __set__(self, obj, val: Union[float, timedelta, datetime]):
 
+        if isinstance(val, (int, float)):
+            val = timedelta(days=float(val))
+
         if isinstance(val, datetime):
             val = localize_datetime(val).astimezone(pytz.utc)
 
-        elif not isinstance(val, timedelta):
+        elif not isinstance(val, timedelta) and obj.start_date is not None:
             val = obj.start_date + timedelta(days=float(val))
 
-        elif isinstance(val, timedelta):
+        elif isinstance(val, timedelta) and obj.start_date is not None:
             val = obj.start_date + val
+
+        else:
+            val = None
 
         self.end_date = val
 
@@ -109,7 +119,7 @@ def nearest_zulu(input_datetime=None, method='floor'):
 
 
 def nearest_cycle(input_datetime=None, period=6, method='floor'):
-
+    # Bug: method='ceil' doesn´t work correctly for cycle 18
     if input_datetime is None:
         input_datetime = localize_datetime(datetime.utcnow())
     assert method in ['floor', 'ceil']

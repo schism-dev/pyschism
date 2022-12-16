@@ -47,6 +47,19 @@ class Tides:
     major_constituents = MAJOR_CONSTITUENTS
     minor_constituents = MINOR_CONSTITUENTS
     constituents = ALL_CONSTITUENTS
+    _nodal_factors = {}
+    _earth_equilibrium_arguments = {}
+    _tidal_species_types = {}
+    _amplitude_constants = {}
+    _amplitudes = {
+            'elevation': {},
+            'velocity': {},
+        }
+
+    _phases = {
+        'elevation': {},
+        'velocity': {},
+    }
 
     def __init__(
             self,
@@ -109,14 +122,43 @@ class Tides:
                 self.get_greenwich_factor(start_date, rnday, constituent))  # FACE* # noqa:E501
 
     def get_elevation(self, constituent, vertices):
+
         if constituent.lower() == 'z0':
             return np.full((vertices.shape[0],), float(self._Z0)), \
                     np.full((vertices.shape[0],), 0.)
+
+        if constituent in self._amplitudes['elevation']:
+            amps = self._amplitudes['elevation'][constituent]
+            phases = self._phases['elevation'][constituent]
+            if isinstance(amps, (float, int)):
+                amps = np.full((vertices.shape[0],), float(amps))
+            if isinstance(phases, (float, int)):
+                phases = np.full((vertices.shape[0],), float(phases))
+            return amps, phases
+        
+        # if vertices is None:
+            # raise ValueError(
+            #     'Argument vertices must not be None for tidal constituent '
+            #     f'{constituent}.')
         return self.tidal_database.get_elevation(constituent, vertices)
 
     def get_velocity(self, constituent, vertices):
         if constituent.lower() == 'z0':
             return tuple(4*[np.full((vertices.shape[0],), 0.)])
+        
+        if constituent in self._amplitudes['velocity']:
+            amps = self._amplitudes['velocity'][constituent]
+            phases = self._phases['velocity'][constituent]
+            if isinstance(amps, (float, int)):
+                amps = np.full((vertices.shape[0],), float(amps))
+            if isinstance(phases, (float, int)):
+                phases = np.full((vertices.shape[0],), float(phases))
+            return amps, phases
+
+        # if vertices is None:
+            # raise ValueError(
+            #     'Argument vertices must not be None for tidal constituent '
+            #     f'{constituent}.')
         return self.tidal_database.get_velocity(constituent, vertices)
 
     def use_all(self, potential=True, forcing=True):
@@ -148,6 +190,35 @@ class Tides:
             raise ValueError("Argument constituent must be one of "
                              f"{self.active_constituents}")
         self._active_constituents.pop(constituent)
+        
+    def add_constituent(
+            self,
+            name: str,
+            angular_frequency,
+            nodal_factor = 1.,
+            earth_equilibrium_argument: float = 0.,
+            amplitude_constant: float = None,
+            tidal_species_type: int = None,
+            elevation_amplitude: dict = None,
+            elevation_phase: dict = 0.,
+            velocity_amplitude: dict = None,
+            velocity_phase = 0.,
+    ):
+        # self._amplitudes['elevation'].update({name: amplitude})
+        self.orbital_frequencies.update({name: angular_frequency})
+        # self.
+        self._nodal_factors.update({name: nodal_factor})
+        self._earth_equilibrium_arguments.update({name: earth_equilibrium_argument})
+        self._tidal_species_types.update({name: tidal_species_type})
+        self._amplitude_constants.update({name: amplitude_constant})  
+        self._amplitudes['elevation'].update({name: elevation_amplitude})
+        self._amplitudes['velocity'].update({name: velocity_amplitude})
+        self._phases['elevation'].update({name: elevation_phase})
+        self._phases['velocity'].update({name: velocity_phase})
+        self._active_constituents[name] = {
+                "potential": False,
+                "forcing": True,
+            }
 
     def add_Z0(self, value):
         self._active_constituents['Z0'] = {
@@ -176,6 +247,7 @@ class Tides:
             return self.tidal_species_type[constituent]
 
     def get_orbital_frequency(self, constituent):
+        # if constituent in self.
         return self.orbital_frequencies[constituent]
 
     def get_initial_conditions(self, constituent, vertices):
@@ -191,8 +263,10 @@ class Tides:
     def _manage_dates(f: Callable):
         def decorator(self, start_date, rnday, constituent):
             val = f(self, start_date, rnday, constituent)
-            del(self.start_date_utc)
-            del(self.end_date_utc)
+            if hasattr(self, 'start_date_utc'):
+                del(self.start_date_utc)
+            if hasattr(self, 'end_date_utc'):
+                del(self.end_date_utc)
             return val
         return decorator
 
@@ -200,6 +274,8 @@ class Tides:
     def get_nodal_factor(self, start_date: datetime,
                          rnday: Union[float, timedelta],
                          constituent: str):
+        if constituent not in ALL_CONSTITUENTS:
+            return self._nodal_factors[constituent]
         if start_date.tzinfo is not None and \
                 start_date.tzinfo.utcoffset(start_date) is not None:
             self.start_date_utc = start_date.astimezone(timezone(timedelta(0)))
@@ -300,6 +376,8 @@ class Tides:
     def get_greenwich_factor(self, start_date: datetime,
                              rnday: Union[float, timedelta],
                              constituent: str):
+        if constituent in self._earth_equilibrium_arguments:
+            return self._earth_equilibrium_arguments[constituent]
         if start_date.tzinfo is not None and \
                 start_date.tzinfo.utcoffset(start_date) is not None:
             self.start_date_utc = start_date.astimezone(timezone(timedelta(0)))
