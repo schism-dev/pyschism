@@ -733,7 +733,7 @@ class DownloadHycom:
         xmax = xmax + 360. if xmax < 0 else xmax
         self.bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
 
-    def fetch_data(self, date, fmt='schism', output_directory=os.cwd()):
+    def fetch_data(self, date, fmt='schism', output_directory=os.getcwd()):
         '''
         date: datetime.datetime
         fmt: 'schism' - for Fortran code; 'hycom' - raw netCDF from HYCOM
