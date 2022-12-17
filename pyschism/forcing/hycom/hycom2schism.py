@@ -37,26 +37,25 @@ def convert_longitude(ds):
     ds = ds.rename({'_lon_adjusted': lon_name})
     return ds
 
-def get_database(date, Bbox=None):
+def get_database(date):
     if date >= datetime(2018, 12, 4):
-        database = f'GLBy0.08/expt_93.0'
+        return f'GLBy0.08/expt_93.0'
     elif date >= datetime(2018, 1, 1) and date < datetime(2018, 12, 4):
-        database = f'GLBv0.08/expt_93.0'
+        return f'GLBv0.08/expt_93.0'
     elif date >= datetime(2017, 10, 1) and date < datetime(2018, 1, 1):
-        database = f'GLBv0.08/expt_92.9'
+        return f'GLBv0.08/expt_92.9'
     elif date >= datetime(2017, 6, 1) and date < datetime(2017, 10, 1):
-        database = f'GLBv0.08/expt_57.7'
+        return f'GLBv0.08/expt_57.7'
     elif date >= datetime(2017, 2, 1) and date < datetime(2017, 6, 1):
-        database = f'GLBv0.08/expt_92.8'
+        return f'GLBv0.08/expt_92.8'
     elif date >= datetime(2016, 5, 1) and date < datetime(2017, 2, 1):
-        database = f'GLBv0.08/expt_57.2'
+        return f'GLBv0.08/expt_57.2'
     elif date >= datetime(2016, 1, 1) and date < datetime(2016, 5, 1):
-        database = f'GLBv0.08/expt_56.3'
+        return f'GLBv0.08/expt_56.3'
     elif date >= datetime(1994, 1, 1) and date < datetime(2016, 1, 1):
-        database = f'GLBv0.08/expt_53.X/data/{date.year}'
+        return f'GLBv0.08/expt_53.X/data/{date.year}'
     else:
-        logger.info('No data for {date}')
-    return database
+        raise ValueError(f'No GOFS data for {date} (input must be >= than 1994-01-01).')
 
 def get_idxs(date, database, bbox):
 
@@ -108,9 +107,8 @@ def get_idxs(date, database, bbox):
             else:
                 break
     if len(idxs) ==0:
-        logger.info(f'No date for date {date}')
-        sys.exit()
-    time_idx=idxs.item()  
+        raise ValueError(f'No data for date {date} (data gap).')
+    time_idx=idxs.item()
 
     ds.close()
 
@@ -142,8 +140,7 @@ def interp_to_points_3d(dep, y2, x2, bxyz, val):
         val_int[idxs] = sp.interpolate.griddata(bxyz[~idxs,:], val_int[~idxs], bxyz[idxs,:],'nearest')
     idxs = np.isnan(val_int)
     if np.sum(idxs) != 0:
-        logger.info(f'There is still missing value for {val}')
-        sys.exit()
+        raise ValueError(f'There is still missing value for {val}')
     return val_int
 
 def interp_to_points_2d(y2, x2, bxy, val):
@@ -157,8 +154,7 @@ def interp_to_points_2d(y2, x2, bxy, val):
         val_int[idxs] = sp.interpolate.griddata(bxy[~idxs,:], val_int[~idxs], bxy[idxs,:],'nearest')
     idxs = np.isnan(val_int)
     if np.sum(idxs) != 0:
-        logger.info(f'There is still missing value for {val}')
-        sys.exit()
+        raise ValueError(f'There is still missing value for {val}')
     return val_int
 
 def ConvertTemp(salt, temp, dep):
@@ -521,7 +517,7 @@ class Nudge:
         idxs=np.where(idxs_nudge == 1)[0]
         self.include=idxs
         #logger.info(f'len of nudge idxs is {len(idxs)}')
-        logger.info(f'It took {time() -t0} sencods to calcuate nudge coefficient')
+        logger.info(f'It took {time() -t0} seconds to calcuate nudge coefficient')
 
         nudge = [f"{rlmax}, {rnu_day}"]
         nudge.extend("\n")
@@ -639,7 +635,7 @@ class Nudge:
             #dst_salt['time'][:] = ndt
 
             dst_salt.createVariable('map_to_global_node', 'i4', ('node',))
-            dst_salt['map_to_global_node'][:] = include+0  
+            dst_salt['map_to_global_node'][:] = include+0
 
             dst_salt.createVariable('tracer_concentration', 'f', ('time', 'node', 'nLevels', 'one'))
             #dst_salt['tracer_concentration'][:,:,:,:] = timeseries_s
@@ -727,20 +723,22 @@ class Nudge:
 
 class DownloadHycom:
 
-    def __init__(self, hgrid):
-
-        xmin, xmax = hgrid.coords[:, 0].min(), hgrid.coords[:, 0].max()
-        ymin, ymax = hgrid.coords[:, 1].min(), hgrid.coords[:, 1].max()
+    def __init__(self, hgrid=None):
+        if hgrid is not None:
+            xmin, xmax = hgrid.coords[:, 0].min(), hgrid.coords[:, 0].max()
+            ymin, ymax = hgrid.coords[:, 1].min(), hgrid.coords[:, 1].max()
+        else:
+            xmin, ymin, xmax, ymax = -180., -90, 180., 90.
         xmin = xmin + 360. if xmin < 0 else xmin
         xmax = xmax + 360. if xmax < 0 else xmax
         self.bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
 
-    def fetch_data(self, date, fmt='schism'):
+    def fetch_data(self, date, fmt='schism', output_directory=os.cwd()):
         '''
         date: datetime.datetime
         fmt: 'schism' - for Fortran code; 'hycom' - raw netCDF from HYCOM
         '''
-
+        output_directory = pathlib.Path(output_directory)
         database=get_database(date)
         logger.info(f'Fetching data for {date} from database {database}')
 
@@ -750,8 +748,8 @@ class DownloadHycom:
             url_ssh = f'https://tds.hycom.org/thredds/dodsC/{database}?lat[{lat_idx1}:1:{lat_idx2}],' + \
                 f'lon[{lon_idx1}:1:{lon_idx2}],depth[0:1:-1],time[{time_idx}],' + \
                 f'surf_el[{time_idx}][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
-            foutname = f'SSH_{date.strftime("%Y%m%d")}.nc'
-            logger.info(f'filename is {foutname}')
+            foutname = output_directory / f'SSH_{date.strftime("%Y%m%d")}.nc'
+            logger.info(f'filename is {foutname.resolve()}')
             ds = xr.open_dataset(url_ssh)
             ds = convert_longitude(ds)
             ds = ds.rename_dims({'lon':'xlon'})
@@ -766,7 +764,7 @@ class DownloadHycom:
                 f'water_u[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
                 f'water_v[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
 
-            foutname = f'UV_{date.strftime("%Y%m%d")}.nc'
+            foutname = output_directory / f'UV_{date.strftime("%Y%m%d")}.nc'
             logger.info(f'filename is {foutname}')
             ds = xr.open_dataset(url_uv)
             ds = convert_longitude(ds)
@@ -782,11 +780,11 @@ class DownloadHycom:
                 f'water_temp[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
                 f'salinity[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
 
-            foutname = f'ST_{date.strftime("%Y%m%d")}.nc'
+            foutname = output_directory / f'ST_{date.strftime("%Y%m%d")}.nc'
             logger.info(f'filename is {foutname}')
 
             ds = xr.open_dataset(url_ts)
-            
+
             temp = ds.water_temp.values
             salt = ds.salinity.values
             dep = ds.depth.values
@@ -823,7 +821,7 @@ class DownloadHycom:
                 f'water_u[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
                 f'water_v[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
 
-            foutname = f'hycom_{date.strftime("%Y%m%d")}.nc' 
+            foutname = output_directory / f'hycom_{date.strftime("%Y%m%d")}.nc'
             ds = xr.open_dataset(url)
             ds.to_netcdf(foutname, 'w')
 
