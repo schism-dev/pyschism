@@ -918,16 +918,16 @@ class DownloadHycom:
         if eta:
             if isinstance(eta, bool):
                 eta = None
-            self.fetch_eta(self, date, fmt=fmt, output_path=eta)
+            self.fetch_eta(date, fmt=fmt, output_path=eta)
         
         if uv:
             if isinstance(uv, bool):
                 uv = None
-            self.fetch_uv(self, date, fmt=fmt, output_path=uv)
+            self.fetch_uv(date, fmt=fmt, output_path=uv)
         
         if st:
             if isinstance(st, bool):
                 st = None
-            self.fetch_st(self, date, fmt=fmt, output_path=st)
+            self.fetch_st(date, fmt=fmt, output_path=st)
 
         return
