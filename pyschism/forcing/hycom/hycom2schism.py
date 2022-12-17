@@ -916,18 +916,12 @@ class DownloadHycom:
             return self.fetch_hycom(date, surf_el=eta, water_temp=st, salinity=st, water_u=uv, water_v=uv)
 
         if eta:
-            if isinstance(eta, bool):
-                eta = None
-            self.fetch_eta(date, fmt=fmt, output_path=eta)
-        
+            self.fetch_eta(date, fmt=fmt, output_path=None if eta is True else eta)
+
         if uv:
-            if isinstance(uv, bool):
-                uv = None
-            self.fetch_uv(date, fmt=fmt, output_path=uv)
-        
+            self.fetch_uv(date, fmt=fmt, output_path=None if uv is True else uv)
+
         if st:
-            if isinstance(st, bool):
-                st = None
-            self.fetch_st(date, fmt=fmt, output_path=st)
+            self.fetch_st(date, fmt=fmt, output_path=None if st is True else st)
 
         return
