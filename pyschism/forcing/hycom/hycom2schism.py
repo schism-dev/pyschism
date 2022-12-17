@@ -747,8 +747,10 @@ class DownloadHycom:
             water_u: bool = True,
             water_v: bool = True,
             ):
-        foutname = pathlib.Path(os.getcwd()) / f'hycom_{date.strftime("%Y%m%d")}.nc' if output_path is None \
+        fname = f'hycom_{date.strftime("%Y%m%d")}.nc'
+        foutname = pathlib.Path(os.getcwd()) / fname if output_path is None \
                 else pathlib.Path(output_path)
+        foutname = foutname / fname if foutname.is_dir() else foutname
         for var in [surf_el, water_temp, salinity, water_u, water_v]:
             if not isinstance(var, bool):
                 raise TypeError(f'Argument `{var}` must be of type bool, not {var}.')
@@ -792,8 +794,11 @@ class DownloadHycom:
         url_ssh = f'https://tds.hycom.org/thredds/dodsC/{database}?lat[{lat_idx1}:1:{lat_idx2}],' + \
             f'lon[{lon_idx1}:1:{lon_idx2}],depth[0:1:-1],time[{time_idx}],' + \
             f'surf_el[{time_idx}][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
-        foutname = pathlib.Path(os.getcwd()) / f'SSH_{date.strftime("%Y%m%d")}.nc' if output_path is None \
+
+        fname = f'SSH_{date.strftime("%Y%m%d")}.nc'
+        foutname = pathlib.Path(os.getcwd()) / fname if output_path is None \
                 else pathlib.Path(output_path)
+        foutname = foutname / fname if foutname.is_dir() else foutname
         logger.info(f'filename is {foutname.resolve()}')
         ds = xr.open_dataset(url_ssh)
         ds = convert_longitude(ds)
@@ -819,8 +824,10 @@ class DownloadHycom:
                     water_u=True,
                     water_v=True
                     )
-        foutname = pathlib.Path(os.getcwd()) / f'UV_{date.strftime("%Y%m%d")}.nc' if output_path is None \
+        fname = f'UV_{date.strftime("%Y%m%d")}.nc'
+        foutname = pathlib.Path(os.getcwd()) / fname if output_path is None \
                 else pathlib.Path(output_path)
+        foutname = foutname / fname if foutname.is_dir() else foutname
         database = get_database(date)
         logger.info(f'Fetching SCHISM-formatted UV data for {date} from database {database}.')
         time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2 = get_idxs(date, database, self.bbox)
@@ -828,7 +835,7 @@ class DownloadHycom:
             f'lon[{lon_idx1}:1:{lon_idx2}],depth[0:1:-1],time[{time_idx}],' + \
             f'water_u[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
             f'water_v[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
-        logger.info(f'filename is {foutname}')
+        logger.info(f'filename is {foutname.resolve()}')
         ds = xr.open_dataset(url_uv)
         ds = convert_longitude(ds)
         ds = ds.rename_dims({'lon':'xlon'})
@@ -840,7 +847,6 @@ class DownloadHycom:
         return foutname
 
     def fetch_st(self, date, fmt='schism', output_path: PathLike = None):
-
         allowed_fmts = ['schism', 'hycom']
         if fmt not in allowed_fmts:
             raise ValueError(f"Argument `fmt` must be one of {', '.join(allowed_fmts)}, but got: {fmt}.")
@@ -854,9 +860,10 @@ class DownloadHycom:
                     water_u=False,
                     water_v=False
                     )
-
-        foutname = pathlib.Path(os.getcwd()) / f'ST_{date.strftime("%Y%m%d")}.nc' if output_path is None \
+        fname = f'ST_{date.strftime("%Y%m%d")}.nc'
+        foutname = pathlib.Path(os.getcwd()) / fname if output_path is None \
                 else pathlib.Path(output_path)
+        foutname = foutname / fname if foutname.is_dir() else foutname
         database = get_database(date)
         time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2 = get_idxs(date, database, self.bbox)
         url_ts = f'https://tds.hycom.org/thredds/dodsC/{database}?lat[{lat_idx1}:1:{lat_idx2}],' + \
@@ -864,7 +871,7 @@ class DownloadHycom:
             f'water_temp[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
             f'salinity[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
 
-        logger.info(f'filename is {foutname}')
+        logger.info(f'filename is {foutname.resolve()}')
 
         ds = xr.open_dataset(url_ts)
 
