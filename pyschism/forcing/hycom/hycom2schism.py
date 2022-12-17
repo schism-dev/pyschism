@@ -521,7 +521,7 @@ class Nudge:
         idxs=np.where(idxs_nudge == 1)[0]
         self.include=idxs
         #logger.info(f'len of nudge idxs is {len(idxs)}')
-        logger.info(f'It took {time() -t0} seconds to calcuate nudge coefficient')
+        logger.info(f'It took {time() -t0} seconds to calculate nudge coefficient')
 
         nudge = [f"{rlmax}, {rnu_day}"]
         nudge.extend("\n")
