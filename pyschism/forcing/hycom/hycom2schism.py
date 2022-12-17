@@ -1,7 +1,7 @@
 from datetime import datetime,timedelta
 from functools import lru_cache
 from time import time
-from typing import Union
+from typing import Union, TypeVar
 import logging
 import os
 import pathlib
@@ -715,42 +715,6 @@ class Nudge:
             dst_temp['time'][it] = it
             temp_int = interp_to_points_3d(dep, y2, x2, bxyz, ptemp)
             temp_int = temp_int.reshape(zcor2.shape)
-            timeseries_t[it,:,:,0]=temp_int
-
-            ds.close()
- 
-        with Dataset(outdir / 'TEM_nu.nc', 'w', format='NETCDF4') as dst:
-        #dimensions
-            dst.createDimension('node', nNode)
-            dst.createDimension('nLevels', nvrt)
-            dst.createDimension('one', one)
-            dst.createDimension('time', None)
-        #variables
-            dst.createVariable('time', 'f', ('time',))
-            dst['time'][:] = ndt
-
-            dst.createVariable('map_to_global_node', 'i4', ('node',))
-            dst['map_to_global_node'][:] = include+1
-
-            dst.createVariable('tracer_concentration', 'f', ('time', 'node', 'nLevels', 'one'))
-            dst['tracer_concentration'][:,:,:,:] = timeseries_t
-
-        with Dataset(outdir / 'SAL_nu.nc', 'w', format='NETCDF4') as dst:
-        #dimensions
-            dst.createDimension('node', nNode)
-            dst.createDimension('nLevels', nvrt)
-            dst.createDimension('one', one)
-            dst.createDimension('time', None)
-        #variables
-            dst.createVariable('time', 'f', ('time',))
-            dst['time'][:] = ndt
-
-            dst.createVariable('map_to_global_node', 'i4', ('node',))
-            dst['map_to_global_node'][:] = include+1
-
-            dst.createVariable('tracer_concentration', 'f', ('time', 'node', 'nLevels', 'one'))
-            dst['tracer_concentration'][:,:,:,:] = timeseries_s
-
             #timeseries_t[it,:,:,0]=temp_int
             dst_temp['tracer_concentration'][it,:,:,0] = temp_int
 
