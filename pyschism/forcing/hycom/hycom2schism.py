@@ -1,5 +1,6 @@
 from datetime import datetime,timedelta
 from functools import lru_cache
+from multiprocessing import Process
 from time import time
 from typing import Union, TypeVar
 import logging
@@ -75,6 +76,9 @@ def get_idxs(date, database, bbox):
     
     lon=ds['lon'][:]
     lat=ds['lat'][:]
+
+    # xmin = xmin + 360. if xmin < 0 else xmin
+    # xmax = xmax + 360. if xmax < 0 else xmax
     dep=ds['depth'][:]
     lat_idxs=np.where((lat>=bbox.ymin-2.0)&(lat<=bbox.ymax+2.0))[0]
     lon_idxs=np.where((lon>=bbox.xmin-2.0) & (lon<=bbox.xmax+2.0))[0]
@@ -719,10 +723,7 @@ class Nudge:
             dst_temp['tracer_concentration'][it,:,:,0] = temp_int
 
             ds.close()
- 
-        #dst_temp.close()
-        #dst_salt.close()
-        
+
         logger.info(f'Writing *_nu.nc takes {time()-t0} seconds')
 
 class DownloadHycom:
@@ -733,8 +734,6 @@ class DownloadHycom:
             ymin, ymax = hgrid.coords[:, 1].min(), hgrid.coords[:, 1].max()
         else:
             xmin, ymin, xmax, ymax = -180., -90, 180., 90.
-        xmin = xmin + 360. if xmin < 0 else xmin
-        xmax = xmax + 360. if xmax < 0 else xmax
         self.bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
 
     def fetch_hycom(
@@ -789,7 +788,7 @@ class DownloadHycom:
                     water_v=False
                     )
         database = get_database(date)
-        logger.info(f'Fetching SCHISM-formatted SSH data for {date} from database {database}.')
+        logger.info(f'Fetching SCHISM-formatted SSH data for {date} from GOFS database {database}.')
         time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2 = get_idxs(date, database, self.bbox)
         url_ssh = f'https://tds.hycom.org/thredds/dodsC/{database}?lat[{lat_idx1}:1:{lat_idx2}],' + \
             f'lon[{lon_idx1}:1:{lon_idx2}],depth[0:1:-1],time[{time_idx}],' + \
@@ -829,7 +828,7 @@ class DownloadHycom:
                 else pathlib.Path(output_path)
         foutname = foutname / fname if foutname.is_dir() else foutname
         database = get_database(date)
-        logger.info(f'Fetching SCHISM-formatted UV data for {date} from database {database}.')
+        logger.info(f'Fetching SCHISM-formatted UV data for {date} from GOFS database {database}.')
         time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2 = get_idxs(date, database, self.bbox)
         url_uv = f'https://tds.hycom.org/thredds/dodsC/{database}?lat[{lat_idx1}:1:{lat_idx2}],' + \
             f'lon[{lon_idx1}:1:{lon_idx2}],depth[0:1:-1],time[{time_idx}],' + \
@@ -865,6 +864,7 @@ class DownloadHycom:
                 else pathlib.Path(output_path)
         foutname = foutname / fname if foutname.is_dir() else foutname
         database = get_database(date)
+        logger.info(f'Fetching SCHISM-formatted ST data for {date} from GOFS database {database}.')
         time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2 = get_idxs(date, database, self.bbox)
         url_ts = f'https://tds.hycom.org/thredds/dodsC/{database}?lat[{lat_idx1}:1:{lat_idx2}],' + \
             f'lon[{lon_idx1}:1:{lon_idx2}],depth[0:1:-1],time[{time_idx}],' + \
@@ -915,6 +915,8 @@ class DownloadHycom:
         date: datetime.datetime
         fmt: 'schism' - for Fortran code; 'hycom' - raw netCDF from HYCOM
         '''
+        
+        
         allowed_fmts = ['schism', 'hycom']
         if fmt not in allowed_fmts:
             raise ValueError(f"Argument `fmt` must be one of {', '.join(allowed_fmts)}, but got: {fmt}.")
@@ -922,13 +924,28 @@ class DownloadHycom:
         if fmt == 'hycom' and np.all([eta is True, uv is True, st is True]):
             return self.fetch_hycom(date, surf_el=eta, water_temp=st, salinity=st, water_u=uv, water_v=uv)
 
+        tasks = []
         if eta:
-            self.fetch_eta(date, fmt=fmt, output_path=None if eta is True else eta)
+            tasks.append(Process(
+                target=self.fetch_eta,
+                args=(date, fmt, None if eta is True else eta)
+                ))
 
         if uv:
-            self.fetch_uv(date, fmt=fmt, output_path=None if uv is True else uv)
+            tasks.append(Process(
+                target=self.fetch_uv,
+                args=(date, fmt, None if uv is True else uv)
+                ))
 
         if st:
-            self.fetch_st(date, fmt=fmt, output_path=None if st is True else st)
+            tasks.append(Process(
+                target=self.fetch_st,
+                args=(date, fmt, None if st is True else st)
+                ))
+
+        for task in tasks:
+            task.start()
+        for task in tasks:
+            task.join()
 
         return
