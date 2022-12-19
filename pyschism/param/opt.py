@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 import logging
 
-# import pathlib
+import pathlib
 from typing import Union
 
 import f90nml
@@ -10,9 +10,7 @@ import f90nml
 
 from pyschism import dates
 from pyschism.mesh.fgrid import NchiType
-from pyschism.param.schism_init import GitParamTemplate
 
-PARAM_DEFAULTS = f90nml.read(GitParamTemplate().path)["opt"]
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +40,8 @@ logger = logging.getLogger(__name__)
 
 class OptMeta(type):
     def __new__(meta, name, bases, attrs):
+
+        PARAM_DEFAULTS = f90nml.read(pathlib.Path(__file__).parent / 'param.nml')["opt"]
         for key, value in PARAM_DEFAULTS.items():
             if key not in attrs:
                 if isinstance(value, list):

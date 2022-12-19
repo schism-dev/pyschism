@@ -7,7 +7,6 @@ from typing import Union
 import f90nml
 
 from pyschism.enums import Stratification
-from pyschism.param.schism_init import GitParamTemplate
 
 
 # class IbcType(Enum):
@@ -202,7 +201,7 @@ class CORE:
     @template.setter
     def template(self, template: Union[str, os.PathLike, None]):
         if template is True:
-            template = GitParamTemplate().path
+            template = pathlib.Path(__file__) / 'param.nml'
         elif template is False or template is None:
             template = None
         else:
@@ -212,5 +211,5 @@ class CORE:
     @property
     def defaults(self):
         if self.template is None:
-            return GitParamTemplate().core
+            return f90nml.read(pathlib.Path(__file__).parent / 'param.nml')["core"]
         return f90nml.read(self.template)['core']
