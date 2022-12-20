@@ -1,7 +1,8 @@
 from datetime import timedelta
+from typing import Union
 import logging
 import pathlib
-from typing import Union
+import tempfile
 
 import f90nml
 
@@ -10,11 +11,9 @@ from pyschism.enums import Stratification
 from pyschism.param.core import CORE
 from pyschism.param.opt import OPT
 from pyschism.param.schout import SCHOUT
-
+from pyschism.param import schism_init
 # from pyschism.stations import Stations
 
-# PARAM_TEMPLATE = pathlib.Path(__file__).parent / 'param.nml.template'
-from pyschism.param.schism_init import GitParamTemplate
 
 logger = logging.getLogger(__name__)
 
@@ -48,8 +47,12 @@ class Param:
         if path.is_file() and not overwrite:
             raise IOError(f"File {path} exists and overwrite=False")
         if use_template:
-            PARAM_TEMPLATE = GitParamTemplate().path if use_template is True else use_template
-            f90nml.patch(PARAM_TEMPLATE, self.to_dict(), path)
+            PARAM_TEMPLATE = pathlib.Path(__file__).parent / 'param.nml' if use_template is True else use_template
+            schism_param_sample = schism_init.read_schism_param_sample_patched(PARAM_TEMPLATE)
+            tmpfile = tempfile.NamedTemporaryFile()
+            with open(tmpfile.name, 'w') as fh:
+                fh.write(schism_param_sample)
+            f90nml.patch(tmpfile.name, self.to_dict(), path)
         else:
             with open(path, "w") as f:
                 f.write(str(self))
