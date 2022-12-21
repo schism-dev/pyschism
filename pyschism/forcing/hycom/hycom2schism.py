@@ -1,20 +1,22 @@
-import os
-import sys
 from datetime import datetime,timedelta
-import logging
-import pathlib
-import tempfile
-import subprocess
-import shutil
-from typing import Union
+from functools import lru_cache
+from multiprocessing import Process
 from time import time
+from typing import Union, TypeVar
+import logging
+import os
+import pathlib
+import shutil
+import subprocess
+import sys
+import tempfile
 
-import numpy as np
-import scipy as sp
+from matplotlib.transforms import Bbox
+from netCDF4 import Dataset
 from numba import jit, prange
 import netCDF4 as nc
-from netCDF4 import Dataset
-from matplotlib.transforms import Bbox
+import numpy as np
+import scipy as sp
 import seawater as sw
 import xarray as xr
 
@@ -22,6 +24,8 @@ from pyschism.mesh.base import Nodes, Elements
 from pyschism.mesh.vgrid import Vgrid
 
 logger = logging.getLogger(__name__)
+
+PathLike = TypeVar(os.PathLike, str, pathlib.Path, None)
 
 def convert_longitude(ds):
     lon_name = 'lon'
@@ -37,27 +41,27 @@ def convert_longitude(ds):
     ds = ds.rename({'_lon_adjusted': lon_name})
     return ds
 
-def get_database(date, Bbox=None):
+@lru_cache
+def get_database(date):
     if date >= datetime(2018, 12, 4):
-        database = f'GLBy0.08/expt_93.0'
+        return f'GLBy0.08/expt_93.0'
     elif date >= datetime(2018, 1, 1) and date < datetime(2018, 12, 4):
-        database = f'GLBv0.08/expt_93.0'
+        return f'GLBv0.08/expt_93.0'
     elif date >= datetime(2017, 10, 1) and date < datetime(2018, 1, 1):
-        database = f'GLBv0.08/expt_92.9'
+        return f'GLBv0.08/expt_92.9'
     elif date >= datetime(2017, 6, 1) and date < datetime(2017, 10, 1):
-        database = f'GLBv0.08/expt_57.7'
+        return f'GLBv0.08/expt_57.7'
     elif date >= datetime(2017, 2, 1) and date < datetime(2017, 6, 1):
-        database = f'GLBv0.08/expt_92.8'
+        return f'GLBv0.08/expt_92.8'
     elif date >= datetime(2016, 5, 1) and date < datetime(2017, 2, 1):
-        database = f'GLBv0.08/expt_57.2'
+        return f'GLBv0.08/expt_57.2'
     elif date >= datetime(2016, 1, 1) and date < datetime(2016, 5, 1):
-        database = f'GLBv0.08/expt_56.3'
+        return f'GLBv0.08/expt_56.3'
     elif date >= datetime(1994, 1, 1) and date < datetime(2016, 1, 1):
-        database = f'GLBv0.08/expt_53.X/data/{date.year}'
-    else:
-        logger.info('No data for {date}')
-    return database
+        return f'GLBv0.08/expt_53.X/data/{date.year}'
+    raise ValueError(f'No GOFS data for {date} (input must be >= than 1994-01-01).')
 
+@lru_cache
 def get_idxs(date, database, bbox):
 
     if date.strftime("%Y-%m-%d") >= datetime.now().strftime("%Y-%m-%d"):
@@ -72,6 +76,9 @@ def get_idxs(date, database, bbox):
     
     lon=ds['lon'][:]
     lat=ds['lat'][:]
+
+    # xmin = xmin + 360. if xmin < 0 else xmin
+    # xmax = xmax + 360. if xmax < 0 else xmax
     dep=ds['depth'][:]
     lat_idxs=np.where((lat>=bbox.ymin-2.0)&(lat<=bbox.ymax+2.0))[0]
     lon_idxs=np.where((lon>=bbox.xmin-2.0) & (lon<=bbox.xmax+2.0))[0]
@@ -108,9 +115,8 @@ def get_idxs(date, database, bbox):
             else:
                 break
     if len(idxs) ==0:
-        logger.info(f'No date for date {date}')
-        sys.exit()
-    time_idx=idxs.item()  
+        raise ValueError(f'No data for date {date} (data gap).')
+    time_idx=idxs.item()
 
     ds.close()
 
@@ -142,14 +148,12 @@ def interp_to_points_3d(dep, y2, x2, bxyz, val):
         val_int[idxs] = sp.interpolate.griddata(bxyz[~idxs,:], val_int[~idxs], bxyz[idxs,:],'nearest')
     idxs = np.isnan(val_int)
     if np.sum(idxs) != 0:
-        logger.info(f'There is still missing value for {val}')
-        sys.exit()
+        raise ValueError(f'There is still missing value for {val}')
     return val_int
 
 def interp_to_points_2d(y2, x2, bxy, val):
     idxs = np.where(abs(val) > 10000)
     val[idxs] = float('nan')
-
     val_fd = sp.interpolate.RegularGridInterpolator((y2,x2),np.squeeze(val),'linear', bounds_error=False, fill_value = float('nan'))
     val_int = val_fd(bxy)
     idxs = np.isnan(val_int)
@@ -157,8 +161,7 @@ def interp_to_points_2d(y2, x2, bxy, val):
         val_int[idxs] = sp.interpolate.griddata(bxy[~idxs,:], val_int[~idxs], bxy[idxs,:],'nearest')
     idxs = np.isnan(val_int)
     if np.sum(idxs) != 0:
-        logger.info(f'There is still missing value for {val}')
-        sys.exit()
+        raise ValueError(f'There is still missing value for {val}')
     return val_int
 
 def ConvertTemp(salt, temp, dep):
@@ -177,7 +180,7 @@ class OpenBoundaryInventory:
         self.hgrid = hgrid
         self.vgrid = Vgrid.default() if vgrid is None else vgrid
 
-    def fetch_data(self, outdir: Union[str, os.PathLike], start_date, rnday, ocean_bnd_ids = [0], elev2D=True, TS=True, UV=True, restart=False, adjust2D=False, lats=None, msl_shifts=None): 
+    def fetch_data(self, outdir: Union[str, os.PathLike], start_date, rnday, ocean_bnd_ids = [0], elev2D=True, TS=True, UV=True, restart=False, adjust2D=False, lats=None, msl_shifts=None):
         outdir = pathlib.Path(outdir)
 
         self.start_date = start_date
@@ -187,7 +190,7 @@ class OpenBoundaryInventory:
             self.start_date + timedelta(days=self.rnday+1),
             timedelta(days=1)).astype(datetime)
 
-        #Get open boundary 
+        #Get open boundary
         gdf=self.hgrid.boundaries.open.copy()
         opbd=[]
         #for boundary in gdf.itertuples():
@@ -492,7 +495,7 @@ class Nudge:
         lon=hgrid.coords[:,0]
         lat=hgrid.coords[:,1]
 
-        #Get open boundary 
+        #Get open boundary
         gdf=hgrid.boundaries.open.copy()
         opbd=[]
         #for boundary in gdf.itertuples():
@@ -521,7 +524,7 @@ class Nudge:
         idxs=np.where(idxs_nudge == 1)[0]
         self.include=idxs
         #logger.info(f'len of nudge idxs is {len(idxs)}')
-        logger.info(f'It took {time() -t0} sencods to calcuate nudge coefficient')
+        logger.info(f'It took {time() -t0} seconds to calculate nudge coefficient')
 
         nudge = [f"{rlmax}, {rnu_day}"]
         nudge.extend("\n")
@@ -639,7 +642,7 @@ class Nudge:
             #dst_salt['time'][:] = ndt
 
             dst_salt.createVariable('map_to_global_node', 'i4', ('node',))
-            dst_salt['map_to_global_node'][:] = include+0  
+            dst_salt['map_to_global_node'][:] = include+0
 
             dst_salt.createVariable('tracer_concentration', 'f', ('time', 'node', 'nLevels', 'one'))
             #dst_salt['tracer_concentration'][:,:,:,:] = timeseries_s
@@ -719,112 +722,255 @@ class Nudge:
             dst_temp['tracer_concentration'][it,:,:,0] = temp_int
 
             ds.close()
- 
-        #dst_temp.close()
-        #dst_salt.close()
-        
+
         logger.info(f'Writing *_nu.nc takes {time()-t0} seconds')
 
 class DownloadHycom:
 
-    def __init__(self, hgrid):
+    def __init__(self, hgrid=None, bbox: Bbox = None):
+        """
+        Bbox is assumed to be in lat/lon
+        """
 
-        xmin, xmax = hgrid.coords[:, 0].min(), hgrid.coords[:, 0].max()
-        ymin, ymax = hgrid.coords[:, 1].min(), hgrid.coords[:, 1].max()
-        xmin = xmin + 360. if xmin < 0 else xmin
-        xmax = xmax + 360. if xmax < 0 else xmax
-        self.bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
+        if hgrid is not None and bbox is not None:
+            raise ValueError('Arguments `hgrid` and `bbox` are mutually exclusive.')
 
-    def fetch_data(self, date, fmt='schism'):
+        if hgrid is not None:
+            xy = hgrid.get_xy(crs='epsg:4326')
+            xmin, xmax = xy[:, 0].min(), xy[:, 0].max()
+            ymin, ymax = xy[:, 1].min(), xy[:, 1].max()
+            self.bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
+
+        else:
+            self.bbox = bbox
+
+    @property
+    def bbox(self):
+        return self._bbox
+
+    @bbox.setter
+    def bbox(self, bbox: Union[Bbox, None]):
+        if bbox is None:
+            bbox = Bbox.from_extents( -180., -90, 180., 90.)
+        if isinstance(bbox, Bbox):
+            raise ValueError(f'Argument `bbox` must be of type {Bbox} or None, but got {bbox}.')
+        self._bbox = bbox
+
+    def get_dataset(
+            self,
+            date,
+            fmt='schism',
+            lat: bool = True,
+            lon: bool = True,
+            depth: bool = True,
+            time: bool = True,
+            surf_el: bool = False,
+            water_temp: bool = False,
+            salinity: bool = False,
+            water_u: bool = False,
+            water_v: bool = False,
+            **other_variables
+            ):
+        """
+        This is a "live" instance of the dataset. Can be used to stream the data without writting to disk.
+        """
+
+        # sanitize inputs
+        allowed_fmts = ['schism', 'hycom']
+        if fmt not in allowed_fmts:
+            raise ValueError(f"Argument `fmt` must be one of {', '.join(allowed_fmts)}, but got: {fmt}.")
+
+        # required by SCHISM
+        for var in [lat, lon, depth, time, surf_el, water_temp, salinity, water_u, water_v]:
+            if not isinstance(var, bool):
+                raise TypeError(f'Argument `{var}` must be of type bool, not {var}.')
+
+        for var, state in other_variables.items():
+            # let xr.open_dataset handle invalid variable name errors.
+            if not isinstance(state, bool):
+                raise TypeError(f'Argument `{var}` must be of type bool, not {state}.')
+
+        database = get_database(date)
+        logger.info(f'Fetching HYCOM data for {date} from database {database}.')
+        time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2 = get_idxs(date, database, self.bbox)
+
+        if fmt == 'schism':
+            lat = True
+            lon = True
+            depth = True
+            time = True
+
+        if fmt == 'schism' and water_temp:
+            salinity = True
+
+        variables = [
+                f'lat[{lat_idx1}:1:{lat_idx2}]' if lat else '',
+                f'lon[{lon_idx1}:1:{lon_idx2}]' if lon else '',
+                'depth[0:1:-1]' if depth else '',
+                f'time[{time_idx}]' if time else '',
+                f'surf_el[{time_idx}][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]' if surf_el else '',
+                f'water_temp[{time_idx}][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]' if water_temp else '',
+                f'salinity[{time_idx}][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]' if salinity else '',
+                f'water_u[{time_idx}][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]' if water_u else '',
+                f'water_v[{time_idx}][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]' if water_v else '',
+                ]
+        # use kwargs to request any other variables, error handling is relayed to xr.open_dataset
+        variables.extend([
+            f'{variable}[{time_idx}][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
+            for variable, state in other_variables.items() if state
+            ])
+        variables = ','.join(variables)
+        ds = xr.open_dataset(f'https://tds.hycom.org/thredds/dodsC/{database}?{variables}')
+        if fmt == 'schism':
+            ds = convert_longitude(ds)
+            ds = ds.rename_dims({'lon':'xlon'})
+            ds = ds.rename_dims({'lat':'ylat'})
+            ds = ds.rename_vars({'lat':'ylat'})
+            ds = ds.rename_vars({'lon':'xlon'})
+            if water_temp:
+                #ds.assign(water_temp2=ptemp)
+                #ds.assign.attrs = ds.water_temp.attrs
+                temp = ds.water_temp.values
+                salt = ds.salinity.values
+                dep = ds.depth.values
+
+                #convert in-situ temperature to potential temperature
+                ptemp = ConvertTemp(salt, temp, dep)
+
+                #drop water_temp variable and add new temperature variable
+                ds = ds.drop('water_temp')
+                ds['temperature']=(['time','depth','lat','lon'], ptemp)
+                ds.temperature.attrs = {
+                    'long_name': 'Sea water potential temperature',
+                    'standard_name': 'sea_water_potential_temperature',
+                    'units': 'degC'
+                }
+        return ds
+
+    def fetch_hycom(
+            self,
+            date,
+            output_path: PathLike = None,
+            **hycom_variables,
+            ):
+
+        # set default output_path
+        fname = f'hycom_{date.strftime("%Y%m%d")}.nc'
+        foutname = pathlib.Path(os.getcwd()) / fname if output_path is None \
+                else pathlib.Path(output_path)
+        foutname = foutname / fname if foutname.is_dir() else foutname
+        ds = self.get_dataset(date, fmt='hycom', **hycom_variables)
+        ds.to_netcdf(foutname, 'w')
+        ds.close()
+        return foutname
+
+    def fetch_eta(self, date, fmt='schism', output_path: PathLike = None):
+        if fmt == 'hycom':
+            return self.fetch_hycom(
+                    date,
+                    output_path=output_path,
+                    surf_el=True,
+                    )
+        fname = f'SSH_{date.strftime("%Y%m%d")}.nc'
+        foutname = pathlib.Path(os.getcwd()) / fname if output_path is None \
+                else pathlib.Path(output_path)
+        foutname = foutname / fname if foutname.is_dir() else foutname
+        logger.info(f'Downloading SCHISM-formatted SSH data to file: {foutname.resolve()}.')
+        start = time()
+        ds = self.get_dataset(date, surf_el=True)
+        ds.to_netcdf(foutname, 'w', 'NETCDF3_CLASSIC', unlimited_dims='time')
+        ds.close()
+        logger.info(f'Downloading SCHISM-formatted SSH data took: {time()-start}')
+        return foutname
+
+    def fetch_uv(self, date, fmt='schism', output_path: PathLike = None):
+        allowed_fmts = ['schism', 'hycom']
+        if fmt not in allowed_fmts:
+            raise ValueError(f"Argument `fmt` must be one of {', '.join(allowed_fmts)}, but got: {fmt}.")
+        if fmt == 'hycom':
+            return self.fetch_hycom(
+                    date,
+                    output_path=output_path,
+                    water_u=True,
+                    water_v=True
+                    )
+        fname = f'UV_{date.strftime("%Y%m%d")}.nc'
+        foutname = pathlib.Path(os.getcwd()) / fname if output_path is None \
+                else pathlib.Path(output_path)
+        foutname = foutname / fname if foutname.is_dir() else foutname
+        logger.info(f'Downloading SCHISM-formatted UV data to file: {foutname.resolve()}.')
+        start = time()
+        ds = self.get_dataset(date, water_u=True, water_v=True)
+        ds.to_netcdf(foutname, 'w', 'NETCDF3_CLASSIC', unlimited_dims='time')
+        ds.close()
+        logger.info(f'Downoading SCHISM-formatted UV data took: {time()-start}')
+        return foutname
+
+    def fetch_st(self, date, fmt='schism', output_path: PathLike = None):
+        allowed_fmts = ['schism', 'hycom']
+        if fmt not in allowed_fmts:
+            raise ValueError(f"Argument `fmt` must be one of {', '.join(allowed_fmts)}, but got: {fmt}.")
+        if fmt == 'hycom':
+            return self.fetch_hycom(
+                    date,
+                    output_path=output_path,
+                    water_temp=True,
+                    salinity=True,
+                    )
+        fname = f'ST_{date.strftime("%Y%m%d")}.nc'
+        foutname = pathlib.Path(os.getcwd()) / fname if output_path is None \
+                else pathlib.Path(output_path)
+        foutname = foutname / fname if foutname.is_dir() else foutname
+        logger.info(f'Downloading SCHISM-formatted ST data to file: {foutname.resolve()}.')
+        start = time()
+        ds = self.get_dataset(date, water_temp=True, salinity=True)
+        ds.to_netcdf(foutname, 'w', unlimited_dims='time', encoding={'temperature':{'dtype': 'h', '_FillValue': -30000.,'scale_factor': 0.001, 'add_offset': 20., 'missing_value': -30000.}})
+        ds.close()
+        logger.info(f'Downoading SCHISM-formatted ST data took: {time()-start}')
+        return foutname
+
+    def fetch_data(
+            self,
+            date,
+            fmt='schism',
+            eta: Union[bool, PathLike] = True,
+            uv: Union[bool, PathLike] = True,
+            st: Union[bool, PathLike] = True,
+            ):
         '''
         date: datetime.datetime
         fmt: 'schism' - for Fortran code; 'hycom' - raw netCDF from HYCOM
         '''
 
-        database=get_database(date)
-        logger.info(f'Fetching data for {date} from database {database}')
+        allowed_fmts = ['schism', 'hycom']
+        if fmt not in allowed_fmts:
+            raise ValueError(f"Argument `fmt` must be one of {', '.join(allowed_fmts)}, but got: {fmt}.")
 
-        time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2 = get_idxs(date, database, self.bbox)
+        if fmt == 'hycom' and np.all([eta is True, uv is True, st is True]):
+            return self.fetch_hycom(date, surf_el=eta, water_temp=st, salinity=st, water_u=uv, water_v=uv)
 
-        if fmt == 'schism':
-            url_ssh = f'https://tds.hycom.org/thredds/dodsC/{database}?lat[{lat_idx1}:1:{lat_idx2}],' + \
-                f'lon[{lon_idx1}:1:{lon_idx2}],depth[0:1:-1],time[{time_idx}],' + \
-                f'surf_el[{time_idx}][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
-            foutname = f'SSH_{date.strftime("%Y%m%d")}.nc'
-            logger.info(f'filename is {foutname}')
-            ds = xr.open_dataset(url_ssh)
-            ds = convert_longitude(ds)
-            ds = ds.rename_dims({'lon':'xlon'})
-            ds = ds.rename_dims({'lat':'ylat'})
-            ds = ds.rename_vars({'lat':'ylat'})
-            ds = ds.rename_vars({'lon':'xlon'})
-            ds.to_netcdf(foutname, 'w', 'NETCDF3_CLASSIC', unlimited_dims='time')
-            ds.close()
+        tasks = []
+        if eta:
+            tasks.append(Process(
+                target=self.fetch_eta,
+                args=(date, fmt, None if eta is True else eta)
+                ))
 
-            url_uv = f'https://tds.hycom.org/thredds/dodsC/{database}?lat[{lat_idx1}:1:{lat_idx2}],' + \
-                f'lon[{lon_idx1}:1:{lon_idx2}],depth[0:1:-1],time[{time_idx}],' + \
-                f'water_u[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
-                f'water_v[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
+        if uv:
+            tasks.append(Process(
+                target=self.fetch_uv,
+                args=(date, fmt, None if uv is True else uv)
+                ))
 
-            foutname = f'UV_{date.strftime("%Y%m%d")}.nc'
-            logger.info(f'filename is {foutname}')
-            ds = xr.open_dataset(url_uv)
-            ds = convert_longitude(ds)
-            ds = ds.rename_dims({'lon':'xlon'})
-            ds = ds.rename_dims({'lat':'ylat'})
-            ds = ds.rename_vars({'lat':'ylat'})
-            ds = ds.rename_vars({'lon':'xlon'})
-            ds.to_netcdf(foutname, 'w', 'NETCDF3_CLASSIC', unlimited_dims='time')
-            ds.close()
+        if st:
+            tasks.append(Process(
+                target=self.fetch_st,
+                args=(date, fmt, None if st is True else st)
+                ))
 
-            url_ts = f'https://tds.hycom.org/thredds/dodsC/{database}?lat[{lat_idx1}:1:{lat_idx2}],' + \
-                f'lon[{lon_idx1}:1:{lon_idx2}],depth[0:1:-1],time[{time_idx}],' + \
-                f'water_temp[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
-                f'salinity[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
+        for task in tasks:
+            task.start()
+        for task in tasks:
+            task.join()
 
-            foutname = f'ST_{date.strftime("%Y%m%d")}.nc'
-            logger.info(f'filename is {foutname}')
-
-            ds = xr.open_dataset(url_ts)
-            
-            temp = ds.water_temp.values
-            salt = ds.salinity.values
-            dep = ds.depth.values
-
-            #convert in-situ temperature to potential temperature
-            ptemp = ConvertTemp(salt, temp, dep)
-
-            #drop water_temp variable and add new temperature variable
-            ds = ds.drop('water_temp')
-            ds['temperature']=(['time','depth','lat','lon'], ptemp)
-            ds.temperature.attrs = {
-                'long_name': 'Sea water potential temperature',
-                'standard_name': 'sea_water_potential_temperature',
-                'units': 'degC'
-            }
-
-            #ds.assign(water_temp2=ptemp)
-            #ds.assign.attrs = ds.water_temp.attrs
-
-            ds = convert_longitude(ds)
-            ds = ds.rename_dims({'lon':'xlon'})
-            ds = ds.rename_dims({'lat':'ylat'})
-            ds = ds.rename_vars({'lat':'ylat'})
-            ds = ds.rename_vars({'lon':'xlon'})
-            ds.to_netcdf(foutname, 'w', unlimited_dims='time', encoding={'temperature':{'dtype': 'h', '_FillValue': -30000.,'scale_factor': 0.001, 'add_offset': 20., 'missing_value': -30000.}})
-            ds.close()
-
-        elif fmt == 'hycom':
-            url=f'https://tds.hycom.org/thredds/dodsC/{database}?lat[{lat_idx1}:1:{lat_idx2}],' + \
-                f'lon[{lon_idx1}:1:{lon_idx2}],depth[0:1:-1],time[{time_idx}],' + \
-                f'surf_el[{time_idx}][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
-                f'water_temp[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
-                f'salinity[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
-                f'water_u[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
-                f'water_v[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
-
-            foutname = f'hycom_{date.strftime("%Y%m%d")}.nc' 
-            ds = xr.open_dataset(url)
-            ds.to_netcdf(foutname, 'w')
-
-            ds.close()
+        return
