@@ -752,7 +752,7 @@ class DownloadHycom:
     def bbox(self, bbox: Union[Bbox, None]):
         if bbox is None:
             bbox = Bbox.from_extents( -180., -90, 180., 90.)
-        if isinstance(bbox, Bbox):
+        if not isinstance(bbox, Bbox):
             raise ValueError(f'Argument `bbox` must be of type {Bbox} or None, but got {bbox}.')
         self._bbox = bbox
 
@@ -809,18 +809,19 @@ class DownloadHycom:
                 'depth[0:1:-1]' if depth else '',
                 f'time[{time_idx}]' if time else '',
                 f'surf_el[{time_idx}][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]' if surf_el else '',
-                f'water_temp[{time_idx}][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]' if water_temp else '',
-                f'salinity[{time_idx}][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]' if salinity else '',
-                f'water_u[{time_idx}][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]' if water_u else '',
-                f'water_v[{time_idx}][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]' if water_v else '',
+                f'water_temp[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]' if water_temp else '',
+                f'salinity[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]' if salinity else '',
+                f'water_u[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]' if water_u else '',
+                f'water_v[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]' if water_v else '',
                 ]
         # use kwargs to request any other variables, error handling is relayed to xr.open_dataset
         variables.extend([
             f'{variable}[{time_idx}][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
             for variable, state in other_variables.items() if state
             ])
-        variables = ','.join(variables)
-        ds = xr.open_dataset(f'https://tds.hycom.org/thredds/dodsC/{database}?{variables}')
+        variables = ','.join([var for var in variables if var != ''])
+        url = f'https://tds.hycom.org/thredds/dodsC/{database}?{variables}'
+        ds = xr.open_dataset(url)
         if fmt == 'schism':
             ds = convert_longitude(ds)
             ds = ds.rename_dims({'lon':'xlon'})
@@ -845,6 +846,13 @@ class DownloadHycom:
                     'standard_name': 'sea_water_potential_temperature',
                     'units': 'degC'
                 }
+                ds.temperature.encoding = {
+                            'dtype': 'h',
+                            '_FillValue': -30000.,
+                            'scale_factor': 0.001,
+                            'add_offset': 20.,
+                            'missing_value': -30000.
+                            }
         return ds
 
     def fetch_hycom(
@@ -924,7 +932,7 @@ class DownloadHycom:
         logger.info(f'Downloading SCHISM-formatted ST data to file: {foutname.resolve()}.')
         start = time()
         ds = self.get_dataset(date, water_temp=True, salinity=True)
-        ds.to_netcdf(foutname, 'w', unlimited_dims='time', encoding={'temperature':{'dtype': 'h', '_FillValue': -30000.,'scale_factor': 0.001, 'add_offset': 20., 'missing_value': -30000.}})
+        ds.to_netcdf(foutname, 'w', unlimited_dims='time')
         ds.close()
         logger.info(f'Downoading SCHISM-formatted ST data took: {time()-start}')
         return foutname
