@@ -8,6 +8,7 @@ import os
 import pathlib
 import posixpath
 import shutil
+import glob
 
 import tarfile
 import tempfile
@@ -163,9 +164,9 @@ class NWMElementPairings:
                         .intersection(hull)
                         .intersects(downstream)
                     ):
-                        sources[element.id].append(reaches.iloc[row.reachIndex].feature_id)
+                        sources[element.id].append(reaches.iloc[row.reachIndex].ID)
                     else:
-                        sinks[element.id].append(reaches.iloc[row.reachIndex].feature_id)
+                        sinks[element.id].append(reaches.iloc[row.reachIndex].ID)
                     break
 
         logger.info(
@@ -264,7 +265,7 @@ class NWMElementPairings:
             for reach_layer in [
                 reach_layer
                 for reach_layer in fiona.listlayers(self.nwm_file)
-                if "reaches" in reach_layer
+                if "RouteLink_Flowlines_CONUS" in reach_layer
             ]:
                 layer_crs = gpd.read_file(
                     self.nwm_file, rows=1, layer=reach_layer).crs
@@ -289,10 +290,15 @@ class NWMElementPairings:
 
     @_nwm_file.setter
     def _nwm_file(self, nwm_file):
+        #nwm_file = (
+        #    list(DATADIR.glob("**/*hydrofabric*.gdb")
+        #         ) if nwm_file is None else nwm_file
+        #)
         nwm_file = (
-            list(DATADIR.glob("**/*hydrofabric*.gdb")
+            list(glob.glob("/sciclone/schism10/lcui01/schism20/ICOGS/ICOGS3D/Forecast/NWM/oper_3D/NWM3_0/*Prelim*.gdb")
                  ) if nwm_file is None else nwm_file
         )
+        print(nwm_file)
         if isinstance(nwm_file, list):
             if len(nwm_file) == 0:
                 tmpdir = tempfile.TemporaryDirectory()
@@ -893,13 +899,13 @@ class NationalWaterModel(SourceSink):
 
         sources = []
         sinks = []
-        nc_fid0 = Dataset(list(self.inventory.files.values())[0])["feature_id"][:]
+        nc_fid0 = Dataset(list(self.inventory.files.values())[0])["ID"][:]
         src_idxs = get_aggregated_features(nc_fid0, self.pairings.sources.values())
         snk_idxs = get_aggregated_features(nc_fid0, self.pairings.sinks.values())
         for file in self.inventory.files.values():
             start = datetime.now()
             nc = Dataset(file)
-            ncfeatureid=nc['feature_id'][:]
+            ncfeatureid=nc['ID'][:]
             if not np.all(ncfeatureid == nc_fid0):
                 logger.info(f'Indexes of feature_id are changed in  {file}')
                 src_idxs=get_aggregated_features(ncfeatureid, self.pairings.sources.values())
