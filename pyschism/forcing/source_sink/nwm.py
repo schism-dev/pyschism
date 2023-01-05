@@ -318,7 +318,26 @@ class NWMElementPairings:
                         f"Extracting National Water Model stream network tar file to {DATADIR}"
                     )
 
-                    src.extractall(DATADIR)
+                    def is_within_directory(directory, target):
+                        
+                        abs_directory = os.path.abspath(directory)
+                        abs_target = os.path.abspath(target)
+                    
+                        prefix = os.path.commonprefix([abs_directory, abs_target])
+                        
+                        return prefix == abs_directory
+                    
+                    def safe_extract(tar, path=".", members=None, *, numeric_owner=False):
+                    
+                        for member in tar.getmembers():
+                            member_path = os.path.join(path, member.name)
+                            if not is_within_directory(path, member_path):
+                                raise Exception("Attempted Path Traversal in Tar File")
+                    
+                        tar.extractall(path, members, numeric_owner) 
+                        
+                    
+                    safe_extract(src, DATADIR)
                 nwm_file = list(DATADIR.glob("**/*.gdb"))[0]
             elif len(nwm_file) == 1:
                 nwm_file = nwm_file[0]
