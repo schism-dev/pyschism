@@ -523,7 +523,7 @@ class Nudge:
         #logger.info(f'len of nudge idxs is {len(idxs)}')
         logger.info(f'It took {time() -t0} sencods to calcuate nudge coefficient')
 
-        nudge = [f"{rlmax}, {rnu_day}"]
+        nudge = [f"rlmax={rlmax}, rnu_day={rnu_day}"]
         nudge.extend("\n")
         nudge.append(f"{NE} {NP}")
         nudge.extend("\n")
@@ -551,7 +551,7 @@ class Nudge:
 
         return self.include
 
-    def fetch_data(self, outdir: Union[str, os.PathLike], hgrid, vgrid, start_date, rnday, restart = False):
+    def fetch_data(self, outdir: Union[str, os.PathLike], hgrid, vgrid, start_date, rnday, restart = False, rlmax = None, rnu_day=None):
 
         outdir = pathlib.Path(outdir)
 
@@ -565,8 +565,12 @@ class Nudge:
         vd=Vgrid.open(vgrid)
         sigma=vd.sigma
 
+        #define nudge zone and strength 
+        rlmax = 1.5 if rlmax is None else rlmax
+        rnu_day = 0.25 if rnu_day is None else rnu_day
+        logger.info(f'Max relax distance is {rlmax} degree, max relax strengh is {rnu_day} days.')
         #Get the index for nudge
-        include = self.gen_nudge(outdir,hgrid)
+        include = self.gen_nudge(outdir,hgrid, rlmax = rlmax, rnu_day=rnu_day)
 
         #get coords of SCHISM
         loni=hgrid.nodes.coords[:,0]
