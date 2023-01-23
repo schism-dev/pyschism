@@ -248,7 +248,7 @@ class OpenBoundaryInventory:
 
             dst_elev.createVariable('time_series', 'f', ('time', 'nOpenBndNodes', 'nLevels', 'nComponents'))
             #dst_elev['time_series'][:,:,:,:] = timeseries_el
-        elif restart:
+        elif elev2D and restart:
             dst_elev = Dataset(outdir / 'elev2D.th.nc', 'a', format='NETCDF4')
             time_idx_restart = dst_elev['time'][:].shape[0]
 
@@ -289,9 +289,10 @@ class OpenBoundaryInventory:
 
             dst_temp.createVariable('time_series', 'f', ('time', 'nOpenBndNodes', 'nLevels', 'nComponents'))
             #dst_temp['time_series'][:,:,:,:] = timeseries_t
-        elif restart:
+        elif TS and restart:
             dst_salt = Dataset(outdir / 'SAL_3D.th.nc', 'a', format='NETCDF4')
             dst_temp = Dataset(outdir / 'TEM_3D.th.nc', 'a', format='NETCDF4')
+            time_idx_restart = dst_salt['time'][:].shape[0]
 
         if UV and restart == False:
             #timeseries_uv=np.zeros([ntimes,NOP,nvrt,nComp2])
@@ -312,8 +313,9 @@ class OpenBoundaryInventory:
             dst_uv.createVariable('time_series', 'f', ('time', 'nOpenBndNodes', 'nLevels', 'nComponents'))
             #dst_uv['time_series'][:,:,:,:] = timeseries_uv
 
-        elif restart:
+        elif UV and restart:
             dst_uv = Dataset(outdir / 'uv3D.th.nc', 'a', format='NETCDF4')
+            time_idx_restart = dst_uv['time'][:].shape[0]
 
         logger.info('**** Accessing GOFS data*****')
         t0=time()
@@ -652,7 +654,7 @@ class Nudge:
         logger.info('**** Accessing GOFS data*****')
         if restart:
             timevector = self.timevector[time_idx_restart+1:]
-            it0 = time_idx_restart
+            it0 = time_idx_restart+1
         else:
             timevector = self.timevector
             it0 = 0
@@ -786,7 +788,7 @@ class DownloadHycom:
                 f'water_temp[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
                 f'salinity[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
 
-            foutname = f'ST_{date.strftime("%Y%m%d")}.nc'
+            foutname = f'TS_{date.strftime("%Y%m%d")}.nc'
             logger.info(f'filename is {foutname}')
 
             ds = xr.open_dataset(url_ts)
