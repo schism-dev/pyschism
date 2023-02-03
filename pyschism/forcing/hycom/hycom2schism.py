@@ -58,10 +58,10 @@ def get_database(date, Bbox=None):
         logger.info('No data for {date}')
     return database
 
-def get_idxs(date, database, bbox):
+def get_idxs(date, database, bbox, blonc, blatc):
 
-    if date.strftime("%Y-%m-%d") >= datetime.now().strftime("%Y-%m-%d"):
-        date2 = datetime.now() - timedelta(days=1)
+    if date >= datetime.utcnow():
+        date2 = datetime.utcnow() - timedelta(days=1)
         baseurl = f'https://tds.hycom.org/thredds/dodsC/{database}/FMRC/runs/GLBy0.08_930_FMRC_RUN_{date2.strftime("%Y-%m-%dT12:00:00Z")}?depth[0:1:-1],lat[0:1:-1],lon[0:1:-1],time[0:1:-1]'
     else:
         baseurl=f'https://tds.hycom.org/thredds/dodsC/{database}?lat[0:1:-1],lon[0:1:-1],time[0:1:-1],depth[0:1:-1]'
@@ -73,8 +73,20 @@ def get_idxs(date, database, bbox):
     lon=ds['lon'][:]
     lat=ds['lat'][:]
     dep=ds['depth'][:]
-    lat_idxs=np.where((lat>=bbox.ymin-2.0)&(lat<=bbox.ymax+2.0))[0]
-    lon_idxs=np.where((lon>=bbox.xmin-2.0) & (lon<=bbox.xmax+2.0))[0]
+    
+    #check if hycom's lon is the same range as schism's
+    if not (bbox.xmin >= lon.min() and bbox.xmax <= lon.max()):
+        if lon.min() >= 0:
+            logger.info(f'Convert HYCOM longitude from [0, 360) to [-180, 180):')
+            idxs = lon>=180
+            lon[idxs] = lon[idxs]-360
+        elif lon.min() <= 0:
+            logger.info(f'Convert HYCOM longitude from [-180, 180) to [0, 360):')
+            idxs = lon<=0
+            lon[idxs] = lon[idxs]+360
+
+    lat_idxs=np.where((lat>=bbox.ymin-0.5)&(lat<=bbox.ymax+0.5))[0]
+    lon_idxs=np.where((lon>=bbox.xmin-0.5) & (lon<=bbox.xmax+0.5))[0]
     lon=lon[lon_idxs]
     lat=lat[lat_idxs]
     #logger.info(lon_idxs)
@@ -86,14 +98,11 @@ def get_idxs(date, database, bbox):
     lat_idx2=lat_idxs[-1].item()
     #logger.info(f'lat_idx1 is {lat_idx1}, lat_idx2 is {lat_idx2}')
     
-    for ilon in np.arange(len(lon)):
-        if lon[ilon] > 180:
-            lon[ilon] = lon[ilon]-360.
     #lonc=(np.max(lon)+np.min(lon))/2.0
-    #logger.info(f'lonc is {lonc}')
-    #latc=(np.max(lat)+np.min(lat))/2.0
-    #logger.info(f'latc is {latc}')
-    x2, y2=transform_ll_to_cpp(lon, lat)
+    #logger.info(f'lonc is {blonc}')
+    ##latc=(np.max(lat)+np.min(lat))/2.0
+    #logger.info(f'latc is {blatc}')
+    x2, y2=transform_ll_to_cpp(lon, lat, blonc, blatc)
 
     idxs=np.where( date == times)[0]
     #check if time_idx is empty
@@ -117,10 +126,6 @@ def get_idxs(date, database, bbox):
     return time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2
 
 def transform_ll_to_cpp(lon, lat, lonc=-77.07, latc=24.0):
-    #lonc=(np.max(lon)+np.min(lon))/2.0
-    #logger.info(f'lonc is {lonc}')
-    #latc=(np.max(lat)+np.min(lat))/2.0
-    #logger.info(f'latc is {latc}')
     longitude=lon/180*np.pi
     latitude=lat/180*np.pi
     radius=6378206.4
@@ -134,6 +139,12 @@ def transform_ll_to_cpp(lon, lat, lonc=-77.07, latc=24.0):
 def interp_to_points_3d(dep, y2, x2, bxyz, val):
     idxs = np.where(abs(val) > 10000)
     val[idxs] = float('nan')
+
+    if not np.all(x2[:-1] <= x2[1:]):
+        logger.info('x2 is not in stricitly ascending order! Sorting x2 and val')
+        idxs = np.argsort(x2)
+        x2 = x2[idxs]
+        val = val[:, :, idxs]
 
     val_fd = sp.interpolate.RegularGridInterpolator((dep,y2,x2),np.squeeze(val),'linear', bounds_error=False, fill_value = float('nan'))
     val_int = val_fd(bxyz)
@@ -149,6 +160,12 @@ def interp_to_points_3d(dep, y2, x2, bxyz, val):
 def interp_to_points_2d(y2, x2, bxy, val):
     idxs = np.where(abs(val) > 10000)
     val[idxs] = float('nan')
+
+    if not np.all(x2[:-1] <= x2[1:]):
+        logger.info('x2 is not in stricitly ascending order! Sorting x2 and val')
+        idxs = np.argsort(x2)
+        x2 = x2[idxs]
+        val = val[:, idxs]
 
     val_fd = sp.interpolate.RegularGridInterpolator((y2,x2),np.squeeze(val),'linear', bounds_error=False, fill_value = float('nan'))
     val_int = val_fd(bxy)
@@ -346,7 +363,10 @@ class OpenBoundaryInventory:
                 #logger.info(f'ind1 = {ind1}, ind2 = {ind2}')
                 blon = self.hgrid.coords[opbd,0]
                 blat = self.hgrid.coords[opbd,1]
-                xi,yi = transform_ll_to_cpp(blon, blat)
+                blonc = blon.mean()
+                blatc = blat.mean()
+                #logger.info(f'blonc = {blon.mean()}, blatc = {blat.mean()}')
+                xi,yi = transform_ll_to_cpp(blon, blat, blonc, blatc)
                 bxy = np.c_[yi, xi]
 
                 if TS or UV:
@@ -361,21 +381,22 @@ class OpenBoundaryInventory:
 
                 xmin, xmax = np.min(blon), np.max(blon)
                 ymin, ymax = np.min(blat), np.max(blat)
+                bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
 
-                if date.strftime("%Y-%m-%d") >= datetime(2017, 2, 1).strftime("%Y-%m-%d") and  \
-                    date.strftime("%Y-%m-%d") < datetime(2017, 6, 1).strftime("%Y-%m-%d") or \
-                    date.strftime("%Y-%m-%d") >= datetime(2017, 10, 1).strftime("%Y-%m-%d"):
-                    xmin = xmin + 360. if xmin < 0 else xmin
-                    xmax = xmax + 360. if xmax < 0 else xmax
-                    bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
-                else:
-                    bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
+                #if date >= datetime(2017, 2, 1) and  \
+                #    date < datetime(2017, 6, 1) or \
+                #    date >= datetime(2017, 10, 1):
+                #    xmin = xmin + 360. if xmin < 0 else xmin
+                #    xmax = xmax + 360. if xmax < 0 else xmax
+                #    bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
+                #else:
+                #    bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
                 #logger.info(f'xmin is {xmin}, xmax is {xmax}')
 
-                time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2 = get_idxs(date, database, bbox)
+                time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2 = get_idxs(date, database, bbox, blonc, blatc)
 
-                if date.strftime("%Y-%m-%d") >= datetime.now().strftime("%Y-%m-%d"):
-                    date2 = datetime.now() - timedelta(days=1)
+                if date >= datetime.utcnow():
+                    date2 = datetime.utcnow() - timedelta(days=1)
                     url = f'https://tds.hycom.org/thredds/dodsC/{database}/FMRC/runs/GLBy0.08_930_FMRC_RUN_' + \
                         f'{date2.strftime("%Y-%m-%dT12:00:00Z")}?depth[0:1:-1],lat[{lat_idx1}:1:{lat_idx2}],' + \
                         f'lon[{lon_idx1}:1:{lon_idx2}],time[{time_idx}],' + \
@@ -398,7 +419,7 @@ class OpenBoundaryInventory:
                 ds=Dataset(url)
                 dep=ds['depth'][:]
 
-                logger.info('****Interpolation starts****')
+                logger.info(f'****Interpolation starts for boundary {ibnd}****')
 
                 #ndt[it]=it*24*3600.
 
@@ -589,7 +610,9 @@ class Nudge:
         #Get open nudge array 
         nlon = hgrid.coords[include, 0]
         nlat = hgrid.coords[include, 1]
-        xi,yi = transform_ll_to_cpp(nlon, nlat)
+        nlonc = nlon.mean()
+        nlatc = nlat.mean()
+        xi,yi = transform_ll_to_cpp(nlon, nlat, nlonc, nlatc)
         bxy = np.c_[yi, xi]
 
         zcor2=zcor[include,:]
@@ -669,22 +692,13 @@ class Nudge:
 
             xmin, xmax = np.min(nlon), np.max(nlon)
             ymin, ymax = np.min(nlat), np.max(nlat)
-
-            if date.strftime("%Y-%m-%d") >= datetime(2017, 2, 1).strftime("%Y-%m-%d") and  \
-                date.strftime("%Y-%m-%d") < datetime(2017, 6, 1).strftime("%Y-%m-%d") or \
-                date.strftime("%Y-%m-%d") >= datetime(2017, 10, 1).strftime("%Y-%m-%d"):
-                logger.info('Convert xmin and xmax')
-                xmin = xmin + 360. if xmin < 0 else xmin
-                xmax = xmax + 360. if xmax < 0 else xmax
-                bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
-            else:
-                bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
+            bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
             #logger.info(f'xmin is {xmin}, xmax is {xmax}')
 
-            time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2 = get_idxs(date, database, bbox)
+            time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2 = get_idxs(date, database, bbox, nlonc, nlatc)
 
-            if date.strftime("%Y-%m-%d") >= datetime.now().strftime("%Y-%m-%d"):
-                date2 = datetime.now() - timedelta(days=1)
+            if date >= datetime.utcnow():
+                date2 = datetime.utcnow() - timedelta(days=1)
                 url = f'https://tds.hycom.org/thredds/dodsC/{database}/FMRC/runs/GLBy0.08_930_FMRC_RUN_' + \
                     f'{date2.strftime("%Y-%m-%dT12:00:00Z")}?depth[0:1:-1],lat[{lat_idx1}:1:{lat_idx2}],' + \
                     f'lon[{lon_idx1}:1:{lon_idx2}],time[{time_idx}],' + \
