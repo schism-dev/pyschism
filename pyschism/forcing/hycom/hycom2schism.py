@@ -75,7 +75,9 @@ def get_idxs(date, database, bbox, lonc=None, latc=None):
     dep=ds['depth'][:]
     
     #check if hycom's lon is the same range as schism's
+    same = True
     if not (bbox.xmin >= lon.min() and bbox.xmax <= lon.max()):
+        same = False
         if lon.min() >= 0:
             logger.info(f'Convert HYCOM longitude from [0, 360) to [-180, 180):')
             idxs = lon>=180
@@ -100,10 +102,10 @@ def get_idxs(date, database, bbox, lonc=None, latc=None):
     
     if lonc is None:
         lonc = lon.mean()
-    logger.info(f'lonc is {lonc}')
+    #logger.info(f'lonc is {lonc}')
     if latc is None:
         latc = lat.mean()
-    logger.info(f'latc is {latc}')
+    #logger.info(f'latc is {latc}')
     x2, y2=transform_ll_to_cpp(lon, lat, lonc, latc)
 
     idxs=np.where( date == times)[0]
@@ -125,7 +127,7 @@ def get_idxs(date, database, bbox, lonc=None, latc=None):
 
     ds.close()
 
-    return time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2
+    return time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2, same
 
 def transform_ll_to_cpp(lon, lat, lonc=-77.07, latc=24.0):
     longitude=lon/180*np.pi
@@ -385,17 +387,7 @@ class OpenBoundaryInventory:
                 ymin, ymax = np.min(blat), np.max(blat)
                 bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
 
-                #if date >= datetime(2017, 2, 1) and  \
-                #    date < datetime(2017, 6, 1) or \
-                #    date >= datetime(2017, 10, 1):
-                #    xmin = xmin + 360. if xmin < 0 else xmin
-                #    xmax = xmax + 360. if xmax < 0 else xmax
-                #    bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
-                #else:
-                #    bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
-                #logger.info(f'xmin is {xmin}, xmax is {xmax}')
-
-                time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2 = get_idxs(date, database, bbox, lonc=blonc, latc=blatc)
+                time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2, _ = get_idxs(date, database, bbox, lonc=blonc, latc=blatc)
 
                 if date >= datetime.utcnow():
                     date2 = datetime.utcnow() - timedelta(days=1)
@@ -607,7 +599,6 @@ class Nudge:
         #compute zcor
         zcor = depth[:,None]*sigma
         nvrt=zcor.shape[1]
-        #logger.info(f'zcor at node 1098677 is {zcor[1098676,:]}')
 
         #Get open nudge array 
         nlon = hgrid.coords[include, 0]
@@ -619,9 +610,7 @@ class Nudge:
 
         zcor2=zcor[include,:]
         idxs=np.where(zcor2 > 5000)
-        #logger.info(idxs)
         zcor2[idxs]=5000.0-1.0e-6
-        #logger.info(f'zcor2 at node 200 is {zcor2[199,:]}')
 
         #construct schism grid
         x2i=np.tile(xi,[nvrt,1]).T
@@ -697,7 +686,7 @@ class Nudge:
             bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
             #logger.info(f'xmin is {xmin}, xmax is {xmax}')
 
-            time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2 = get_idxs(date, database, bbox, lonc=nlonc, latc=nlatc)
+            time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2, _ = get_idxs(date, database, bbox, lonc=nlonc, latc=nlatc)
 
             if date >= datetime.utcnow():
                 date2 = datetime.utcnow() - timedelta(days=1)
@@ -770,17 +759,18 @@ class DownloadHycom:
         nudge: file name is TS_*.nc used in gen_nudge_from_hycom.f90
         outdir: directory for output files
         '''
-        timevector = np.arange(
-            start_date,
-            start_date + timedelta(days=rnday+1),
-            timedelta(days=1)
+        if rnday == 1:
+            timevector = [start_date]
+        else:
+            timevector = np.arange(
+                start_date, start_date + timedelta(days=rnday+1), timedelta(days=1)
             ).astype(datetime)
 
         for i, date in enumerate(timevector):
             database=get_database(date)
             logger.info(f'Fetching data for {date} from database {database}')
 
-            time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2 = get_idxs(date, database, self.bbox)
+            time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2, isLonSame = get_idxs(date, database, self.bbox)
 
             if fmt == 'schism':
                 url_ssh = f'https://tds.hycom.org/thredds/dodsC/{database}?lat[{lat_idx1}:1:{lat_idx2}],' + \
@@ -811,7 +801,10 @@ class DownloadHycom:
                     'units': 'degC'
                 }
 
-                ds = convert_longitude(ds)
+                if not isLonSame:
+                    logger.info('Lon is not the same!')
+                    ds = convert_longitude(ds)
+
                 ds = ds.rename_dims({'lon':'xlon'})
                 ds = ds.rename_dims({'lat':'ylat'})
                 ds = ds.rename_vars({'lat':'ylat'})
