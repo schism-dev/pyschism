@@ -55,10 +55,10 @@ def get_database(date, Bbox=None):
     elif date >= datetime(1994, 1, 1) and date < datetime(2016, 1, 1):
         database = f'GLBv0.08/expt_53.X/data/{date.year}'
     else:
-        logger.info('No data for {date}')
+        raise ValueError(f'No data fro {date}!') 
     return database
 
-def get_idxs(date, database, bbox, blonc, blatc):
+def get_idxs(date, database, bbox, lonc=None, latc=None):
 
     if date >= datetime.utcnow():
         date2 = datetime.utcnow() - timedelta(days=1)
@@ -98,11 +98,13 @@ def get_idxs(date, database, bbox, blonc, blatc):
     lat_idx2=lat_idxs[-1].item()
     #logger.info(f'lat_idx1 is {lat_idx1}, lat_idx2 is {lat_idx2}')
     
-    #lonc=(np.max(lon)+np.min(lon))/2.0
-    #logger.info(f'lonc is {blonc}')
-    ##latc=(np.max(lat)+np.min(lat))/2.0
-    #logger.info(f'latc is {blatc}')
-    x2, y2=transform_ll_to_cpp(lon, lat, blonc, blatc)
+    if lonc is None:
+        lonc = lon.mean()
+    logger.info(f'lonc is {lonc}')
+    if latc is None:
+        latc = lat.mean()
+    logger.info(f'latc is {latc}')
+    x2, y2=transform_ll_to_cpp(lon, lat, lonc, latc)
 
     idxs=np.where( date == times)[0]
     #check if time_idx is empty
@@ -393,7 +395,7 @@ class OpenBoundaryInventory:
                 #    bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
                 #logger.info(f'xmin is {xmin}, xmax is {xmax}')
 
-                time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2 = get_idxs(date, database, bbox, blonc, blatc)
+                time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2 = get_idxs(date, database, bbox, lonc=blonc, latc=blatc)
 
                 if date >= datetime.utcnow():
                     date2 = datetime.utcnow() - timedelta(days=1)
@@ -695,7 +697,7 @@ class Nudge:
             bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
             #logger.info(f'xmin is {xmin}, xmax is {xmax}')
 
-            time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2 = get_idxs(date, database, bbox, nlonc, nlatc)
+            time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2 = get_idxs(date, database, bbox, lonc=nlonc, latc=nlatc)
 
             if date >= datetime.utcnow():
                 date2 = datetime.utcnow() - timedelta(days=1)
@@ -747,104 +749,100 @@ class Nudge:
 
 class DownloadHycom:
 
-    def __init__(self, hgrid):
+    def __init__(self, hgrid=None, bbox=None):
 
-        xmin, xmax = hgrid.coords[:, 0].min(), hgrid.coords[:, 0].max()
-        ymin, ymax = hgrid.coords[:, 1].min(), hgrid.coords[:, 1].max()
-        xmin = xmin + 360. if xmin < 0 else xmin
-        xmax = xmax + 360. if xmax < 0 else xmax
-        self.bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
+        if hgrid is None and bbox is None:
+            raise ValueError('Either hgrid or bbox must be provided!') 
 
-    def fetch_data(self, date, fmt='schism'):
+        if hgrid is not None:        
+            xmin, xmax = hgrid.coords[:, 0].min(), hgrid.coords[:, 0].max()
+            ymin, ymax = hgrid.coords[:, 1].min(), hgrid.coords[:, 1].max()
+            self.bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
+        elif bbox is not None:
+            self.bbox = bbox
+
+    def fetch_data(self, start_date, rnday=1, fmt='schism', bnd=False, nudge=False, outdir=None):
         '''
-        date: datetime.datetime
+        start_date: datetime.datetime
+        rnday: integer
         fmt: 'schism' - for Fortran code; 'hycom' - raw netCDF from HYCOM
+        bnd: file names are SSH_*.nc, TS_*.nc, UV_*.nc used in gen_hot_3Dth_from_hycom.f90
+        nudge: file name is TS_*.nc used in gen_nudge_from_hycom.f90
+        outdir: directory for output files
         '''
+        timevector = np.arange(
+            start_date,
+            start_date + timedelta(days=rnday+1),
+            timedelta(days=1)
+            ).astype(datetime)
 
-        database=get_database(date)
-        logger.info(f'Fetching data for {date} from database {database}')
+        for i, date in enumerate(timevector):
+            database=get_database(date)
+            logger.info(f'Fetching data for {date} from database {database}')
 
-        time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2 = get_idxs(date, database, self.bbox)
+            time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2 = get_idxs(date, database, self.bbox)
 
-        if fmt == 'schism':
-            url_ssh = f'https://tds.hycom.org/thredds/dodsC/{database}?lat[{lat_idx1}:1:{lat_idx2}],' + \
-                f'lon[{lon_idx1}:1:{lon_idx2}],depth[0:1:-1],time[{time_idx}],' + \
-                f'surf_el[{time_idx}][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
-            foutname = f'SSH_{date.strftime("%Y%m%d")}.nc'
-            logger.info(f'filename is {foutname}')
-            ds = xr.open_dataset(url_ssh)
-            ds = convert_longitude(ds)
-            ds = ds.rename_dims({'lon':'xlon'})
-            ds = ds.rename_dims({'lat':'ylat'})
-            ds = ds.rename_vars({'lat':'ylat'})
-            ds = ds.rename_vars({'lon':'xlon'})
-            ds.to_netcdf(foutname, 'w', 'NETCDF3_CLASSIC', unlimited_dims='time')
-            ds.close()
+            if fmt == 'schism':
+                url_ssh = f'https://tds.hycom.org/thredds/dodsC/{database}?lat[{lat_idx1}:1:{lat_idx2}],' + \
+                    f'lon[{lon_idx1}:1:{lon_idx2}],depth[0:1:-1],time[{time_idx}:8:{time_idx}],' + \
+                    f'surf_el[{time_idx}][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
+                    f'water_u[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
+                    f'water_v[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
+                    f'water_temp[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
+                    f'salinity[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
 
-            url_uv = f'https://tds.hycom.org/thredds/dodsC/{database}?lat[{lat_idx1}:1:{lat_idx2}],' + \
-                f'lon[{lon_idx1}:1:{lon_idx2}],depth[0:1:-1],time[{time_idx}],' + \
-                f'water_u[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
-                f'water_v[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
+                foutname = f'hycom_{date.strftime("%Y%m%d")}.nc'
+                #foutname = f'TS_{i+1}.nc'
+                logger.info(f'filename is {foutname}')
+                ds = xr.open_dataset(url_ssh)
 
-            foutname = f'UV_{date.strftime("%Y%m%d")}.nc'
-            logger.info(f'filename is {foutname}')
-            ds = xr.open_dataset(url_uv)
-            ds = convert_longitude(ds)
-            ds = ds.rename_dims({'lon':'xlon'})
-            ds = ds.rename_dims({'lat':'ylat'})
-            ds = ds.rename_vars({'lat':'ylat'})
-            ds = ds.rename_vars({'lon':'xlon'})
-            ds.to_netcdf(foutname, 'w', 'NETCDF3_CLASSIC', unlimited_dims='time')
-            ds.close()
+                #convert in-situ temperature to potential temperature
+                temp = ds.water_temp.values
+                salt = ds.salinity.values
+                dep = ds.depth.values
 
-            url_ts = f'https://tds.hycom.org/thredds/dodsC/{database}?lat[{lat_idx1}:1:{lat_idx2}],' + \
-                f'lon[{lon_idx1}:1:{lon_idx2}],depth[0:1:-1],time[{time_idx}],' + \
-                f'water_temp[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
-                f'salinity[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
+                ptemp = ConvertTemp(salt, temp, dep)
+                #drop water_temp variable and add new temperature variable
+                ds = ds.drop('water_temp')
+                ds['temperature']=(['time','depth','lat','lon'], ptemp)
+                ds.temperature.attrs = {
+                    'long_name': 'Sea water potential temperature',
+                    'standard_name': 'sea_water_potential_temperature',
+                    'units': 'degC'
+                }
 
-            foutname = f'TS_{date.strftime("%Y%m%d")}.nc'
-            logger.info(f'filename is {foutname}')
+                ds = convert_longitude(ds)
+                ds = ds.rename_dims({'lon':'xlon'})
+                ds = ds.rename_dims({'lat':'ylat'})
+                ds = ds.rename_vars({'lat':'ylat'})
+                ds = ds.rename_vars({'lon':'xlon'})
+                ds.to_netcdf(foutname, 'w', unlimited_dims='time', encoding={'temperature':{'dtype': 'h', '_FillValue': -30000.,'scale_factor': 0.001, 'add_offset': 20., 'missing_value': -30000.}})
+                ds.close()
 
-            ds = xr.open_dataset(url_ts)
-            
-            temp = ds.water_temp.values
-            salt = ds.salinity.values
-            dep = ds.depth.values
+                #link output file to Fortran required files
+                dir_path = os.path.abspath(outdir)
+                logger.info(f'current dir is {dir_path}')
+                src = f'{dir_path}/{foutname}'
+                if bnd:
+                    names = ['SSH', 'TS', 'UV']
+                    for name in names:
+                        dst = f'{dir_path}/{name}_{i+1}.nc'
+                        os.symlink(src, dst)
+                elif nudge:
+                        dst = f'{dir_path}/TS_{i+1}.nc'
+                        os.symlink(src, dst)
 
-            #convert in-situ temperature to potential temperature
-            ptemp = ConvertTemp(salt, temp, dep)
+            elif fmt == 'hycom':
+                url=f'https://tds.hycom.org/thredds/dodsC/{database}?lat[{lat_idx1}:1:{lat_idx2}],' + \
+                    f'lon[{lon_idx1}:1:{lon_idx2}],depth[0:1:-1],time[{time_idx}],' + \
+                    f'surf_el[{time_idx}][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
+                    f'water_temp[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
+                    f'salinity[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
+                    f'water_u[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
+                    f'water_v[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
 
-            #drop water_temp variable and add new temperature variable
-            ds = ds.drop('water_temp')
-            ds['temperature']=(['time','depth','lat','lon'], ptemp)
-            ds.temperature.attrs = {
-                'long_name': 'Sea water potential temperature',
-                'standard_name': 'sea_water_potential_temperature',
-                'units': 'degC'
-            }
+                foutname = f'hycom_{date.strftime("%Y%m%d")}.nc' 
+                ds = xr.open_dataset(url)
+                ds.to_netcdf(foutname, 'w')
 
-            #ds.assign(water_temp2=ptemp)
-            #ds.assign.attrs = ds.water_temp.attrs
-
-            ds = convert_longitude(ds)
-            ds = ds.rename_dims({'lon':'xlon'})
-            ds = ds.rename_dims({'lat':'ylat'})
-            ds = ds.rename_vars({'lat':'ylat'})
-            ds = ds.rename_vars({'lon':'xlon'})
-            ds.to_netcdf(foutname, 'w', unlimited_dims='time', encoding={'temperature':{'dtype': 'h', '_FillValue': -30000.,'scale_factor': 0.001, 'add_offset': 20., 'missing_value': -30000.}})
-            ds.close()
-
-        elif fmt == 'hycom':
-            url=f'https://tds.hycom.org/thredds/dodsC/{database}?lat[{lat_idx1}:1:{lat_idx2}],' + \
-                f'lon[{lon_idx1}:1:{lon_idx2}],depth[0:1:-1],time[{time_idx}],' + \
-                f'surf_el[{time_idx}][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
-                f'water_temp[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
-                f'salinity[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
-                f'water_u[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
-                f'water_v[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
-
-            foutname = f'hycom_{date.strftime("%Y%m%d")}.nc' 
-            ds = xr.open_dataset(url)
-            ds.to_netcdf(foutname, 'w')
-
-            ds.close()
+                ds.close()
