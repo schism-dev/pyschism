@@ -23,13 +23,15 @@ logger = logging.getLogger(__name__)
 
 class ERA5DataInventory:
 
-    def __init__(self, start_date=None, rnday: Union[float, timedelta] = 4, bbox=None):
+    def __init__(self, start_date=None, rnday: Union[float, timedelta] = 4, bbox=None, tmpdir=None):
 
         self.start_date = start_date
         self.rnday = rnday
         self.end_date = self.start_date+timedelta(self.rnday + 1)
         self.client=cdsapi.Client()
         self._bbox = bbox
+        if tmpdir is not None:
+            self.tmpdir = tmpdir
 
         r = self.client.retrieve(
             'reanalysis-era5-single-levels',
@@ -59,6 +61,10 @@ class ERA5DataInventory:
         if not hasattr(self, '_tmpdir'):
             self._tmpdir = tempfile.TemporaryDirectory()
         return pathlib.Path(self._tmpdir.name)
+
+    @tmpdir.setter
+    def tmpdir(self, value):
+        self._tmpdir = value
 
     @property
     def files(self):
@@ -274,6 +280,7 @@ class ERA5(SfluxDataset):
         bbox: Bbox = None,
         overwrite: bool=False,
         output_interval: int = 1,
+        tmpdir = None,
     ):
         self.start_date=start_date
         self.rnday=rnday
@@ -294,6 +301,7 @@ class ERA5(SfluxDataset):
             self.start_date,
             self.rnday,
             bbox,
+            tmpdir = tmpdir
         )
 
         logger.info('Finished downloading ERA5')
