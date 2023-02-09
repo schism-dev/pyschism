@@ -60,6 +60,7 @@ hgrid.write("/path/to/output/file.2dm", fmt='2dm')
 ```
 ---
 ## References
+
 If you used this software as part of your work, please use the following citation format.
 Jaime R Calzada, Linlin Cui, & Joseph Zhang. (2023). schism-dev/pyschism: v0.1.5 (v0.1.5). Zenodo. https://doi.org/10.5281/zenodo.7623122
 ---
