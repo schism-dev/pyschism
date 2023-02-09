@@ -59,6 +59,12 @@ hgrid = Hgrid.open('hgrid.gr3')
 hgrid.write("/path/to/output/file.2dm", fmt='2dm')
 ```
 ---
+## References
+If you used this software as part of your work, please use the following citation format.
+Jaime R Calzada, Linlin Cui, & Joseph Zhang. (2023). schism-dev/pyschism: v0.1.5 (v0.1.5). Zenodo. https://doi.org/10.5281/zenodo.7623122
+---
+
+
 
 Questions, comments and suggestions are welcome. Please follow the instructions on the `CONTRIBUTING.md` file for contributions. For bug reports and feature requests, please open an issue using the issue tracker.
 Main author name: Jaime R Calzada
