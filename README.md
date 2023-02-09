@@ -1,5 +1,6 @@
 # PySCHISM
 [![codecov](https://codecov.io/gh/schism-dev/pyschism/branch/main/graph/badge.svg?token=VE9PHEACBZ)](https://codecov.io/gh/schism-dev/pyschism)
+[![DOI](https://zenodo.org/badge/233075737.svg)](https://zenodo.org/badge/latestdoi/233075737)
 
 ## A Python interface for SCHISM model runs.
 
@@ -58,8 +59,10 @@ hgrid = Hgrid.open('hgrid.gr3')
 hgrid.write("/path/to/output/file.2dm", fmt='2dm')
 ```
 ---
+
 Questions, comments and suggestions are welcome. Please follow the instructions on the `CONTRIBUTING.md` file for contributions. For bug reports and feature requests, please open an issue using the issue tracker.
-Author contact: jrcalzada@wm.edu
+Main author name: Jaime R Calzada
+Author contact: jrcalzada@vims.edu
 
 
 ---
