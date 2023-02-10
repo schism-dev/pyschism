@@ -164,9 +164,9 @@ class NWMElementPairings:
                         .intersection(hull)
                         .intersects(downstream)
                     ):
-                        sources[element.id].append(reaches.iloc[row.reachIndex].ID)
+                        sources[element.id].append(int(reaches.iloc[row.reachIndex].ID))
                     else:
-                        sinks[element.id].append(reaches.iloc[row.reachIndex].ID)
+                        sinks[element.id].append(int(reaches.iloc[row.reachIndex].ID))
                     break
 
         logger.info(
@@ -899,13 +899,13 @@ class NationalWaterModel(SourceSink):
 
         sources = []
         sinks = []
-        nc_fid0 = Dataset(list(self.inventory.files.values())[0])["ID"][:]
+        nc_fid0 = Dataset(list(self.inventory.files.values())[0])["feature_id"][:]
         src_idxs = get_aggregated_features(nc_fid0, self.pairings.sources.values())
         snk_idxs = get_aggregated_features(nc_fid0, self.pairings.sinks.values())
         for file in self.inventory.files.values():
             start = datetime.now()
             nc = Dataset(file)
-            ncfeatureid=nc['ID'][:]
+            ncfeatureid=nc['feature_id'][:]
             if not np.all(ncfeatureid == nc_fid0):
                 logger.info(f'Indexes of feature_id are changed in  {file}')
                 src_idxs=get_aggregated_features(ncfeatureid, self.pairings.sources.values())
