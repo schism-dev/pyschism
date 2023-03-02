@@ -364,7 +364,10 @@ class Elements:
     @property
     def i34(self):
         if not hasattr(self, "_i34"):
-            self._i34 = np.sum(~self.array.mask, axis=1)
+            if np.any(self.array.mask):
+                self._i34 = np.sum(~self.array.mask, axis=1)
+            else:
+                self._i34 = np.full(self.array.shape[0], 3)
         return self._i34
 
     @property
