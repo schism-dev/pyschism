@@ -645,7 +645,7 @@ class Nudge:
             #dst_temp['time'][:] = ndt
 
             dst_temp.createVariable('map_to_global_node', 'i4', ('node',))
-            dst_temp['map_to_global_node'][:] = include+0 
+            dst_temp['map_to_global_node'][:] = include+1
 
             dst_temp.createVariable('tracer_concentration', 'f', ('time', 'node', 'nLevels', 'one'))
             #dst_temp['tracer_concentration'][:,:,:,:] = timeseries_t
@@ -662,7 +662,7 @@ class Nudge:
             #dst_salt['time'][:] = ndt
 
             dst_salt.createVariable('map_to_global_node', 'i4', ('node',))
-            dst_salt['map_to_global_node'][:] = include+0  
+            dst_salt['map_to_global_node'][:] = include+1
 
             dst_salt.createVariable('tracer_concentration', 'f', ('time', 'node', 'nLevels', 'one'))
             #dst_salt['tracer_concentration'][:,:,:,:] = timeseries_s
