@@ -528,11 +528,14 @@ class Nudge:
 
         idxs=np.where(out > 0)[0]
         idxs_nudge[idxs]=1
+  
         #expand nudging marker to neighbor nodes
-        idxs=np.where(np.max(out[elnode], axis=1) > 0)[0]
-        fp=elnode[idxs,-1] < 0
-        idxs_nudge[elnode[idxs[fp],:3]]=1
-        idxs_nudge[elnode[idxs[~fp],:]]=1
+        i34 = hgrid.elements.i34
+        fp = i34==3
+        idxs=np.where(np.max(out[elnode[fp, 0:3]], axis=1) > 0)[0]
+        idxs_nudge[elnode[fp,0:3][idxs,:]]=1
+        idxs=np.where(np.max(out[elnode[~fp, :]], axis=1) > 0)[0]
+        idxs_nudge[elnode[~fp,:][idxs,:]]=1
 
         #idxs_nudge=np.delete(idxs_nudge, np.where(idxs_nudge == -99))
         idxs=np.where(idxs_nudge == 1)[0]

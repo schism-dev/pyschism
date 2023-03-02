@@ -362,6 +362,12 @@ class Elements:
         return self._array
 
     @property
+    def i34(self):
+        if not hasattr(self, "_i34"):
+            self._i34 = np.sum(~self.array.mask, axis=1)
+        return self._i34
+
+    @property
     def triangles(self):
         if not hasattr(self, "_triangles"):
             self._triangles = np.array(
