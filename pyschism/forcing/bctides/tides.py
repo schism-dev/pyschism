@@ -9,6 +9,7 @@ import numpy as np
 
 # from pyschism.forcing.tides import bctypes
 from pyschism.forcing.bctides.tpxo import TPXO
+from pyschism.forcing.bctides.fes2014 import FES2014
 from pyschism.forcing.bctides.hamtide import HAMTIDE
 # from pyschism.forcing.baroclinic.gofs import GOFS
 # from pyschism.forcing.baroclinic.rtofs import RTOFS
@@ -22,6 +23,7 @@ ALL_CONSTITUENTS = MAJOR_CONSTITUENTS + MINOR_CONSTITUENTS
 
 class TidalDatabase(Enum):
     TPXO = TPXO
+    FES2014 = FES2014 
     HAMTIDE = HAMTIDE
 
     def _missing_(self, name):
@@ -573,7 +575,7 @@ class Tides:
     def all_constituents(self):
         if isinstance(self.tidal_database, HAMTIDE):
             return self.major_constituents
-        elif isinstance(self.tidal_database, TPXO):
+        elif isinstance(self.tidal_database, TPXO) or isinstance(self.tidal_database, FES2014):
             return (*self.major_constituents, *self.minor_constituents)
         else:
             raise NotImplementedError(
