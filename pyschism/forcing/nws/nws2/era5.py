@@ -54,7 +54,8 @@ class ERA5DataInventory:
             })
  
         filename = self.tmpdir / f"era5_{self.start_date.strftime('%Y%m%d')}.nc"
-        r.download(filename)
+        if filename.is_file() == False:
+            r.download(filename)
         
     @property
     def tmpdir(self):
@@ -87,13 +88,7 @@ class ERA5DataInventory:
         return self._lat
 
     def xy_grid(self):
-        lon = []
-        for x in self.lon:
-            if x > 180:
-                lon.append(x-360)
-            else:
-                lon.append(x)
-        return np.meshgrid(np.array(lon), self.lat)
+        return np.meshgrid(self.lon, self.lat)
 
 def put_sflux_fields(iday, date, timevector, ds, nx_grid, ny_grid, air, rad, prc, output_interval, OUTDIR):
     rt=pd.to_datetime(str(date))
