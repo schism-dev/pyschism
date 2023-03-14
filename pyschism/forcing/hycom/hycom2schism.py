@@ -472,74 +472,66 @@ class OpenBoundaryInventory:
 
 class Nudge:
 
-    def __init__(self, ocean_bnd_ids=[0]):
+    def __init__(self, hgrid=None, ocean_bnd_ids=None):
 
-        self.include = None
-        self.ocean_bnd_ids = ocean_bnd_ids
+        if hgrid is None:
+            raise ValueError('No hgrid information!') 
+        else:
+            self.hgrid = hgrid
+
+        
+        if ocean_bnd_ids is None:
+            raise ValueError('Please specify indexes for ocean boundaries!') 
+        else:
+            self.ocean_bnd_ids = ocean_bnd_ids
 
 
-    def gen_nudge(self, outdir: Union[str, os.PathLike], hgrid, rlmax = 1.5, rnu_day=0.25):
+    def gen_nudge(self, outdir: Union[str, os.PathLike], rlmax = 1.5, rnu_day=0.25):
 
-        @jit(nopython=True, parallel=True)
-        def compute_nudge(lon, lat, nnode, opbd, out):
           
-            rnu_max = 1.0 / rnu_day / 86400.0
-            rnu = 0
-
-            for idn in prange(nnode):
-                if idn in opbd:
-                    rnu = rnu_max
-                    distmin = 0.
-                else:
-                    distmin = np.finfo(np.float64).max
-                    for j in opbd:
-                        tmp = np.square(lon[idn]-lon[j]) + np.square(lat[idn]-lat[j])
-                        rl2 = np.sqrt(tmp)
-                        if rl2 < distmin:
-                            distmin=rl2
-                rnu = 0.
-                if distmin <= rlmax:
-                    rnu = (1-distmin/rlmax)*rnu_max
-                    #idxs_nudge[idn]=1 #idn
-                out[idn] = rnu
-
         outdir = pathlib.Path(outdir)
 
+        rnu_max = 1.0 / rnu_day / 86400.0
+
         #get nudge zone
-        lon=hgrid.coords[:,0]
-        lat=hgrid.coords[:,1]
+        lon = self.hgrid.coords[:,0]
+        lat = self.hgrid.coords[:,1]
+        gdf = self.hgrid.boundaries.open.copy()
+        elnode = self.hgrid.elements.array
+        NE, NP = elnode.shape[0],len(lon)
+        nudge_coeff = np.zeros(NP, dtype=float)
 
-        #Get open boundary 
-        gdf=hgrid.boundaries.open.copy()
-        opbd=[]
-        #for boundary in gdf.itertuples():
-        for ibnd in self.ocean_bnd_ids:
-            opbd.extend(list(gdf.iloc[ibnd].indexes))
-        opbd = np.array(opbd)
+        global_idxs = {}
 
-        elnode=hgrid.elements.array
-        NE, NP = len(elnode), len(lon)
-
-        out = np.zeros([NP])
-        idxs_nudge=np.zeros(NP, dtype=int)
         t0 = time()
-        #compute_nudge(lon, lat, NP, opbd2, idxs_nudge, out)
-        compute_nudge(lon, lat, NP, opbd, out)
+        for i in self.ocean_bnd_ids:
+            print(f'boundary {i}')
+            bnd_idxs = gdf.iloc[i].indexes
 
-        idxs=np.where(out > 0)[0]
-        idxs_nudge[idxs]=1
+            dis = abs((lon + 1j*lat)[:, None] - (lon[bnd_idxs] + 1j*lat[bnd_idxs])[None, :]).min(axis=1)
+            out = (1-dis/rlmax)*rnu_max
+            out[out<0] = 0
+            out[out>rnu_max] = rnu_max
+            fp = out>0
+
+            nudge_coeff[fp] = -out[fp]
+
+            idxs_nudge=np.zeros(NP, dtype=int)
+            idxs=np.where(out > 0)[0]
+            idxs_nudge[idxs]=1
   
-        #expand nudging marker to neighbor nodes
-        i34 = hgrid.elements.i34
-        fp = i34==3
-        idxs=np.where(np.max(out[elnode[fp, 0:3]], axis=1) > 0)[0]
-        idxs_nudge[elnode[fp,0:3][idxs,:]]=1
-        idxs=np.where(np.max(out[elnode[~fp, :]], axis=1) > 0)[0]
-        idxs_nudge[elnode[~fp,:][idxs,:]]=1
+            #expand nudging marker to neighbor nodes
+            i34 = self.hgrid.elements.i34
+            fp = i34==3
+            idxs=np.where(np.max(out[elnode[fp, 0:3]], axis=1) > 0)[0]
+            idxs_nudge[elnode[fp,0:3][idxs,:]]=1
+            idxs=np.where(np.max(out[elnode[~fp, :]], axis=1) > 0)[0]
+            idxs_nudge[elnode[~fp,:][idxs,:]]=1
 
-        #idxs_nudge=np.delete(idxs_nudge, np.where(idxs_nudge == -99))
-        idxs=np.where(idxs_nudge == 1)[0]
-        self.include=idxs
+            idxs=np.where(idxs_nudge == 1)[0]
+            global_idxs[i] = idxs
+
+
         #logger.info(f'len of nudge idxs is {len(idxs)}')
         logger.info(f'It took {time() -t0} sencods to calcuate nudge coefficient')
 
@@ -547,13 +539,13 @@ class Nudge:
         nudge.extend("\n")
         nudge.append(f"{NE} {NP}")
         nudge.extend("\n")
-        hgrid = hgrid.to_dict()
+        hgrid = self.hgrid.to_dict()
         nodes = hgrid['nodes']
         elements = hgrid['elements']
         for idn, (coords, values) in nodes.items():
             line = [f"{idn}"]
             line.extend([f"{x:<.7e}" for x in coords])
-            line.extend([f"{out[int(idn)-1]:<.7e}"])
+            line.extend([f"{nudge_coeff[int(idn)-1]:<.7e}"])
             line.extend("\n")
             nudge.append(" ".join(line))
 
@@ -569,9 +561,9 @@ class Nudge:
 
         shutil.copy2(outdir / 'TEM_nudge.gr3', outdir / 'SAL_nudge.gr3')
 
-        return self.include
+        return global_idxs
 
-    def fetch_data(self, outdir: Union[str, os.PathLike], hgrid, vgrid, start_date, rnday, restart = False, rlmax = None, rnu_day=None):
+    def fetch_data(self, outdir: Union[str, os.PathLike], vgrid, start_date, rnday, restart = False, rlmax = None, rnu_day=None):
 
         outdir = pathlib.Path(outdir)
 
@@ -590,41 +582,31 @@ class Nudge:
         rnu_day = 0.25 if rnu_day is None else rnu_day
         logger.info(f'Max relax distance is {rlmax} degree, max relax strengh is {rnu_day} days.')
         #Get the index for nudge
-        include = self.gen_nudge(outdir,hgrid, rlmax = rlmax, rnu_day=rnu_day)
+        global_idxs = self.gen_nudge(outdir, rlmax = rlmax, rnu_day=rnu_day)
 
-        #get coords of SCHISM
-        loni=hgrid.nodes.coords[:,0]
-        lati=hgrid.nodes.coords[:,1]
 
         #get bathymetry
-        depth = hgrid.values
+        depth = self.hgrid.values
 
         #compute zcor
         zcor = depth[:,None]*sigma
         nvrt=zcor.shape[1]
 
-        #Get open nudge array 
-        nlon = hgrid.coords[include, 0]
-        nlat = hgrid.coords[include, 1]
-        nlonc = nlon.mean()
-        nlatc = nlat.mean()
-        xi,yi = transform_ll_to_cpp(nlon, nlat, nlonc, nlatc)
-        bxy = np.c_[yi, xi]
-
-        zcor2=zcor[include,:]
-        idxs=np.where(zcor2 > 5000)
-        zcor2[idxs]=5000.0-1.0e-6
-
-        #construct schism grid
-        x2i=np.tile(xi,[nvrt,1]).T
-        y2i=np.tile(yi,[nvrt,1]).T
-        bxyz=np.c_[zcor2.reshape(np.size(zcor2)),y2i.reshape(np.size(y2i)),x2i.reshape(np.size(x2i))]
-        logger.info('Computing SCHISM zcor is done!')
 
         #allocate output variables
-        nNode=len(include)
-        one=1
-        ntimes=self.rnday+1
+        include = global_idxs[0]
+        nbnd = len(self.ocean_bnd_ids)
+        if nbnd > 1:
+            include = np.concatenate((global_idxs[0], global_idxs[1],))
+            if nbnd > 2:
+                for i in self.ocean_bnd_ids[2:]:
+                    include = np.concatenate((include, global_idxs[i]))
+        else:
+            include = global_idxs[0]
+
+        nNode = include.shape[0]
+        one = 1
+        ntimes = self.rnday+1
 
         #timeseries_s=np.zeros([ntimes,nNode,nvrt,one])
         #timeseries_t=np.zeros([ntimes,nNode,nvrt,one])
@@ -684,55 +666,81 @@ class Nudge:
             database=get_database(date)
             logger.info(f'Fetching data for {date} from database {database}')
 
-            xmin, xmax = np.min(nlon), np.max(nlon)
-            ymin, ymax = np.min(nlat), np.max(nlat)
-            bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
-            #logger.info(f'xmin is {xmin}, xmax is {xmax}')
 
-            time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2, _ = get_idxs(date, database, bbox, lonc=nlonc, latc=nlatc)
+            ind1 = 0
+            ind2 = 0
+            for ibnd in self.ocean_bnd_ids:
+                include = global_idxs[ibnd]
 
-            if date >= datetime.utcnow():
-                date2 = datetime.utcnow() - timedelta(days=1)
-                url = f'https://tds.hycom.org/thredds/dodsC/{database}/FMRC/runs/GLBy0.08_930_FMRC_RUN_' + \
-                    f'{date2.strftime("%Y-%m-%dT12:00:00Z")}?depth[0:1:-1],lat[{lat_idx1}:1:{lat_idx2}],' + \
-                    f'lon[{lon_idx1}:1:{lon_idx2}],time[{time_idx}],' + \
-                    f'water_temp[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
-                    f'salinity[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
+                ind1 = ind2
+                ind2 = ind1 + include.shape[0]
+                #Get open nudge array 
+                nlon = self.hgrid.coords[include, 0]
+                nlat = self.hgrid.coords[include, 1]
+                nlonc = nlon.mean()
+                nlatc = nlat.mean()
+                xi,yi = transform_ll_to_cpp(nlon, nlat, nlonc, nlatc)
+                bxy = np.c_[yi, xi]
 
-            else:
-                url=f'https://tds.hycom.org/thredds/dodsC/{database}?lat[{lat_idx1}:1:{lat_idx2}],' + \
-                    f'lon[{lon_idx1}:1:{lon_idx2}],depth[0:1:-1],time[{time_idx}],' + \
-                    f'water_temp[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
-                    f'salinity[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
-            #logger.info(url)
+                zcor2=zcor[include,:]
+                idxs=np.where(zcor2 > 5000)
+                zcor2[idxs]=5000.0-1.0e-6
 
-            ds=Dataset(url)
-            salt=np.squeeze(ds['salinity'][:,:,:])
-            temp=np.squeeze(ds['water_temp'][:,:,:])
-            #logger.info(f'The shape of temp is {temp.shape}')
+                #construct schism grid
+                x2i=np.tile(xi,[nvrt,1]).T
+                y2i=np.tile(yi,[nvrt,1]).T
+                bxyz=np.c_[zcor2.reshape(np.size(zcor2)),y2i.reshape(np.size(y2i)),x2i.reshape(np.size(x2i))]
+                logger.info('Computing SCHISM zcor is done!')
 
-            #Convert temp to potential temp
-            dep=ds['depth'][:]
-            ptemp = ConvertTemp(salt, temp, dep)
+                xmin, xmax = np.min(nlon), np.max(nlon)
+                ymin, ymax = np.min(nlat), np.max(nlat)
+                bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
+                #logger.info(f'xmin is {xmin}, xmax is {xmax}')
 
-            logger.info('****Interpolation starts****')
+                time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2, _ = get_idxs(date, database, bbox, lonc=nlonc, latc=nlatc)
 
-            #ndt[it]=it
-            #salt
-            dst_salt['time'][it] = it
-            salt_int = interp_to_points_3d(dep, y2, x2, bxyz, salt)
-            salt_int = salt_int.reshape(zcor2.shape)
-            #timeseries_s[it,:,:,0]=salt_int
-            dst_salt['tracer_concentration'][it,:,:,0] = salt_int
+                if date >= datetime.utcnow():
+                    date2 = datetime.utcnow() - timedelta(days=1)
+                    url = f'https://tds.hycom.org/thredds/dodsC/{database}/FMRC/runs/GLBy0.08_930_FMRC_RUN_' + \
+                        f'{date2.strftime("%Y-%m-%dT12:00:00Z")}?depth[0:1:-1],lat[{lat_idx1}:1:{lat_idx2}],' + \
+                        f'lon[{lon_idx1}:1:{lon_idx2}],time[{time_idx}],' + \
+                        f'water_temp[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
+                        f'salinity[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
 
-            #temp
-            dst_temp['time'][it] = it
-            temp_int = interp_to_points_3d(dep, y2, x2, bxyz, ptemp)
-            temp_int = temp_int.reshape(zcor2.shape)
-            #timeseries_t[it,:,:,0]=temp_int
-            dst_temp['tracer_concentration'][it,:,:,0] = temp_int
+                else:
+                    url=f'https://tds.hycom.org/thredds/dodsC/{database}?lat[{lat_idx1}:1:{lat_idx2}],' + \
+                        f'lon[{lon_idx1}:1:{lon_idx2}],depth[0:1:-1],time[{time_idx}],' + \
+                        f'water_temp[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
+                        f'salinity[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
+                #logger.info(url)
 
-            ds.close()
+                ds=Dataset(url)
+                salt=np.squeeze(ds['salinity'][:,:,:])
+                temp=np.squeeze(ds['water_temp'][:,:,:])
+                #logger.info(f'The shape of temp is {temp.shape}')
+
+                #Convert temp to potential temp
+                dep=ds['depth'][:]
+                ptemp = ConvertTemp(salt, temp, dep)
+
+                logger.info('****Interpolation starts****')
+
+                #ndt[it]=it
+                #salt
+                dst_salt['time'][it] = it
+                salt_int = interp_to_points_3d(dep, y2, x2, bxyz, salt)
+                salt_int = salt_int.reshape(zcor2.shape)
+                #timeseries_s[it,:,:,0]=salt_int
+                dst_salt['tracer_concentration'][it,ind1:ind2,:,0] = salt_int
+
+                #temp
+                dst_temp['time'][it] = it
+                temp_int = interp_to_points_3d(dep, y2, x2, bxyz, ptemp)
+                temp_int = temp_int.reshape(zcor2.shape)
+                #timeseries_t[it,:,:,0]=temp_int
+                dst_temp['tracer_concentration'][it,ind1:ind2,:,0] = temp_int
+
+                ds.close()
  
         #dst_temp.close()
         #dst_salt.close()
