@@ -513,8 +513,7 @@ class Nudge:
             out[out<0] = 0
             out[out>rnu_max] = rnu_max
             fp = out>0
-
-            nudge_coeff[fp] = -out[fp]
+            nudge_coeff[fp] = out[fp]
 
             idxs_nudge=np.zeros(NP, dtype=int)
             idxs=np.where(out > 0)[0]
