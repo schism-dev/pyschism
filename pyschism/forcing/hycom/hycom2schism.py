@@ -11,7 +11,7 @@ from time import time
 
 import numpy as np
 import scipy as sp
-from numba import jit, prange
+#from numba import jit, prange
 import netCDF4 as nc
 from netCDF4 import Dataset
 from matplotlib.transforms import Bbox
@@ -345,8 +345,9 @@ class OpenBoundaryInventory:
             timevector = self.timevector
             it0 = 0
         elif restart:
-            timevector = self.timevector[time_idx_restart+1:]
-            it0 = time_idx_restart+1
+            #restart from one day earlier
+            timevector = self.timevector[time_idx_restart-1:]
+            it0 = time_idx_restart-1
 
         for it1, date in enumerate(timevector):
             
@@ -651,8 +652,9 @@ class Nudge:
 
         logger.info('**** Accessing GOFS data*****')
         if restart:
-            timevector = self.timevector[time_idx_restart+1:]
-            it0 = time_idx_restart+1
+            #restart from one day earlier to make sure all files consistant
+            timevector = self.timevector[time_idx_restart-1:]
+            it0 = time_idx_restart-1
         else:
             timevector = self.timevector
             it0 = 0
