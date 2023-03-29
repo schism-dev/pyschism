@@ -32,6 +32,6 @@ if __name__ == '__main__':
     #bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
     hycom = DownloadHycom(hgrid=hgrid)
     t0 = time()
-    hycom.fetch_data(date, rnday=1, bnd=False, nudge=False, outdir='./')
+    hycom.fetch_data(date, rnday=1, bnd=False, nudge=False, sub_sample=3, outdir='./')
     print(f'It took {(time()-t0)/60} mins to download')
     
