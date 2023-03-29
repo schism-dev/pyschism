@@ -2,8 +2,9 @@ from datetime import datetime
 import io
 import logging
 import os
-from os import PathLike
 import pathlib
+from enum import IntEnum
+from os import PathLike
 from typing import Union
 
 from matplotlib import pyplot
@@ -24,6 +25,12 @@ from pyschism.forcing.nws.nws2.sflux import SfluxDataset
 from pyschism.mesh import gridgr3
 
 
+class HurricaneModel(IntEnum):
+    SYMMETRIC = 1
+    GAHM = 10
+
+
+
 class BestTrackForcing(VortexTrack, NWS):
 
     def __init__(
@@ -32,8 +39,10 @@ class BestTrackForcing(VortexTrack, NWS):
         start_date: datetime = None,
         end_date: datetime = None,
         mode: ATCF_Mode = None,
+        hurricane_model: HurricaneModel = HurricaneModel.GAHM
     ):
 
+        self._model = hurricane_model
 
         VortexTrack.__init__(
             self,
@@ -98,6 +107,17 @@ class BestTrackForcing(VortexTrack, NWS):
     def dtype(self) -> NWSType:
         """Returns the datatype of the object"""
         return NWSType(-1)
+
+    @property
+    def model(self) -> HurricaneModel:
+        """Return hurricane model used for this best track forcing"""
+        return self._model
+
+    @model.setter
+    def model(self, value: HurricaneModel):
+        if value not in list(HurricaneModel):
+            raise ValueError(f"Invalid hurricane model specified: {value}")
+        self._model = value
 
     def clip_to_bbox(self, bbox, bbox_crs):
         msg = f'bbox must be a {Bbox} instance.'
