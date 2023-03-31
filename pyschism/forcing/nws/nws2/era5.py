@@ -33,28 +33,31 @@ class ERA5DataInventory:
         if tmpdir is not None:
             self.tmpdir = tmpdir
 
-        r = self.client.retrieve(
-            'reanalysis-era5-single-levels',
-            {
-            'variable':[
-                '10m_u_component_of_wind','10m_v_component_of_wind','mean_sea_level_pressure',
-                '2m_dewpoint_temperature','2m_temperature','mean_total_precipitation_rate',
-                'mean_surface_downward_long_wave_radiation_flux','mean_surface_downward_short_wave_radiation_flux'
-                ],
-            'product_type':'reanalysis',
-            'date':f"{self.start_date.strftime('%Y-%m-%d')}/{self.end_date.strftime('%Y-%m-%d')}",
-            'time':[
-                '00:00','01:00','02:00','03:00','04:00','05:00',
-                '06:00','07:00','08:00','09:00','10:00','11:00',
-                '12:00','13:00','14:00','15:00','16:00','17:00',
-                '18:00','19:00','20:00','21:00','22:00','23:00'
-                ],
-            'area': [self._bbox.ymax+0.5, self._bbox.xmin-0.5, self._bbox.ymin-0.5, self._bbox.xmax+0.5], # North, West, South, East. Default: global
-            'format':'netcdf'
-            })
- 
         filename = self.tmpdir / f"era5_{self.start_date.strftime('%Y%m%d')}.nc"
+
         if filename.is_file() == False:
+
+            r = self.client.retrieve(
+                'reanalysis-era5-single-levels',
+                {
+                'variable':[
+                    '10m_u_component_of_wind','10m_v_component_of_wind','mean_sea_level_pressure',
+                    '2m_dewpoint_temperature','2m_temperature','mean_total_precipitation_rate',
+                    'mean_surface_downward_long_wave_radiation_flux','mean_surface_downward_short_wave_radiation_flux'
+                    ],
+                'product_type':'reanalysis',
+                'date':f"{self.start_date.strftime('%Y-%m-%d')}/{self.end_date.strftime('%Y-%m-%d')}",
+                'time':[
+                    '00:00','01:00','02:00','03:00','04:00','05:00',
+                    '06:00','07:00','08:00','09:00','10:00','11:00',
+                    '12:00','13:00','14:00','15:00','16:00','17:00',
+                    '18:00','19:00','20:00','21:00','22:00','23:00'
+                    ],
+                'area': [self._bbox.ymax+0.5, self._bbox.xmin-0.5, self._bbox.ymin-0.5, self._bbox.xmax+0.5], # North, West, South, East. Default: global
+                'format':'netcdf'
+                }
+            )
+ 
             r.download(filename)
         
     @property

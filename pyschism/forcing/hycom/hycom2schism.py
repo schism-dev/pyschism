@@ -23,18 +23,35 @@ from pyschism.mesh.vgrid import Vgrid
 
 logger = logging.getLogger(__name__)
 
-def convert_longitude(ds):
-    lon_name = 'lon'
-    ds['_lon_adjusted'] = xr.where(
-        ds[lon_name] > 180,
-        ds[lon_name] - 360,
-        ds[lon_name])
+def convert_longitude(ds, bbox):
+#https://stackoverflow.com/questions/53345442/about-changing-longitude-array-from-0-360-to-180-to-180-with-python-xarray
+#Light_B's solution didn't generate the correct result
+#Michael's solution works, but it takes significantly longer to write nc file (~30 mins compared with 5 mins)
+#TODO: figure out why it takes much longer with the second method
+    #lon_attr = ds.coords['lon'].attrs
+    if bbox.xmin < 0:
+        logger.info(f'Convert HYCOM longitude from [0, 360) to [-180, 180):')
+        #ds.coords['lon'] = (ds.coords['lon'] + 180) % 360 - 180
+        ds['_lon_adjusted'] = xr.where(ds['lon'] > 180, ds['lon'] - 360, ds['lon'])
+    elif bbox.xmin > 0:
+        logger.info(f'Convert HYCOM longitude from [-180, 180) to [0, 360): ')
+        #ds.coords['lon'] = (ds.coords['lon'] + 360) % 360 - 180
+        ds['_lon_adjusted'] = xr.where(ds['lon'] < 0, ds['lon'] + 360, ds['lon'])
+
+    t0 = time()
     ds = (
         ds.swap_dims({lon_name: '_lon_adjusted'})
         .sel(**{'_lon_adjusted': sorted(ds._lon_adjusted)})
         .drop(lon_name)
     )
     ds = ds.rename({'_lon_adjusted': lon_name})
+    #ds = ds.sortby(ds.lon)
+    #ds.coords['lon'].attrs = lon_attr
+    logger.info(f'swap dims took {time()-t0} seconds!')
+
+    #make sure it is clipped to the bbox
+    ds = ds.sel(lon=slice(bbox.xmin - 0.5, bbox.xmax + 0.5))
+
     return ds
 
 def get_database(date, Bbox=None):
@@ -786,7 +803,7 @@ class DownloadHycom:
 
             if fmt == 'schism':
                 url_ssh = f'https://tds.hycom.org/thredds/dodsC/{database}?lat[{lat_idx1}:{sub_sample}:{lat_idx2}],' + \
-                    f'lon[{lon_idx1}:{sub_sample}:{lon_idx2}],depth[0:1:-1],time[{time_idx}:8:{time_idx}],' + \
+                    f'lon[{lon_idx1}:{sub_sample}:{lon_idx2}],depth[0:1:-1],time[{time_idx}],' + \
                     f'surf_el[{time_idx}][{lat_idx1}:{sub_sample}:{lat_idx2}][{lon_idx1}:{sub_sample}:{lon_idx2}],' + \
                     f'water_u[{time_idx}][0:1:39][{lat_idx1}:{sub_sample}:{lat_idx2}][{lon_idx1}:{sub_sample}:{lon_idx2}],' + \
                     f'water_v[{time_idx}][0:1:39][{lat_idx1}:{sub_sample}:{lat_idx2}][{lon_idx1}:{sub_sample}:{lon_idx2}],' + \
@@ -815,14 +832,18 @@ class DownloadHycom:
 
                 if not isLonSame:
                     logger.info('Lon is not the same!')
-                    ds = convert_longitude(ds)
+                    ds = convert_longitude(ds, self.bbox)
 
                 ds = ds.rename_dims({'lon':'xlon'})
                 ds = ds.rename_dims({'lat':'ylat'})
                 ds = ds.rename_vars({'lat':'ylat'})
                 ds = ds.rename_vars({'lon':'xlon'})
+
+                t0 =  time()
+                logger.info(f'Start writing nc file!')
                 ds.to_netcdf(foutname, 'w', unlimited_dims='time', encoding={'temperature':{'dtype': 'h', '_FillValue': -30000.,'scale_factor': 0.001, 'add_offset': 20., 'missing_value': -30000.}})
                 ds.close()
+                logger.info(f'It took {time()-t0} seconds to write nc file!')
 
                 #link output file to Fortran required files
                 dir_path = os.path.abspath(outdir)
