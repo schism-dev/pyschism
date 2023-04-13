@@ -31,6 +31,7 @@ import wget
 
 from pyschism import dates
 from pyschism.mesh.base import Gr3
+from pyschism.utils.jsonencoder import NpEncoder
 
 from pyschism.forcing.source_sink.base import SourceSink, Sources, Sinks
 
@@ -38,7 +39,6 @@ DATADIR = pathlib.Path(appdirs.user_data_dir("pyschism/nwm"))
 DATADIR.mkdir(exist_ok=True, parents=True)
 
 logger = logging.getLogger(__name__)
-
 
 class NWMElementPairings:
     def __init__(self, hgrid: Gr3, nwm_file=None, workers=-1):
@@ -198,13 +198,13 @@ class NWMElementPairings:
         if sources:
             logger.info(f"Saving {sources}")
             with open(sources, "w") as fh:
-                json.dump(self.sources, fh)
+                json.dump(self.sources, fh, cls=NpEncoder)
 
         sinks = "sinks.json" if sinks is True else sinks
         if sinks:
             with open(sinks, "w") as fh:
                 logger.info(f"Saving {sinks}")
-                json.dump(self.sinks, fh)
+                json.dump(self.sinks, fh, cls=NpEncoder)
 
     @staticmethod
     def load_json(hgrid, sources=None, sinks=None):
@@ -261,11 +261,14 @@ class NWMElementPairings:
     def gdf(self):
         if not hasattr(self, "_gdf"):
             gdf_coll = []
-            for reach_layer in [
-                reach_layer
-                for reach_layer in fiona.listlayers(self.nwm_file)
-                if "reaches" in reach_layer
-            ]:
+            #for reach_layer in [
+            #    reach_layer
+            #    for reach_layer in fiona.listlayers(self.nwm_file)
+            #    if "reaches" in reach_layer
+            #]:
+            reach_layers = ['nwm_reaches_conus']
+            for reach_layer in reach_layers:
+                logger.info(f'layer is {reach_layer}')
                 layer_crs = gpd.read_file(
                     self.nwm_file, rows=1, layer=reach_layer).crs
                 bbox = self.hgrid.get_bbox(crs=layer_crs)
@@ -276,7 +279,8 @@ class NWMElementPairings:
                         layer=reach_layer,
                     )
                 )
-            self._gdf = pd.concat(gdf_coll)
+            #self._gdf = pd.concat(gdf_coll)
+            self._gdf = gpd.GeoDataFrame(gdf_coll[0])
         return self._gdf
 
     @property
