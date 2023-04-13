@@ -265,7 +265,7 @@ class NWMElementPairings:
             for reach_layer in [
                 reach_layer
                 for reach_layer in fiona.listlayers(self.nwm_file)
-                if "RouteLink_Flowlines_CONUS" in reach_layer
+                if "reaches_conus" in reach_layer
             ]:
                 layer_crs = gpd.read_file(
                     self.nwm_file, rows=1, layer=reach_layer).crs
@@ -295,7 +295,7 @@ class NWMElementPairings:
         #         ) if nwm_file is None else nwm_file
         #)
         nwm_file = (
-            list(glob.glob("/sciclone/schism10/lcui01/schism20/ICOGS/ICOGS3D/Forecast/NWM/oper_3D/NWM3_0/*Prelim*.gdb")
+            list(glob.glob("/sciclone/schism10/lcui01/schism20/ICOGS/ICOGS3D/Forecast/NWM/oper_3D/NWM_v3_final/*hydrofabric*.gdb")
                  ) if nwm_file is None else nwm_file
         )
         print(nwm_file)
