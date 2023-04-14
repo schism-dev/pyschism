@@ -1,7 +1,10 @@
 from datetime import datetime, timedelta
-import pathlib
 from typing import Dict, Union
+from functools import lru_cache
 import logging
+import pathlib
+
+from ordered_set import OrderedSet
 
 from pyschism import dates
 
@@ -318,9 +321,10 @@ class Bctides(metaclass=BctidesMeta):
                             forcing=True if constituent in afc else False,
                             potential=True if constituent in apc else False,
                         )
-
+                
+                @lru_cache
                 def get_active_forcing_constituents(self):
-                    active_constituents = set()
+                    active_constituents = OrderedSet()
                     for row in self.gdf.itertuples():
                         if row.iettype is not None:
                             if row.iettype.iettype in [3, 5]:
@@ -337,8 +341,9 @@ class Bctides(metaclass=BctidesMeta):
 
                     return list(active_constituents)
 
+                @lru_cache
                 def get_active_potential_constituents(self):
-                    active_constituents = set()
+                    active_constituents = OrderedSet()
                     for row in self.gdf.itertuples():
                         if row.iettype is not None:
                             if row.iettype.iettype in [3, 5]:
@@ -355,209 +360,18 @@ class Bctides(metaclass=BctidesMeta):
 
                     return list(active_constituents)
 
-                @property
-                def constituents(self):
-                    if not hasattr(self, "_constituents"):
-                        self._constituents = sorted(
-                            list(
-                                set(
-                                    [
-                                        *self.get_active_potential_constituents(),
-                                        *self.get_active_forcing_constituents(),
-                                    ]
-                                )
-                            )
+                @lru_cache
+                def get_active_constituents(self):
+                    return list(
+                        OrderedSet(
+                            [
+                                *self.get_active_potential_constituents(),
+                                *self.get_active_forcing_constituents(),
+                            ]
                         )
-                    return self._constituents
+                    )
 
             self._tides = TidalConstituentCombiner(self.gdf)
 
         return self._tides
 
-
-class TidesCombiner(Tides):
-    def __init__(self, bctides):
-        self.bctides = bctides
-
-    def get_active_potential_constituents(self):
-        const = dict()
-        # for row in self.bctides.gdf.itertuples():
-
-    #         forcing = data['forcing']
-    #         if isinstance(forcing, Tides):
-    #             for active in forcing.get_active_potential_constituents():
-    #                 const[active] = True
-    #     return tuple(const.keys())
-
-    # def get_active_forcing_constituents(self):
-    #     # set active tidal forcing constituents
-    #     const = dict()
-    #     for id, data in self._model_domain.open_boundaries:
-    #         forcing = data['forcing']
-    #         if isinstance(forcing, Tides):
-    #             for active in forcing.get_active_forcing_constituents():
-    #                 const[active] = True
-    #     return tuple(const.keys())
-
-
-# ----------- draft
-# @property
-# def tides(self):
-#     if not hasattr(self, '_tides'):
-#         # get the first one you can find, since the Tides object is a
-#         # singleton.
-#         tides = None
-#         for boundary in self.hgrid.boundaries.open.itertuples():
-#             if boundary.iettype is not None:
-#                 if hasattr(boundary.iettype, "tides"):
-#                     tides = boundary.iettype.tides
-#                     break
-#                 elif boundary.ifltype is not None:
-#                     if hasattr(boundary.ifltype, "tides"):
-#                         tides = boundary.ifltype.tides
-#                         break
-#         self._tides = tides
-#     return self._tides
-
-# @property
-# def tracers(self) -> List[Dict[Any, Union[bctides.itrtype.Itrtype, None]]]:
-#     # if not hasattr(self, '_tracers'):
-#     #     # tracers: List[Dict[Any, Union[itrtype.Itrtype, None]]] = []
-#     #     boundary_data = {}
-#     #     for boundary in self.hgrid.boundaries.open.itertuples():
-#     #         itrtypes = boundary.itrtype
-#     #         if itrtypes is None:
-#     #             tracers.append({})
-#     #         for tracer in boundary.itr
-#     #             tracers.append()
-#     #         tracer.setdefault(
-
-#     #             )
-
-#     # _itrtype = boundary.itrtype
-#     # return self._tracers
-#     # TODO: Cheating for now...
-#     return []
-
-# @property
-# def ntip(self):
-#     if self.tides is None:
-#         return 0
-#     return len(self.tides.get_active_potential_constituents())
-
-# @property
-# def nbfr(self):
-#     if self.tides is None:
-#         return 0
-#     return self.tides.nbfr
-
-# @property
-# def Z0(self):
-#     if hasattr(self.tides, '_Z0'):
-#         return self.tides._Z0
-
-# @Z0.setter
-# def Z0(self, Z0):
-#     self.tides.add_Z0(Z0)
-
-# @property
-# def cutoff_depth(self):
-#     return self._cutoff_depth
-
-# @cutoff_depth.setter
-# def cutoff_depth(self, cutoff_depth: float):
-#     self._cutoff_depth = float(cutoff_depth)
-
-# @property
-# def subtidal_database(self):
-#     return self._subtidal_database
-
-# @subtidal_database.setter
-# def subtidal_database(self, subtidal_database: SubTidalDatabase):
-#     if subtidal_database is not None:
-#         # self._subtidal_database = Tides(subtidal_database=subtidal_database)
-#     else:
-#         self._subtidal_database = None
-
-# @property
-# def elevation(self):
-#     return self._elevation
-
-# @elevation.setter
-# def elevation(self, elevation):
-#     if elevation is not None:
-#         assert isinstance(elevation, iettype.Iettype)
-#     self._elevation = elevation
-
-# @property
-# def velocity(self):
-#     return self._velocity
-
-# @velocity.setter
-# def velocity(self, velocity):
-#     if velocity is not None:
-#         assert isinstance(velocity, ifltype.Ifltype)
-#     self._velocity = velocity
-
-# @property
-# def temperature(self):
-#     return self._temperature
-
-# @temperature.setter
-# def temperature(self, temperature: Union[itetype.Itetype, None]):
-#     if temperature is not None:
-#         assert isinstance(temperature, itetype.Itetype)
-#     self._temperature = temperature
-
-# @property
-# def salinity(self):
-#     return self._salinity
-
-# @salinity.setter
-# def salinity(self, salinity: Union[isatype.Isatype, None]):
-#     if salinity is not None:
-#         assert isinstance(salinity, isatype.Isatype)
-#     self._salinity = salinity
-
-
-# class HgridDescriptor:
-
-#     def __set__(self, obj, val: Hgrid):
-#         if not isinstance(val, Hgrid):
-#             raise TypeError(
-#                 f'Argument hgrid must be of type {Hgrid}, not type '
-#                 f'{type(val)}.')
-#         obj.__dict__['hgrid'] = val
-
-#     def __get__(self, obj, val):
-#         return obj.__dict__['hgrid']
-
-
-# class StartDateDescriptor:
-
-#     def __set__(self, obj, val: datetime):
-#         if not isinstance(val, datetime):
-#             raise TypeError(
-#                     f'Argument start_date must be of type {datetime}, '
-#                     f'not type {type(val)}.')
-#         if datetime_is_naive(val):
-#             val = pytz.timezone('UTC').localize(val)
-#         obj.__dict__['start_date'] = val
-
-#     def __get__(self, obj, val):
-#         return obj.__dict__['start_date']
-
-
-# class RndayDescriptor:
-
-#     def __set__(self, obj, val: Union[int, float, timedelta]):
-#         if not isinstance(val, (int, float, timedelta)):
-#             raise TypeError(
-#                 f'Argument rnday must be of type {int}, {float} or '
-#                 f'{timedelta}, not type {type(val)}.')
-#         if not isinstance(val, timedelta):
-#             val = timedelta(days=val)
-#         obj.__dict__['rnday'] = val
-
-#     def __get__(self, obj, val) -> timedelta:
-#         return obj.__dict__['rnday']
