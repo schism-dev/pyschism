@@ -364,6 +364,7 @@ class ModelDriver:
                 self.config.forcings.nws.windrot = gridgr3.Windrot.default(
                     self.config.hgrid
                 )
+                self.param.opt.model_type_pahm = self.config.forcings.nws.model.value
 
             self.param.opt.wtiminc = self.param.core.dt
             self.param.opt.nws = self.config.forcings.nws.dtype.value

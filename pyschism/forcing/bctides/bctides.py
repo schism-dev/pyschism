@@ -1,9 +1,10 @@
 from datetime import datetime, timedelta
-from functools import cached_property
+from functools import cached_property, lru_cache
 import pathlib
 from typing import Dict, Union
 import logging
 
+from ordered_set import OrderedSet
 import numpy as np
 
 from pyschism import dates
@@ -310,7 +311,7 @@ class TidalConstituentCombiner(Tides):
             )
 
     def get_active_forcing_constituents(self):
-        active_constituents = set()
+        active_constituents = OrderedSet()
         for row in self.gdf.itertuples():
             if row.iettype is not None:
                 if row.iettype.iettype in [3, 5]:
@@ -328,7 +329,7 @@ class TidalConstituentCombiner(Tides):
         return list(active_constituents)
 
     def get_active_potential_constituents(self):
-        active_constituents = set()
+        active_constituents = OrderedSet()
         for row in self.gdf.itertuples():
             if row.iettype is not None:
                 if row.iettype.iettype in [3, 5]:
@@ -345,16 +346,14 @@ class TidalConstituentCombiner(Tides):
 
         return list(active_constituents)
 
-    @cached_property
-    def constituents(self):
-        return sorted(
-            list(
-                set(
-                    [
-                        *self.get_active_potential_constituents(),
-                        *self.get_active_forcing_constituents(),
-                    ]
-                )
+    @lru_cache
+    def get_active_constituents(self):
+        return list(
+            OrderedSet(
+                [
+                    *self.get_active_potential_constituents(),
+                    *self.get_active_forcing_constituents(),
+                ]
             )
         )
 

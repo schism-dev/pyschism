@@ -1,0 +1,14 @@
+cff-version: 1.2.0
+message: "If you used this software as part of your work, please use the following citation format."
+authors:
+  - family-names: Calzada
+    given-names: Jaime R
+    orcid: https://orcid.org/0000-0002-3172-1906
+  - family-names: Cui
+    given-names: Linlin
+  - family-names: Zhang
+    given-names: Joseph
+title: "PySCHISM"
+version: v0.1.5
+doi: 10.5281/zenodo.7623122
+date-released: 2023-02-08

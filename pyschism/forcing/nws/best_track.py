@@ -2,12 +2,11 @@ from datetime import datetime
 import io
 import logging
 import os
-from os import PathLike
 import pathlib
+from enum import IntEnum
+from os import PathLike
 from typing import Union
 
-from matplotlib import pyplot
-from matplotlib.axis import Axis
 from matplotlib.transforms import Bbox
 import numpy as numpy
 from pandas import DataFrame
@@ -15,13 +14,19 @@ from pyproj import CRS, Transformer
 from shapely import ops
 from shapely.geometry import Point, Polygon
 from stormevents.nhc import VortexTrack
-from stormevents.nhc.atcf import ATCF_Mode
 import utm
 
 from pyschism.enums import NWSType
 from pyschism.forcing.nws.base import NWS
-from pyschism.forcing.nws.nws2.sflux import SfluxDataset
-from pyschism.mesh import gridgr3
+
+
+class HurricaneModel(IntEnum):
+    SYMMETRIC = 1
+    GAHM = 10
+
+    @classmethod
+    def _missing_(cls, value):
+        raise ValueError(f"Invalid hurricane model specified: {value}, choose from: {cls.__members__}")
 
 
 class BestTrackForcing(VortexTrack, NWS):
@@ -31,9 +36,10 @@ class BestTrackForcing(VortexTrack, NWS):
         storm: Union[str, PathLike, DataFrame, io.BytesIO],
         start_date: datetime = None,
         end_date: datetime = None,
-        mode: ATCF_Mode = None,
+        hurricane_model: Union[str, HurricaneModel] = 'gahm'
     ):
 
+        self.model = hurricane_model
 
         VortexTrack.__init__(
             self,
@@ -44,11 +50,9 @@ class BestTrackForcing(VortexTrack, NWS):
             advisories=['BEST'],
         )
 
-
     def __str__(self):
         """Returns string used in param.nml"""
         return f"{self.dtype.value}"
-
 
     @classmethod
     def from_nhc_bdeck(
@@ -98,6 +102,26 @@ class BestTrackForcing(VortexTrack, NWS):
     def dtype(self) -> NWSType:
         """Returns the datatype of the object"""
         return NWSType(-1)
+
+    @property
+    def model(self) -> HurricaneModel:
+        """Return hurricane model used for this best track forcing"""
+        return self._model
+
+    @model.setter
+    def model(self, value: Union[str, HurricaneModel]):
+        """Set hurricane model used for this best track forcing"""
+        if isinstance(value, str):
+            if value.upper() not in HurricaneModel.__members__:
+                raise ValueError(f"Invalid hurricane model specified: {value}, choose from: {HurricaneModel.__members__}")
+            value = HurricaneModel[value.upper()]
+        elif isinstance(value, int):
+            value = HurricaneModel(value)
+        elif isinstance(value, HurricaneModel):
+            pass
+        else:
+            raise ValueError(f"Invalid hurricane model specified: {value}")
+        self._model = value
 
     def clip_to_bbox(self, bbox, bbox_crs):
         msg = f'bbox must be a {Bbox} instance.'
