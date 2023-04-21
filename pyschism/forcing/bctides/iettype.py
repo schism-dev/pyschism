@@ -8,10 +8,15 @@ from pyschism.forcing import hycom
 
 
 class Iettype(Bctype):
+
     @property
     @abstractmethod
     def iettype(self) -> int:
         pass
+
+    @property
+    def forcing_digit(self):
+        return self.iettype
 
 
 class UniformTimeHistoryElevation(Iettype):
@@ -40,15 +45,34 @@ class ConstantElevation(Iettype):
 
 
 class TidalElevation(Iettype):
-    def __init__(self, constituents="all", database="hamtide"):
+    def __init__(self, constituents='all', database="hamtide"):
         self.tides = Tides(tidal_database=database, constituents=constituents)
+        
+    def add_constituent(
+            self,
+            name: str,
+            amplitude,
+            angular_frequency,
+            phase=0.,
+            **kwargs,
+    ):
+        self.tides.add_constituent(
+            name=name,
+            angular_frequency=angular_frequency,
+            elevation_amplitude=amplitude,
+            elevation_phase=phase,
+            velocity_amplitude=self.tides._amplitudes['velocity'].get(name, 0.),
+            velocity_phase=self.tides._phases['velocity'].get(name, 0.),
+            **kwargs
+        )
 
     def get_boundary_string(self, hgrid, boundary, global_constituents: List[str] = None):
         f = []
+        crs = 'epsg:4326' if hgrid.crs is not None else None
         if global_constituents is None:
             for constituent in self.tides.get_active_forcing_constituents():
                 f.append(f"{constituent}")
-                vertices = hgrid.get_xy(crs="EPSG:4326")[boundary.indexes, :]
+                vertices = hgrid.get_xy(crs=crs)[boundary.indexes, :]
                 amp, phase = self.tides.get_elevation(constituent, vertices)
                 for i in range(len(boundary.indexes)):
                     f.append(f"{amp[i]:.8e} {phase[i]:.8e}")
@@ -60,7 +84,7 @@ class TidalElevation(Iettype):
                     for i in range(len(boundary.indexes)):
                         f.append(f"{0:.8e} {0:.8e}")
                 else:
-                    vertices = hgrid.get_xy(crs="EPSG:4326")[boundary.indexes, :]
+                    vertices = hgrid.get_xy(crs=crs)[boundary.indexes, :]
                     amp, phase = self.tides.get_elevation(constituent, vertices)
                     for i in range(len(boundary.indexes)):
                         f.append(f"{amp[i]:.8e} {phase[i]:.8e}")
@@ -71,6 +95,11 @@ class TidalElevation(Iettype):
     def iettype(self):
         return 3
 
+
+class HarmonicElevation(TidalElevation):
+
+    def __init__(self):
+        self.tides = Tides(constituents=None)
 
 class SpatiallyVaryingTimeHistoryElevation(Iettype):
     class BaroclinicDatabases(Enum):
@@ -139,9 +168,25 @@ class ZeroElevation(Iettype):
         return -1
 
 
-Iettype1 = UniformTimeHistoryElevation
-Iettype2 = ConstantElevation
-Iettype3 = TidalElevation
-Iettype4 = SpatiallyVaryingTimeHistoryElevation
-Iettype5 = TidalAndSpatiallyVaryingElevationTimeHistory
-Iettype_1 = ZeroElevation
+class Iettype1(UniformTimeHistoryElevation):
+    pass
+
+
+class Iettype2(ConstantElevation):
+    pass
+
+
+class Iettype3(TidalElevation):
+    pass
+
+
+class Iettype4(SpatiallyVaryingTimeHistoryElevation):
+    pass
+
+
+class Iettype5(TidalAndSpatiallyVaryingElevationTimeHistory):
+    pass
+
+
+class Iettype_1(ZeroElevation):
+    pass

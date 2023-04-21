@@ -23,42 +23,52 @@ logger = logging.getLogger(__name__)
 
 class ERA5DataInventory:
 
-    def __init__(self, start_date=None, rnday: Union[float, timedelta] = 4, bbox=None):
+    def __init__(self, start_date=None, rnday: Union[float, timedelta] = 4, bbox=None, tmpdir=None):
 
         self.start_date = start_date
         self.rnday = rnday
         self.end_date = self.start_date+timedelta(self.rnday + 1)
         self.client=cdsapi.Client()
         self._bbox = bbox
+        if tmpdir is not None:
+            self.tmpdir = tmpdir
 
-        r = self.client.retrieve(
-            'reanalysis-era5-single-levels',
-            {
-            'variable':[
-                '10m_u_component_of_wind','10m_v_component_of_wind','mean_sea_level_pressure',
-                '2m_dewpoint_temperature','2m_temperature','mean_total_precipitation_rate',
-                'mean_surface_downward_long_wave_radiation_flux','mean_surface_downward_short_wave_radiation_flux'
-                ],
-            'product_type':'reanalysis',
-            'date':f"{self.start_date.strftime('%Y-%m-%d')}/{self.end_date.strftime('%Y-%m-%d')}",
-            'time':[
-                '00:00','01:00','02:00','03:00','04:00','05:00',
-                '06:00','07:00','08:00','09:00','10:00','11:00',
-                '12:00','13:00','14:00','15:00','16:00','17:00',
-                '18:00','19:00','20:00','21:00','22:00','23:00'
-                ],
-            'area': [self._bbox.ymax+0.5, self._bbox.xmin-0.5, self._bbox.ymin-0.5, self._bbox.xmax+0.5], # North, West, South, East. Default: global
-            'format':'netcdf'
-            })
- 
         filename = self.tmpdir / f"era5_{self.start_date.strftime('%Y%m%d')}.nc"
-        r.download(filename)
+
+        if filename.is_file() == False:
+
+            r = self.client.retrieve(
+                'reanalysis-era5-single-levels',
+                {
+                'variable':[
+                    '10m_u_component_of_wind','10m_v_component_of_wind','mean_sea_level_pressure',
+                    '2m_dewpoint_temperature','2m_temperature','mean_total_precipitation_rate',
+                    'mean_surface_downward_long_wave_radiation_flux','mean_surface_downward_short_wave_radiation_flux'
+                    ],
+                'product_type':'reanalysis',
+                'date':f"{self.start_date.strftime('%Y-%m-%d')}/{self.end_date.strftime('%Y-%m-%d')}",
+                'time':[
+                    '00:00','01:00','02:00','03:00','04:00','05:00',
+                    '06:00','07:00','08:00','09:00','10:00','11:00',
+                    '12:00','13:00','14:00','15:00','16:00','17:00',
+                    '18:00','19:00','20:00','21:00','22:00','23:00'
+                    ],
+                'area': [self._bbox.ymax+0.5, self._bbox.xmin-0.5, self._bbox.ymin-0.5, self._bbox.xmax+0.5], # North, West, South, East. Default: global
+                'format':'netcdf'
+                }
+            )
+ 
+            r.download(filename)
         
     @property
     def tmpdir(self):
         if not hasattr(self, '_tmpdir'):
             self._tmpdir = tempfile.TemporaryDirectory()
         return pathlib.Path(self._tmpdir.name)
+
+    @tmpdir.setter
+    def tmpdir(self, value):
+        self._tmpdir = value
 
     @property
     def files(self):
@@ -81,13 +91,7 @@ class ERA5DataInventory:
         return self._lat
 
     def xy_grid(self):
-        lon = []
-        for x in self.lon:
-            if x > 180:
-                lon.append(x-360)
-            else:
-                lon.append(x)
-        return np.meshgrid(np.array(lon), self.lat)
+        return np.meshgrid(self.lon, self.lat)
 
 def put_sflux_fields(iday, date, timevector, ds, nx_grid, ny_grid, air, rad, prc, output_interval, OUTDIR):
     rt=pd.to_datetime(str(date))
@@ -274,6 +278,7 @@ class ERA5(SfluxDataset):
         bbox: Bbox = None,
         overwrite: bool=False,
         output_interval: int = 1,
+        tmpdir = None,
     ):
         self.start_date=start_date
         self.rnday=rnday
@@ -294,6 +299,7 @@ class ERA5(SfluxDataset):
             self.start_date,
             self.rnday,
             bbox,
+            tmpdir = tmpdir
         )
 
         logger.info('Finished downloading ERA5')

@@ -1,16 +1,18 @@
 from pyschism.mesh.hgrid import Hgrid
 from pyschism.mesh.fgrid import DragCoefficient
 
-hgrid=Hgrid.open('/sciclone/schism10/whuang07/NWM/Case1/RUN07b_ZG/hgrid.gr3', crs='epsg:4326')
+hgrid=Hgrid.open('./hgrid.gr3', crs='epsg:4326')
 depth1=-1.0
 depth2=-3.0
 bfric_river=0.0025
 bfric_land=0.025
 fgrid=DragCoefficient.linear_with_depth(hgrid, depth1, depth2, bfric_river, bfric_land)
+
+#modify values in regions
 regions=['GoME+0.001.reg', 'Lake_Charles_0.reg']
 values=[0.001, 0.0]
-flags=[1, 0]
+flags=[1, 0] # 0: reset to given value, 1: add given value to the current value
 for reg, value, flag in zip(regions, values, flags):
-    fgrid.modify_by_region(hgrid, f'Drag_Python/{reg}', 0.001,depth1, 1)
+    fgrid.modify_by_region(hgrid, f'./{reg}', value, depth1, flag)
 
 fgrid.write('drag.gr3', overwrite=True)

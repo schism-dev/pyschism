@@ -111,7 +111,8 @@ class SchismInitParser:
         return SchoutParser(self.schism_init_f90)
 
 
-def patch_sample_param_to_avoid_f90nml_bug(schism_param_sample):
+def read_schism_param_sample_patched(schism_param_file):
+    schism_param_sample = pathlib.Path(schism_param_file).read_text().decode('utf-8').split('\n')
     pattern = r"^[! _A-Za-z0-9]+\([*\d]*(\d+)[^\d]*\)[ ]*="
     var_collection = []
     for i, line in enumerate(schism_param_sample):
@@ -132,7 +133,7 @@ def patch_sample_param_to_avoid_f90nml_bug(schism_param_sample):
                 else:
                     schism_param_sample.insert(i + 1, f"{var}({varcount}) = 0")
                 break
-
+    return '\n'.join(schism_param_sample)
 
 class Singleton(type):
     def __init__(cls, name, bases, dict):
@@ -149,8 +150,11 @@ class GitParamTemplate(metaclass=Singleton):
     def __init__(self, branch="master"):
         url = f"https://raw.githubusercontent.com/schism-dev/schism/{branch}/sample_inputs/param.nml"
         response = urllib.request.urlopen(url)
-        schism_param_sample = response.read().decode("utf-8").split("\n")
-        patch_sample_param_to_avoid_f90nml_bug(schism_param_sample)
+        tmpfile = tempfile.NamedTemporaryFile()
+        with open(tmpfile.name) as fh:
+            fh.write(response.read().decode("utf-8"))
+        # schism_param_sample = response.read().decode("utf-8").split("\n")
+        schism_param_sample = read_schism_param_sample_patched(tmpfile.name)
         tmpfile1 = tempfile.NamedTemporaryFile()
         with open(tmpfile1.name, "w") as f:
             f.write("\n".join(schism_param_sample))

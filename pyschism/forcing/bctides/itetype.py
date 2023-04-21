@@ -16,6 +16,10 @@ class Itetype(Bctype):
     def itetype(self) -> int:
         pass
 
+    @property
+    def forcing_digit(self):
+        return self.itetype
+
 
 class UniformTimeHistoryTemperature(Itetype):
 
@@ -30,13 +34,25 @@ class UniformTimeHistoryTemperature(Itetype):
 
 class ConstantTemperature(Itetype):
 
-    # def __init__(self, value, tobc: float = 1.):
-    #     self.value = value
-    #     super().__init__(tobc)
+    def __init__(self, value: float, nudging_factor: float):
+        self.value = value
+        if not (nudging_factor >= 0) and (nudging_factor <= 1):
+            raise ValueError(
+                    'Argument `nudging_factor` must be >= 0 and <= 1,'
+                    f'but got {nudging_factor}.')
+        self.nudging_factor = nudging_factor
+        super().__init__()
 
     @property
     def itetype(self) -> int:
         return 2
+
+    def get_boundary_string(self, *args, **kwargs) -> str:
+        boundary_string = [
+            f'{self.value:0.6f}',
+            f'{self.nudging_factor:0.6f}',
+        ]
+        return '\n'.join(boundary_string)
 
 
 class TemperatureInitialConditions(Itetype):
@@ -86,8 +102,21 @@ class SpatiallyVaryingTimeHistoryTemperature(Itetype):
         return 4
 
 
-Itetype0 = Itetype
-Itetype1 = UniformTimeHistoryTemperature
-Itetype2 = ConstantTemperature
-Itetype3 = TemperatureInitialConditions
-Itetype4 = SpatiallyVaryingTimeHistoryTemperature
+class Itetype0(Itetype):
+    pass
+
+
+class Itetype1(UniformTimeHistoryTemperature):
+    pass
+
+
+class Itetype2(ConstantTemperature):
+    pass
+
+
+class Itetype3(TemperatureInitialConditions):
+    pass
+
+
+class Itetype4(SpatiallyVaryingTimeHistoryTemperature):
+    pass

@@ -7,10 +7,15 @@ from pyschism.forcing import hycom
 
 
 class Ifltype(Bctype):
+
     @property
     @abstractmethod
     def ifltype(self) -> int:
         """Returns integer representig SCHISM ifltype code for bctides.in"""
+
+    @property
+    def forcing_digit(self):
+        return self.ifltype
 
 
 class UniformTimeHistoryVelocity(Ifltype):
@@ -25,12 +30,14 @@ class UniformTimeHistoryVelocity(Ifltype):
 
 class ConstantVelocity(Ifltype):
     def __init__(self, value):
-        raise NotImplementedError(f"{self.__class__.__name__}")
         self.value = value
 
     @property
     def ifltype(self) -> int:
         return 2
+
+    def get_boundary_string(self, *args, **kwargs):
+        return f'{self.value}'
 
 
 class TidalVelocity(Ifltype):
@@ -151,10 +158,29 @@ class OutflowVelocity(Ifltype):
         return -5
 
 
-Ifltype1 = UniformTimeHistoryVelocity
-Ifltype2 = ConstantVelocity
-Ifltype3 = TidalVelocity
-Ifltype4 = SpatiallyVaryingTimeHistoryVelocity
-Ifltype5 = TidalAndSpatiallyVaryingVelocityTimeHistory
-Ifltype_1 = ZeroVelocity
-Flather = ZeroVelocity
+class Ifltype1(UniformTimeHistoryVelocity):
+    pass
+
+
+class Ifltype2(ConstantVelocity):
+    pass
+
+
+class Ifltype3(TidalVelocity):
+    pass
+
+
+class Ifltype4(SpatiallyVaryingTimeHistoryVelocity):
+    pass
+
+
+class Ifltype5(TidalAndSpatiallyVaryingVelocityTimeHistory):
+    pass
+
+
+class Ifltype_1(ZeroVelocity):
+    pass
+
+
+class Flather(ZeroVelocity):
+    pass
