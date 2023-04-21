@@ -36,7 +36,9 @@ class BestTrackForcing(VortexTrack, NWS):
         storm: Union[str, PathLike, DataFrame, io.BytesIO],
         start_date: datetime = None,
         end_date: datetime = None,
-        hurricane_model: Union[str, HurricaneModel] = 'gahm'
+        hurricane_model: Union[str, HurricaneModel] = 'gahm',
+        *args,
+        **kwargs
     ):
 
         self.model = hurricane_model
