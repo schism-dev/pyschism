@@ -3,6 +3,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 import json
 import logging
+from typing import List
 from multiprocessing import Pool, cpu_count
 import os
 import pathlib
@@ -41,12 +42,19 @@ DATADIR.mkdir(exist_ok=True, parents=True)
 logger = logging.getLogger(__name__)
 
 
+def merge_lines(lines: List[LineString]) -> LineString:
+    points = []
+    for line in lines.geoms:
+            points.extend(p for p in line.coords)
+    return LineString(points)
+
 class NWMElementPairings:
-    def __init__(self, hgrid: Gr3, nwm_file=None, workers=-1):
+    def __init__(self, hgrid: Gr3, nwm_file=None, reach_layer=None, workers=-1):
 
         # TODO: Accelerate using dask: https://blog.dask.org/2017/09/21/accelerating-geopandas-1
 
         self._nwm_file = nwm_file
+        self._reach_layer = reach_layer
 
         logger.info("Computing NWMElementPairings...")
         self._hgrid = hgrid
@@ -148,8 +156,12 @@ class NWMElementPairings:
         for row in intersection.itertuples():
             poi = row.geometry
             reach = reaches.iloc[row.reachIndex].geometry
+            #if ir == 204: breakpoint()
             if not isinstance(reach, LineString):
                 reach = ops.linemerge(reach)
+            if not isinstance(reach, LineString):
+                logger.warning(f'ops.linemerge not working, using merge_line function')
+                reach = merge_lines(reach)
             for segment in map(
                 LineString, zip(reach.coords[:-1], reach.coords[1:])
             ):
@@ -265,7 +277,7 @@ class NWMElementPairings:
             for reach_layer in [
                 reach_layer
                 for reach_layer in fiona.listlayers(self.nwm_file)
-                if "reaches_conus" in reach_layer
+                if self._reach_layer in reach_layer
             ]:
                 layer_crs = gpd.read_file(
                     self.nwm_file, rows=1, layer=reach_layer).crs
@@ -290,15 +302,11 @@ class NWMElementPairings:
 
     @_nwm_file.setter
     def _nwm_file(self, nwm_file):
-        #nwm_file = (
-        #    list(DATADIR.glob("**/*hydrofabric*.gdb")
-        #         ) if nwm_file is None else nwm_file
-        #)
         nwm_file = (
-            list(glob.glob("/sciclone/schism10/lcui01/schism20/ICOGS/ICOGS3D/Forecast/NWM/oper_3D/NWM_v3_final/*hydrofabric*.gdb")
+            list(DATADIR.glob("**/*hydrofabric*.gdb")
                  ) if nwm_file is None else nwm_file
         )
-        print(nwm_file)
+        logger.info(nwm_file)
         if isinstance(nwm_file, list):
             if len(nwm_file) == 0:
                 tmpdir = tempfile.TemporaryDirectory()
