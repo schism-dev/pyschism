@@ -9,8 +9,12 @@ import tarfile
 import tempfile
 import unittest
 import urllib.request
+from datetime import datetime, timedelta
 
-from pyschism.cmd.bctides import add_bctides, BctidesCli
+from pyschism.cmd.bctides import BctidesCli
+from pyschism.driver import ModelConfig
+from pyschism.forcing.bctides import iettype, ifltype
+from pyschism.mesh import Hgrid
 
 
 logging.basicConfig(level=logging.INFO, force=True)
@@ -105,6 +109,44 @@ class ModelConfigurationTestCase(unittest.TestCase):
                 '--overwrite'
             ])
         BctidesCli(args)
+
+    def test_simple_tidal_setup(self):
+        # Inputs: Modify As Needed!
+        start_date = "2018091000" #in YYYYMMDDHH format
+        end_date = "2018091600" #in YYYYMMDDHH format
+
+        tide_source = "tpxo"
+
+        dt = timedelta(seconds=150.)
+        nspool = timedelta(minutes=20.)
+
+        start_date = datetime.strptime(start_date, "%Y%m%d%H")
+        end_date = datetime.strptime(end_date, "%Y%m%d%H")
+        rnday = end_date - start_date
+
+        hgrid = Hgrid.open(
+            'https://raw.githubusercontent.com/geomesh/test-data/main/NWM/hgrid.ll',
+            crs=4326
+        )
+
+        config = ModelConfig(
+            hgrid=hgrid,
+            iettype=iettype.Iettype3(database=tide_source),
+            ifltype=ifltype.Ifltype3(database=tide_source),
+        )
+
+        coldstart = config.coldstart(
+            start_date=start_date,
+            end_date=start_date + rnday,
+            timestep=dt,
+            nspool=timedelta(hours=1),
+            elev=True,
+            dahv=True,
+        )
+
+        with tempfile.TemporaryDirectory() as dn:
+            tmpdir = pathlib.Path(dn)
+            coldstart.write(tmpdir, overwrite=True)
 
 
 if __name__ == '__main__':
