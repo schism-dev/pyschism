@@ -18,6 +18,7 @@ import utm
 
 from pyschism.enums import NWSType
 from pyschism.forcing.nws.base import NWS
+from pyschism.mesh import gridgr3
 
 
 class HurricaneModel(IntEnum):
@@ -37,11 +38,13 @@ class BestTrackForcing(VortexTrack, NWS):
         start_date: datetime = None,
         end_date: datetime = None,
         hurricane_model: Union[str, HurricaneModel] = 'gahm',
+        windrot: gridgr3.Windrot = None,
         *args,
         **kwargs
     ):
 
         self.model = hurricane_model
+        self.windrot = windrot
 
         VortexTrack.__init__(
             self,
@@ -96,9 +99,19 @@ class BestTrackForcing(VortexTrack, NWS):
                 logging.debug(f'skipping existing file "{output}"')
         return summary
 
-    def write(self, path: PathLike, overwrite: bool = False):
+    def write(
+        self,
+        path: PathLike,
+        overwrite: bool = False,
+        windrot: bool = True,
+    ):
         VortexTrack.to_file(
             self, path=path/'hurricane-track.dat', overwrite=overwrite)
+
+        # write windrot data
+        if windrot is not False and self.windrot is not None:
+            windrot = "windrot_geo2proj.gr3" if windrot is True else windrot
+            self.windrot.write(path / "windrot_geo2proj.gr3", overwrite)
 
     @property
     def dtype(self) -> NWSType:
@@ -172,3 +185,16 @@ class BestTrackForcing(VortexTrack, NWS):
 
         if _found_start_date is False:
             raise Exception(f'No data within mesh bounding box for storm {self.storm_id}.')
+
+    @property
+    def windrot(self):
+        return self._windrot
+
+    @windrot.setter
+    def windrot(self, windrot: Union[gridgr3.Windrot, None]):
+        if not isinstance(windrot, (gridgr3.Windrot, type(None))):
+            raise TypeError(
+                f"Argument windrot must be of type {gridgr3.Windrot} or None, "
+                f"not type {type(windrot)}."
+            )
+        self._windrot = windrot

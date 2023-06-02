@@ -69,5 +69,3 @@ def test_paramwind_from_file():
         driver.write(tmpdir / 'paramwind', overwrite=True)
 
 
-if __name__ == '__main__':
-    test_paramwind()
