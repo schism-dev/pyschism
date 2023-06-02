@@ -226,6 +226,8 @@ class Bctides(metaclass=BctidesMeta):
                 job.start()
             for job in jobs:
                 job.join()
+            if any(j.exitcode != 0 for j in jobs):
+                raise RuntimeError("Some parallel writer jobs failed!")
         else:
             if elev2D:
                 write_elev2D()
