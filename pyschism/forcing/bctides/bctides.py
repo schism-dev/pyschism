@@ -219,8 +219,13 @@ class Bctides(metaclass=BctidesMeta):
             from multiprocessing import Process
 
             jobs = [
-                Process(target=f)
-                for f in (write_elev2D, write_uv3D, write_tem3D, write_sal3D)
+                Process(target=fn)
+                for fn, fl in (
+                    (write_elev2D, elev2D),
+                    (write_uv3D, uv3D),
+                    (write_tem3D, tem3D),
+                    (write_sal3D, sal3D)
+                ) if fl
             ]
             for job in jobs:
                 job.start()
