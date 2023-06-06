@@ -212,8 +212,8 @@ class IcField(Gr3Field):
 class ElevIc(IcField):
     @classmethod
     def default(cls, hgrid, offset=0.1):
-        obj = hgrid.copy()
-        obj.values[:] = -np.maximum(0.0, hgrid.values - offset)
+        obj = cls.constant(hgrid, 0.0)
+        obj.values[:] = np.maximum(0.0, hgrid.values - offset)
         return obj
 
 class TempIc(IcField):
