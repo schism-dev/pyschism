@@ -209,12 +209,11 @@ class IcField(Gr3Field):
     pass
 
 
-class ElevIc(Gr3):
+class ElevIc(IcField):
     @classmethod
     def default(cls, hgrid, offset=0.1):
-        #Use Gr3.open to read hgrid.gr3 thus keep original bathymetry 
         obj = hgrid.copy()
-        obj.values[:] = np.maximum(0, -hgrid.values - offset)
+        obj.values[:] = -np.maximum(0.0, hgrid.values - offset)
         return obj
 
 class TempIc(IcField):
