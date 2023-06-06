@@ -40,11 +40,11 @@ def convert_longitude(ds, bbox):
 
     t0 = time()
     ds = (
-        ds.swap_dims({lon_name: '_lon_adjusted'})
+        ds.swap_dims({'lon': '_lon_adjusted'})
         .sel(**{'_lon_adjusted': sorted(ds._lon_adjusted)})
-        .drop(lon_name)
+        .drop('lon')
     )
-    ds = ds.rename({'_lon_adjusted': lon_name})
+    ds = ds.rename({'_lon_adjusted': 'lon'})
     #ds = ds.sortby(ds.lon)
     #ds.coords['lon'].attrs = lon_attr
     logger.info(f'swap dims took {time()-t0} seconds!')
@@ -713,7 +713,7 @@ class Nudge:
                 xmin, xmax = np.min(nlon), np.max(nlon)
                 ymin, ymax = np.min(nlat), np.max(nlat)
                 bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
-                #logger.info(f'xmin is {xmin}, xmax is {xmax}')
+                logger.info(f'bbox for nudge is {bbox}')
 
                 time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2, _ = get_idxs(date, database, bbox, lonc=nlonc, latc=nlatc)
 
