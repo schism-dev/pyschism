@@ -505,7 +505,11 @@ class Nudge:
 
 
     def gen_nudge(self, outdir: Union[str, os.PathLike], rlmax = 1.5, rnu_day=0.25):
-
+        """
+        set up nudge zone within rlmax distance from the ocean boundary;
+        modify the nudging zone width rlmax.
+        rlmax can be a uniform value, e.g., rlmax = 1.5 (degree if hgrid is lon/lat)
+        """
           
         outdir = pathlib.Path(outdir)
 
@@ -522,6 +526,7 @@ class Nudge:
         global_idxs = {}
 
         t0 = time()
+        nudge_coeff = np.zeros(NP, dtype=float)
         for i in self.ocean_bnd_ids:
             print(f'boundary {i}')
             bnd_idxs = gdf.iloc[i].indexes
@@ -531,7 +536,7 @@ class Nudge:
             out[out<0] = 0
             out[out>rnu_max] = rnu_max
             fp = out>0
-            nudge_coeff[fp] = out[fp]
+            nudge_coeff[fp] = np.maximum(out[fp], nudge_coeff[fp])
 
             idxs_nudge=np.zeros(NP, dtype=int)
             idxs=np.where(out > 0)[0]
@@ -581,6 +586,10 @@ class Nudge:
         return global_idxs
 
     def fetch_data(self, outdir: Union[str, os.PathLike], vgrid, start_date, rnday, restart = False, rlmax = None, rnu_day=None):
+        """
+        fetch data from the database and generate nudge file
+        see gen_nudge for the meaning of rlmax, rnu_day
+        """
 
         outdir = pathlib.Path(outdir)
 
@@ -601,14 +610,12 @@ class Nudge:
         #Get the index for nudge
         global_idxs = self.gen_nudge(outdir, rlmax = rlmax, rnu_day=rnu_day)
 
-
         #get bathymetry
         depth = self.hgrid.values
 
         #compute zcor
         zcor = depth[:,None]*sigma
         nvrt=zcor.shape[1]
-
 
         #allocate output variables
         include = global_idxs[0]
@@ -665,7 +672,6 @@ class Nudge:
 
             dst_salt.createVariable('tracer_concentration', 'f', ('time', 'node', 'nLevels', 'one'))
             #dst_salt['tracer_concentration'][:,:,:,:] = timeseries_s
-        
 
         logger.info('**** Accessing GOFS data*****')
         if restart:
@@ -683,7 +689,6 @@ class Nudge:
 
             database=get_database(date)
             logger.info(f'Fetching data for {date} from database {database}')
-
 
             ind1 = 0
             ind2 = 0
@@ -730,12 +735,10 @@ class Nudge:
                         f'lon[{lon_idx1}:1:{lon_idx2}],depth[0:1:-1],time[{time_idx}],' + \
                         f'water_temp[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
                         f'salinity[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
-                #logger.info(url)
 
                 ds=Dataset(url)
                 salt=np.squeeze(ds['salinity'][:,:,:])
                 temp=np.squeeze(ds['water_temp'][:,:,:])
-                #logger.info(f'The shape of temp is {temp.shape}')
 
                 #Convert temp to potential temp
                 dep=ds['depth'][:]
