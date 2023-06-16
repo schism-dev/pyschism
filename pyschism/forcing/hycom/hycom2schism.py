@@ -521,11 +521,9 @@ class Nudge:
         gdf = self.hgrid.boundaries.open.copy()
         elnode = self.hgrid.elements.array
         NE, NP = elnode.shape[0],len(lon)
-        nudge_coeff = np.zeros(NP, dtype=float)
-
-        global_idxs = {}
 
         t0 = time()
+        global_idxs = {}
         nudge_coeff = np.zeros(NP, dtype=float)
         for i in self.ocean_bnd_ids:
             print(f'boundary {i}')
