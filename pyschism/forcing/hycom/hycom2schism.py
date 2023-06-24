@@ -509,6 +509,7 @@ class Nudge:
         set up nudge zone within rlmax distance from the ocean boundary;
         modify the nudging zone width rlmax.
         rlmax can be a uniform value, e.g., rlmax = 1.5 (degree if hgrid is lon/lat)
+        TODO: seperate gen_nudge function
         """
           
         outdir = pathlib.Path(outdir)
