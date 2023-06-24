@@ -129,6 +129,7 @@ setuptools.setup(
         'xarray',
         'xmltodict',
         'zarr',
+        'pylib-essentials',
     ],
     entry_points={'console_scripts': ['pyschism = pyschism.__main__:main']},
     tests_require=['nose'],
