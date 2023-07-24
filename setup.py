@@ -130,6 +130,7 @@ setuptools.setup(
         'xmltodict',
         'zarr',
         'pylib-essentials',
+        'appdirs',
     ],
     entry_points={'console_scripts': ['pyschism = pyschism.__main__:main']},
     tests_require=['nose'],
