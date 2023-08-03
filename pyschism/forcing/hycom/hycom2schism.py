@@ -11,7 +11,6 @@ from time import time
 
 import numpy as np
 import scipy as sp
-#from numba import jit, prange
 import netCDF4 as nc
 from netCDF4 import Dataset
 from matplotlib.transforms import Bbox

@@ -266,6 +266,7 @@ class NWMElementPairings:
             #    for reach_layer in fiona.listlayers(self.nwm_file)
             #    if "reaches" in reach_layer
             #]:
+            logger.info(f"nwm_file is {self.nwm_file}")
             reach_layers = ['nwm_reaches_conus']
             for reach_layer in reach_layers:
                 logger.info(f'layer is {reach_layer}')

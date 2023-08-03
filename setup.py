@@ -112,7 +112,6 @@ setuptools.setup(
         'metpy',
         'netCDF4',
         'netcdf-flattener>=1.2.0',
-        'numba',
         'ordered-set',
         'psutil',
         'pygeos',
