@@ -148,7 +148,7 @@ class SCHOUT(
             schout.append(f"  iout_sta={self.iout_sta}")
             schout.append(f"  nspool_sta={nspool_sta}")
         for var in dir(self):
-            if var.startswith('iof'):
+            if var.startswith('_iof'):
                 for i, state in enumerate(getattr(self, var)):
                     if state == 1:
                         schout.append(f'  {var[1:]}({i+1})={state}')
@@ -173,7 +173,7 @@ class SCHOUT(
             data['iout_sta'] = self.iout_sta
             data['nspool_sta'] = nspool_sta
         for var in dir(self):
-            if var.startswith('iof'):
+            if var.startswith('_iof'):
                 _var = var[1:]
                 data[_var] = len(getattr(self, var)) * [0]
                 for i, state in enumerate(getattr(self, var)):
