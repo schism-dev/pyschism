@@ -626,20 +626,17 @@ class GOOGLEHindcastInventory(AWSDataInventory):
 
     def request_data(self, request_time, request_time2):
 
-        fname = self.tmpdir / f'nwm.t00z.{self.product[:12]}.channel_rt_1.' \
+        filename = self.tmpdir / f'nwm.t00z.{self.product[:12]}.channel_rt_1.' \
             f'{request_time.strftime("%Y%m%d%H")}.conus.nc'
         #logger.info(f'fname is {fname}')
 
-        if fname.is_file():
-            cached_file = list(self.tmpdir.glob(f'**/{fname.name}'))
+        if filename.is_file():
+            cached_file = list(self.tmpdir.glob(f'**/{filename.name}'))
             if len(cached_file) == 1:
-                fname = cached_file[0]
-                logger.info(f'Use cached file {fname}')
+                filename = cached_file[0]
+                logger.info(f'Use cached file {filename}')
         else:
-        
-            fname = f'{self.start_date.strftime("%Y%m%d")}/nwm.t00z.' \
-                f'{self.product[:12]}.channel_rt_1.{request_time.strftime("%Y%m%d%H")}.conus.nc'
-
+            filename.parent.mkdir(parents=True, exist_ok=True) 
             logger.info(f'Downloading file {request_time}, ')
 
             it = request_time.strftime("%H")
@@ -652,16 +649,16 @@ class GOOGLEHindcastInventory(AWSDataInventory):
                 f'/{self.product}/nwm.t00z.{self.product[:12]}.channel_rt_1.f{it}.conus.nc'
             logger.info(f'{url}')
             try:
-                wget.download(url, fname)
+                wget.download(url, str(filename))
             except:
                 logger.info(f'No data for {request_time}!')
                 
-        return fname
+        return filename
 
     @property
     def output_interval(self) -> timedelta:
         return {
-            'medium_range_mem1': timedelta(hours=1)
+            'medium_range_mem1': timedelta(hours=3)
         }[self.product]
 
     @property
