@@ -26,9 +26,9 @@ if __name__ == "__main__":
 
     pscr = '/sciclone/pscr/lcui01/GFS/'
     rnday = 5
-    record = 1
+    record = 1 # parameter for how many days of time records in each nc file (1 for hindcast, > 1 for forecast)
 
-    hgrid = Hgrid.open('../../static/hgrid.gr3', crs='epsg:4326')
+    hgrid = Hgrid.open('./hgrid.gr3', crs='epsg:4326')
 
     gfs = GFS(start_date=startdate, rnday=rnday, pscr=pscr, record=record, bbox=hgrid.bbox)
 

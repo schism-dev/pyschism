@@ -9,7 +9,7 @@ from pyschism.mesh.hgrid import Hgrid
 if __name__ == '__main__':
 
     startdate=datetime(2018, 1, 1)
-    rnday=366
+    rnday=30  #limit rnday less than 180 days (size constrain from cdsapi)
 
     t0=time()
     hgrid=Hgrid.open('./hgrid.gr3',crs='EPSG:4326')

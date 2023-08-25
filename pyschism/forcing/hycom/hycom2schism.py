@@ -76,8 +76,8 @@ def get_database(date, Bbox=None):
 
 def get_idxs(date, database, bbox, lonc=None, latc=None):
 
-    if date >= datetime.utcnow():
-        date2 = datetime.utcnow() - timedelta(days=1)
+    if date >= datetime.now():
+        date2 = datetime.now() - timedelta(days=1)
         baseurl = f'https://tds.hycom.org/thredds/dodsC/{database}/FMRC/runs/GLBy0.08_930_FMRC_RUN_{date2.strftime("%Y-%m-%dT12:00:00Z")}?depth[0:1:-1],lat[0:1:-1],lon[0:1:-1],time[0:1:-1]'
     else:
         baseurl=f'https://tds.hycom.org/thredds/dodsC/{database}?lat[0:1:-1],lon[0:1:-1],time[0:1:-1],depth[0:1:-1]'
@@ -406,8 +406,8 @@ class OpenBoundaryInventory:
 
                 time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2, _ = get_idxs(date, database, bbox, lonc=blonc, latc=blatc)
 
-                if date >= datetime.utcnow():
-                    date2 = datetime.utcnow() - timedelta(days=1)
+                if date >= datetime.now():
+                    date2 = datetime.now() - timedelta(days=1)
                     url = f'https://tds.hycom.org/thredds/dodsC/{database}/FMRC/runs/GLBy0.08_930_FMRC_RUN_' + \
                         f'{date2.strftime("%Y-%m-%dT12:00:00Z")}?depth[0:1:-1],lat[{lat_idx1}:1:{lat_idx2}],' + \
                         f'lon[{lon_idx1}:1:{lon_idx2}],time[{time_idx}],' + \
@@ -720,8 +720,8 @@ class Nudge:
 
                 time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2, _ = get_idxs(date, database, bbox, lonc=nlonc, latc=nlatc)
 
-                if date >= datetime.utcnow():
-                    date2 = datetime.utcnow() - timedelta(days=1)
+                if date >= datetime.now():
+                    date2 = datetime.now() - timedelta(days=1)
                     url = f'https://tds.hycom.org/thredds/dodsC/{database}/FMRC/runs/GLBy0.08_930_FMRC_RUN_' + \
                         f'{date2.strftime("%Y-%m-%dT12:00:00Z")}?depth[0:1:-1],lat[{lat_idx1}:1:{lat_idx2}],' + \
                         f'lon[{lon_idx1}:1:{lon_idx2}],time[{time_idx}],' + \
