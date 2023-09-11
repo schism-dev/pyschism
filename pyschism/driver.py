@@ -288,6 +288,7 @@ class ModelDriver:
         # set opt
         self.param.opt.start_date = start_date
         self.param.opt.ics = 2 if self.config.hgrid.crs.is_geographic is True else 1
+        self.param.opt.ncor = 1 if self.param.opt.ics == 2 else 0
         self.param.opt.dramp = dramp
         self.param.opt.drampbc = drampbc
         self.param.opt.dramp_ss = dramp_ss
