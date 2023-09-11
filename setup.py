@@ -129,6 +129,7 @@ setuptools.setup(
         'xarray',
         'xmltodict',
         'zarr',
+        'appdirs',
     ],
     entry_points={'console_scripts': ['pyschism = pyschism.__main__:main']},
     tests_require=['nose'],
