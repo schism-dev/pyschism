@@ -128,7 +128,6 @@ setuptools.setup(
         'xarray',
         'xmltodict',
         'zarr',
-        'pylib-essentials',
         'appdirs',
     ],
     entry_points={'console_scripts': ['pyschism = pyschism.__main__:main']},
