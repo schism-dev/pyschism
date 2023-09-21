@@ -2,17 +2,13 @@ from collections import OrderedDict
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 import logging
-# import os
 from typing import Callable, Union
 
 import numpy as np
 
-# from pyschism.forcing.tides import bctypes
 from pyschism.forcing.bctides.tpxo import TPXO
 from pyschism.forcing.bctides.fes2014 import FES2014
 from pyschism.forcing.bctides.hamtide import HAMTIDE
-# from pyschism.forcing.baroclinic.gofs import GOFS
-# from pyschism.forcing.baroclinic.rtofs import RTOFS
 
 _logger = logging.getLogger(__name__)
 

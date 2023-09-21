@@ -148,6 +148,5 @@ class ModelConfigurationTestCase(unittest.TestCase):
             tmpdir = pathlib.Path(dn)
             coldstart.write(tmpdir, overwrite=True)
 
-
 if __name__ == '__main__':
     unittest.main()
