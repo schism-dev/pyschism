@@ -59,6 +59,10 @@ hgrid = Hgrid.open('hgrid.gr3')
 hgrid.write("/path/to/output/file.2dm", fmt='2dm')
 ```
 ---
+## Online manual
+
+https://schism-dev.github.io/schism/master/getting-started/pre-processing-with-pyschism/overview.html
+
 ## References
 
 If you used this software as part of your work, please use the following citation format.
