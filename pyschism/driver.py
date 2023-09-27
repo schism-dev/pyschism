@@ -46,8 +46,6 @@ class ModelForcings:
         driver: "ModelDriver",
         output_directory,
         overwrite,
-        parallel_download,
-        progress_bar,
     ):
 
         if self.bctides is not None:
@@ -56,8 +54,6 @@ class ModelForcings:
                 start_date=driver.param.opt.start_date,
                 end_date=driver.param.core.rnday,
                 overwrite=True,
-                parallel_download=parallel_download,
-                progress_bar=progress_bar,
             )
 
         if self.nws is not None:
@@ -487,8 +483,6 @@ class ModelDriver:
         salt_ic=True,
         # rtofs=True,
         hydrology=True,
-        parallel_download=True,
-        progress_bar=False,
     ):
         """Writes to disk the full set of input files necessary to run SCHISM."""
 
@@ -548,7 +542,7 @@ class ModelDriver:
         obj_write(stations, self.stations, "station.in", overwrite)
 
         self.config.forcings.write(
-            self, output_directory, overwrite, parallel_download, progress_bar
+            self, output_directory, overwrite,
         )
 
         MakefileDriver(self.server_config, hotstart=self.hotstart).write(
