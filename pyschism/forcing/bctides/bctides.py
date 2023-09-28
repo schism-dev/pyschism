@@ -2,17 +2,19 @@ from datetime import datetime, timedelta
 from functools import cached_property, lru_cache 
 import pathlib
 import logging
+from typing import Union
 
 from pyschism.forcing.bctides import Tides
 
 logger = logging.getLogger(__name__)
+
 class Bctides:
 
     def __init__(
         self,
         hgrid,
         flags,
-        constituents = 'major',
+        constituents: Union[str, list] = 'major',
         database = 'tpxo',
         cutoff_depth: float = 50.0,
         ethconst = None,
@@ -74,6 +76,8 @@ class Bctides:
  
         #get amplitude and phase for each open boundary         
         f.append(f"{len(self.gdf)} !nope")
+        if len(self.gdf) != len(self.flags):
+            raise ValueError(f'Number of open boundary {len(self.gdf)} is not consistent with number of given bctypes {len(self.flags)}!')
         for ibnd, (boundary, flag) in enumerate(zip(self.gdf.itertuples(), self.flags)):
             logger.info(f"Processing boundary {ibnd}:")
             #number of nodes and flags
@@ -218,7 +222,7 @@ class Bctides:
         output_directory,
         start_date: datetime = None,
         rnday = None,
-        constituents = ['K1', 'O1'],
+        constituents = 'major',
         overwrite: bool = True, 
     ):
 
