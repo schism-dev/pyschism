@@ -70,6 +70,7 @@ if __name__ == "__main__":
     sthconst = []
     tobc = []
     sobc = []
+    relax = []
 
     for ibnd, flag in enumerate(flags):
         iettype, ifltype, itetype, isatype = [i for i in flag]
@@ -80,19 +81,25 @@ if __name__ == "__main__":
             ethconst.append(np.nan)
 
         if ifltype == 2:
-            val = input(f"Discharge value at boundary {ibnd+1}: ")
+            val = input(f"Discharge value (negative for inflow) at boundary {ibnd+1}: ")
             vthconst.append(float(val))
+        elif ifltype == -4:
+            val = input(f"Relaxation constants (between 0 and 1) for inflow at boundary {ibnd+1}: ")
+            relax.append(float(val))
+            val = input(f"Relaxation constants (between 0 and 1) for outflow at boundary {ibnd+1}: ")
+            relax.append(float(val))
+            
         else:
             vthconst.append(np.nan)
 
         if itetype == 2:
             val = input(f"Temperature value at boundary {ibnd+1}: ")
             tthconst.append(float(val))
-            val = input(f"Nuding factor for temperature at boundary {ibnd+1}: ")
+            val = input(f"Nuding factor (between 0 and 1) for temperature at boundary {ibnd+1}: ")
             tobc.append(float(val))
         elif itetype == 1 or itetype == 3 or itetype == 4:
             tthconst.append(np.nan)
-            val = input(f"Nuding factor for temperature at boundary {ibnd+1}: ")
+            val = input(f"Nuding factor (between 0 and 1) for temperature at boundary {ibnd+1}: ")
             tobc.append(float(val))
         else:
             tthconst.append(np.nan)
@@ -101,25 +108,21 @@ if __name__ == "__main__":
         if isatype == 2:
             val = input(f"Salinity value at boundary {ibnd+1}: ")
             sthconst.append(float(val))
-            val = input(f"Nuding factor for salinity at boundary {ibnd+1}: ")
+            val = input(f"Nuding factor (between 0 and 1) for salinity at boundary {ibnd+1}: ")
             sobc.append(float(val))
         elif isatype == 1 or isatype == 3 or isatype == 4:
             sthconst.append(np.nan)
-            val = input(f"Nuding factor for salinity at boundary {ibnd+1}: ")
+            val = input(f"Nuding factor (between 0 and 1) for salinity at boundary {ibnd+1}: ")
             sobc.append(float(val))
         else:
             sthconst.append(np.nan)
             sobc.append(np.nan)
 
-
-    #start_date = datetime(2014, 12, 1)
-    #rnday = 397
     outdir = './'
     hgrid = Hgrid.open(hgrid_filename, crs="epsg:4326")
 
     bctides=Bctides(
         hgrid = hgrid, 
-        #flags = [[5, 5, 4, 4], [5, 5, 4, 4], [0, 1, 2, 2]],
         flags = flags,
         constituents = constituents, 
         database = database,
@@ -130,6 +133,7 @@ if __name__ == "__main__":
         sthconst = sthconst,
         tobc = tobc,
         sobc = sobc,
+        relax = relax,
     )
 
     bctides.write(

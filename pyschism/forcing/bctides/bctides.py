@@ -24,6 +24,7 @@ class Bctides:
         sthconst: list = None,
         tobc: list = None,
         sobc: list = None,
+        relax: list = None,
     ):
 
         self.hgrid = hgrid
@@ -37,6 +38,7 @@ class Bctides:
         self.sthconst = sthconst 
         self.tobc = tobc
         self.sobc = sobc
+        self.relax = relax
 
     def __str__(self):
  
@@ -60,6 +62,8 @@ class Bctides:
                         f"{forcing[4]:G}",
                     ])
                 )
+        else:
+            f.append(f"0 {self.cutoff_depth} !number of earth tidal potential, cut-off depth for applying tidal potential")
 
         #get tidal boundary 
         f.append(f"{self.nbfr:d} !nbfr")
@@ -140,10 +144,8 @@ class Bctides:
             elif ifltype == 4 or -4:
                 logger.warning("time history of velocity (not discharge!) is read in from uv3D.th.nc (netcdf)")
                 if ifltype == -4:
-                    logger.info(f"You are using type 4 , please specify relaxation constants for inflow and outflow (between 0 and 1 with 1 being strongest nudging)")
-                    rel1 = input()
-                    rel2 = input()
-                    f.append(f"{rel1} {rel2}")
+                    logger.info(f"You are using type -4, relaxation constants for inflow  is {self.relax[0]}, for outflow is {self.relax[1]}")
+                    f.append(f"{self.relax[0]} {self.relax[1]} !relaxation constant")
             elif ifltype == -1: 
                 raise NotImplementedError(f"Velocity type {ifltype} not implemented yet!")
                 #logger.info(f"Flather type radiation b.c. (iettype must be 0 in this case)!")
