@@ -3,8 +3,9 @@ import os
 import argparse
 from datetime import datetime, timedelta
 import logging
-import pathlib
 import json
+
+import numpy as np
 
 from pyschism.mesh import Hgrid
 from pyschism.forcing.bctides import Bctides
@@ -55,6 +56,62 @@ if __name__ == "__main__":
     except json.JSONDecodeError:
         raise TypeError("Invalid JSON format for bctype list.")
 
+    #earth tidal potential
+    add_earth_tidal_potential = input("Would you like to add earth tidal potential? Y/N: ")
+    if add_earth_tidal_potential == "Y":
+        earth_tidal_potential = True
+    else:
+        earth_tidal_potential = False
+
+    #Check if constant values needed
+    ethconst = []
+    vthconst = []
+    tthconst = []
+    sthconst = []
+    tobc = []
+    sobc = []
+
+    for ibnd, flag in enumerate(flags):
+        iettype, ifltype, itetype, isatype = [i for i in flag]
+        if iettype == 2:
+            val = input(f"Elevation value at boundary {ibnd+1}: ")
+            ethconst.append(float(val))
+        else:
+            ethconst.append(np.nan)
+
+        if ifltype == 2:
+            val = input(f"Discharge value at boundary {ibnd+1}: ")
+            vthconst.append(float(val))
+        else:
+            vthconst.append(np.nan)
+
+        if itetype == 2:
+            val = input(f"Temperature value at boundary {ibnd+1}: ")
+            tthconst.append(float(val))
+            val = input(f"Nuding factor for temperature at boundary {ibnd+1}: ")
+            tobc.append(float(val))
+        elif itetype == 1 or itetype == 3 or itetype == 4:
+            tthconst.append(np.nan)
+            val = input(f"Nuding factor for temperature at boundary {ibnd+1}: ")
+            tobc.append(float(val))
+        else:
+            tthconst.append(np.nan)
+            tobc.append(np.nan)
+
+        if isatype == 2:
+            val = input(f"Salinity value at boundary {ibnd+1}: ")
+            sthconst.append(float(val))
+            val = input(f"Nuding factor for salinity at boundary {ibnd+1}: ")
+            sobc.append(float(val))
+        elif isatype == 1 or isatype == 3 or isatype == 4:
+            sthconst.append(np.nan)
+            val = input(f"Nuding factor for salinity at boundary {ibnd+1}: ")
+            sobc.append(float(val))
+        else:
+            sthconst.append(np.nan)
+            sobc.append(np.nan)
+
+
     #start_date = datetime(2014, 12, 1)
     #rnday = 397
     outdir = './'
@@ -66,8 +123,13 @@ if __name__ == "__main__":
         flags = flags,
         constituents = constituents, 
         database = database,
-        tthconst = 10.0,
-        sthconst = 0.0,
+        add_earth_tidal = earth_tidal_potential,
+        ethconst = ethconst,
+        vthconst = vthconst,
+        tthconst = tthconst,
+        sthconst = sthconst,
+        tobc = tobc,
+        sobc = sobc,
     )
 
     bctides.write(
