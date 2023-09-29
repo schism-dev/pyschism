@@ -19,7 +19,7 @@ from pyschism.forcing.nws.nws2 import NWS2
 from pyschism.forcing.nws.best_track import BestTrackForcing
 
 # from pyschism.forcing.baroclinic import BaroclinicForcing
-from pyschism.forcing.bctides import Bctides, iettype, ifltype, isatype, itetype
+from pyschism.forcing.bctides import Bctides
 from pyschism.makefile import MakefileDriver
 from pyschism.mesh import Hgrid, Vgrid, Fgrid, gridgr3, prop
 from pyschism.mesh.fgrid import ManningsN, DragCoefficient
@@ -52,7 +52,7 @@ class ModelForcings:
             self.bctides.write(
                 output_directory,
                 start_date=driver.param.opt.start_date,
-                end_date=driver.param.core.rnday,
+                rnday=driver.param.core.rnday,
                 overwrite=True,
             )
 
@@ -687,10 +687,17 @@ class ModelConfig(metaclass=ModelConfigMeta):
         hgrid: Hgrid,
         vgrid: Vgrid = None,
         fgrid: Fgrid = None,
-        iettype: iettype.Iettype = None,
-        ifltype: ifltype.Ifltype = None,
-        itetype: itetype.Itetype = None,
-        isatype: isatype.Isatype = None,
+        flags = None,
+        constituents = 'major',
+        database = 'tpxo',
+        add_earth_tidal = True,
+        ethconst = None,
+        vthconst = None,
+        tthconst = None,
+        sthconst = None,
+        tobc = None,
+        sobc = None,
+        relax = None, 
         # itrtype: itrtype.Itrtype = None,
         nws: NWS = None,
         source_sink: Union[List[SourceSink], SourceSink] = None,
@@ -708,10 +715,16 @@ class ModelConfig(metaclass=ModelConfigMeta):
         self.hgrid = hgrid
         self.vgrid = vgrid
         self.fgrid = fgrid
-        self.iettype = iettype
-        self.ifltype = ifltype
-        self.itetype = itetype
-        self.isatype = isatype
+        self.flags = flags
+        self.constituents = constituents
+        self.add_earth_tidal = add_earth_tidal
+        self.ethconst = ethconst
+        self.vthconst = vthconst
+        self.tthconst = tthconst
+        self.sthconst = sthconst
+        self.tobc = tobc
+        self.sobc = sobc
+        self.relax = relax
         # self.itrtype = itrtype
         self.nws = nws
         self.source_sink = source_sink
@@ -941,12 +954,17 @@ class ModelConfig(metaclass=ModelConfigMeta):
     def bctides(self):
         if not hasattr(self, "_bctides"):
             self._bctides = Bctides(
-                self.hgrid,
-                vgrid=self.vgrid,
-                iettype=self.iettype,
-                ifltype=self.ifltype,
-                isatype=self.isatype,
-                itetype=self.itetype,
+                hgrid = self.hgrid,
+                flags = self.flags,
+                constituents = self.constituents,
+                add_earth_tidal = self.add_earth_tidal,
+                ethconst = self.ethconst,
+                vthconst = self.vthconst,
+                tthconst = self.tthconst,
+                sthconst = self.sthconst,
+                tobc = self.tobc,
+                sobc = self.sobc,
+                relax = self.relax,
                 # cutoff_depth=self.cutoff_depth,
             )
         return self._bctides
