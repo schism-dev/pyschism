@@ -1,12 +1,11 @@
 #! /usr/bin/env python
-from datetime import timedelta
+from datetime import datetime, timedelta
 import logging
 import pathlib
 import shutil
 
 from pyschism import dates
 from pyschism.driver import ModelConfig
-from pyschism.forcing.bctides import iettype, ifltype
 from pyschism.forcing.nws import NWS2, GFS, HRRR
 from pyschism.forcing.source_sink import NWM
 from pyschism.mesh import Hgrid
@@ -25,22 +24,24 @@ def test_barotropic_forecast():
             "https://raw.githubusercontent.com/geomesh/test-data/main/NWM/hgrid.ll",
             crs="epsg:4326",
         ),
-        iettype=iettype.Iettype3(database="tpxo"),
-        ifltype=ifltype.Ifltype3(database="tpxo"),
-        nws=NWS2(GFS(), HRRR()),
+        flags = [[3, 3, 0, 0]],
+        constituents = 'major',
+        database="tpxo",
+        #nws=NWS2(GFS(), HRRR()),
         source_sink=NWM(
             # aggregation_radius=4000.
         ),
     )
 
-    config.forcings.nws.sflux_2.inventory.file_interval = timedelta(hours=6)
+    #config.forcings.nws.sflux_2.inventory.file_interval = timedelta(hours=6)
 
     # create reference dates
-    nearest_cycle = dates.nearest_cycle()
+    #nearest_cycle = dates.nearest_cycle()
+    start_date = datetime(2023, 9, 10)
     spinup_time = timedelta(days=1)
     coldstart = config.coldstart(
-        start_date=nearest_cycle - spinup_time,
-        end_date=nearest_cycle,
+        start_date= start_date,
+        end_date=start_date + timedelta(days=3),
         timestep=300.0,
         dramp=spinup_time,
         dramp_ss=spinup_time,
