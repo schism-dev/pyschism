@@ -9,7 +9,9 @@ from pyschism.forcing.bctides import Tides
 logger = logging.getLogger(__name__)
 
 class Bctides:
-    """
+    """Bctides class
+    This is the bctides class to generate bctides.in file.
+    
     """
 
     def __init__(
@@ -28,6 +30,23 @@ class Bctides:
         sobc: list = None,
         relax: list = None,
     ):
+    """Initialize Bctides ojbect
+    Parameters
+    --------
+    hgrid: Hgrid object
+    flags: nested list of bctypes
+    constituents: str or list
+    dtabase: str ('tpxo' or 'fes2014')
+    add_earth_tidal: bool
+    cutoff_depth: float
+    ethconst: list (constant elevation value for each open boundary)
+    vthconst: list (constant discharge value for each open boundary)
+    tthconst: list (constant temperature value for each open boundary)
+    sthconst: list (constant salinity value for each open boundary)
+    tobc: list (nuding factor of temperature for each open boundary)
+    sobc: list (nuding factor of salinity for each open boundary)
+    realx: list (relaxation constants for inflow and outflow)
+    """
 
         self.hgrid = hgrid
         self.add_earth_tidal = add_earth_tidal
@@ -217,6 +236,15 @@ class Bctides:
         constituents = 'major',
         overwrite: bool = True, 
     ):
+    """
+    parameters
+    --------
+    output_directory: str
+    start_date: datetime.datetime
+    rnday: int, float or datetime.timedelta
+    constituents: str or list
+    overwrite: bool 
+    """
 
         if start_date is not None:
             self.start_date = start_date
