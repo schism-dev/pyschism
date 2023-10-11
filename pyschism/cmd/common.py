@@ -259,27 +259,27 @@ def add_tidal_database_to_parser(parser):
     )
 
 
-def add_baroclinic_database_to_parser(parser):
-    class BaroclinicDatabases(Enum):
-        RTOFS = hycom.RTOFS
-        GOFS = hycom.GOFS
-
-    class BaroclinicDatabaseAction(argparse.Action):
-        def __call__(self, parser, namespace, values, option_string=None):
-
-            setattr(namespace, self.dest, values)
-
-    hycom_group = parser.add_argument_group("HYCOM options")
-    # *************************************************************************************************
-    hycom_group.add_argument(
-        "--hycom",
-        # "--baroclinic-database",
-        choices=[x.name.lower() for x in BaroclinicDatabases],
-        dest="baroclinic_database",
-        default="gofs",
-        action=BaroclinicDatabaseAction,
-        help="Options for obtaining HYCOM data. Defaults to GOFS.",
-    )
+# def add_baroclinic_database_to_parser(parser):
+#     class BaroclinicDatabases(Enum):
+#         RTOFS = hycom.RTOFS
+#         GOFS = hycom.GOFS
+# 
+#     class BaroclinicDatabaseAction(argparse.Action):
+#         def __call__(self, parser, namespace, values, option_string=None):
+# 
+#             setattr(namespace, self.dest, values)
+# 
+#     hycom_group = parser.add_argument_group("HYCOM options")
+#     # *************************************************************************************************
+#     hycom_group.add_argument(
+#         "--hycom",
+#         # "--baroclinic-database",
+#         choices=[x.name.lower() for x in BaroclinicDatabases],
+#         dest="baroclinic_database",
+#         default="gofs",
+#         action=BaroclinicDatabaseAction,
+#         help="Options for obtaining HYCOM data. Defaults to GOFS.",
+#     )
 
 
 # class CustomBoundaryAction(argparse.Action):
@@ -312,536 +312,536 @@ def get_per_boundary_help_message(varname, ibctype):
     )
 
 
-def add_iettype_to_parser(parser):
-    class IettypeAction(argparse.Action):
-        def __call__(self, parser, namespace, values, option_string=None):
-            values = json.loads(values)
-            for key, val in values.items():
-                values.update({key: self.iettype(int(key), val)})
-            setattr(namespace, self.dest, values)
-
-        def iettype(self, key, value):
-            values = [1, 2, 3, 4, 5, -1]
-            assert value in values, (
-                "per-boundary iettype values must be " f"one of {values}, not {value}."
-            )
-            raise NotImplementedError(
-                "Per-boundary specification not yet " "supported."
-            )
-
-    class Iettype3Action(argparse.Action):
-        def __call__(self, parser, namespace, values, option_string=None):
-            tmp_parser = argparse.ArgumentParser(add_help=False)
-            add_tidal_constituents_to_parser(tmp_parser)
-            add_tidal_database_to_parser(tmp_parser)
-            tmp_args = tmp_parser.parse_known_args()[0]
-            setattr(
-                namespace,
-                self.dest,
-                self.const(
-                    constituents=tmp_args.constituents, database=tmp_args.tidal_database
-                ),
-            )
-
-    class Iettype4Action(argparse.Action):
-        def __call__(self, parser, namespace, values, option_string=None):
-            if not bool(set(sys.argv).intersection(["-h", "--help"])):
-                if namespace.vgrid.is2D() is True:
-                    raise NotImplementedError("--iettype-4 not available for 2D model.")
-                tmp_parser = argparse.ArgumentParser(add_help=False)
-                add_baroclinic_database_to_parser(tmp_parser)
-                tmp_args = tmp_parser.parse_known_args()[0]
-                setattr(namespace, self.dest, self.const(tmp_args.baroclinic_database))
-
-    class Iettype5Action(argparse.Action):
-        def __call__(self, parser, namespace, values, option_string=None):
-            if not bool(set(sys.argv).intersection(["-h", "--help"])):
-                if namespace.vgrid.is2D() is True:
-                    raise NotImplementedError("--iettype-5 not available for 2D model.")
-                tmp_parser = argparse.ArgumentParser(add_help=False)
-                add_tidal_constituents_to_parser(tmp_parser)
-                add_tidal_database_to_parser(tmp_parser)
-                add_baroclinic_database_to_parser(tmp_parser)
-                tmp_args = tmp_parser.parse_known_args()[0]
-                iettype3 = bctides.iettype.Iettype3(
-                    constituents=tmp_args.constituents, database=tmp_args.tidal_database
-                )
-                iettype4 = bctides.iettype.Iettype4(
-                    data_source=tmp_args.baroclinic_database
-                )
-                setattr(namespace, self.dest, self.const(iettype3, iettype4))
-
-    iettype_group = parser.add_argument_group(
-        "Elevation boundary condition options"
-    ).add_mutually_exclusive_group()
-    iettype_group.add_argument(
-        "--iettype",
-        "--per-boundary-elevation",
-        dest="iettype",
-        metavar="JSON_STYLE_STRING",
-        action=IettypeAction,
-        # const=bctides.iettype.Iettype,
-        help=get_per_boundary_help_message("elevation", "iettype"),
-    )
-    iettype_group.add_argument(
-        "--iettype-1",
-        "--elevation-time-history",
-        dest="iettype",
-        metavar="ELEVATION_TIME_HISTORY",
-        type=bctides.iettype.Iettype1,
-        help="Global elevation options for time history.  (Not implemented)",
-    )
-    iettype_group.add_argument(
-        "--iettype-2",
-        "--constant-elevation-value",
-        dest="iettype",
-        metavar="VALUE",
-        type=bctides.iettype.Iettype2,
-        help="Global constant elevation option.",
-    )
-
-    iettype_group.add_argument(
-        "--iettype-3",
-        "--harmonic-tidal-elevation",
-        dest="iettype",
-        nargs=0,
-        const=bctides.iettype.Iettype3,
-        action=Iettype3Action,
-        help="Enables tidal elevation harmonic forcing.",
-    )
-
-    iettype_group.add_argument(
-        "--iettype-4",
-        "--subtidal-elevation",
-        "--elev-2d",
-        dest="iettype",
-        nargs=0,
-        const=bctides.iettype.Iettype4,
-        action=Iettype4Action,
-        help="Enables subtidal elevation forcing.",
-    )
-
-    iettype_group.add_argument(
-        "--iettype-5",
-        "--subtidal-and-tidal-elevation",
-        dest="iettype",
-        nargs=0,
-        const=bctides.iettype.Iettype5,
-        action=Iettype5Action,
-        help="Enables the combined elevation tidal harmonic forcing and "
-        "subtidal elevation forcing.",
-    )
-
-    iettype_group.add_argument(
-        "--iettype--1",
-        "--zero-elevation",
-        dest="iettype",
-        const=bctides.iettype.Iettype_1,
-        action="store_const",
-        help="Zero elevation at boundaries. (Not implemented)",
-    )
-
-
-def add_ifltype_to_parser(parser):
-    class IfltypeAction(argparse.Action):
-        def __call__(self, parser, namespace, values, option_string=None):
-            values = json.loads(values)
-            for key, val in values.items():
-                values.update({key: self.iettype(int(key), val)})
-            setattr(namespace, self.dest, values)
-
-        def ifltype(self, key, value):
-            values = [1, 2, 3, 4, 5, -1]
-            assert value in values, (
-                "per-boundary ifltype values must be " f"one of {values}, not {value}."
-            )
-            raise NotImplementedError(
-                "Per-boundary specification not yet " "supported."
-            )
-
-    class Ifltype3Action(argparse.Action):
-        def __call__(self, parser, namespace, values, option_string=None):
-            tmp_parser = argparse.ArgumentParser(add_help=False)
-            add_tidal_constituents_to_parser(tmp_parser)
-            add_tidal_database_to_parser(tmp_parser)
-            tmp_args = tmp_parser.parse_known_args()[0]
-            setattr(
-                namespace,
-                self.dest,
-                self.const(
-                    constituents=tmp_args.constituents,
-                    database=tmp_args.tidal_database,
-                ),
-            )
-
-    class Ifltype4Action(argparse.Action):
-        def __call__(self, parser, namespace, values, option_string=None):
-            if not bool(set(sys.argv).intersection(["-h", "--help"])):
-                if namespace.vgrid.is2D() is True:
-                    raise NotImplementedError("--ifltype-4 not available for 2D model.")
-                tmp_parser = argparse.ArgumentParser(add_help=False)
-                add_baroclinic_database_to_parser(tmp_parser)
-                tmp_args = tmp_parser.parse_known_args()[0]
-                setattr(namespace, self.dest, self.const(tmp_args.baroclinic_database))
-
-    class Ifltype5Action(argparse.Action):
-        def __call__(self, parser, namespace, values, option_string=None):
-            if not bool(set(sys.argv).intersection(["-h", "--help"])):
-                if namespace.vgrid.is2D() is True:
-                    raise NotImplementedError("--ifltype-5 not available for 2D model.")
-                tmp_parser = argparse.ArgumentParser(add_help=False)
-                add_tidal_constituents_to_parser(tmp_parser)
-                add_tidal_database_to_parser(tmp_parser)
-                add_baroclinic_database_to_parser(tmp_parser)
-                tmp_args = tmp_parser.parse_known_args()[0]
-                ifltype3 = bctides.ifltype.Ifltype3(
-                    constituents=tmp_args.constituents, database=tmp_args.tidal_database
-                )
-                ifltype4 = bctides.ifltype.Ifltype4(
-                    data_source=tmp_args.baroclinic_database
-                )
-                setattr(namespace, self.dest, self.const(ifltype3, ifltype4))
-
-    ifltype_group = parser.add_argument_group(
-        "Velocity boundary condition options"
-    ).add_mutually_exclusive_group()
-    # ifltype_group.add_argument(
-    #     "--ifltype",
-    #     '--per-boundary-velocity',
-    #     dest="ifltype",
-    #     metavar='JSON_STYLE_STRING',
-    #     action=IfltypeAction,
-    #     help=get_per_boundary_help_message('velocity', 'ifltype')
-    # )
-    ifltype_group.add_argument(
-        "--ifltype-1",
-        "--flux-time-history",
-        metavar="VELOCITY_TIME_HISTORY",
-        dest="ifltype",
-        # type=ifltype.Ifltype1
-        help="Global boundary velocity time history file. (Not implemented)",
-    )
-    ifltype_group.add_argument(
-        "--ifltype-2",
-        "--constant-flux-value",
-        dest="ifltype",
-        metavar="VALUE",
-        # type=ifltype.Ifltype2,
-        help="Global constant flow option.",
-    )
-    ifltype_group.add_argument(
-        "--ifltype-3",
-        "--harmonic-tidal-velocity",
-        dest="ifltype",
-        nargs=0,
-        const=bctides.ifltype.Ifltype3,
-        action=Ifltype3Action,
-        help="Enables tidal velocity harmonic forcing.",
-    )
-
-    ifltype_group.add_argument(
-        "--ifltype-4",
-        "--subtidal-velocity",
-        dest="ifltype",
-        nargs=0,
-        const=bctides.ifltype.Ifltype4,
-        action=Ifltype4Action,
-        help="Enables subtidal velocity forcing.",
-    )
-
-    ifltype_group.add_argument(
-        "--ifltype-5",
-        "--subtidal-and-tidal-velocity",
-        action=Ifltype5Action,
-        nargs=0,
-        dest="ifltype",
-        const=bctides.ifltype.Ifltype5,
-        help="Enables the combined velocity tidal harmonic forcing and "
-        "subtidal velocity forcing.",
-    )
-
-    ifltype_group.add_argument(
-        "--ifltype--1",
-        "--uv-zero",
-        "--flather",
-        # action='store_const',
-        dest="ifltype",
-        # const=ifltype.Ifltype_1,
-    )
-
-
-def add_itetype_to_parser(parser):
-    def get_nudge_bnds(namespace):
-        tmp_parser = argparse.ArgumentParser(add_help=False)
-        add_baroclinic_database_to_parser(tmp_parser)
-        add_nudge_to_parser(tmp_parser)
-        tmp_args = tmp_parser.parse_known_args()[0]
-        bnd_ids = namespace.hgrid.boundaries.open["id"].tolist()
-        if tmp_args.nudge_temp is None:
-            if namespace.vgrid.is2D():
-                tmp_args.nudge_temp = {bnd_id: False for bnd_id in bnd_ids}
-            else:
-                tmp_args.nudge_temp = {bnd_id: True for bnd_id in bnd_ids}
-        elif tmp_args.nudge_temp is True:
-            tmp_args.nudge_temp = {bnd_id: True for bnd_id in bnd_ids}
-        elif tmp_args.nudge_temp is False:
-            tmp_args.nudge_temp = {bnd_id: False for bnd_id in bnd_ids}
-        else:
-            remaining_bounds = list(
-                set(list(tmp_args.nudge_temp.keys())) - set(bnd_ids)
-            )
-            if np.all(list(tmp_args.nudge_temp.values())) is True:
-                for bnd_id in remaining_bounds:
-                    tmp_args.nudge_temp.setdefault(bnd_id, False)
-            else:
-                for bnd_id in remaining_bounds:
-                    tmp_args.nudge_temp.setdefault(bnd_id, True)
-        remaining_bounds = list(set(tmp_args.nudge_temp.keys()) - set(bnd_ids))
-        if len(remaining_bounds) > 0:
-            f = ["No nudging boundaries found with ids:"]
-            for bnd in remaining_bounds:
-                f.append(bnd)
-            raise ValueError(" ".join(f))
-        return tmp_args.nudge_temp
-
-    class Itetype4Action(argparse.Action):
-        def __call__(self, parser, namespace, values, option_string=None):
-            tmp_parser = argparse.ArgumentParser(add_help=False)
-            add_nudge_to_parser(tmp_parser)
-            tmp_args = tmp_parser.parse_known_args()[0]
-            if namespace.hgrid is not None:
-                nudge_bounds = get_nudge_bnds(namespace)
-                itetype4 = bctides.itetype.Itetype4(
-                    nudge=nudge_bounds["1"],
-                    rlmax=tmp_args.rlmax_temp,
-                    rnu_day=tmp_args.rnu_day_temp,
-                )
-                setattr(namespace, self.dest, itetype4)
-
-    itetype_group = parser.add_argument_group(
-        "Temperature boundary condition options"
-    ).add_mutually_exclusive_group()
-    # itetype_group.add_argument(
-    #     "--itetype",
-    #     dest="itetype",
-    #     # nargs=1,  # 0 or more
-    #     # const={},
-    #     # action=CustomBoundaryAction,
-    # )
-    itetype_group.add_argument(
-        "--itetype-1",
-        "--temperature-time-history",
-        dest="itetype",
-        # type=itetype.Itetype1
-    )
-    itetype_group.add_argument(
-        "--itetype-2",
-        "--constant-temperature-value",
-        dest="itetype",
-        # type=itetype.Itetype2
-    )
-
-    itetype_group.add_argument(
-        "--itetype-3",
-        "--temperature-initial-condition",
-        dest="itetype",
-        # type=itetype.Itetype3,
-    )
-
-    itetype_group.add_argument(
-        "--itetype-4",
-        "--temp-3d",
-        action=Itetype4Action,
-        dest="itetype",
-        nargs=0,
-        const=bctides.itetype.Itetype4,
-    )
-
-
-def add_isatype_to_parser(parser):
-    def get_nudge_bnds(namespace):
-        tmp_parser = argparse.ArgumentParser(add_help=False)
-        add_baroclinic_database_to_parser(tmp_parser)
-        add_nudge_to_parser(tmp_parser)
-        tmp_args = tmp_parser.parse_known_args()[0]
-        bnd_ids = namespace.hgrid.boundaries.open["id"].tolist()
-        if tmp_args.nudge_salt is None:
-            if namespace.vgrid.is2D():
-                tmp_args.nudge_salt = {bnd_id: False for bnd_id in bnd_ids}
-            else:
-                tmp_args.nudge_salt = {bnd_id: True for bnd_id in bnd_ids}
-        elif tmp_args.nudge_salt is True:
-            tmp_args.nudge_salt = {bnd_id: True for bnd_id in bnd_ids}
-        elif tmp_args.nudge_salt is False:
-            tmp_args.nudge_salt = {bnd_id: False for bnd_id in bnd_ids}
-        else:
-            remaining_bounds = list(
-                set(list(tmp_args.nudge_salt.keys())) - set(bnd_ids)
-            )
-            if np.all(list(tmp_args.nudge_salt.values())) is True:
-                for bnd_id in remaining_bounds:
-                    tmp_args.nudge_salt.setdefault(bnd_id, False)
-            else:
-                for bnd_id in remaining_bounds:
-                    tmp_args.nudge_salt.setdefault(bnd_id, True)
-        remaining_bounds = list(set(tmp_args.nudge_salt.keys()) - set(bnd_ids))
-        if len(remaining_bounds) > 0:
-            f = ["No nudging boundaries found with ids:"]
-            for bnd in remaining_bounds:
-                f.append(bnd)
-            raise ValueError(" ".join(f))
-        return tmp_args.nudge_salt
-
-    class Isatype4Action(argparse.Action):
-        def __call__(self, parser, namespace, values, option_string=None):
-            tmp_parser = argparse.ArgumentParser(add_help=False)
-            add_nudge_to_parser(tmp_parser)
-            tmp_args = tmp_parser.parse_known_args()[0]
-            if namespace.hgrid is not None:
-                nudge_bounds = get_nudge_bnds(namespace)
-                isatype4 = bctides.isatype.Isatype4(
-                    nudge=nudge_bounds["1"],
-                    rlmax=tmp_args.rlmax_salt,
-                    rnu_day=tmp_args.rnu_day_salt,
-                )
-                setattr(namespace, self.dest, isatype4)
-
-    isatype_group = parser.add_argument_group(
-        "Salinity boundary condition options"
-    ).add_mutually_exclusive_group()
-    # isatype_group.add_argument(
-    #     "--isatype",
-    #     dest="isatype",
-    #     # nargs=1,  # 0 or more
-    #     # const={},
-    #     # action=CustomBoundaryAction,
-    # )
-    isatype_group.add_argument(
-        "--isatype-1",
-        "--salt-th",
-        dest="isatype",
-        # type=isatype.Isatype1
-    )
-    isatype_group.add_argument(
-        "--isatype-2",
-        "--salt-val",
-        dest="isatype",
-        # type=isatype.Isatype2
-    )
-
-    isatype_group.add_argument(
-        "--isatype-3",
-        # "--salt-ic",
-        dest="isatype",
-        # type=isatype.Isatype3,
-    )
-
-    isatype_group.add_argument(
-        "--isatype-4",
-        "--salt-3d",
-        action=Isatype4Action,
-        dest="isatype",
-        nargs=0,
-        const=bctides.isatype.Isatype4,
-    )
-
-
-class NudgeAction(argparse.Action):
-    def __call__(self, parser, namespace, values, option_string=None):
-        nudge = {}
-        if "disable" in option_string:
-            for disable_bnd in values:
-                nudge.setdefault(disable_bnd, False)
-            if len(nudge) == 0:
-                nudge = False
-        else:
-            for enable_bnd in values:
-                nudge.setdefault(enable_bnd, True)
-            if len(nudge) == 0:
-                nudge = True
-        setattr(namespace, self.dest, nudge)
-
-
-def add_temperature_nudge_to_parser(parser):
-    temp_group = parser.add_argument_group("Nudge options for temperature")
-    nudge_parser = temp_group.add_mutually_exclusive_group()
-    nudge_parser.add_argument(
-        "--nudge-temp",
-        "--nudge-temperature",
-        "--nudge-t",
-        dest="nudge_temp",
-        nargs="*",
-        action=NudgeAction,
-        help="Enables temperature nudging. If no arguments are given, the nudging "
-        "is enabled for all the boundaries. If a per-boundary nudging is desired, "
-        "you can pass the boundary id's of the boundaries where nudging should "
-        "be enabled, for example passing --nudge-temp 1 2 4 will enable nudging "
-        "for boundaries with id's 1, 2 and 4, and will disable the nudging "
-        "for the remaining boundaries. Note: This option is mutually exclusive "
-        "to --disable-nudge-temperature.",
-    )
-    nudge_parser.add_argument(
-        "--disable-nudge-temp",
-        "--disable-nudge-temperature",
-        "--disable-nudge-t",
-        dest="nudge_temp",
-        nargs="*",
-        action=NudgeAction,
-        help="Disables temperature nudging. If no arguments are given, the nudging "
-        "is disabled for all the boundaries. If per-boundary nudging disabling is desired, "
-        "you can pass the boundary id's of the boundaries where nudging should "
-        "be disabled, for example passing --disable-nudge-temp 1 2 4 will disable nudging "
-        "for boundaries with id's 1, 2 and 4, and will enable the nudging "
-        "for the remaining boundaries. Note: This option is mutually exclusive "
-        "to --nudge-temperature.",
-    )
-    temp_group.set_defaults(nudge_temp=None)
-    temp_group.add_argument("--rlmax-temp", default=1.5, type=float)
-    temp_group.add_argument("--rnu_day-temp", default=0.25, type=float)
-
-
-def add_salinity_nudge_to_parser(parser):
-    salt_group = parser.add_argument_group("Nudge options for salinity")
-    salt_group.add_argument(
-        "--nudge-salt",
-        "--nudge-salinity",
-        "--nudge-s",
-        dest="nudge_salt",
-        nargs="?",
-        action=NudgeAction,
-    )
-    salt_group.add_argument(
-        "--disable-nudge-salt",
-        "--disable-nudge-salinity",
-        "--disable-nudge-s",
-        dest="nudge_salt",
-        nargs="?",
-        action=NudgeAction,
-    )
-    salt_group.set_defaults(nudge_salt=None)
-    salt_group.add_argument("--rlmax-salt", default=1.5, type=float)
-    salt_group.add_argument("--rnu_day-salt", default=0.25, type=float)
-
-
-def add_nudge_to_parser(parser):
-    add_temperature_nudge_to_parser(parser)
-    add_salinity_nudge_to_parser(parser)
-
-
-def add_ibctype_to_parser(parser):
-    add_iettype_to_parser(parser)
-    add_ifltype_to_parser(parser)
-    add_itetype_to_parser(parser)
-    add_isatype_to_parser(parser)
-    # add_itrtype_to_parser(parser)
-    add_nudge_to_parser(parser)
-
-
-def add_windrot_to_parser(parser):
-    parser.add_argument(
-        "--windrot",
-        # action=WindrotAction,
-    )
+# def add_iettype_to_parser(parser):
+#     class IettypeAction(argparse.Action):
+#         def __call__(self, parser, namespace, values, option_string=None):
+#             values = json.loads(values)
+#             for key, val in values.items():
+#                 values.update({key: self.iettype(int(key), val)})
+#             setattr(namespace, self.dest, values)
+# 
+#         def iettype(self, key, value):
+#             values = [1, 2, 3, 4, 5, -1]
+#             assert value in values, (
+#                 "per-boundary iettype values must be " f"one of {values}, not {value}."
+#             )
+#             raise NotImplementedError(
+#                 "Per-boundary specification not yet " "supported."
+#             )
+# 
+#     class Iettype3Action(argparse.Action):
+#         def __call__(self, parser, namespace, values, option_string=None):
+#             tmp_parser = argparse.ArgumentParser(add_help=False)
+#             add_tidal_constituents_to_parser(tmp_parser)
+#             add_tidal_database_to_parser(tmp_parser)
+#             tmp_args = tmp_parser.parse_known_args()[0]
+#             setattr(
+#                 namespace,
+#                 self.dest,
+#                 self.const(
+#                     constituents=tmp_args.constituents, database=tmp_args.tidal_database
+#                 ),
+#             )
+# 
+#     class Iettype4Action(argparse.Action):
+#         def __call__(self, parser, namespace, values, option_string=None):
+#             if not bool(set(sys.argv).intersection(["-h", "--help"])):
+#                 if namespace.vgrid.is2D() is True:
+#                     raise NotImplementedError("--iettype-4 not available for 2D model.")
+#                 tmp_parser = argparse.ArgumentParser(add_help=False)
+#                 add_baroclinic_database_to_parser(tmp_parser)
+#                 tmp_args = tmp_parser.parse_known_args()[0]
+#                 setattr(namespace, self.dest, self.const(tmp_args.baroclinic_database))
+# 
+#     class Iettype5Action(argparse.Action):
+#         def __call__(self, parser, namespace, values, option_string=None):
+#             if not bool(set(sys.argv).intersection(["-h", "--help"])):
+#                 if namespace.vgrid.is2D() is True:
+#                     raise NotImplementedError("--iettype-5 not available for 2D model.")
+#                 tmp_parser = argparse.ArgumentParser(add_help=False)
+#                 add_tidal_constituents_to_parser(tmp_parser)
+#                 add_tidal_database_to_parser(tmp_parser)
+#                 add_baroclinic_database_to_parser(tmp_parser)
+#                 tmp_args = tmp_parser.parse_known_args()[0]
+#                 iettype3 = bctides.iettype.Iettype3(
+#                     constituents=tmp_args.constituents, database=tmp_args.tidal_database
+#                 )
+#                 iettype4 = bctides.iettype.Iettype4(
+#                     data_source=tmp_args.baroclinic_database
+#                 )
+#                 setattr(namespace, self.dest, self.const(iettype3, iettype4))
+# 
+#     iettype_group = parser.add_argument_group(
+#         "Elevation boundary condition options"
+#     ).add_mutually_exclusive_group()
+#     iettype_group.add_argument(
+#         "--iettype",
+#         "--per-boundary-elevation",
+#         dest="iettype",
+#         metavar="JSON_STYLE_STRING",
+#         action=IettypeAction,
+#         # const=bctides.iettype.Iettype,
+#         help=get_per_boundary_help_message("elevation", "iettype"),
+#     )
+#     iettype_group.add_argument(
+#         "--iettype-1",
+#         "--elevation-time-history",
+#         dest="iettype",
+#         metavar="ELEVATION_TIME_HISTORY",
+#         type=bctides.iettype.Iettype1,
+#         help="Global elevation options for time history.  (Not implemented)",
+#     )
+#     iettype_group.add_argument(
+#         "--iettype-2",
+#         "--constant-elevation-value",
+#         dest="iettype",
+#         metavar="VALUE",
+#         type=bctides.iettype.Iettype2,
+#         help="Global constant elevation option.",
+#     )
+# 
+#     iettype_group.add_argument(
+#         "--iettype-3",
+#         "--harmonic-tidal-elevation",
+#         dest="iettype",
+#         nargs=0,
+#         const=bctides.iettype.Iettype3,
+#         action=Iettype3Action,
+#         help="Enables tidal elevation harmonic forcing.",
+#     )
+# 
+#     iettype_group.add_argument(
+#         "--iettype-4",
+#         "--subtidal-elevation",
+#         "--elev-2d",
+#         dest="iettype",
+#         nargs=0,
+#         const=bctides.iettype.Iettype4,
+#         action=Iettype4Action,
+#         help="Enables subtidal elevation forcing.",
+#     )
+# 
+#     iettype_group.add_argument(
+#         "--iettype-5",
+#         "--subtidal-and-tidal-elevation",
+#         dest="iettype",
+#         nargs=0,
+#         const=bctides.iettype.Iettype5,
+#         action=Iettype5Action,
+#         help="Enables the combined elevation tidal harmonic forcing and "
+#         "subtidal elevation forcing.",
+#     )
+# 
+#     iettype_group.add_argument(
+#         "--iettype--1",
+#         "--zero-elevation",
+#         dest="iettype",
+#         const=bctides.iettype.Iettype_1,
+#         action="store_const",
+#         help="Zero elevation at boundaries. (Not implemented)",
+#     )
+# 
+# 
+# def add_ifltype_to_parser(parser):
+#     class IfltypeAction(argparse.Action):
+#         def __call__(self, parser, namespace, values, option_string=None):
+#             values = json.loads(values)
+#             for key, val in values.items():
+#                 values.update({key: self.iettype(int(key), val)})
+#             setattr(namespace, self.dest, values)
+# 
+#         def ifltype(self, key, value):
+#             values = [1, 2, 3, 4, 5, -1]
+#             assert value in values, (
+#                 "per-boundary ifltype values must be " f"one of {values}, not {value}."
+#             )
+#             raise NotImplementedError(
+#                 "Per-boundary specification not yet " "supported."
+#             )
+# 
+#     class Ifltype3Action(argparse.Action):
+#         def __call__(self, parser, namespace, values, option_string=None):
+#             tmp_parser = argparse.ArgumentParser(add_help=False)
+#             add_tidal_constituents_to_parser(tmp_parser)
+#             add_tidal_database_to_parser(tmp_parser)
+#             tmp_args = tmp_parser.parse_known_args()[0]
+#             setattr(
+#                 namespace,
+#                 self.dest,
+#                 self.const(
+#                     constituents=tmp_args.constituents,
+#                     database=tmp_args.tidal_database,
+#                 ),
+#             )
+# 
+#     class Ifltype4Action(argparse.Action):
+#         def __call__(self, parser, namespace, values, option_string=None):
+#             if not bool(set(sys.argv).intersection(["-h", "--help"])):
+#                 if namespace.vgrid.is2D() is True:
+#                     raise NotImplementedError("--ifltype-4 not available for 2D model.")
+#                 tmp_parser = argparse.ArgumentParser(add_help=False)
+#                 add_baroclinic_database_to_parser(tmp_parser)
+#                 tmp_args = tmp_parser.parse_known_args()[0]
+#                 setattr(namespace, self.dest, self.const(tmp_args.baroclinic_database))
+# 
+#     class Ifltype5Action(argparse.Action):
+#         def __call__(self, parser, namespace, values, option_string=None):
+#             if not bool(set(sys.argv).intersection(["-h", "--help"])):
+#                 if namespace.vgrid.is2D() is True:
+#                     raise NotImplementedError("--ifltype-5 not available for 2D model.")
+#                 tmp_parser = argparse.ArgumentParser(add_help=False)
+#                 add_tidal_constituents_to_parser(tmp_parser)
+#                 add_tidal_database_to_parser(tmp_parser)
+#                 add_baroclinic_database_to_parser(tmp_parser)
+#                 tmp_args = tmp_parser.parse_known_args()[0]
+#                 ifltype3 = bctides.ifltype.Ifltype3(
+#                     constituents=tmp_args.constituents, database=tmp_args.tidal_database
+#                 )
+#                 ifltype4 = bctides.ifltype.Ifltype4(
+#                     data_source=tmp_args.baroclinic_database
+#                 )
+#                 setattr(namespace, self.dest, self.const(ifltype3, ifltype4))
+# 
+#     ifltype_group = parser.add_argument_group(
+#         "Velocity boundary condition options"
+#     ).add_mutually_exclusive_group()
+#     # ifltype_group.add_argument(
+#     #     "--ifltype",
+#     #     '--per-boundary-velocity',
+#     #     dest="ifltype",
+#     #     metavar='JSON_STYLE_STRING',
+#     #     action=IfltypeAction,
+#     #     help=get_per_boundary_help_message('velocity', 'ifltype')
+#     # )
+#     ifltype_group.add_argument(
+#         "--ifltype-1",
+#         "--flux-time-history",
+#         metavar="VELOCITY_TIME_HISTORY",
+#         dest="ifltype",
+#         # type=ifltype.Ifltype1
+#         help="Global boundary velocity time history file. (Not implemented)",
+#     )
+#     ifltype_group.add_argument(
+#         "--ifltype-2",
+#         "--constant-flux-value",
+#         dest="ifltype",
+#         metavar="VALUE",
+#         # type=ifltype.Ifltype2,
+#         help="Global constant flow option.",
+#     )
+#     ifltype_group.add_argument(
+#         "--ifltype-3",
+#         "--harmonic-tidal-velocity",
+#         dest="ifltype",
+#         nargs=0,
+#         const=bctides.ifltype.Ifltype3,
+#         action=Ifltype3Action,
+#         help="Enables tidal velocity harmonic forcing.",
+#     )
+# 
+#     ifltype_group.add_argument(
+#         "--ifltype-4",
+#         "--subtidal-velocity",
+#         dest="ifltype",
+#         nargs=0,
+#         const=bctides.ifltype.Ifltype4,
+#         action=Ifltype4Action,
+#         help="Enables subtidal velocity forcing.",
+#     )
+# 
+#     ifltype_group.add_argument(
+#         "--ifltype-5",
+#         "--subtidal-and-tidal-velocity",
+#         action=Ifltype5Action,
+#         nargs=0,
+#         dest="ifltype",
+#         const=bctides.ifltype.Ifltype5,
+#         help="Enables the combined velocity tidal harmonic forcing and "
+#         "subtidal velocity forcing.",
+#     )
+# 
+#     ifltype_group.add_argument(
+#         "--ifltype--1",
+#         "--uv-zero",
+#         "--flather",
+#         # action='store_const',
+#         dest="ifltype",
+#         # const=ifltype.Ifltype_1,
+#     )
+# 
+# 
+# def add_itetype_to_parser(parser):
+#     def get_nudge_bnds(namespace):
+#         tmp_parser = argparse.ArgumentParser(add_help=False)
+#         add_baroclinic_database_to_parser(tmp_parser)
+#         add_nudge_to_parser(tmp_parser)
+#         tmp_args = tmp_parser.parse_known_args()[0]
+#         bnd_ids = namespace.hgrid.boundaries.open["id"].tolist()
+#         if tmp_args.nudge_temp is None:
+#             if namespace.vgrid.is2D():
+#                 tmp_args.nudge_temp = {bnd_id: False for bnd_id in bnd_ids}
+#             else:
+#                 tmp_args.nudge_temp = {bnd_id: True for bnd_id in bnd_ids}
+#         elif tmp_args.nudge_temp is True:
+#             tmp_args.nudge_temp = {bnd_id: True for bnd_id in bnd_ids}
+#         elif tmp_args.nudge_temp is False:
+#             tmp_args.nudge_temp = {bnd_id: False for bnd_id in bnd_ids}
+#         else:
+#             remaining_bounds = list(
+#                 set(list(tmp_args.nudge_temp.keys())) - set(bnd_ids)
+#             )
+#             if np.all(list(tmp_args.nudge_temp.values())) is True:
+#                 for bnd_id in remaining_bounds:
+#                     tmp_args.nudge_temp.setdefault(bnd_id, False)
+#             else:
+#                 for bnd_id in remaining_bounds:
+#                     tmp_args.nudge_temp.setdefault(bnd_id, True)
+#         remaining_bounds = list(set(tmp_args.nudge_temp.keys()) - set(bnd_ids))
+#         if len(remaining_bounds) > 0:
+#             f = ["No nudging boundaries found with ids:"]
+#             for bnd in remaining_bounds:
+#                 f.append(bnd)
+#             raise ValueError(" ".join(f))
+#         return tmp_args.nudge_temp
+# 
+#     class Itetype4Action(argparse.Action):
+#         def __call__(self, parser, namespace, values, option_string=None):
+#             tmp_parser = argparse.ArgumentParser(add_help=False)
+#             add_nudge_to_parser(tmp_parser)
+#             tmp_args = tmp_parser.parse_known_args()[0]
+#             if namespace.hgrid is not None:
+#                 nudge_bounds = get_nudge_bnds(namespace)
+#                 itetype4 = bctides.itetype.Itetype4(
+#                     nudge=nudge_bounds["1"],
+#                     rlmax=tmp_args.rlmax_temp,
+#                     rnu_day=tmp_args.rnu_day_temp,
+#                 )
+#                 setattr(namespace, self.dest, itetype4)
+# 
+#     itetype_group = parser.add_argument_group(
+#         "Temperature boundary condition options"
+#     ).add_mutually_exclusive_group()
+#     # itetype_group.add_argument(
+#     #     "--itetype",
+#     #     dest="itetype",
+#     #     # nargs=1,  # 0 or more
+#     #     # const={},
+#     #     # action=CustomBoundaryAction,
+#     # )
+#     itetype_group.add_argument(
+#         "--itetype-1",
+#         "--temperature-time-history",
+#         dest="itetype",
+#         # type=itetype.Itetype1
+#     )
+#     itetype_group.add_argument(
+#         "--itetype-2",
+#         "--constant-temperature-value",
+#         dest="itetype",
+#         # type=itetype.Itetype2
+#     )
+# 
+#     itetype_group.add_argument(
+#         "--itetype-3",
+#         "--temperature-initial-condition",
+#         dest="itetype",
+#         # type=itetype.Itetype3,
+#     )
+# 
+#     itetype_group.add_argument(
+#         "--itetype-4",
+#         "--temp-3d",
+#         action=Itetype4Action,
+#         dest="itetype",
+#         nargs=0,
+#         const=bctides.itetype.Itetype4,
+#     )
+# 
+# 
+# def add_isatype_to_parser(parser):
+#     def get_nudge_bnds(namespace):
+#         tmp_parser = argparse.ArgumentParser(add_help=False)
+#         add_baroclinic_database_to_parser(tmp_parser)
+#         add_nudge_to_parser(tmp_parser)
+#         tmp_args = tmp_parser.parse_known_args()[0]
+#         bnd_ids = namespace.hgrid.boundaries.open["id"].tolist()
+#         if tmp_args.nudge_salt is None:
+#             if namespace.vgrid.is2D():
+#                 tmp_args.nudge_salt = {bnd_id: False for bnd_id in bnd_ids}
+#             else:
+#                 tmp_args.nudge_salt = {bnd_id: True for bnd_id in bnd_ids}
+#         elif tmp_args.nudge_salt is True:
+#             tmp_args.nudge_salt = {bnd_id: True for bnd_id in bnd_ids}
+#         elif tmp_args.nudge_salt is False:
+#             tmp_args.nudge_salt = {bnd_id: False for bnd_id in bnd_ids}
+#         else:
+#             remaining_bounds = list(
+#                 set(list(tmp_args.nudge_salt.keys())) - set(bnd_ids)
+#             )
+#             if np.all(list(tmp_args.nudge_salt.values())) is True:
+#                 for bnd_id in remaining_bounds:
+#                     tmp_args.nudge_salt.setdefault(bnd_id, False)
+#             else:
+#                 for bnd_id in remaining_bounds:
+#                     tmp_args.nudge_salt.setdefault(bnd_id, True)
+#         remaining_bounds = list(set(tmp_args.nudge_salt.keys()) - set(bnd_ids))
+#         if len(remaining_bounds) > 0:
+#             f = ["No nudging boundaries found with ids:"]
+#             for bnd in remaining_bounds:
+#                 f.append(bnd)
+#             raise ValueError(" ".join(f))
+#         return tmp_args.nudge_salt
+# 
+#     class Isatype4Action(argparse.Action):
+#         def __call__(self, parser, namespace, values, option_string=None):
+#             tmp_parser = argparse.ArgumentParser(add_help=False)
+#             add_nudge_to_parser(tmp_parser)
+#             tmp_args = tmp_parser.parse_known_args()[0]
+#             if namespace.hgrid is not None:
+#                 nudge_bounds = get_nudge_bnds(namespace)
+#                 isatype4 = bctides.isatype.Isatype4(
+#                     nudge=nudge_bounds["1"],
+#                     rlmax=tmp_args.rlmax_salt,
+#                     rnu_day=tmp_args.rnu_day_salt,
+#                 )
+#                 setattr(namespace, self.dest, isatype4)
+# 
+#     isatype_group = parser.add_argument_group(
+#         "Salinity boundary condition options"
+#     ).add_mutually_exclusive_group()
+#     # isatype_group.add_argument(
+#     #     "--isatype",
+#     #     dest="isatype",
+#     #     # nargs=1,  # 0 or more
+#     #     # const={},
+#     #     # action=CustomBoundaryAction,
+#     # )
+#     isatype_group.add_argument(
+#         "--isatype-1",
+#         "--salt-th",
+#         dest="isatype",
+#         # type=isatype.Isatype1
+#     )
+#     isatype_group.add_argument(
+#         "--isatype-2",
+#         "--salt-val",
+#         dest="isatype",
+#         # type=isatype.Isatype2
+#     )
+# 
+#     isatype_group.add_argument(
+#         "--isatype-3",
+#         # "--salt-ic",
+#         dest="isatype",
+#         # type=isatype.Isatype3,
+#     )
+# 
+#     isatype_group.add_argument(
+#         "--isatype-4",
+#         "--salt-3d",
+#         action=Isatype4Action,
+#         dest="isatype",
+#         nargs=0,
+#         const=bctides.isatype.Isatype4,
+#     )
+# 
+# 
+# class NudgeAction(argparse.Action):
+#     def __call__(self, parser, namespace, values, option_string=None):
+#         nudge = {}
+#         if "disable" in option_string:
+#             for disable_bnd in values:
+#                 nudge.setdefault(disable_bnd, False)
+#             if len(nudge) == 0:
+#                 nudge = False
+#         else:
+#             for enable_bnd in values:
+#                 nudge.setdefault(enable_bnd, True)
+#             if len(nudge) == 0:
+#                 nudge = True
+#         setattr(namespace, self.dest, nudge)
+# 
+# 
+# def add_temperature_nudge_to_parser(parser):
+#     temp_group = parser.add_argument_group("Nudge options for temperature")
+#     nudge_parser = temp_group.add_mutually_exclusive_group()
+#     nudge_parser.add_argument(
+#         "--nudge-temp",
+#         "--nudge-temperature",
+#         "--nudge-t",
+#         dest="nudge_temp",
+#         nargs="*",
+#         action=NudgeAction,
+#         help="Enables temperature nudging. If no arguments are given, the nudging "
+#         "is enabled for all the boundaries. If a per-boundary nudging is desired, "
+#         "you can pass the boundary id's of the boundaries where nudging should "
+#         "be enabled, for example passing --nudge-temp 1 2 4 will enable nudging "
+#         "for boundaries with id's 1, 2 and 4, and will disable the nudging "
+#         "for the remaining boundaries. Note: This option is mutually exclusive "
+#         "to --disable-nudge-temperature.",
+#     )
+#     nudge_parser.add_argument(
+#         "--disable-nudge-temp",
+#         "--disable-nudge-temperature",
+#         "--disable-nudge-t",
+#         dest="nudge_temp",
+#         nargs="*",
+#         action=NudgeAction,
+#         help="Disables temperature nudging. If no arguments are given, the nudging "
+#         "is disabled for all the boundaries. If per-boundary nudging disabling is desired, "
+#         "you can pass the boundary id's of the boundaries where nudging should "
+#         "be disabled, for example passing --disable-nudge-temp 1 2 4 will disable nudging "
+#         "for boundaries with id's 1, 2 and 4, and will enable the nudging "
+#         "for the remaining boundaries. Note: This option is mutually exclusive "
+#         "to --nudge-temperature.",
+#     )
+#     temp_group.set_defaults(nudge_temp=None)
+#     temp_group.add_argument("--rlmax-temp", default=1.5, type=float)
+#     temp_group.add_argument("--rnu_day-temp", default=0.25, type=float)
+# 
+# 
+# def add_salinity_nudge_to_parser(parser):
+#     salt_group = parser.add_argument_group("Nudge options for salinity")
+#     salt_group.add_argument(
+#         "--nudge-salt",
+#         "--nudge-salinity",
+#         "--nudge-s",
+#         dest="nudge_salt",
+#         nargs="?",
+#         action=NudgeAction,
+#     )
+#     salt_group.add_argument(
+#         "--disable-nudge-salt",
+#         "--disable-nudge-salinity",
+#         "--disable-nudge-s",
+#         dest="nudge_salt",
+#         nargs="?",
+#         action=NudgeAction,
+#     )
+#     salt_group.set_defaults(nudge_salt=None)
+#     salt_group.add_argument("--rlmax-salt", default=1.5, type=float)
+#     salt_group.add_argument("--rnu_day-salt", default=0.25, type=float)
+# 
+# 
+# def add_nudge_to_parser(parser):
+#     add_temperature_nudge_to_parser(parser)
+#     add_salinity_nudge_to_parser(parser)
+# 
+# 
+# def add_ibctype_to_parser(parser):
+#     add_iettype_to_parser(parser)
+#     add_ifltype_to_parser(parser)
+#     add_itetype_to_parser(parser)
+#     add_isatype_to_parser(parser)
+#     # add_itrtype_to_parser(parser)
+#     add_nudge_to_parser(parser)
+# 
+# 
+# def add_windrot_to_parser(parser):
+#     parser.add_argument(
+#         "--windrot",
+#         # action=WindrotAction,
+#     )
 
 
 def add_sflux_options_to_parser(parser):
@@ -892,7 +892,7 @@ def add_sflux_to_parser(parser):
         metavar="sflux_level",
     )
     add_sflux_options_to_parser(parser)
-    add_windrot_to_parser(parser)
+    #add_windrot_to_parser(parser)
 
 
 def add_nws_to_parser(parser):
@@ -912,7 +912,7 @@ def add_nws_to_parser(parser):
         metavar="sflux_level",
     )
     add_sflux_options_to_parser(parser)
-    add_windrot_to_parser(parser)
+    #add_windrot_to_parser(parser)
     nws_parser.add_argument(
         "--nws-3",
         dest="nws",

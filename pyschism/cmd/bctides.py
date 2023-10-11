@@ -71,10 +71,10 @@ def add_bctides_options_to_parser(parser):
     common.add_vgrid_to_parser(parser)
     common.add_tidal_constituents_to_parser(parser)
     common.add_tidal_database_to_parser(parser)
-    common.add_baroclinic_database_to_parser(parser)
+    #common.add_baroclinic_database_to_parser(parser)
     common.add_bctides_options_to_parser(parser)
-    common.add_ibctype_to_parser(parser)
-    parser.add_argument("--parallel-download", action='store_true')
+    #common.add_ibctype_to_parser(parser)
+    #parser.add_argument("--parallel-download", action='store_true')
 
 
 #     add_nudge_to_parser(parser)
