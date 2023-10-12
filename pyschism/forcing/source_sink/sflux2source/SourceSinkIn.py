@@ -24,7 +24,7 @@ def BinA(A, B):
     return [np.logical_not(np.ma.getmask(result)), np.ma.getmask(result)]
 
 
-class SourceSinkIn():
+class SourceSinkIn:
     """ class for *.prop or other similar formats"""
     def __init__(self, filename=None, number_of_groups=2, ele_groups=[]):
         self.n_group = number_of_groups  # 0: source; 1: sink
@@ -72,7 +72,7 @@ class SourceSinkIn():
         """return ele id with specified prop value"""
 
 
-class source_sink():
+class source_sink:
     """class for handling all source/sink inputs"""
     def __init__(self, source_dir=None, start_time_str='2000-01-01 00:00:00', timedeltas=[0.0, 86400.0*365],
                  source_eles=[], sink_eles=[], vsource_data=None, vsink_data=None):

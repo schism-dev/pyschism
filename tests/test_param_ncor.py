@@ -26,6 +26,7 @@ class ModelConfigurationTestCase(unittest.TestCase):
 
         config = ModelConfig(
             hgrid,
+            flags = [[3, 3, 0, 0]],
         )
         
         # create reference dates
@@ -41,8 +42,6 @@ class ModelConfigurationTestCase(unittest.TestCase):
             dramp_ss=spinup_time,
             drampwind=spinup_time,
             nspool=timedelta(hours=1),
-            elev=True,
-            dahv=True,
         )
 
         with tempfile.TemporaryDirectory() as tempdir:
@@ -58,6 +57,7 @@ class ModelConfigurationTestCase(unittest.TestCase):
 
         config = ModelConfig(
             hgrid,
+            flags = [[3, 3, 0, 0]],
         )
         
         # create reference dates
@@ -73,8 +73,6 @@ class ModelConfigurationTestCase(unittest.TestCase):
             dramp_ss=spinup_time,
             drampwind=spinup_time,
             nspool=timedelta(hours=1),
-            elev=True,
-            dahv=True,
         )
 
         with tempfile.TemporaryDirectory() as tempdir:

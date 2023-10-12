@@ -87,11 +87,16 @@ class AWSGrib2Inventory:
         return grbfiles
 
 class GFS:
-    def __init__(self, start_date=None, rnday=None, pscr=None, record=1, bbox=None):
-
+    def __init__(self, start_date=None, rnday=None, pscr=None, record=1, bbox=None, outdir=None): 
         start_date = nearest_cycle() if start_date is None else start_date 
         logger.info(f'start_date is {start_date}')
         self.bbox = bbox
+
+        if outdir is None:
+            self.path = pathlib.Path(start_date.strftime("%Y%m%d"))
+            self.path.mkdir(parents=True, exist_ok=True)
+        else:
+            self.path = outdir
 
         end_date = start_date + timedelta(days=rnday)
         
@@ -99,9 +104,9 @@ class GFS:
                 dtype='datetime64')
         datevector = pd.to_datetime(datevector)
 
-        npool = len(datevector) if len(datevector) < mp.cpu_count() else mp.cpu_count()
+        npool = len(datevector) if len(datevector) < mp.cpu_count()/2 else mp.cpu_count()/2
         logger.info(f'npool is {npool}')
-        pool = mp.Pool(npool)
+        pool = mp.Pool(int(npool))
 
         pool.starmap(self.gen_sflux, [(date, record, pscr) for date in datevector])
 
@@ -113,8 +118,6 @@ class GFS:
         grbfiles = inventory.files
         cycle = date.hour
 
-        path = pathlib.Path(date.strftime("%Y%m%d"))
-        path.mkdir(parents=True, exist_ok=True)
         
         prate = []
         dlwrf = []
@@ -258,7 +261,7 @@ class GFS:
             'long_name': 'Downward long-wave radiation flux'
         }
                          
-        fout.to_netcdf(path / f'gfs_{date.strftime("%Y%m%d")}{cycle:02d}.nc','w', 'NETCDF3_CLASSIC', unlimited_dims='time')
+        fout.to_netcdf(self.path / f'gfs_{date.strftime("%Y%m%d")}{cycle:02d}.nc','w', 'NETCDF3_CLASSIC', unlimited_dims='time')
 
 
     def modified_latlon(self, grbfile):

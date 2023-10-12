@@ -1,414 +1,283 @@
 from datetime import datetime, timedelta
-from functools import cached_property, lru_cache
+from functools import cached_property
 import pathlib
-from typing import Dict, Union
 import logging
+from typing import Union
 
-from ordered_set import OrderedSet
-import numpy as np
-
-from pyschism import dates
-from pyschism.mesh.vgrid import Vgrid
-from pyschism.forcing.bctides import iettype, ifltype, isatype, itetype, itrtype, Tides
-from pyschism.forcing.bctides.elev2d import Elev2D
-from pyschism.forcing.bctides.uv3d import UV3D
-from pyschism.forcing.bctides.mod3d import TEM_3D, SAL_3D
+from pyschism.forcing.bctides import Tides
 
 logger = logging.getLogger(__name__)
 
-
-class IbctypeDescriptor:
-    def __init__(self, name, bctype):
-        self.name = name
-        self.bctype = bctype
-
-    def __get__(self, obj, val):
-        return obj.gdf[self.name]
-
-    def __set__(self, obj, val):
-        if val is not None:
-            if isinstance(val, dict):
-                for bnd_id, ibctype in val.items():
-                    if not isinstance(ibctype, (self.bctype, type(None))):
-                        raise TypeError(
-                            f"Argument {ibctype} for boundary {bnd_id} must be of type {self.bctype} "
-                            f" or None, not type {type(ibctype)}."
-                        )
-                    obj.gdf.at[np.where(obj.gdf["id"] == bnd_id)[0][0], self.bctype.__name__.lower()] = ibctype
-            else:
-                if not isinstance(val, self.bctype):
-                    raise TypeError(
-                        f"Argument {self.name} must be of type "
-                        f"{self.bctype}, not type {type(val)}."
-                    )
-                obj.gdf[self.name] = val
-
-
-class BctidesMeta(type):
-    def __new__(meta, name, bases, attrs):
-        bctypes = {
-            "iettype": iettype.Iettype,
-            "ifltype": ifltype.Ifltype,
-            "isatype": isatype.Isatype,
-            "itetype": itetype.Itetype,
-            "itrtype": itrtype.Itrtype,
-        }
-        for name, ibctype in bctypes.items():
-            attrs[name] = IbctypeDescriptor(name, ibctype)
-        return type(name, bases, attrs)
-
-
-class Bctides(metaclass=BctidesMeta):
-
-    start_date = dates.StartDate()
-    end_date = dates.EndDate()
-    run_days = dates.RunDays()
+class Bctides:
+    """Bctides class
+    This is the bctides class to generate bctides.in file.
+    
+    """
 
     def __init__(
         self,
         hgrid,
-        vgrid=None,
-        iettype: Union[Dict, iettype.Iettype] = None,
-        ifltype: Union[Dict, ifltype.Ifltype] = None,
-        isatype: Union[Dict, isatype.Isatype] = None,
-        itetype: Union[Dict, itetype.Itetype] = None,
-        itrtype: Union[Dict, itrtype.Itrtype] = None,
+        flags: list = None,
+        constituents: Union[str, list] = 'major',
+        database: str = 'tpxo',
+        add_earth_tidal: bool = True,
         cutoff_depth: float = 50.0,
+        ethconst: list = None,
+        vthconst: list = None,
+        tthconst: list = None,
+        sthconst: list = None,
+        tobc: list = None,
+        sobc: list = None,
+        relax: list = None,
     ):
+        """Initialize Bctides ojbect
+        Parameters
+        --------
+        hgrid: Hgrid object
+        flags: nested list of bctypes
+        constituents: str or list
+        database: str ('tpxo' or 'fes2014')
+        add_earth_tidal: bool
+        cutoff_depth: float
+        ethconst: list (constant elevation value for each open boundary)
+        vthconst: list (constant discharge value for each open boundary)
+        tthconst: list (constant temperature value for each open boundary)
+        sthconst: list (constant salinity value for each open boundary)
+        tobc: list (nuding factor of temperature for each open boundary)
+        sobc: list (nuding factor of salinity for each open boundary)
+        realx: list (relaxation constants for inflow and outflow)
+        """
+
         self.hgrid = hgrid
-        self.vgrid = Vgrid.default() if vgrid is None else vgrid
+        self.add_earth_tidal = add_earth_tidal
         self.cutoff_depth = cutoff_depth
-        self.iettype = iettype
-        self.ifltype = ifltype
-        self.isatype = isatype
-        self.itetype = itetype
-        self.itrtype = itrtype
+        self.tides = Tides(constituents=constituents, tidal_database=database)
+        self.flags = flags
+        self.ethconst = ethconst 
+        self.vthconst = vthconst 
+        self.tthconst = tthconst 
+        self.sthconst = sthconst 
+        self.tobc = tobc
+        self.sobc = sobc
+        self.relax = relax
 
     def __str__(self):
+ 
+        #first line in the bctides.in is a note, not used in the schism code
         f = [
-            f"{str(self.start_date)}",
-            f"{self.ntip} {self.cutoff_depth}",
+            f"!{str(self.start_date)} UTC",
         ]
-        if self.ntip > 0:
-            for constituent in self.tides.get_active_potential_constituents():
+
+        #get earth tidal potential and frequency
+        if self.add_earth_tidal:
+            f.append(f"{self.ntip} {self.cutoff_depth} !number of earth tidal potential, cut-off depth for applying tidal potential")
+            for constituent in self.tides.get_active_potential_constituents(): 
                 forcing = self.tides(self.start_date, self.rnday, constituent)
                 f.append(
-                    " ".join(
-                        [
-                            f"{constituent}\n",
-                            f"{forcing[0]:G}",
-                            f"{forcing[1]:G}",
-                            f"{forcing[2]:G}",
-                            f"{forcing[3]:G}",
-                            f"{forcing[4]:G}",
-                        ]
-                    )
+                    " ".join([
+                        f"{constituent}\n",
+                        f"{forcing[0]:G}",
+                        f"{forcing[1]:G}",
+                        f"{forcing[2]:G}",
+                        f"{forcing[3]:G}",
+                        f"{forcing[4]:G}",
+                    ])
                 )
-        f.append(f"{self.nbfr:d}")
+        else:
+            f.append(f"0 {self.cutoff_depth} !number of earth tidal potential, cut-off depth for applying tidal potential")
+
+        #get tidal boundary 
+        f.append(f"{self.nbfr:d} !nbfr")
         if self.nbfr > 0:
             for constituent in self.tides.get_active_forcing_constituents():
                 forcing = self.tides(self.start_date, self.rnday, constituent)
                 f.append(
-                    " ".join(
-                        [
-                            f"{constituent}\n",
-                            f"{forcing[2]:G}",
-                            f"{forcing[3]:G}",
-                            f"{forcing[4]:G}",
-                        ]
-                    )
+                    " ". join([
+                        f"{constituent}\n", 
+                        f"{forcing[2]:G}",
+                        f"{forcing[3]:G}",
+                        f"{forcing[4]:G}",
+
+                    ])
                 )
-        global_constituents = self.tides.get_active_constituents()
-        f.append(f"{len(self.gdf)}")
-        for boundary in self.gdf.itertuples():
-            f.append(self.get_forcing_string(boundary, global_constituents))
+ 
+        #get amplitude and phase for each open boundary         
+        f.append(f"{len(self.gdf)} !nope")
+        if len(self.gdf) != len(self.flags):
+            raise ValueError(f'Number of open boundary {len(self.gdf)} is not consistent with number of given bctypes {len(self.flags)}!')
+        for ibnd, (boundary, flag) in enumerate(zip(self.gdf.itertuples(), self.flags)):
+            logger.info(f"Processing boundary {ibnd+1}:")
+            #number of nodes and flags
+            line = [
+                f"{len(boundary.indexes)}",
+                *[str(digit) for digit in flag],
+                f"!open bnd {ibnd+1}",
+            ]
+            f.append(" ".join(line))
+
+            #It only accounts for elevation, velocity, temperature, salinity
+            #TODO: add information for tracers
+            if len(flag) > 4:
+                raise NotImplementedError(f"Tracer module is not implemented yet!") 
+            iettype, ifltype, itetype, isatype = [i for i in flag]
+
+            #elevation boundary
+            logger.info(f"Elevation type: {iettype}")
+            if iettype == 1:
+                logger.warning(f'time history of elevation is read in from elev.th (ASCII)!')
+            elif iettype == 2:
+                logger.info("You are choosing type 2 for elevation, value is {selfethconst[ibnd]} ")
+                f.append(f"{self.ethconst[ibnd]}")
+            elif iettype == 4:
+                logger.warning('time history of elevation is read in from elev2D.th.nc (netcdf)')
+            elif iettype == 3 or iettype == 5:
+                if iettype == 5:
+                    logger.warning(f'Combination of 3 and 4, time history of elevation is read in from elev2D.th.nc!')
+                for constituent in self.tides.get_active_forcing_constituents():
+                    f.append(f"{constituent}")
+                    vertices = self.hgrid.get_xy(crs=self.hgrid.crs)[boundary.indexes, :]
+                    amp, phase = self.tides.get_elevation(constituent, vertices)
+                    for i in range(len(boundary.indexes)):
+                        f.append(f"{amp[i]: .6f} {phase[i]: .6f}")
+            elif iettype == 0:
+                logger.warning(f"elevations are not specified for this boundary (in this case the discharge must be specified)")
+            else:
+                raise IOError(f"Invalid type {iettype} for elevation!")
+
+            #velocity
+            logger.info(f"Velocity type: {ifltype}")
+            if ifltype == 0:
+                logger.info("Velocity is not sepcified, not input needed!")
+            elif ifltype == 1:
+                logger.warning("time history of discharge is read in from flux.th (ASCII)!")
+            elif ifltype == 2:
+                logger.info("You are choosing type 2 for velocity, value is {self.vthconst[ibnd]} ")
+                f.append(f"{self.vthconst[ibnd]}")
+            elif ifltype == 3 or ifltype == 5:
+                if ifltype == 5:
+                    logger.warning(f'Combination of 3 and 4, time history of velocity is read in from uv.3D.th.nc!')
+                for constituent in self.tides.get_active_forcing_constituents():
+                    f.append(f"{constituent}")
+                    vertices = self.hgrid.get_xy(crs=self.hgrid.crs)[boundary.indexes, :]
+                    uamp, uphase, vamp, vphase = self.tides.get_velocity(constituent, vertices)
+                    for i in range(len(boundary.indexes)):
+                        f.append(f"{uamp[i]: .6f} {uphase[i]: .6f} {vamp[i]: .6f} {vphase[i]: 6f}")
+            elif ifltype == 4 or -4:
+                logger.warning("time history of velocity (not discharge!) is read in from uv3D.th.nc (netcdf)")
+                if ifltype == -4:
+                    logger.info(f"You are using type -4, relaxation constants for inflow  is {self.relax[0]}, for outflow is {self.relax[1]}")
+                    f.append(f"{self.relax[0]} {self.relax[1]} !relaxation constant")
+            elif ifltype == -1: 
+                raise NotImplementedError(f"Velocity type {ifltype} not implemented yet!")
+                #logger.info(f"Flather type radiation b.c. (iettype must be 0 in this case)!")
+                #f.append(['vn_mean'])
+                
+                #TODO: add mean normal velocity at the node (at all levels)[
+            else:
+                raise IOError(f"Invalid type {ifltype} for veloicty!")
+
+            #temperature
+            logger.info(f"Temperature type: {itetype}")
+            if itetype == 0:
+                logger.warning("Temperature is not sepcified, not input needed!")
+            elif itetype == 1:
+                logger.warning("time history of temperature will be read in from TEM_1.th!")
+                logger.info(f"Nudging factor for T at boundary {ibnd+1} is {self.tobc[ibnd]}")
+                f.append(f"{self.tobc[ibnd]} !nudging factor for T")
+            elif itetype == 2:
+                logger.info("You are choosing type 2 for temperature, value is {self.tthconst[ibnd]} ")
+                f.append(f"{self.tthconst[ibnd]} !T")
+
+                logger.info(f"Nudging factor for T at boundary {ibnd+1} is {self.tobc[ibnd]}")
+                f.append(f"{self.tobc[ibnd]} !nudging factor for T")
+            elif itetype == 3:
+                logger.info("Using initial temperature profile for inflow")
+                logger.info(f"Nudging factor for T at boundary {ibnd+1} is{self.tobc[ibnd]}")
+                f.append(f"{self.tobc[ibnd]} !nudging factor for T")
+            elif itetype == 4:
+                logger.warning("time history of temperature is read in from TEM_3D.th.nc (netcdf)!")
+                logger.info(f"Nudging factor for T at boundary {ibnd+1} is{self.tobc[ibnd]}")
+                f.append(f"{self.tobc[ibnd]} !nudging factor for T")
+            else:
+                raise IOError(f"Invalid type {itetype} for salinity!")        
+
+            #salinity
+            logger.info(f"Salinity type: {isatype}")
+            if isatype == 0:
+                logger.info("Salinity is not sepcified, not input needed!")
+            elif isatype == 1:
+                logger.warning("time history of salinity will be read in from SAL_1.th!")
+                logger.info(f"Nudging factor for salt at boundary {ibnd+1} is {self.sobc[ibnd]}")
+                f.append(f"{self.sobc[ibnd]} !nudging factor for S")
+            elif isatype == 2:
+                logger.info("Yor are choosing type 2 for salinity, value is {self.sthconst[ibnd]} ")
+                f.append(f"{self.sthconst[ibnd]} !S")
+
+                logger.info(f"Nudging factor for salt at boundary {ibnd+1} is {self.sobc[ibnd]}")
+                f.append(f"{self.sobc[ibnd]} !nudging factor for S")
+            elif isatype == 3:
+                logger.info("Using initial salinity profile for inflow")
+                logger.info(f"Nudging factor for salt at boundary {ibnd+1} is {self.sobc[ibnd]}")
+                f.append(f"{self.sobc[ibnd]} !nudging factor for S")
+            elif isatype == 4:
+                logger.warning("time history of salinity is read in from SAL_3D.th.nc (netcdf)!")
+                logger.info(f"Nudging factor for salt at boundary {ibnd+1} is {self.sobc[ibnd]}")
+                f.append(f"{self.sobc[ibnd]} !nudging factor for S")
+            else:
+                raise IOError(f"Invalid type {isatype} for salinity!") 
+                
         return "\n".join(f)
 
     def write(
         self,
         output_directory,
         start_date: datetime = None,
-        end_date: Union[datetime, timedelta] = None,
-        bctides: Union[bool, str] = True,
-        elev2D: Union[bool, str] = False,
-        uv3D: Union[bool, str] = False,
-        tem3D: Union[bool, str] = False,
-        sal3D: Union[bool, str] = False,
-        overwrite: bool = False,
-        parallel_download=False,
-        progress_bar=True,
+        rnday = None,
+        constituents = 'major',
+        overwrite: bool = True, 
     ):
+        """
+        parameters
+        --------
+        output_directory: str
+        start_date: datetime.datetime
+        rnday: int, float or datetime.timedelta
+        constituents: str or list
+        overwrite: bool 
+        """
+
         if start_date is not None:
             self.start_date = start_date
-        if end_date is not None:
-            self.run_days = end_date
-        # self.tidal_database.write(path, )
+        else:
+            raise IOError("Please specify the start_date!")
+
+        if rnday is not None:
+            self.rnday = rnday
+        else:
+            raise IOError("Please specify the number of days!")
+
+        if constituents is not None:
+            self.constituents = constituents
+        else:
+            raise IOError("Please specify tidal constituents!")
+
         output_directory = pathlib.Path(output_directory)
-        output_directory.mkdir(exist_ok=overwrite, parents=True)
-        bctides = output_directory / "bctides.in" if bctides is True else bctides
+        output_directory.mkdir(exist_ok=overwrite, parents=True) 
+        bctides = output_directory / "bctides.in"
         if bctides.exists() and not overwrite:
-            raise IOError("path exists and overwrite is False")
+            raise IOError("path exists and overwrite is False") 
         with open(bctides, "w") as f:
             f.write(str(self))
-        # write nudge
-        for bctype, tracer in {"itetype": "TEM", "isatype": "SAL"}.items():
-            for boundary in self.gdf.itertuples():
-                data_source = getattr(boundary, bctype)
-                if data_source is not None:
-                    import importlib
-                    if hasattr(data_source, 'rlmax'):
-                        # This generates all the nudges and writes the nudge files.
-                        nudgemod = importlib.import_module('pyschism.forcing.bctides.nudge')
-                        nudgeclass = getattr(nudgemod, f'{tracer}_Nudge')
-                        _tracerfile = locals()[f'{tracer.lower()}3D']
-                        if _tracerfile is False:
-                            continue
-                        elif _tracerfile is True:
-                            _tracerfile = output_directory / f'{tracer}_nudge.gr3'
-                        nudgeclass(self, data_source, rlmax=data_source.rlmax, rnu_day=data_source.rnu_day
-                                   ).write(_tracerfile, overwrite=overwrite)
-                        break
-
-        def write_elev2D():
-            _elev2D = output_directory / "elev2D.th.nc" if elev2D is True else elev2D
-            Elev2D(self).write(
-                _elev2D,
-                self.start_date,
-                self.rnday,
-                timedelta(days=1),
-                overwrite,
-                progress_bar=progress_bar,
-            )
-
-        def write_uv3D():
-            # write uv3D.th.nc
-            _uv3D = output_directory / "uv3D.th.nc" if uv3D is True else uv3D
-            UV3D(self).write(
-                _uv3D,
-                self.start_date,
-                self.rnday,
-                timedelta(days=1),
-                overwrite,
-                progress_bar=progress_bar,
-            )
-
-        def write_tem3D():
-            # write TEM_3D.th.nc
-            _tem3D = output_directory / "TEM_3D.th.nc" if tem3D is True else tem3D
-            TEM_3D(self).write(
-                _tem3D,
-                self.start_date,
-                self.rnday,
-                timedelta(days=1),
-                overwrite,
-                progress_bar=progress_bar,
-            )
-
-        def write_sal3D():
-            _sal3D = output_directory / "SAL_3D.th.nc" if sal3D is True else sal3D
-            SAL_3D(self).write(
-                _sal3D,
-                self.start_date,
-                self.rnday,
-                timedelta(days=1),
-                overwrite,
-                progress_bar=progress_bar,
-            )
-
-        if parallel_download is True:
-            from multiprocessing import Process
-
-            jobs = [
-                Process(target=fn)
-                for fn, fl in (
-                    (write_elev2D, elev2D),
-                    (write_uv3D, uv3D),
-                    (write_tem3D, tem3D),
-                    (write_sal3D, sal3D)
-                ) if fl
-            ]
-            for job in jobs:
-                job.start()
-            for job in jobs:
-                job.join()
-            if any(j.exitcode != 0 for j in jobs):
-                raise RuntimeError("Some parallel writer jobs failed!")
-        else:
-            if elev2D:
-                write_elev2D()
-            if uv3D:
-                write_uv3D()
-            if tem3D:
-                write_tem3D()
-            if sal3D:
-                write_sal3D()
-
-        # def write_tracer(tracer):
-        #     tracer.write()
-
-        # for tracer in [self.temperature, self.salinity, *self.tracers]:
-        #     if tracer is not None:
-        #         write_tracer(tracer)
-
-    def get_forcing_string(self, boundary, global_constituents):
-
-        bctypes = [
-            boundary.iettype,
-            boundary.ifltype,
-            boundary.itetype,
-            boundary.isatype,
-        ]
-
-        def get_focing_digit(bctype):
-            if bctype is not None:
-                return bctype.forcing_digit
-            return "0"
-
-        line = [
-            f"{len(boundary.indexes)}",
-            *[str(digit) for digit in map(get_focing_digit, bctypes)],
-        ]
-        f = [" ".join(line)]
-        for bctype in bctypes:
-            if bctype is not None:
-                f.append(
-                    bctype.get_boundary_string(
-                        self.hgrid, boundary, global_constituents=global_constituents
-                    )
-                )
-        return "\n".join(f)
-
-    @property
-    def rnday(self):
-        return self.run_days
 
     @cached_property
     def gdf(self):
-        gdf = self.hgrid.boundaries.open.copy()
-        gdf["iettype"] = None
-        gdf["ifltype"] = None
-        gdf["isatype"] = None
-        gdf["itetype"] = None
-        gdf["itrtype"] = None
-        return gdf
-
+       return self.hgrid.boundaries.open.copy()
+        
     @property
     def ntip(self):
         return len(self.tides.get_active_potential_constituents())
 
     @property
     def nbfr(self):
-        return len(self.tides.get_active_forcing_constituents())
+        return len(self.tides.get_active_potential_constituents())
 
-    @cached_property
-    def tides(self):
-        return TidalConstituentCombiner(self.gdf)
-
-
-class TidalConstituentCombiner(Tides):
-    def __init__(self, gdf):
-        self.gdf = gdf
-        afc = self.get_active_forcing_constituents()
-        apc = self.get_active_potential_constituents()
-        for constituent in set([*afc, *apc]):
-            self.use_constituent(
-                constituent,
-                forcing=True if constituent in afc else False,
-                potential=True if constituent in apc else False,
-            )
-
-    def get_active_forcing_constituents(self):
-        active_constituents = OrderedSet()
-        for row in self.gdf.itertuples():
-            if row.iettype is not None:
-                if row.iettype.iettype in [3, 5]:
-                    [
-                        active_constituents.add(x)
-                        for x in row.iettype.tides.get_active_constituents()
-                    ]
-            if row.ifltype is not None:
-                if row.ifltype.ifltype in [3, 5]:
-                    [
-                        active_constituents.add(x)
-                        for x in row.ifltype.tides.get_active_constituents()
-                    ]
-
-        return list(active_constituents)
-
-    def get_active_potential_constituents(self):
-        active_constituents = OrderedSet()
-        for row in self.gdf.itertuples():
-            if row.iettype is not None:
-                if row.iettype.iettype in [3, 5]:
-                    [
-                        active_constituents.add(x)
-                        for x in row.iettype.tides.get_active_potential_constituents()
-                    ]
-            if row.ifltype is not None:
-                if row.ifltype.ifltype in [3, 5]:
-                    [
-                        active_constituents.add(x)
-                        for x in row.ifltype.tides.get_active_potential_constituents()
-                    ]
-
-        return list(active_constituents)
-
-    @lru_cache
-    def get_active_constituents(self):
-        return list(
-            OrderedSet(
-                [
-                    *self.get_active_potential_constituents(),
-                    *self.get_active_forcing_constituents(),
-                ]
-            )
-        )
-
-
-def ad_hoc_test():
-    from datetime import datetime
-    import logging
-
-    from pyschism.mesh import Hgrid
-    from pyschism.forcing.bctides import Bctides, iettype, ifltype, isatype, itetype
-
-    # setup logging
-    logging.basicConfig(
-        format="[%(asctime)s] %(name)s %(levelname)s: %(message)s",
-        force=True,
-    )
-    logging.getLogger("pyschism").setLevel(logging.DEBUG)
-
-    startdate = datetime(2018, 8, 17)
-    print(startdate)
-    rnday = 61
-    hgrid = Hgrid.open("./hgrid.gr3", crs="epsg:4326")
-
-    # Bctides
-    iet3 = iettype.Iettype3(constituents='major', database='tpxo')
-    iet4 = iettype.Iettype4()
-    iet5 = iettype.Iettype5(iettype3=iet3, iettype4=iet4)
-    ifl3 = ifltype.Ifltype3(constituents='major', database='tpxo')
-    ifl4 = ifltype.Ifltype4()
-    ifl5 = ifltype.Ifltype5(ifltype3=ifl3, ifltype4=ifl4)
-    isa3 = isatype.Isatype4()
-    # ite3 = itetype.Itetype4()
-    bctides = Bctides(hgrid, iettype={'1': iet5}, ifltype={'1': ifl5},
-                      isatype=isa3,
-                      itetype={'1': itetype.Itetype2(10, 1)}
-                      )
-    bctides.write(
-            './',
-            startdate,
-            rnday,
-            bctides=True,
-            elev2D=False,
-            uv3D=False,
-            tem3D=False,
-            sal3D=False,
-            overwrite=True
-            )
-
-
-if __name__ == "__main__":
-    ad_hoc_test()

@@ -70,12 +70,28 @@ class TPXO(TidalDataProvider):
         return self._constituents
 
     @property
-    def x(self) -> np.ndarray:
+    def lon_z(self) -> np.ndarray:
         return self.h['lon_z'][:, 0].data
 
     @property
-    def y(self) -> np.ndarray:
+    def lat_z(self) -> np.ndarray:
         return self.h['lat_z'][0, :].data
+
+    @property
+    def lon_u(self) -> np.ndarray:
+        return self.uv['lon_u'][:, 0].data
+
+    @property
+    def lat_u(self) -> np.ndarray:
+        return self.uv['lat_u'][0, :].data
+
+    @property
+    def lon_v(self) -> np.ndarray:
+        return self.uv['lon_v'][:, 0].data
+
+    @property
+    def lat_v(self) -> np.ndarray:
+        return self.uv['lat_v'][0, :].data
 
     @property
     def h(self):
@@ -107,8 +123,17 @@ class TPXO(TidalDataProvider):
         lower_c = [c.lower() for c in self.constituents]
         if phys_var == 'elevation':
             ncarray = self.h
-        elif phys_var == 'velocity':
+            self.x = self.lon_z
+            self.y = self.lat_z
+        elif ncvar == 'ua' or ncvar == 'up':
             ncarray = self.uv
+            self.x = self.lon_u
+            self.y = self.lat_u
+        elif ncvar == 'va' or ncvar == 'vp':
+            ncarray = self.uv
+            self.x = self.lon_v
+            self.y = self.lat_v
+
         zi = ncarray[ncvar][
             lower_c.index(constituent.lower()), :, :]
         xo = np.asarray(

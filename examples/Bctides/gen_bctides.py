@@ -1,14 +1,23 @@
 from time import time
 import os
+import argparse
 from datetime import datetime, timedelta
 import logging
-import pathlib
-import f90nml
+import json
+
+import numpy as np
 
 from pyschism.mesh import Hgrid
-from pyschism.forcing.bctides import Bctides, iettype, ifltype, isatype, itetype
-from pyschism.forcing.source_sink.nwm import NationalWaterModel, NWMElementPairings
-from pyschism.forcing.nws import NWS2, GFS, HRRR
+from pyschism.forcing.bctides import Bctides
+
+logging.basicConfig(
+    format = "[%(asctime)s] %(name)s %(levelname)s: %(message)s",
+    force=True,
+)
+logging.getLogger("pyschism").setLevel(logging.DEBUG)
+
+def list_of_strings(arg):
+    return arg.split(',')
 
 if __name__ == "__main__":
 
@@ -21,50 +30,115 @@ if __name__ == "__main__":
     database = 'tpxo'
         ~/.local/share/tpxo/
     '''
-    #setup logging
-    logging.basicConfig(
-        format = "[%(asctime)s] %(name)s %(levelname)s: %(message)s",
-        force=True,
-    )
-    logging.getLogger("pyschism").setLevel(logging.DEBUG)
+    parser = argparse.ArgumentParser(description="Create bctides.in for SCHISM with command-line arguments! e.g. python test_bctides.py hgrid.ll 2014-12-01 397 '[[5,5,4,4],[5,5,4,4],[0,1,1,2]]' major fes2014")
+    
+    #Add arguments
+    parser.add_argument('hgrid', type=str, help='hgrid.ll (lon/lat) file')
+    parser.add_argument('start_date', type=datetime.fromisoformat, help='model startdate')
+    parser.add_argument('rnday', type=float, help='model rnday')
+    parser.add_argument('bctypes', type=str, help="JSON format for Flags for each open boundary, '[[5,5,4,4],[5,5,4,4],[0,1,1,2]]'")
+    parser.add_argument('constituents', type=list_of_strings, help="Choose tidal constituents to be included, major, minor, or list of constituents ['K1', 'O1', 'M2']")
+    parser.add_argument('database', type=str, help='Tidal datbase: tpxo or fes2014')
 
-    start_date = datetime(2017, 12, 1)
-    rnday = 396
-    end_date = start_date + timedelta(days=61)
+    #Parse the command-line arguments
+    args = parser.parse_args()
+    hgrid_filename = args.hgrid
+    start_date = args.start_date
+    rnday = args.rnday
+    bctypes = args.bctypes
+    constituents = args.constituents
+    database = args.database
+
+    # Parse the JSON string into a Python data structure
+    try:
+        flags = json.loads(bctypes)
+        print("Parsed bctype list:", flags)
+    except json.JSONDecodeError:
+        raise TypeError("Invalid JSON format for bctype list.")
+
+    #earth tidal potential
+    add_earth_tidal_potential = input("Would you like to add earth tidal potential? Y/N: ")
+    if add_earth_tidal_potential.lower() == "y":
+        earth_tidal_potential = True
+    else:
+        earth_tidal_potential = False
+
+    #Check if constant values needed
+    ethconst = []
+    vthconst = []
+    tthconst = []
+    sthconst = []
+    tobc = []
+    sobc = []
+    relax = []
+
+    for ibnd, flag in enumerate(flags):
+        iettype, ifltype, itetype, isatype = [i for i in flag]
+        if iettype == 2:
+            val = input(f"Elevation value at boundary {ibnd+1}: ")
+            ethconst.append(float(val))
+        else:
+            ethconst.append(np.nan)
+
+        if ifltype == 2:
+            val = input(f"Discharge value (negative for inflow) at boundary {ibnd+1}: ")
+            vthconst.append(float(val))
+        elif ifltype == -4:
+            val = input(f"Relaxation constants (between 0 and 1) for inflow at boundary {ibnd+1}: ")
+            relax.append(float(val))
+            val = input(f"Relaxation constants (between 0 and 1) for outflow at boundary {ibnd+1}: ")
+            relax.append(float(val))
+            
+        else:
+            vthconst.append(np.nan)
+
+        if itetype == 2:
+            val = input(f"Temperature value at boundary {ibnd+1}: ")
+            tthconst.append(float(val))
+            val = input(f"Nuding factor (between 0 and 1) for temperature at boundary {ibnd+1}: ")
+            tobc.append(float(val))
+        elif itetype == 1 or itetype == 3 or itetype == 4:
+            tthconst.append(np.nan)
+            val = input(f"Nuding factor (between 0 and 1) for temperature at boundary {ibnd+1}: ")
+            tobc.append(float(val))
+        else:
+            tthconst.append(np.nan)
+            tobc.append(np.nan)
+
+        if isatype == 2:
+            val = input(f"Salinity value at boundary {ibnd+1}: ")
+            sthconst.append(float(val))
+            val = input(f"Nuding factor (between 0 and 1) for salinity at boundary {ibnd+1}: ")
+            sobc.append(float(val))
+        elif isatype == 1 or isatype == 3 or isatype == 4:
+            sthconst.append(np.nan)
+            val = input(f"Nuding factor (between 0 and 1) for salinity at boundary {ibnd+1}: ")
+            sobc.append(float(val))
+        else:
+            sthconst.append(np.nan)
+            sobc.append(np.nan)
+
     outdir = './'
-    hgrid = Hgrid.open("./hgrid.gr3", crs="epsg:4326")
-
-    #elevation
-    iet3 = iettype.Iettype3(constituents='major', database='fes2014')
-    iet4 = iettype.Iettype4()
-    iet5 = iettype.Iettype5(iettype3=iet3, iettype4=iet4)
-
-    #velocity
-    ifl1 = ifltype.Ifltype1()
-    ifl3 = ifltype.Ifltype3(constituents='major', database='fes2014')
-    ifl4 = ifltype.Ifltype4()
-    ifl5 = ifltype.Ifltype5(ifltype3=ifl3, ifltype4=ifl4)
-
-    #salinity
-    isa4 = isatype.Isatype4()
-    isa2 = isatype.Isatype2(5, 1)
-
-    #temperature
-    ite4 = itetype.Itetype4()
-    ite2 = itetype.Itetype2(0, 1)
+    hgrid = Hgrid.open(hgrid_filename, crs="epsg:4326")
 
     bctides=Bctides(
-        hgrid, 
-        iettype={'1': iet5, '2': iet5}, 
-        ifltype={'1': ifl5, '2': ifl5, '3': ifl1}, 
-        isatype={'1': isa4, '2':isa4, '3': isa2}, 
-        itetype={'1': ite4, '2':ite4, '3': ite2}
+        hgrid = hgrid, 
+        flags = flags,
+        constituents = constituents, 
+        database = database,
+        add_earth_tidal = earth_tidal_potential,
+        ethconst = ethconst,
+        vthconst = vthconst,
+        tthconst = tthconst,
+        sthconst = sthconst,
+        tobc = tobc,
+        sobc = sobc,
+        relax = relax,
     )
 
     bctides.write(
         outdir, 
         start_date=start_date, 
-        end_date=end_date, 
-        bctides=True, 
-        overwrite=True
+        rnday=rnday, 
+        overwrite=True,
     )
