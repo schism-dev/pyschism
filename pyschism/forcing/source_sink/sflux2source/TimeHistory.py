@@ -23,7 +23,7 @@ def running_mean(X, N):
     return (cumsum[N:] - cumsum[:-N]) / float(N)
 
 
-class TimeHistory():
+class TimeHistory:
 
 
     """Class for manipulating *.th"""
