@@ -50,39 +50,72 @@ class AWSGrib2Inventory:
         # self.file_metadata = list(sorted([
         #     _['Key'] for _ in data if 'wrfsfcf' in _['Key'] and tz in _['Key'] and not 'idx' in _['Key']
         # ]))
-        self.get_file_namelist(self.forecast_cycle)
+        timevector = np.arange(
+            self.start_date + timedelta(hours=1),
+            self.start_date + timedelta(hours=25),
+            np.timedelta64(1, 'h')
+        ).astype(datetime)
 
-        while (not self.file_metadata): 
-            logger.info(f'No data for cycle t{self.forecast_cycle.hour:02d}z on {self.forecast_cycle}, try next cycle: +1!')
-            self.forecast_cycle += timedelta(hours=1)
-            self.get_file_namelist(self.forecast_cycle)
+        self.get_file_namelist(timevector)
 
-        for key in self.file_metadata[1:record*24+1]:
-            filename = pathlib.Path(self.tmpdir) / key
+        for dt in timevector:
+            
+            outfile_name = f"hrrr.{self.start_date.strftime('%Y%m%d')}/hrrr_wrfsfcf{dt.strftime('%Y%m%d%H')}.grib2"
+            filename = pathlib.Path(self.tmpdir) / outfile_name
             filename.parent.mkdir(parents=True, exist_ok=True)
 
             with open(filename, 'wb') as f:
-                logger.info(f'Downloading file {key}, ')
-                try:
-                    self.s3.download_fileobj(self.bucket, key, f)
-                except:
-                    logger.info(f'file {key} is not available')
+                while(self.file_metadata[dt]):
+                    try:
+                        key = self.file_metadata[dt].pop(0)
+                        logger.info(f"Downloading file {key} for {dt}") 
+                        self.s3.download_fileobj(self.bucket, key, f)
+                        break
+                    except:
+                        logger.info(f'file {key} is not available, try next file')
+                        continue
 
-    def get_file_namelist(self, requested_date):
-        paginator=self.s3.get_paginator('list_objects_v2')
-        pages=paginator.paginate(Bucket=self.bucket, 
-                Prefix=f'hrrr.{requested_date.strftime("%Y%m%d")}'
-                       f'/{self.product}/')
-        data=[]
-        for page in pages:
-            for obj in page['Contents']:
-                data.append(obj) 
+    def get_file_namelist(self, requested_dates):
 
-        self.cycle = requested_date.hour
-        tz='t{:02d}z'.format(self.cycle)
-        self.file_metadata = list(sorted([
-            _['Key'] for _ in data if 'wrfsfcf' in _['Key'] and tz in _['Key'] and not 'idx' in _['Key']
-        ]))
+        _file_metadata = {}
+        for it, dt in enumerate(requested_dates):
+            levels = 3
+            i = 0
+            date1 = dt
+            fhour = int(dt.hour)
+           
+            while (levels):
+                if dt.hour == 0:
+                    date2 = (dt - timedelta(days=1)).strftime('%Y%m%d')
+                else:
+                    date2 = dt.strftime('%Y%m%d')
+
+                if (fhour > 0) & (fhour < 7):
+                    cycle = self.fcst_cycles[0-i]
+                    fhour2 = fhour + i*6
+
+                elif (fhour > 6) & (fhour < 13):
+                    cycle = self.fcst_cycles[1-i]
+                    fhour2 = fhour + (i-1)*6
+
+                elif (fhour > 12) & (fhour < 19):
+                    cycle = self.fcst_cycles[2-i]
+                    fhour2 = fhour + (i-2)*6
+
+                elif (fhour > 18) & (fhour < 24):
+                    cycle = self.fcst_cycles[3-i]
+                    fhour2 = fhour + (i-3)*6
+
+                elif fhour == 0:
+                    cycle = self.fcst_cycles[3-i]
+                    fhour2 = fhour + (i+1)*6
+
+                _file_metadata.setdefault(date1, []).append(f"hrrr.{date2}/{self.product}/hrrr.t{cycle}z.wrfsfcf{fhour2:02d}.grib2")
+                levels -= 1
+                i += 1
+                dt -= timedelta(hours=6)
+        self.file_metadata = _file_metadata    
+
         return self.file_metadata
 
     @property
@@ -90,10 +123,8 @@ class AWSGrib2Inventory:
         return 'noaa-hrrr-bdp-pds'
 
     @property
-    def output_interval(self) -> timedelta:
-        return {
-            'conus': timedelta(hours=1)
-        }[self.product]
+    def fcst_cycles(self):
+        return ['00', '06', '12', '18']
 
     @property
     def s3(self):
@@ -112,7 +143,7 @@ class AWSGrib2Inventory:
 
     @property
     def files(self):
-        grbfiles=glob.glob(f'{self.tmpdir}/hrrr.{self.forecast_cycle.strftime("%Y%m%d")}/conus/hrrr.t{self.cycle:02d}z.wrfsfcf*.grib2')
+        grbfiles=glob.glob(f'{self.tmpdir}/hrrr.{self.forecast_cycle.strftime("%Y%m%d")}/hrrr_wrfsfcf*.grib2')
         grbfiles.sort()
         return grbfiles
 
