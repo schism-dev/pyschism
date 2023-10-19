@@ -36,27 +36,13 @@ class AWSGrib2Inventory:
 
         self.forecast_cycle = self.start_date #nearest_cycle()
 
-        # paginator=self.s3.get_paginator('list_objects_v2')
-        # pages=paginator.paginate(Bucket=self.bucket, 
-        #         Prefix=f'hrrr.{self.forecast_cycle.strftime("%Y%m%d")}'
-        #                f'/{self.product}/')
-        # data=[]
-        # for page in pages:
-        #     for obj in page['Contents']:
-        #         data.append(obj) 
-
-        # self.cycle=self.forecast_cycle.hour
-        # tz='t{:02d}z'.format(self.cycle)
-        # self.file_metadata = list(sorted([
-        #     _['Key'] for _ in data if 'wrfsfcf' in _['Key'] and tz in _['Key'] and not 'idx' in _['Key']
-        # ]))
         timevector = np.arange(
             self.start_date + timedelta(hours=1),
             self.start_date + timedelta(hours=25),
             np.timedelta64(1, 'h')
         ).astype(datetime)
 
-        self.get_file_namelist(timevector)
+        file_metadata = self.get_file_namelist(timevector)
 
         for dt in timevector:
             
@@ -65,9 +51,9 @@ class AWSGrib2Inventory:
             filename.parent.mkdir(parents=True, exist_ok=True)
 
             with open(filename, 'wb') as f:
-                while(self.file_metadata[dt]):
+                while(file_metadata[dt]):
                     try:
-                        key = self.file_metadata[dt].pop(0)
+                        key = file_metadata[dt].pop(0)
                         logger.info(f"Downloading file {key} for {dt}") 
                         self.s3.download_fileobj(self.bucket, key, f)
                         break
@@ -77,46 +63,27 @@ class AWSGrib2Inventory:
 
     def get_file_namelist(self, requested_dates):
 
-        _file_metadata = {}
+        file_metadata = {}
         for it, dt in enumerate(requested_dates):
             levels = 3
             i = 0
             date1 = dt
             fhour = int(dt.hour)
-           
+
             while (levels):
-                if dt.hour == 0:
-                    date2 = (dt - timedelta(days=1)).strftime('%Y%m%d')
-                else:
-                    date2 = dt.strftime('%Y%m%d')
 
-                if (fhour > 0) & (fhour < 7):
-                    cycle = self.fcst_cycles[0-i]
-                    fhour2 = fhour + i*6
-
-                elif (fhour > 6) & (fhour < 13):
-                    cycle = self.fcst_cycles[1-i]
-                    fhour2 = fhour + (i-1)*6
-
-                elif (fhour > 12) & (fhour < 19):
-                    cycle = self.fcst_cycles[2-i]
-                    fhour2 = fhour + (i-2)*6
-
-                elif (fhour > 18) & (fhour < 24):
-                    cycle = self.fcst_cycles[3-i]
-                    fhour2 = fhour + (i-3)*6
-
-                elif fhour == 0:
-                    cycle = self.fcst_cycles[3-i]
-                    fhour2 = fhour + (i+1)*6
-
-                _file_metadata.setdefault(date1, []).append(f"hrrr.{date2}/{self.product}/hrrr.t{cycle}z.wrfsfcf{fhour2:02d}.grib2")
+                date2 = (dt - timedelta(days=1)).strftime('%Y%m%d') if dt.hour == 0 else dt.strftime('%Y%m%d')
+                cycle_index = (fhour - 1) // 6
+                cycle = self.fcst_cycles[cycle_index - i]
+                fhour2 = fhour + i * 6 if cycle_index == 0 else fhour - cycle_index * 6 + i * 6
+           
+                file_metadata.setdefault(date1, []).append(f"hrrr.{date2}/{self.product}/hrrr.t{cycle}z.wrfsfcf{fhour2:02d}.grib2")
                 levels -= 1
                 i += 1
                 dt -= timedelta(hours=6)
-        self.file_metadata = _file_metadata    
 
-        return self.file_metadata
+        return file_metadata    
+
 
     @property
     def bucket(self):
