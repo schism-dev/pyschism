@@ -233,7 +233,6 @@ class Bctides:
         output_directory,
         start_date: datetime = None,
         rnday = None,
-        constituents = 'major',
         overwrite: bool = True, 
     ):
         """
@@ -242,7 +241,6 @@ class Bctides:
         output_directory: str
         start_date: datetime.datetime
         rnday: int, float or datetime.timedelta
-        constituents: str or list
         overwrite: bool 
         """
 
@@ -256,14 +254,11 @@ class Bctides:
         else:
             raise IOError("Please specify the number of days!")
 
-        if constituents is not None:
-            self.constituents = constituents
-        else:
-            raise IOError("Please specify tidal constituents!")
-
         output_directory = pathlib.Path(output_directory)
         output_directory.mkdir(exist_ok=overwrite, parents=True) 
+
         bctides = output_directory / "bctides.in"
+
         if bctides.exists() and not overwrite:
             raise IOError("path exists and overwrite is False") 
         with open(bctides, "w") as f:
