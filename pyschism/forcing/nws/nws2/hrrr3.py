@@ -116,10 +116,13 @@ class AWSGrib2Inventory:
 
 class HRRR:
 
-    def __init__(self, start_date=None, rnday=None, pscr=None, record=2, bbox=None, outdir=None):
+    def __init__(self, level=2, record=1, bbox=None, pscr=None, outdir=None):
 
-        start_date = nearest_cycle() if start_date is None else start_date 
+        self.level = level
+        self.record = record
         self.bbox = bbox
+
+        self.pscr = pscr
 
         if outdir is None:
             self.path = pathlib.Path(start_date.strftime("%Y%m%d"))
@@ -127,8 +130,13 @@ class HRRR:
         else:
             self.path = outdir
 
+
+    def write(self, start_date, rnday, air: bool=True, prc: bool=True, rad: bool=True):
+
+        start_date = nearest_cycle() if start_date is None else start_date 
         end_date = start_date + timedelta(days=rnday)
         logger.info(f'start_date is {start_date}, end_date is {end_date}')
+
         
         datevector = np.arange(start_date, end_date, np.timedelta64(1, 'D'),
                 dtype='datetime64')
@@ -139,14 +147,21 @@ class HRRR:
         logger.info(f'npool is {npool}')
         pool = mp.Pool(int(npool))
 
-        pool.starmap(self.gen_sflux, [(date, record, pscr) for date in datevector])
+        pool.starmap(self.gen_sflux, [(istack+1, date, air, prc, rad) for istack, date in enumerate(datevector)])
         #self.gen_sflux(datevector[0], record, pscr)
 
         pool.close()
         
-    def gen_sflux(self, date, record, pscr):
+    def gen_sflux(
+            self, 
+            istack,
+            date, 
+            air: bool = True,
+            prc: bool = True,
+            rad: bool = True,
+        ):
 
-        inventory = AWSGrib2Inventory(date, record, pscr)
+        inventory = AWSGrib2Inventory(date, self.record, self.pscr)
         grbfiles = inventory.files
         cycle = date.hour
 
@@ -167,7 +182,6 @@ class HRRR:
 
         #Get lon/lat
         lon, lat, idx_ymin, idx_ymax, idx_xmin, idx_xmax = self.modified_latlon(grbfiles[0])
- 
 
         times = []
         for ifile, fname in enumerate(grbfiles):
@@ -213,89 +227,125 @@ class HRRR:
                     ds.close()    
 
         #write netcdf
-        fout = xr.Dataset({
-            'stmp': (['time', 'ny_grid', 'nx_grid'], np.array(stmp)),
-            'spfh': (['time', 'ny_grid', 'nx_grid'], np.array(spfh)),
-            'uwind': (['time', 'ny_grid', 'nx_grid'], np.array(uwind)),
-            'vwind': (['time', 'ny_grid', 'nx_grid'], np.array(vwind)),
-            'prmsl': (['time', 'ny_grid', 'nx_grid'], np.array(prmsl)),
-            'prate': (['time', 'ny_grid', 'nx_grid'], np.array(prate)),
-            'dlwrf': (['time', 'ny_grid', 'nx_grid'], np.array(dlwrf)),
-            'dswrf': (['time', 'ny_grid', 'nx_grid'], np.array(dswrf)),
-            },
-            coords={
-                'time': np.round((times - date.to_datetime64()) / np.timedelta64(1, 'D'), 5).astype('float32'),
-                'lon': (['ny_grid', 'nx_grid'], lon),
-                'lat': (['ny_grid', 'nx_grid'], lat)})
-
-        #date_string = np.datetime_as_string(times[0], unit='m')
-        #bdate = datetime.strptime(date_string, '%Y-%m-%dT%H:%M')
         bdate = date.strftime('%Y %m %d %H').split(' ')
         bdate = [int(q) for q in bdate[:4]] + [0]
 
-        fout.time.attrs = {
-            'long_name': 'Time',
-            'standard_name': 'time',
-            'base_date': bdate,
-            'units': f'days since {date.year}-{date.month}-{date.day} {cycle:02d}:00 UTC'
-        }
+        if air:
+            ds = xr.Dataset(
+                {
+                    'stmp': (['time', 'ny_grid', 'nx_grid'], np.array(stmp)),
+                    'spfh': (['time', 'ny_grid', 'nx_grid'], np.array(spfh)),
+                    'uwind': (['time', 'ny_grid', 'nx_grid'], np.array(uwind)),
+                    'vwind': (['time', 'ny_grid', 'nx_grid'], np.array(vwind)),
+                    'prmsl': (['time', 'ny_grid', 'nx_grid'], np.array(prmsl)),
+                },
+                coords = {
+                    'time': np.round((times - date.to_datetime64()) / np.timedelta64(1, 'D'), 5).astype('float32'),
+                    'lon': (['ny_grid', 'nx_grid'], lon),
+                    'lat': (['ny_grid', 'nx_grid'], lat)
+                }
+            )
 
-        fout.lat.attrs = {
-            'units': 'degrees_north',
-            'long_name': 'Latitude',
-            'standard_name': 'latitude',
-        }
+            ds.time.attrs = {
+                'long_name': 'Time',
+                'standard_name': 'time',
+                'base_date': bdate,
+                'units': f'days since {date.year}-{date.month}-{date.day} {cycle:02d}:00 UTC'
+            }
 
-        fout.lon.attrs = {
-            'units': 'degrees_east',
-            'long_name': 'Longitude',
-            'standard_name': 'longitude',
-        }
+            ds.lat.attrs = {
+                'units': 'degrees_north',
+                'long_name': 'Latitude',
+                'standard_name': 'latitude',
+            }
 
-        fout.uwind.attrs={
-            'units': 'm/s',
-            'long_name': '10m_above_ground/UGRD',
-            'standard_name':'eastward_wind'
-        }
+            ds.lon.attrs = {
+                'units': 'degrees_east',
+                'long_name': 'Longitude',
+                'standard_name': 'longitude',
+            }
+
+            ds.uwind.attrs={
+                'units': 'm/s',
+                'long_name': '10m_above_ground/UGRD',
+                'standard_name':'eastward_wind'
+            }
       
-        fout.vwind.attrs={
-            'units': 'm/s',
-            'long_name': '10m_above_ground/UGRD',
-            'standard_name':'northward_wind'
-        }
+            ds.vwind.attrs={
+                'units': 'm/s',
+                'long_name': '10m_above_ground/UGRD',
+                'standard_name':'northward_wind'
+            }
 
-        fout.spfh.attrs={
-            'units': 'kg kg-1',
-            'long_name': '2m_above_ground/Specific Humidity',
-            'standard_name':'specific_humidity'
-        }
+            ds.spfh.attrs={
+                'units': 'kg kg-1',
+                'long_name': '2m_above_ground/Specific Humidity',
+                'standard_name':'specific_humidity'
+            }
 
-        fout.prmsl.attrs = {
-            'units': 'Pa',
-            'long_name': 'Pressure reduced to MSL',
-            'standard_name': 'air_pressure_at_sea_level'
-        }
+            ds.prmsl.attrs = {
+                'units': 'Pa',
+                'long_name': 'Pressure reduced to MSL',
+                'standard_name': 'air_pressure_at_sea_level'
+            }
 
-        fout.stmp.attrs={
-            'units': 'K',
-            'long_name': '2m_above_ground/Temperature',
-        }
+            ds.stmp.attrs={
+                'units': 'K',
+                'long_name': '2m_above_ground/Temperature',
+            }
 
-        fout.prate.attrs={
-            'units': 'kg m-2 s-1',
-            'long_name': 'Precipitation rate'
-        }
-        fout.dlwrf.attrs = {
-            'units': 'W m-2',
-            'long_name': 'Downward short-wave radiation flux'
-        }
+            #write to file
+            ds.to_netcdf(self.path / f'sflux_air_{self.level}_{istack:04d}.nc','w', 'NETCDF3_CLASSIC', unlimited_dims='time')
+            ds.close()
 
-        fout.dswrf.attrs = {
-            'units': 'W m-2',
-            'long_name': 'Downward long-wave radiation flux'
-        }
+        if prc:
+            ds = xr.Dataset(
+                {
+                    'prate': (['time', 'ny_grid', 'nx_grid'], np.array(prate)),
+                },
+                coords = {
+                    'time': np.round((times - date.to_datetime64()) / np.timedelta64(1, 'D'), 5).astype('float32'),
+                    'lon': (['ny_grid', 'nx_grid'], lon),
+                    'lat': (['ny_grid', 'nx_grid'], lat)
+                }
+            )
+
+            ds.prate.attrs={
+                'units': 'kg m-2 s-1',
+                'long_name': 'Precipitation rate'
+            }
+
+            #write to file
+            ds.to_netcdf(self.path / f'sflux_prc_{self.level}_{istack:04d}.nc','w', 'NETCDF3_CLASSIC', unlimited_dims='time')
+            ds.close()
+
+        if rad:
+            ds = xr.Dataset(
+                {
+                    'dlwrf': (['time', 'ny_grid', 'nx_grid'], np.array(dlwrf)),
+                    'dswrf': (['time', 'ny_grid', 'nx_grid'], np.array(dswrf)),
+                },
+                coords = {
+                    'time': np.round((times - date.to_datetime64()) / np.timedelta64(1, 'D'), 5).astype('float32'),
+                    'lon': (['ny_grid', 'nx_grid'], lon),
+                    'lat': (['ny_grid', 'nx_grid'], lat)
+                }
+            )
+
+            ds.dlwrf.attrs = {
+                'units': 'W m-2',
+                'long_name': 'Downward short-wave radiation flux'
+            }
+
+            ds.dswrf.attrs = {
+                'units': 'W m-2',
+                'long_name': 'Downward long-wave radiation flux'
+            }
                          
-        fout.to_netcdf(self.path / f'hrrr_{date.strftime("%Y%m%d")}{cycle:02d}.nc','w', 'NETCDF3_CLASSIC', unlimited_dims='time')
+            #write to file
+            ds.to_netcdf(self.path / f'sflux_rad_{self.level}_{istack:04d}.nc','w', 'NETCDF3_CLASSIC', unlimited_dims='time')
+            ds.close()
+
 
     def modified_latlon(self, grbfile):
 
