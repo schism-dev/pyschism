@@ -26,19 +26,20 @@ class AWSGrib2Inventory:
     def __init__(
             self,
             start_date: datetime = None,
-            record = 2,
+            record = 1,
             pscr = None, #tmpdir to save grib files
             product='conus',
     ):
         self.start_date = nearest_cycle() if start_date is None else start_date
+        self.record = record
         self.pscr = pscr
         self.product = product
 
         self.forecast_cycle = self.start_date #nearest_cycle()
 
         timevector = np.arange(
-            self.start_date + timedelta(hours=1),
-            self.start_date + timedelta(hours=25),
+            self.start_date,
+            self.start_date + timedelta(hours=record*24+1),
             np.timedelta64(1, 'h')
         ).astype(datetime)
 
@@ -56,34 +57,62 @@ class AWSGrib2Inventory:
                         key = file_metadata[dt].pop(0)
                         logger.info(f"Downloading file {key} for {dt}") 
                         self.s3.download_fileobj(self.bucket, key, f)
+                        logger.info("Success!")
                         break
                     except:
-                        logger.info(f'file {key} is not available, try next file')
-                        continue
+                        if not file_metadata[dt]:
+                            logger.info(f'No file for {dt}')
+                            if os.path.exists(filename):
+                                os.remove(filename)
+                        else:
+                            logger.info(f'file {key} is not available, try next file')
+                            continue
 
     def get_file_namelist(self, requested_dates):
 
         file_metadata = {}
-        for it, dt in enumerate(requested_dates):
+        file_metadata = {}
+        hours = (datetime.utcnow() - self.start_date).days * 24 + (datetime.utcnow() - self.start_date).seconds // 3600
+        n_cycles = hours // 6 if hours < 25 else 4
+        cycle_index = (int(self.start_date.hour) - 1) // 6
+        dt = requested_dates[0]
+        for it, dt in enumerate(requested_dates[:n_cycles*6+1]):
             levels = 3
             i = 0
-            date1 = dt
             fhour = int(dt.hour)
+            cycle_index = (fhour - 1) // 6
+            date2 = (dt - timedelta(days=1)).strftime('%Y%m%d') if dt.hour == 0 else dt.strftime('%Y%m%d')
 
             while (levels):
 
-                date2 = (dt - timedelta(days=1)).strftime('%Y%m%d') if dt.hour == 0 else dt.strftime('%Y%m%d')
-                cycle_index = (fhour - 1) // 6
                 cycle = self.fcst_cycles[cycle_index - i]
                 fhour2 = fhour + i * 6 if cycle_index == 0 else fhour - cycle_index * 6 + i * 6
-           
-                file_metadata.setdefault(date1, []).append(f"hrrr.{date2}/{self.product}/hrrr.t{cycle}z.wrfsfcf{fhour2:02d}.grib2")
+                if self.product == 'conus':
+                    file_metadata.setdefault(dt, []).append(f"hrrr.{date2}/{self.product}/hrrr.t{cycle}z.wrfsfcf{fhour2:02d}.grib2")
+                elif self.product == 'alaska':
+                    file_metadata.setdefault(dt, []).append(f"hrrr.{date2}/{self.product}/hrrr.t{cycle}z.wrfsfcf{fhour2:02d}.ak.grib2")
                 levels -= 1
                 i += 1
-                dt -= timedelta(hours=6)
+
+        if it < 25:
+            date2 = (dt - timedelta(days=1)).strftime('%Y%m%d') if dt.hour == 0 else dt.strftime('%Y%m%d')
+            for it, dt in enumerate(requested_dates[n_cycles*6+1:]):
+                levels = 3
+                i = 0
+                hours = (dt - self.forecast_cycle).days * 24 + (dt - self.forecast_cycle).seconds // 3600
+
+                while (levels):
+                    cycle = self.fcst_cycles[cycle_index - i]
+                    fhour2 = ( hours - (n_cycles - 1) * 6) + i * 6
+                    if self.product == 'conus':
+                        file_metadata.setdefault(dt, []).append(f"hrrr.{date2}/{self.product}/hrrr.t{cycle}z.wrfsfcf{fhour2:02d}.grib2")
+                    elif self.product == 'alaska':
+                        file_metadata.setdefault(dt, []).append(f"hrrr.{date2}/{self.product}/hrrr.t{cycle}z.wrfsfcf{fhour2:02d}.ak.grib2")
+
+                    levels -= 1
+                    i += 1
 
         return file_metadata    
-
 
     @property
     def bucket(self):
@@ -116,30 +145,38 @@ class AWSGrib2Inventory:
 
 class HRRR:
 
-    def __init__(self, level=2, record=1, bbox=None, pscr=None, outdir=None):
+    def __init__(self, level=2, region='conus', bbox=None, pscr=None, outdir=None):
 
         self.level = level
-        self.record = record
+        self.region = region
         self.bbox = bbox
-
         self.pscr = pscr
-
-        if outdir is None:
-            self.path = pathlib.Path(start_date.strftime("%Y%m%d"))
-            self.path.mkdir(parents=True, exist_ok=True)
-        else:
-            self.path = outdir
-
+        self.outdir = outdir
+        self.record = 1
 
     def write(self, start_date, rnday, air: bool=True, prc: bool=True, rad: bool=True):
 
         start_date = nearest_cycle() if start_date is None else start_date 
-        end_date = start_date + timedelta(days=rnday)
-        logger.info(f'start_date is {start_date}, end_date is {end_date}')
-
         
-        datevector = np.arange(start_date, end_date, np.timedelta64(1, 'D'),
-                dtype='datetime64')
+        if (start_date + timedelta(days=rnday)) > datetime.utcnow():
+            logger.info(f"End date is beyond current time, set rnday to one day and record to 2 days")
+            rnday = 1
+            self.record = 2 #days
+
+        end_date = start_date + timedelta(hours=rnday * self.record + 1)
+        logger.info(f'start time is {start_date}, end time is {end_date}')
+
+        if self.outdir is None:
+            #self.outdir = pathlib.Path(start_date.strftime("%Y%m%d"))
+            self.outdir = pathlib.Path("sflux")
+            self.outdir.mkdir(parents=True, exist_ok=True)
+        
+        datevector = np.arange(
+            start_date, 
+            start_date + timedelta(days=rnday), 
+            np.timedelta64(1, 'D'),
+            dtype='datetime64',
+        )
         datevector = pd.to_datetime(datevector)
 
         #Use all CPUs may cause memory issue
@@ -161,9 +198,9 @@ class HRRR:
             rad: bool = True,
         ):
 
-        inventory = AWSGrib2Inventory(date, self.record, self.pscr)
+        inventory = AWSGrib2Inventory(date, self.record, self.pscr, self.region)
         grbfiles = inventory.files
-        cycle = date.hour
+        #cycle = date.hour
 
         stmp = [] 
         spfh = []
@@ -250,7 +287,7 @@ class HRRR:
                 'long_name': 'Time',
                 'standard_name': 'time',
                 'base_date': bdate,
-                'units': f'days since {date.year}-{date.month}-{date.day} {cycle:02d}:00 UTC'
+                'units': f"days since {date.strftime('%Y-%m-%d %H:00')} UTC",
             }
 
             ds.lat.attrs = {
@@ -295,7 +332,7 @@ class HRRR:
             }
 
             #write to file
-            ds.to_netcdf(self.path / f'sflux_air_{self.level}_{istack:04d}.nc','w', 'NETCDF3_CLASSIC', unlimited_dims='time')
+            ds.to_netcdf(self.outdir / f'sflux_air_{self.level}.{istack:04d}.nc','w', 'NETCDF3_CLASSIC', unlimited_dims='time')
             ds.close()
 
         if prc:
@@ -310,13 +347,32 @@ class HRRR:
                 }
             )
 
+            ds.time.attrs = {
+                'long_name': 'Time',
+                'standard_name': 'time',
+                'base_date': bdate,
+                'units': f"days since {date.strftime('%Y-%m-%d %H:00')} UTC",
+            }
+
+            ds.lat.attrs = {
+                'units': 'degrees_north',
+                'long_name': 'Latitude',
+                'standard_name': 'latitude',
+            }
+
+            ds.lon.attrs = {
+                'units': 'degrees_east',
+                'long_name': 'Longitude',
+                'standard_name': 'longitude',
+            }
+
             ds.prate.attrs={
                 'units': 'kg m-2 s-1',
                 'long_name': 'Precipitation rate'
             }
 
             #write to file
-            ds.to_netcdf(self.path / f'sflux_prc_{self.level}_{istack:04d}.nc','w', 'NETCDF3_CLASSIC', unlimited_dims='time')
+            ds.to_netcdf(self.outdir / f'sflux_prc_{self.level}.{istack:04d}.nc','w', 'NETCDF3_CLASSIC', unlimited_dims='time')
             ds.close()
 
         if rad:
@@ -332,6 +388,25 @@ class HRRR:
                 }
             )
 
+            ds.time.attrs = {
+                'long_name': 'Time',
+                'standard_name': 'time',
+                'base_date': bdate,
+                'units': f"days since {date.strftime('%Y-%m-%d %H:00')} UTC",
+            }
+
+            ds.lat.attrs = {
+                'units': 'degrees_north',
+                'long_name': 'Latitude',
+                'standard_name': 'latitude',
+            }
+
+            ds.lon.attrs = {
+                'units': 'degrees_east',
+                'long_name': 'Longitude',
+                'standard_name': 'longitude',
+            }
+
             ds.dlwrf.attrs = {
                 'units': 'W m-2',
                 'long_name': 'Downward short-wave radiation flux'
@@ -343,9 +418,8 @@ class HRRR:
             }
                          
             #write to file
-            ds.to_netcdf(self.path / f'sflux_rad_{self.level}_{istack:04d}.nc','w', 'NETCDF3_CLASSIC', unlimited_dims='time')
+            ds.to_netcdf(self.outdir / f'sflux_rad_{self.level}.{istack:04d}.nc','w', 'NETCDF3_CLASSIC', unlimited_dims='time')
             ds.close()
-
 
     def modified_latlon(self, grbfile):
 
