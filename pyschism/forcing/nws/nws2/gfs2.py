@@ -32,7 +32,6 @@ class AWSGrib2Inventory:
         This dataset GFS V16.3.0 starts on Feb 26, 2021.
         """
         self.start_date = nearest_cycle() if start_date is None else start_date
-        self.record = record
         self.pscr = pscr
         self.product = product
 

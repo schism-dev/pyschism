@@ -93,7 +93,7 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url=meta['url'],
     packages=setuptools.find_packages(exclude=['tests', 'examples', 'docs', 'docker']),
-    python_requires='>3.6',
+    python_requires='>=3.8',
     setup_requires=['wheel', 'setuptools_scm', 'setuptools>=41.2',
                     'netcdf-flattener>=1.2.0'],
     include_package_data=True,

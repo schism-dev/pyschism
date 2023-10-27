@@ -31,7 +31,6 @@ class AWSGrib2Inventory:
             product='conus',
     ):
         self.start_date = nearest_cycle() if start_date is None else start_date
-        self.record = record
         self.pscr = pscr
         self.product = product
 
