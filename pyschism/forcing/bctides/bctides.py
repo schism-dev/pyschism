@@ -274,5 +274,5 @@ class Bctides:
 
     @property
     def nbfr(self):
-        return len(self.tides.get_active_potential_constituents())
+        return len(self.tides.get_active_forcing_constituents())
 
