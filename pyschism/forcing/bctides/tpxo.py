@@ -97,7 +97,7 @@ class TPXO(TidalDataProvider):
     def h(self):
         if not hasattr(self, '_h'):
             if self._h_file is None:
-                self._h_file = os.getenv('TPXO_ELEVATION')
+                self._h_file = pathlib.Path(os.getenv('TPXO_ELEVATION'))
                 if self._h_file is None:
                     self._h_file = pathlib.Path(
                         appdirs.user_data_dir('tpxo')) / TPXO_ELEVATION
@@ -110,7 +110,7 @@ class TPXO(TidalDataProvider):
     def uv(self):
         if not hasattr(self, '_uv'):
             if self._u_file is None:
-                self._u_file = os.getenv('TPXO_VELOCITY')
+                self._u_file = pathlib.Path(os.getenv('TPXO_VELOCITY'))
                 if self._u_file is None:
                     self._u_file = pathlib.Path(
                         appdirs.user_data_dir('tpxo')) / TPXO_VELOCITY
