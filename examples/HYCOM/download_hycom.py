@@ -22,16 +22,46 @@ logger = logging.getLogger('pyschism')
 logger.setLevel(logging.INFO)
 
 if __name__ == '__main__':
-    hgrid = Hgrid.open('./hgrid.gr3', crs='epsg:4326')
     date=datetime(2018, 1, 1)
+    outdir = './'
 
-    #xmin = -65
-    #xmax = -50
-    #ymin = 0
-    #ymax = 53
-    #bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
-    hycom = DownloadHycom(hgrid=hgrid)
+    ##example 1 - download data for IC
+    #rnday = 1
+
+    #hgrid = Hgrid.open('./hgrid.gr3', crs='epsg:4326')
+    #hycom = DownloadHycom(hgrid=hgrid)
+
+    #t0 = time()
+    #hycom.fetch_data(date, rnday=1, bnd=False, nudge=False, outdir=outdir)
+    #print(f'It took {(time()-t0)/60} mins to download')
+
+    #example 2 - download data for bnd
+    rnday = 10
+
+    xmin = -55
+    xmax = -50
+    ymin = 0
+    ymax = 53
+    bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
+
+    hycom = DownloadHycom(bbox=bbox)
+
     t0 = time()
-    hycom.fetch_data(date, rnday=1, bnd=False, nudge=False, sub_sample=3, outdir='./')
+    hycom.fetch_data(date, rnday=rnday, bnd=True, nudge=False, fmt='schism', outdir=outdir)
     print(f'It took {(time()-t0)/60} mins to download')
-    
+    #"""
+
+    """example 3 - download data for nudge
+    rnday = 20
+
+    xmin = -65
+    xmax = -50
+    ymin = 0
+    ymax = 53
+    bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
+
+    hycom = DownloadHycom(bbox=bbox)
+
+    hycom.fetch_data(date, rnday=rnday, bnd=False, nudge=True, outdir=outdir) 
+    print(f'It took {(time()-t0)/60} mins to download') 
+    """

@@ -101,8 +101,11 @@ class TPXO(TidalDataProvider):
                 if self._h_file is None:
                     self._h_file = pathlib.Path(
                         appdirs.user_data_dir('tpxo')) / TPXO_ELEVATION
+                elif type(self._h_file) is str:
+                    self._h_file = pathlib.Path(self._h_file)
             if not self._h_file.exists():
                 raise_missing_file(self._h_file, TPXO_ELEVATION)
+            logger.info(f'h_file is {self._h_file}')
             self._h = Dataset(self._h_file)
         return self._h
 
@@ -114,8 +117,11 @@ class TPXO(TidalDataProvider):
                 if self._u_file is None:
                     self._u_file = pathlib.Path(
                         appdirs.user_data_dir('tpxo')) / TPXO_VELOCITY
+                elif type(self._u_file) is str:
+                    self._u_file = pathlib.Path(self._u_file)
             if not self._u_file.exists():
                 raise_missing_file(self._u_file, TPXO_VELOCITY)
+            logger.info(f'u_file is {self._u_file}')
             self._uv = Dataset(self._u_file)
         return self._uv
 

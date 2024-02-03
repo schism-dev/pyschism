@@ -10,6 +10,10 @@ import numpy as np
 from pyschism.mesh import Hgrid
 from pyschism.forcing.bctides import Bctides
 
+##Optional: set up environment variable for TPXO files
+#os.environ['TPXO_ELEVATION'] = '/path-to-your-hfile/h_tpxo9.v1.nc'
+#os.environ['TPXO_VELOCITY'] = '/path-to-your-ufile/u_tpxo9.v1.nc'
+
 logging.basicConfig(
     format = "[%(asctime)s] %(name)s %(levelname)s: %(message)s",
     force=True,
