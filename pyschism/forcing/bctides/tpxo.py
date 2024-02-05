@@ -3,13 +3,12 @@ import os
 import pathlib
 
 import appdirs
-from netCDF4 import Dataset
 import numpy as np
+from netCDF4 import Dataset
 from scipy.interpolate import griddata
 from scipy.interpolate.fitpack2 import RectBivariateSpline
 
 from pyschism.forcing.bctides.base import TidalDataProvider
-
 
 logger = logging.getLogger(__name__)
 
@@ -97,10 +96,7 @@ class TPXO(TidalDataProvider):
     def h(self):
         if not hasattr(self, '_h'):
             if self._h_file is None:
-                self._h_file = pathlib.Path(os.getenv('TPXO_ELEVATION'))
-                if self._h_file is None:
-                    self._h_file = pathlib.Path(
-                        appdirs.user_data_dir('tpxo')) / TPXO_ELEVATION
+                self._h_file = pathlib.Path(os.getenv('TPXO_ELEVATION') or appdirs.user_data_dir('tpxo')) / TPXO_ELEVATION
             if not self._h_file.exists():
                 raise_missing_file(self._h_file, TPXO_ELEVATION)
             self._h = Dataset(self._h_file)
@@ -110,10 +106,7 @@ class TPXO(TidalDataProvider):
     def uv(self):
         if not hasattr(self, '_uv'):
             if self._u_file is None:
-                self._u_file = pathlib.Path(os.getenv('TPXO_VELOCITY'))
-                if self._u_file is None:
-                    self._u_file = pathlib.Path(
-                        appdirs.user_data_dir('tpxo')) / TPXO_VELOCITY
+                self._u_file = pathlib.Path(os.getenv('TPXO_VELOCITY') or appdirs.user_data_dir('tpxo')) / TPXO_VELOCITY
             if not self._u_file.exists():
                 raise_missing_file(self._u_file, TPXO_VELOCITY)
             self._uv = Dataset(self._u_file)
