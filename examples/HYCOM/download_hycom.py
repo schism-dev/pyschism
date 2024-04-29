@@ -32,7 +32,7 @@ if __name__ == '__main__':
     #hycom = DownloadHycom(hgrid=hgrid)
 
     #t0 = time()
-    #hycom.fetch_data(date, rnday=1, bnd=False, nudge=False, outdir=outdir)
+    #hycom.fetch_data(date, rnday=rnday, bnd=False, nudge=False, outdir=outdir)
     #print(f'It took {(time()-t0)/60} mins to download')
 
     #example 2 - download data for bnd
