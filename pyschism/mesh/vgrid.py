@@ -9,7 +9,6 @@ import numpy as np
 
 from pyschism.mesh.hgrid import Hgrid
 
-# import matplotlib as mpl
 from matplotlib.pyplot import *
 
 
