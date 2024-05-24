@@ -262,9 +262,6 @@ class LSC2(Vgrid):
             raise Exception(
                 'File exists, pass overwrite=True to allow overwrite.')
 
-        # fid=open('vgrid.in','w+')
-        # fid.write('           1 !average # of layers={:0.2f}\n          {} !nvrt\n'.format\
-        #           (np.mean(self._nlayer),self.nvrt))
         with open(path, 'w') as fid:
             fid.write('           1 !average # of layers={:0.2f}\n          {} !nvrt\n'.format\
                     (np.mean(self._nlayer),self.nvrt))
