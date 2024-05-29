@@ -9,6 +9,8 @@ import numpy as np
 
 from pyschism.mesh.hgrid import Hgrid
 
+from matplotlib.pyplot import *
+
 
 def C_of_sigma(sigma, theta_b, theta_f):
     assert theta_b <= 0. and theta_b <= 1.
@@ -106,8 +108,16 @@ class Vgrid(ABC):
 
 class LSC2(Vgrid):
 
-    def __init__(self, sigma):
-        self.sigma = sigma
+    def __init__(self, hsm, nv, h_c, theta_b, theta_f):
+        self.hsm = np.array(hsm)
+        self.nv = np.array(nv)
+        self.h_c = h_c
+        self.theta_b = theta_b
+        self.theta_f = theta_f
+        self.m_grid = None
+        self._znd = None
+        self._snd = None
+        self._nlayer = None
 
     def __str__(self):
         f = [
@@ -131,11 +141,146 @@ class LSC2(Vgrid):
         return '\n'.join(f)
 
     def get_xyz(self, gr3, crs=None):
+        if type(gr3) == Hgrid:
+            gr3 = gr3
+        else:
+            gr3=Hgrid.open(gr3)
         xy = gr3.get_xy(crs)
         z = gr3.values[:, None]*self.sigma
         x = np.tile(xy[:, 0], (z.shape[1],))
         y = np.tile(xy[:, 0], (z.shape[1],))
         return np.vstack([x, y, z.flatten()]).T
+
+    def calc_m_grid(self):
+        '''
+        create master grid
+        Adapted from:
+        https://github.com/wzhengui/pylibs/blob/master/pyScripts/gen_vqs.py
+        '''
+        if self.m_grid:
+            pass
+        else:
+            z_mas=np.ones([self.nhm,self.nvrt])*np.nan; eta=0.0
+            for m, [hsmi,nvi] in enumerate(zip(self.hsm,self.nv)):
+                #strethcing funciton
+                hc=min(hsmi,self.h_c)
+                for k in np.arange(nvi):
+                    sigma= k/(1-nvi)  #zi=-sigma #original sigma coordiante
+                    #compute zcoordinate
+                    cs=(1-self.theta_b)*np.sinh(self.theta_f*sigma)/np.sinh(self.theta_f)+\
+                        self.theta_b*(np.tanh(self.theta_f*(sigma+0.5))-\
+                                np.tanh(self.theta_f*0.5))/2/np.tanh(self.theta_f*0.5)
+                    z_mas[m,k]=eta*(1+sigma)+hc*sigma+(hsmi-hc)*cs
+
+                #normalize z_mas
+                z_mas[m]=-(z_mas[m]-z_mas[m,0])*hsmi/(z_mas[m,nvi-1]-z_mas[m,0])
+            s_mas=np.array([z_mas[i]/self.hsm[i] for i in np.arange(self.nhm)])
+
+            self.m_grid = z_mas
+
+    def make_m_plot(self):
+        '''
+        plot master grid
+        Adapted from:
+        https://github.com/wzhengui/pylibs/blob/master/pyScripts/gen_vqs.py
+        '''        
+        #check master grid
+        for i in np.arange(self.nhm-1):
+            if min(self.m_grid[i,:self.nv[i]]-self.m_grid[i+1,:self.nv[i]])<0: \
+                print('check: master grid layer={}, hsm={}, nv={}'.\
+                      format(i+1,self.hsm[i+1],self.nv[i+1]))
+
+        #plot master grid
+        figure(figsize=[10,5])
+        for i in np.arange(self.nhm): plot(i*np.ones(self.nvrt),\
+                                           self.m_grid[i],'k-',lw=0.3)
+        for k in np.arange(self.nvrt): plot(np.arange(self.nhm),\
+                                            self.m_grid.T[k],'k-',lw=0.3)
+        setp(gca(),xlim=[-0.5,self.nhm-0.5],ylim=[-self.hsm[-1],0.5])
+        gcf().tight_layout()
+
+    def calc_lsc2_att(self, gr3, crs=None):
+        '''
+        master grid to lsc2:
+        compute vertical layers at nodes
+        gr3 is either file or Hgrid Object
+        Adapted from:
+        https://github.com/wzhengui/pylibs/blob/master/pyScripts/gen_vqs.py
+        '''
+        if type(gr3) == Hgrid:
+            gd = gr3
+        else:
+            gd=Hgrid.open(gr3)
+        dp = gd.values*-1
+        fpz=dp<self.hsm[0]
+        dp[fpz]=self.hsm[0]
+        
+        #find hsm index for all points
+        rat=np.ones(len(gd.nodes.id))*np.nan
+        nlayer=np.zeros(len(gd.nodes.id)).astype('int')
+        ind1=np.zeros(len(gd.nodes.id)).astype('int')
+        ind2=np.zeros(len(gd.nodes.id)).astype('int')
+        for m, hsmi in enumerate(self.hsm):
+            if m==0:
+                fp=dp<=self.hsm[m]
+                ind1[fp]=0; ind2[fp]=0
+                rat[fp]=0; nlayer[fp]=self.nv[0]
+            else:
+                fp=(dp>self.hsm[m-1])*(dp<=self.hsm[m])
+                ind1[fp]=m-1
+                ind2[fp]=m
+                rat[fp]=(dp[fp]-self.hsm[m-1])/(self.hsm[m]-self.hsm[m-1])
+                nlayer[fp]=self.nv[m]
+
+        #Find the last non NaN node and fills the NaN values with it
+        last_non_nan = (~np.isnan(self.m_grid)).cumsum(1).argmax(1)
+        z_mas=np.array([np.nan_to_num(z_mas_arr,nan=z_mas_arr[last_non_nan[i]])\
+                        for i, z_mas_arr in enumerate(self.m_grid)])
+        znd=z_mas[ind1]*(1-rat[:,None])+z_mas[ind2]*rat[:,None]; #z coordinate
+        for i in np.arange(len(gd.nodes.id)):
+            znd[i,nlayer[i]-1]=-dp[i]
+            znd[i,nlayer[i]:]=np.nan
+        snd=znd/dp[:,None]; #sigma coordinate
+
+        #check vgrid
+        for i in np.arange(len(gd.nodes.id)):
+            for k in np.arange(self.nvrt-1):
+                if znd[i,k]<=znd[i,k+1]:
+                    raise TypeError(f'wrong vertical layers')
+
+        self._znd = znd
+        self._snd = snd
+        self._nlayer = nlayer
+
+
+    def write(self, path, overwrite=False):
+        '''
+        write mg2lsc2 into vgrid.in
+        '''
+        path = pathlib.Path(path)
+        if path.is_file() and not overwrite:
+            raise Exception(
+                'File exists, pass overwrite=True to allow overwrite.')
+
+        with open(path, 'w') as fid:
+            fid.write('           1 !average # of layers={:0.2f}\n          {} !nvrt\n'.format\
+                    (np.mean(self._nlayer),self.nvrt))
+            bli=[]#bottom level index
+            for i in np.arange(len(self._nlayer)):
+                nlayeri=self._nlayer[i]; si=np.flipud(self._snd[i,:nlayeri])
+                bli.append(self.nvrt-nlayeri+1)
+                fstr=f"         {self.nvrt-nlayeri+1:2}"
+                fid.write(fstr)
+            for i in range(self.nvrt):
+                fid.write(f'\n         {i+1}')
+                for n,bl in enumerate(bli):
+                    si=np.flipud(self._snd[n])
+                    if bl <= i+1:
+                        fid.write(f"      {si[i]:.6f}")
+                    else:
+                        fid.write(f"      {-9.:.6f}")
+            fid.close()
+
 
     @classmethod
     def open(cls, path):
@@ -174,7 +319,11 @@ class LSC2(Vgrid):
 
     @property
     def nvrt(self):
-        return self.sigma.shape[1]
+        return self.nv[-1]
+
+    @property
+    def nhm(self):
+        return self.hsm.shape[0]
 
 
 class SZ(Vgrid):
