@@ -56,7 +56,7 @@ hgrid.make_plot(show=True)
 # NOTE: 2dm files can be read by QGIS > 3.0
 from pyschism.mesh import Hgrid
 hgrid = Hgrid.open('hgrid.gr3')
-hgrid.write("/path/to/output/file.2dm", fmt='2dm')
+hgrid.write("/path/to/output/file.2dm", format='2dm')
 ```
 ---
 ## Online manual
