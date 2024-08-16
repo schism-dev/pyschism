@@ -39,7 +39,7 @@ class Gr3Field(Gr3):
         gdf2 = gpd.GeoDataFrame(
             {"geometry": points, "index": list(range(len(points)))}, crs=self.crs
         )
-        gdf_in = gpd.sjoin(gdf2, gdf1, op="within")
+        gdf_in = gpd.sjoin(gdf2, gdf1, predicate="within")
         picks = [i.index for i in gdf_in.itertuples()]
         self.values[picks] = value
 
@@ -61,7 +61,7 @@ class Gr3Field(Gr3):
         points = [Point(*coord) for coord in self.coords]
         gdf2 = gpd.GeoDataFrame(
                  {'geometry': points, 'index': list(range(len(points)))})
-        gdf_in = gpd.sjoin(gdf2, gdf1, op="within")
+        gdf_in = gpd.sjoin(gdf2, gdf1, predicate="within")
         picks = [i.index for i in gdf_in.itertuples()]
         if flag == 0:
             self.values[picks] = value
