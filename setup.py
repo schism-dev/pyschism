@@ -108,7 +108,7 @@ setuptools.setup(
         'cfgrib',
         'f90nml',
         'fsspec',
-        'geopandas',
+        'geopandas>=0.10',
         'metpy',
         'netCDF4',
         'netcdf-flattener>=1.2.0',
