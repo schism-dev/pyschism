@@ -103,7 +103,7 @@ setuptools.setup(
     },
     install_requires=[
         'boto3',
-        'cdsapi',
+        'cdsapi>=0.7.0',
         'cf-python',
         'cfgrib',
         'f90nml',
