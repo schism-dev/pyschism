@@ -5,7 +5,7 @@ import logging
 from typing import Dict, Union
 
 from matplotlib.transforms import Bbox
-import seawater as sw
+import gsw
 from netCDF4 import Dataset
 import numpy as np
 import requests
