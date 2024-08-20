@@ -307,7 +307,7 @@ class ERA5(SfluxDataset):
         nx_grid, ny_grid = self.inventory.xy_grid()
 
         ds=Dataset(self.inventory.files[0])
-        time1=ds['time']
+        time1=ds['valid_time']
         times=nc4.num2date(time1,units=time1.units,only_use_cftime_datetimes=False)
 
         for iday, date in enumerate(dates):
