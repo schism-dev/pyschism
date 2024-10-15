@@ -108,7 +108,7 @@ class Vgrid(ABC):
 
 class LSC2(Vgrid):
 
-    def __init__(self, hsm, nv, h_c, theta_b, theta_f):
+    def __init__(self, hsm, nv, h_c, theta_b, theta_f, sigma):
         self.hsm = np.array(hsm)
         self.nv = np.array(nv)
         self.h_c = h_c
@@ -116,8 +116,27 @@ class LSC2(Vgrid):
         self.theta_f = theta_f
         self.m_grid = None
         self._znd = None
-        self._snd = None
         self._nlayer = None
+        self.sigma = sigma  # expose sigma for backward compatibility
+        self._snd = self.sigma
+
+    @classmethod
+    def from_sigma(cls, sigma):
+        '''
+        Initialize the LSC2 class using the sigma values for backward compatibility
+
+        sigma: np.ndarray of shape (n, m), where
+            n: number of horizontal nodes
+            m: number of vertical layers
+        '''
+        hsm = None  # placeholder value
+        nv = sigma.shape[1]  # number of vertical layers
+        h_c = None  # placeholder value
+        theta_b = None  # placeholder value
+        theta_f = None  # placeholder value
+
+        # Return an instance of the class using the computed values
+        return cls(hsm=hsm, nv=nv, h_c=h_c, theta_b=theta_b, theta_f=theta_f, sigma=sigma)
 
     def __str__(self):
         f = [
@@ -298,7 +317,7 @@ class LSC2(Vgrid):
 
         sline = np.array(lines[2].split()).astype('float')        
         if sline.min() < 0:
-            #old version
+            # old version
             kbp = np.array([int(i.split()[1])-1 for i in lines[2:]])
             sigma = -np.ones((len(kbp), nvrt))
 
@@ -307,15 +326,15 @@ class LSC2(Vgrid):
                     line.strip().split()[2:]).astype('float')
 
         else:
-            #new version
+            # new version
             sline = sline.astype('int')
             kbp = sline-1
             sigma = np.array([line.split()[1:] for line in lines[3:]]).T.astype('float')
-            #replace -9. with -1.
-            fpm = sigma<-1
+            # replace -9. with -1.
+            fpm = sigma < -1
             sigma[fpm] = -1
 
-        return cls(sigma)
+        return cls.from_sigma(sigma)
 
     @property
     def nvrt(self):
