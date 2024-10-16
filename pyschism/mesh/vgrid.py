@@ -109,6 +109,10 @@ class Vgrid(ABC):
 class LSC2(Vgrid):
 
     def __init__(self, hsm, nv, h_c, theta_b, theta_f, sigma):
+        '''
+        Todo: Consider intialize from sigma only.
+        The other attributes can go to a factory method.
+        '''
         self.hsm = np.array(hsm)
         self.nv = np.array(nv)
         self.h_c = h_c
@@ -117,25 +121,24 @@ class LSC2(Vgrid):
         self.m_grid = None
         self._znd = None
         self._nlayer = None
+        self._snd = None
         self.sigma = sigma  # expose sigma for backward compatibility
-        self._snd = self.sigma
 
     @classmethod
     def from_sigma(cls, sigma):
         '''
-        Initialize the LSC2 class using the sigma values for backward compatibility
+        Initialize the LSC2 class using the sigma values
 
         sigma: np.ndarray of shape (n, m), where
             n: number of horizontal nodes
             m: number of vertical layers
         '''
         hsm = None  # placeholder value
-        nv = sigma.shape[1]  # number of vertical layers
+        nv = None  # placeholder value
         h_c = None  # placeholder value
         theta_b = None  # placeholder value
         theta_f = None  # placeholder value
 
-        # Return an instance of the class using the computed values
         return cls(hsm=hsm, nv=nv, h_c=h_c, theta_b=theta_b, theta_f=theta_f, sigma=sigma)
 
     def __str__(self):
@@ -179,12 +182,12 @@ class LSC2(Vgrid):
         if self.m_grid:
             pass
         else:
-            z_mas=np.ones([self.nhm,self.nvrt])*np.nan; eta=0.0
+            z_mas=np.ones([self.nhm,self.nv[-1]])*np.nan; eta=0.0
             for m, [hsmi,nvi] in enumerate(zip(self.hsm,self.nv)):
                 #strethcing funciton
                 hc=min(hsmi,self.h_c)
                 for k in np.arange(nvi):
-                    sigma= k/(1-nvi)  #zi=-sigma #original sigma coordiante
+                    sigma= k/(1-nvi)  #zi=-sigma #original sigma coordinate
                     #compute zcoordinate
                     cs=(1-self.theta_b)*np.sinh(self.theta_f*sigma)/np.sinh(self.theta_f)+\
                         self.theta_b*(np.tanh(self.theta_f*(sigma+0.5))-\
@@ -211,9 +214,9 @@ class LSC2(Vgrid):
 
         #plot master grid
         figure(figsize=[10,5])
-        for i in np.arange(self.nhm): plot(i*np.ones(self.nvrt),\
+        for i in np.arange(self.nhm): plot(i*np.ones(self.nv[-1]),\
                                            self.m_grid[i],'k-',lw=0.3)
-        for k in np.arange(self.nvrt): plot(np.arange(self.nhm),\
+        for k in np.arange(self.nv[-1]): plot(np.arange(self.nhm),\
                                             self.m_grid.T[k],'k-',lw=0.3)
         setp(gca(),xlim=[-0.5,self.nhm-0.5],ylim=[-self.hsm[-1],0.5])
         gcf().tight_layout()
@@ -263,18 +266,20 @@ class LSC2(Vgrid):
 
         #check vgrid
         for i in np.arange(len(gd.nodes.id)):
-            for k in np.arange(self.nvrt-1):
+            for k in np.arange(self.nv[-1]-1):
                 if znd[i,k]<=znd[i,k+1]:
                     raise TypeError(f'wrong vertical layers')
 
         self._znd = znd
         self._snd = snd
+        self.sigma = np.flipud(snd)
         self._nlayer = nlayer
 
 
     def write(self, path, overwrite=False):
         '''
         write mg2lsc2 into vgrid.in
+        Todo: enable writing from sigma only, to be done with the refactoring of the class.
         '''
         path = pathlib.Path(path)
         if path.is_file() and not overwrite:
@@ -286,7 +291,8 @@ class LSC2(Vgrid):
                     (np.mean(self._nlayer),self.nvrt))
             bli=[]#bottom level index
             for i in np.arange(len(self._nlayer)):
-                nlayeri=self._nlayer[i]; si=np.flipud(self._snd[i,:nlayeri])
+                nlayeri=self._nlayer[i]
+                si=np.flipud(self._snd[i,:nlayeri])
                 bli.append(self.nvrt-nlayeri+1)
                 fstr=f"         {self.nvrt-nlayeri+1:2}"
                 fid.write(fstr)
@@ -338,7 +344,7 @@ class LSC2(Vgrid):
 
     @property
     def nvrt(self):
-        return self.nv[-1]
+        return max(self._nlayer)  # may not be equal to self.nv[-1]
 
     @property
     def nhm(self):
