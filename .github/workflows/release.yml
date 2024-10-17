@@ -28,7 +28,7 @@ jobs:
       - name: build wheel
         run: pip wheel . -w dist --no-deps
       - name: save wheel
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: build
           path: ./dist/*.whl
@@ -45,7 +45,7 @@ jobs:
       - name: package source
         run: python setup.py sdist
       - name: save source package
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: build
           path: ./dist/*.tar.gz
