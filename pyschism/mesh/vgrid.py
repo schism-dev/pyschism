@@ -108,10 +108,10 @@ class Vgrid(ABC):
 
 class LSC2(Vgrid):
 
-    def __init__(self, hsm, nv, h_c, theta_b, theta_f, sigma):
+    def __init__(self, hsm, nv, h_c, theta_b, theta_f, sigma=None):
         '''
-        Todo: Consider intialize from sigma only.
-        The other attributes can go to a factory method.
+        Todo: Consider intializing from sigma only.
+        The other parameters can go to a factory method.
         '''
         self.hsm = np.array(hsm)
         self.nv = np.array(nv)
@@ -128,18 +128,14 @@ class LSC2(Vgrid):
     def from_sigma(cls, sigma):
         '''
         Initialize the LSC2 class using the sigma values
+        mainly for 'def open' method.
+        Consider setting this as __init__ and remove other parameters.
 
         sigma: np.ndarray of shape (n, m), where
             n: number of horizontal nodes
             m: number of vertical layers
         '''
-        hsm = None  # placeholder value
-        nv = None  # placeholder value
-        h_c = None  # placeholder value
-        theta_b = None  # placeholder value
-        theta_f = None  # placeholder value
-
-        return cls(hsm=hsm, nv=nv, h_c=h_c, theta_b=theta_b, theta_f=theta_f, sigma=sigma)
+        return cls(hsm=None, nv=None, h_c=None, theta_b=None, theta_f=None, sigma=sigma)
 
     def __str__(self):
         f = [
@@ -272,7 +268,7 @@ class LSC2(Vgrid):
 
         self._znd = znd
         self._snd = snd
-        self.sigma = np.flipud(snd)
+        self.sigma = np.fliplr(snd)
         self._nlayer = nlayer
 
 
