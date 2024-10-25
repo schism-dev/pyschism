@@ -35,6 +35,29 @@ class AWSGrib2Inventory:
         self.pscr = pscr
         self.product = product
 
+        # check start_date
+        min_date = None
+        response = self.s3.list_objects_v2(Bucket=self.bucket, Prefix="gfs.", Delimiter='/')
+        if 'CommonPrefixes' in response:
+            # Extract folder names, parse dates, and find the earliest date
+            dates = []
+            for obj in response['CommonPrefixes']:
+                folder_name = obj['Prefix'].split('.')[1].rstrip('/')  # Extract the date part
+                try:
+                    date_obj = datetime.strptime(folder_name, '%Y%m%d')
+                    dates.append(date_obj)
+                except ValueError:
+                    continue
+            if dates:
+                logger.info(f"Available GFS data dates, from {min(dates)} to {max(dates)}")
+                min_date = min(dates)
+        else:
+            raise Exception("Unable to fetch GFS data dates from S3 bucket.")
+        
+        if min_date is not None and self.start_date < min_date:
+            raise ValueError(
+                f"Start date {self.start_date} is earlier than the earliest available date {min_date}")
+
         self.forecast_cycle = self.start_date
 
         timevector = np.arange(
@@ -67,6 +90,7 @@ class AWSGrib2Inventory:
                         else:
                             logger.info(f'file {key} is not available, try next file')
                             continue
+    
 
     def get_file_namelist(self, requested_dates):
 
@@ -148,6 +172,7 @@ class GFS:
     def write(self, start_date, rnday, air: bool=True, prc: bool=True, rad: bool=True):
 
         start_date = nearest_cycle() if start_date is None else start_date 
+
 
         if (start_date + timedelta(days=rnday)) > datetime.utcnow():
             logger.info(f'End date is beyond the current time, set rnday to 1 day and record to 5 days')
