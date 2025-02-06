@@ -1,12 +1,15 @@
+import os
 from datetime import datetime, timedelta
 import tempfile
 import pathlib
 from typing import Union
 import logging
+from zipfile import ZipFile
 
 import appdirs
 import numpy as np
 import cdsapi
+import xarray as xr
 import netCDF4 as nc4
 from netCDF4 import Dataset
 import pandas as pd
@@ -33,7 +36,7 @@ class ERA5DataInventory:
         if tmpdir is not None:
             self.tmpdir = tmpdir
 
-        filename = self.tmpdir / f"era5_{self.start_date.strftime('%Y%m%d')}.nc"
+        filename = self.tmpdir / f"era5_{self.start_date.strftime('%Y%m%d')}.zip"
 
         if filename.is_file() == False:
 
@@ -59,7 +62,20 @@ class ERA5DataInventory:
             )
  
             r.download(filename)
-        
+            
+            #unzip file
+            with ZipFile(filename, 'r') as zip_ref:
+                zip_ref.extractall(self.tmpdir)
+                ds = xr.merge(
+                        [xr.open_dataset(self.tmpdir / fname)
+                            for fname in zip_ref.namelist()]
+                    ).rename({'avg_tprate': 'mtpr', 'avg_sdlwrf': 'msdwlwrf', 'avg_sdswrf': 'msdwswrf'})
+
+                ds.to_netcdf(str(filename).split('.')[0] + '.nc')
+
+                [os.remove(fname) for fname in zip_ref.namelist()]
+            os.remove(filename)
+
     @property
     def tmpdir(self):
         if not hasattr(self, '_tmpdir'):
