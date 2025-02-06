@@ -73,7 +73,7 @@ class ERA5DataInventory:
 
                 ds.to_netcdf(str(filename).split('.')[0] + '.nc')
 
-                [os.remove(fname) for fname in zip_ref.namelist()]
+                [os.remove(self.tmpdir / fname) for fname in zip_ref.namelist()]
             os.remove(filename)
 
     @property
