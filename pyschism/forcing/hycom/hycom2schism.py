@@ -11,6 +11,7 @@ from time import time
 
 import numpy as np
 import scipy as sp
+import requests
 #from numba import jit, prange
 import netCDF4 as nc
 from netCDF4 import Dataset
@@ -22,6 +23,7 @@ from pyschism.mesh.base import Nodes, Elements
 from pyschism.mesh.vgrid import Vgrid
 
 logger = logging.getLogger(__name__)
+
 
 def convert_longitude(ds, bbox):
 #https://stackoverflow.com/questions/53345442/about-changing-longitude-array-from-0-360-to-180-to-180-with-python-xarray
@@ -72,7 +74,7 @@ def get_database(date, Bbox=None):
     elif date >= datetime(1994, 1, 1) and date < datetime(2016, 1, 1):
         database = f'GLBv0.08/expt_53.X/data/{date.year}'
     else:
-        raise ValueError(f'No data fro {date}!') 
+        raise ValueError(f'No data fro {date}!')
     return database
 
 def get_idxs(date, database, bbox, lonc=None, latc=None):
@@ -86,11 +88,11 @@ def get_idxs(date, database, bbox, lonc=None, latc=None):
     ds=Dataset(baseurl)
     time1=ds['time']
     times=nc.num2date(time1,units=time1.units,only_use_cftime_datetimes=False)
-    
+
     lon=ds['lon'][:]
     lat=ds['lat'][:]
     dep=ds['depth'][:]
-    
+
     #check if hycom's lon is the same range as schism's
     same = True
     if not (bbox.xmin >= lon.min() and bbox.xmax <= lon.max()):
@@ -116,7 +118,7 @@ def get_idxs(date, database, bbox, lonc=None, latc=None):
     lat_idx1=lat_idxs[0].item()
     lat_idx2=lat_idxs[-1].item()
     #logger.info(f'lat_idx1 is {lat_idx1}, lat_idx2 is {lat_idx2}')
-    
+
     if lonc is None:
         lonc = lon.mean()
     #logger.info(f'lonc is {lonc}')
@@ -140,7 +142,7 @@ def get_idxs(date, database, bbox, lonc=None, latc=None):
     if len(idxs) ==0:
         logger.info(f'No date for date {date}')
         sys.exit()
-    time_idx=idxs.item()  
+    time_idx=idxs.item()
 
     ds.close()
 
@@ -215,7 +217,7 @@ class OpenBoundaryInventory:
         self.hgrid = hgrid
         self.vgrid = Vgrid.default() if vgrid is None else vgrid
 
-    def fetch_data(self, outdir: Union[str, os.PathLike], start_date, rnday, ocean_bnd_ids = [0], elev2D=True, TS=True, UV=True, restart=False, adjust2D=False, lats=None, msl_shifts=None): 
+    def fetch_data(self, outdir: Union[str, os.PathLike], start_date, rnday, ocean_bnd_ids = [0], elev2D=True, TS=True, UV=True, restart=False, adjust2D=False, lats=None, msl_shifts=None):
         outdir = pathlib.Path(outdir)
 
         self.start_date = start_date
@@ -225,7 +227,7 @@ class OpenBoundaryInventory:
             self.start_date + timedelta(days=self.rnday+1),
             timedelta(days=1)).astype(datetime)
 
-        #Get open boundary 
+        #Get open boundary
         gdf=self.hgrid.boundaries.open.copy()
         opbd=[]
         #for boundary in gdf.itertuples():
@@ -268,7 +270,7 @@ class OpenBoundaryInventory:
 
         if elev2D and restart == False:
             #timeseries_el=np.zeros([ntimes,NOP,nComp1])
-            #create netcdf 
+            #create netcdf
             dst_elev = Dataset(outdir / 'elev2D.th.nc', 'w', format='NETCDF4')
             #dimensions
             dst_elev.createDimension('nOpenBndNodes', NOP)
@@ -347,7 +349,7 @@ class OpenBoundaryInventory:
 
             dst_uv.createVariable('time', 'f', ('time',))
             #dst_uv['time'][:] = ndt
-            
+
             dst_uv.createVariable('time_series', 'f', ('time', 'nOpenBndNodes', 'nLevels', 'nComponents'))
             #dst_uv['time_series'][:,:,:,:] = timeseries_uv
 
@@ -358,7 +360,7 @@ class OpenBoundaryInventory:
         logger.info('**** Accessing GOFS data*****')
         t0=time()
 
-        if restart == False: 
+        if restart == False:
             timevector = self.timevector
             it0 = 0
         elif restart:
@@ -367,9 +369,9 @@ class OpenBoundaryInventory:
             it0 = time_idx_restart-1
 
         for it1, date in enumerate(timevector):
-            
+
             it = it0 + it1
-        
+
             database=get_database(date)
             logger.info(f'Fetching data for {date} from database {database}')
 
@@ -417,7 +419,7 @@ class OpenBoundaryInventory:
                         f'salinity[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
                         f'water_u[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
                         f'water_v[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
-                        
+
                 else:
                     url=f'https://tds.hycom.org/thredds/dodsC/{database}?lat[{lat_idx1}:1:{lat_idx2}],' + \
                         f'lon[{lon_idx1}:1:{lon_idx2}],depth[0:1:-1],time[{time_idx}],' + \
@@ -427,7 +429,7 @@ class OpenBoundaryInventory:
                         f'water_u[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
                         f'water_v[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
                 #logger.info(url)
-                 
+
                 ds=Dataset(url)
                 dep=ds['depth'][:]
 
@@ -445,7 +447,7 @@ class OpenBoundaryInventory:
                         elev_adjust = np.interp(blat, lats, msl_shifts)
                         dst_elev['time_series'][it,ind1:ind2,0,0] = ssh_int + elev_adjust
                     else:
-                        dst_elev['time_series'][it,ind1:ind2,0,0] = ssh_int 
+                        dst_elev['time_series'][it,ind1:ind2,0,0] = ssh_int
 
                 if TS:
                     #salt
@@ -493,13 +495,13 @@ class Nudge:
     def __init__(self, hgrid=None, ocean_bnd_ids=None):
 
         if hgrid is None:
-            raise ValueError('No hgrid information!') 
+            raise ValueError('No hgrid information!')
         else:
             self.hgrid = hgrid
 
-        
+
         if ocean_bnd_ids is None:
-            raise ValueError('Please specify indexes for ocean boundaries!') 
+            raise ValueError('Please specify indexes for ocean boundaries!')
         else:
             self.ocean_bnd_ids = ocean_bnd_ids
 
@@ -510,7 +512,7 @@ class Nudge:
         modify the nudging zone width rlmax.
         rlmax can be a uniform value, e.g., rlmax = 1.5 (degree if hgrid is lon/lat)
         """
-          
+
         outdir = pathlib.Path(outdir)
 
         rnu_max = 1.0 / rnu_day / 86400.0
@@ -541,7 +543,7 @@ class Nudge:
             idxs_nudge=np.zeros(NP, dtype=int)
             idxs=np.where(out > 0)[0]
             idxs_nudge[idxs]=1
-  
+
             #expand nudging marker to neighbor nodes
             i34 = self.hgrid.elements.i34
             fp = i34==3
@@ -585,13 +587,19 @@ class Nudge:
 
         return global_idxs
 
-    def fetch_data(self, outdir: Union[str, os.PathLike], vgrid, start_date, rnday, restart = False, rlmax = None, rnu_day=None):
+    def fetch_data(
+        self, outdir: Union[str, os.PathLike], vgrid, start_date, rnday, restart=False, rlmax=None, rnu_day=None,
+        hycom_download_dir=None,
+    ):
         """
         fetch data from the database and generate nudge file
         see gen_nudge for the meaning of rlmax, rnu_day
         """
 
         outdir = pathlib.Path(outdir)
+        if hycom_download_dir is None:  # create new download dir
+            hycom_download_dir = f'{outdir}/HYCOM_files/'
+            os.makedirs(hycom_download_dir, exist_ok=True)
 
         self.start_date = start_date
         self.rnday=rnday
@@ -603,7 +611,7 @@ class Nudge:
         vd=Vgrid.open(vgrid)
         sigma=vd.sigma
 
-        #define nudge zone and strength 
+        #define nudge zone and strength
         rlmax = 1.5 if rlmax is None else rlmax
         rnu_day = 0.25 if rnu_day is None else rnu_day
         logger.info(f'Max relax distance is {rlmax} degree, max relax strengh is {rnu_day} days.')
@@ -618,15 +626,7 @@ class Nudge:
         nvrt=zcor.shape[1]
 
         #allocate output variables
-        include = global_idxs[0]
-        nbnd = len(self.ocean_bnd_ids)
-        if nbnd > 1:
-            include = np.concatenate((global_idxs[0], global_idxs[1],))
-            if nbnd > 2:
-                for i in self.ocean_bnd_ids[2:]:
-                    include = np.concatenate((include, global_idxs[i]))
-        else:
-            include = global_idxs[0]
+        include = np.concatenate([global_idxs[i] for i in self.ocean_bnd_ids])
 
         nNode = include.shape[0]
         one = 1
@@ -697,7 +697,7 @@ class Nudge:
 
                 ind1 = ind2
                 ind2 = ind1 + include.shape[0]
-                #Get open nudge array 
+                #Get open nudge array
                 nlon = self.hgrid.coords[include, 0]
                 nlat = self.hgrid.coords[include, 1]
                 nlonc = nlon.mean()
@@ -721,22 +721,29 @@ class Nudge:
                 logger.info(f'bbox for nudge is {bbox}')
 
                 time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2, _ = get_idxs(date, database, bbox, lonc=nlonc, latc=nlatc)
+                # Generate a local copy of the HYCOM file for future use
+                hycom_local_copy = f'{hycom_download_dir}/hycom_{date.strftime("%Y%m%d")}_bnd_{ibnd}_TS.nc'
+                if not os.path.exists(hycom_local_copy):
+                    logger.info(f'Local copy of HYCOM file {hycom_local_copy} does not exist. Downloading...')
+                    if date >= datetime.utcnow():
+                        date2 = datetime.utcnow() - timedelta(days=1)
+                        url = f'https://tds.hycom.org/thredds/dodsC/{database}/FMRC/runs/GLBy0.08_930_FMRC_RUN_' + \
+                            f'{date2.strftime("%Y-%m-%dT12:00:00Z")}?depth[0:1:-1],lat[{lat_idx1}:1:{lat_idx2}],' + \
+                            f'lon[{lon_idx1}:1:{lon_idx2}],time[{time_idx}],' + \
+                            f'water_temp[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
+                            f'salinity[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
 
-                if date >= datetime.utcnow():
-                    date2 = datetime.utcnow() - timedelta(days=1)
-                    url = f'https://tds.hycom.org/thredds/dodsC/{database}/FMRC/runs/GLBy0.08_930_FMRC_RUN_' + \
-                        f'{date2.strftime("%Y-%m-%dT12:00:00Z")}?depth[0:1:-1],lat[{lat_idx1}:1:{lat_idx2}],' + \
-                        f'lon[{lon_idx1}:1:{lon_idx2}],time[{time_idx}],' + \
-                        f'water_temp[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
-                        f'salinity[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
+                    else:
+                        url=f'https://tds.hycom.org/thredds/dodsC/{database}?lat[{lat_idx1}:1:{lat_idx2}],' + \
+                            f'lon[{lon_idx1}:1:{lon_idx2}],depth[0:1:-1],time[{time_idx}],' + \
+                            f'water_temp[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
+                            f'salinity[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
+                    # Download the data
+                    xr.open_dataset(url).to_netcdf(hycom_local_copy)
 
-                else:
-                    url=f'https://tds.hycom.org/thredds/dodsC/{database}?lat[{lat_idx1}:1:{lat_idx2}],' + \
-                        f'lon[{lon_idx1}:1:{lon_idx2}],depth[0:1:-1],time[{time_idx}],' + \
-                        f'water_temp[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
-                        f'salinity[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
+                # load the dataset from the local cached NetCDF file
+                ds = Dataset(hycom_local_copy)
 
-                ds=Dataset(url)
                 salt=np.squeeze(ds['salinity'][:,:,:])
                 temp=np.squeeze(ds['water_temp'][:,:,:])
 
@@ -762,10 +769,10 @@ class Nudge:
                 dst_temp['tracer_concentration'][it,ind1:ind2,:,0] = temp_int
 
                 ds.close()
- 
+
         #dst_temp.close()
         #dst_salt.close()
-        
+
         logger.info(f'Writing *_nu.nc takes {time()-t0} seconds')
 
 class DownloadHycom:
@@ -773,9 +780,9 @@ class DownloadHycom:
     def __init__(self, hgrid=None, bbox=None):
 
         if hgrid is None and bbox is None:
-            raise ValueError('Either hgrid or bbox must be provided!') 
+            raise ValueError('Either hgrid or bbox must be provided!')
 
-        if hgrid is not None:        
+        if hgrid is not None:
             xmin, xmax = hgrid.coords[:, 0].min(), hgrid.coords[:, 0].max()
             ymin, ymax = hgrid.coords[:, 1].min(), hgrid.coords[:, 1].max()
             self.bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
@@ -870,7 +877,7 @@ class DownloadHycom:
                 #    f'water_u[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
                 #    f'water_v[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
 
-                #foutname = f'hycom_{date.strftime("%Y%m%d")}.nc' 
+                #foutname = f'hycom_{date.strftime("%Y%m%d")}.nc'
                 ds = xr.open_dataset(url)
                 ds.to_netcdf(foutname, 'w')
 
