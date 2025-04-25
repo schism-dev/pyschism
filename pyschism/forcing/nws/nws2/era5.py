@@ -301,7 +301,8 @@ class ERA5(SfluxDataset):
         self.end_date=self.start_date+timedelta(self.rnday + 1)
 
         if self.start_date.hour != 0:
-            logger.warning(f'Start datetime hour different than 0. sflux will be offset by {self.start_date.hour} hours!')
+            raise ValueError(f"Start datetime hour different than 0.\
+            Start datetime must be at 00:00. Please specify a full day (no hour) that is before or equal to the model start time")
 
         dates = {_: None for _ in np.arange(
             self.start_date,
