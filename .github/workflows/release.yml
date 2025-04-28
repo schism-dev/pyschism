@@ -30,7 +30,7 @@ jobs:
       - name: save wheel
         uses: actions/upload-artifact@v4
         with:
-          name: build
+          name: build-wheel-${{ matrix.python-version }}
           path: ./dist/*.whl
   build_sdist:
     name: package source
@@ -47,7 +47,7 @@ jobs:
       - name: save source package
         uses: actions/upload-artifact@v4
         with:
-          name: build
+          name: build-sdist
           path: ./dist/*.tar.gz
   upload_pypi:
     if: ${{ github.event_name == 'release' }}
