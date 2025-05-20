@@ -12,9 +12,7 @@ subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'wheel'])
 try:
     from dunamai import Version
 except ImportError:
-    subprocess.check_call(
-            [sys.executable, '-m', 'pip', 'install', 'dunamai']
-    )
+    subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'dunamai'])
     from dunamai import Version  # type: ignore[import]
 
 try:
@@ -27,15 +25,14 @@ except ValueError as e:
     else:
         raise
 
+
 class BuildSchism(setuptools.Command):
 
     description = "build external SCHISM dependencies"
 
-    user_options = [
-        ('url=', None, 'Path for git clone of SCHISM source.'),
-        ('branch=', None, 'Branch to use for install'),
-        ('hydro=', None, 'Branch to use for install')
-    ]
+    user_options = [('url=', None, 'Path for git clone of SCHISM source.'),
+                    ('branch=', None, 'Branch to use for install'),
+                    ('hydro=', None, 'Branch to use for install')]
 
     def initialize_options(self):
         self.url = None
@@ -80,6 +77,7 @@ class BuildSchism(setuptools.Command):
         # subprocess.check_call(
         #   ["git", "submodule", "deinit", "-f", "submodules/jigsaw-python"])
 
+
 parent = pathlib.Path(__file__).parent.absolute()
 conf = setuptools.config.read_configuration(parent / 'setup.cfg')
 meta = conf['metadata']
@@ -92,15 +90,16 @@ setuptools.setup(
     long_description=meta['long_description'],
     long_description_content_type="text/markdown",
     url=meta['url'],
-    packages=setuptools.find_packages(exclude=['tests', 'examples', 'docs', 'docker']),
+    packages=setuptools.find_packages(
+        exclude=['tests', 'examples', 'docs', 'docker']),
     python_requires='>=3.8',
-    setup_requires=['wheel', 'setuptools_scm', 'setuptools>=41.2',
-                    'netcdf-flattener>=1.2.0'],
+    setup_requires=[
+        'wheel', 'setuptools_scm', 'setuptools>=41.2',
+        'netcdf-flattener>=1.2.0'
+    ],
     include_package_data=True,
     extras_require={'dev': ['coverage', 'flake8', 'nose']},
-    cmdclass={
-        "build_schism": BuildSchism
-    },
+    cmdclass={"build_schism": BuildSchism},
     install_requires=[
         'boto3',
         'cdsapi>=0.7.0',
@@ -108,12 +107,16 @@ setuptools.setup(
         'cfgrib',
         'f90nml',
         'fsspec',
+        's3fs',
+        'botocore',
+        'aiobotocore',
+        'boto3',
         'geopandas>=0.10',
         'metpy',
         'netCDF4',
-        'netcdf-flattener>=1.2.0',
+        'netcdf-flattener>=1.2.0',  # last release 2020
         'numba',
-        'ordered-set',
+        'ordered-set',  # last release 2022
         'psutil',
         'pygeos',
         'pyugrid',
