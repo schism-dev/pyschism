@@ -61,7 +61,7 @@ jobs:
           name: build
           path: dist
       - name: upload wheel(s) and source
-        uses: pypa/gh-action-pypi-publish@v1.5.0
+        uses: pypa/gh-action-pypi-publish@v1.13.0
         with:
           user: __token__
           password: ${{ secrets.PYPI_TOKEN }}
