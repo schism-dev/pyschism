@@ -948,7 +948,7 @@ class NationalWaterModel(SourceSink):
             start = datetime.now()
             nc = Dataset(file)
             ncfeatureid=nc['feature_id'][:]
-            if not np.all(ncfeatureid == nc_fid0):
+            if not np.array_equal(ncfeatureid, nc_fid0):
                 logger.info(f'Indexes of feature_id are changed in  {file}')
                 src_idxs=get_aggregated_features(ncfeatureid, self.pairings.sources.values())
                 snk_idxs=get_aggregated_features(ncfeatureid, self.pairings.sinks.values())
