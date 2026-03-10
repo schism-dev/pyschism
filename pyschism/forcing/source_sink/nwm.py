@@ -371,10 +371,16 @@ def get_aggregated_features(nc_feature_id, features):
 
 def streamflow_lookup(file, indexes, threshold=-1e-5):
     nc = Dataset(file)
-    streamflow = nc["streamflow"][:]
+    streamflow = nc["streamflow"]
+    streamflow.set_auto_mask(False)  # see remarks on NWM masks below
+    streamflow = np.array(streamflow)
     streamflow[np.where(streamflow < threshold)] = 0.0
-    #change masked value to zero
-    streamflow[np.where(streamflow.mask)] = 0.0
+
+    # The original mask in NWM files is based on a valid range of [0 50000],
+    # which is not enough for Mississippi River, e.g. at streamflow[1994867]  nc['feature_id'][1994867]
+    # so don't use the following mask:
+    # streamflow[np.where(streamflow.mask)] = 0.0
+
     data = []
     for indxs in indexes:
         # Note: Dataset already consideres scale factor and offset.

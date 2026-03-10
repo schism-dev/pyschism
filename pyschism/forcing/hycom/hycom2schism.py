@@ -57,7 +57,9 @@ def convert_longitude(ds, bbox):
     return ds
 
 def get_database(date, Bbox=None):
-    if date >= datetime(2018, 12, 4):
+    if date >= datetime(2024, 9, 4):
+        database = 'FMRC_ESPC-D-V02_all'  # GOFS 3.1, GLBy0.08 expt_93.0 ends on 2024-09-04
+    elif date >= datetime(2018, 12, 4):
         database = f'GLBy0.08/expt_93.0'
     elif date >= datetime(2018, 1, 1) and date < datetime(2018, 12, 4):
         database = f'GLBv0.08/expt_93.0'
@@ -81,9 +83,14 @@ def get_idxs(date, database, bbox, lonc=None, latc=None):
 
     if date >= datetime.utcnow():
         date2 = datetime.utcnow() - timedelta(days=1)
-        baseurl = f'https://tds.hycom.org/thredds/dodsC/{database}/FMRC/runs/GLBy0.08_930_FMRC_RUN_{date2.strftime("%Y-%m-%dT12:00:00Z")}?depth[0:1:-1],lat[0:1:-1],lon[0:1:-1],time[0:1:-1]'
+        # baseurl = f'https://tds.hycom.org/thredds/dodsC/{database}/FMRC/runs/GLBy0.08_930_FMRC_RUN_{date2.strftime("%Y-%m-%dT12:00:00Z")}?depth[0:1:-1],lat[0:1:-1],lon[0:1:-1],time[0:1:-1]'
+        baseurl = f'https://tds.hycom.org/thredds/dodsC/{database}/runs/{database}_RUN_{date2.strftime("%Y-%m-%dT12:00:00Z")}?depth[0:1:-1],lat[0:1:-1],lon[0:1:-1],time[0:1:-1]'
+    elif date >= datetime(2024, 9, 4):
+        raise ValueError(f'The data for {date} is in ESPC-D-V02: Global 1/12° Analysis, which has not been implemented in pyschism yet!')
     else:
         baseurl=f'https://tds.hycom.org/thredds/dodsC/{database}?lat[0:1:-1],lon[0:1:-1],time[0:1:-1],depth[0:1:-1]'
+    
+    baseurl_prefix = baseurl.split('?')[0]  # the base URL without query parameters
 
     ds=Dataset(baseurl)
     time1=ds['time']
@@ -146,7 +153,7 @@ def get_idxs(date, database, bbox, lonc=None, latc=None):
 
     ds.close()
 
-    return time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2, same
+    return time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2, same, baseurl_prefix
 
 def transform_ll_to_cpp(lon, lat, lonc=-77.07, latc=24.0):
     longitude=lon/180*np.pi
@@ -217,8 +224,17 @@ class OpenBoundaryInventory:
         self.hgrid = hgrid
         self.vgrid = Vgrid.default() if vgrid is None else vgrid
 
-    def fetch_data(self, outdir: Union[str, os.PathLike], start_date, rnday, ocean_bnd_ids = [0], elev2D=True, TS=True, UV=True, restart=False, adjust2D=False, lats=None, msl_shifts=None):
+    def fetch_data(
+        self, outdir: Union[str, os.PathLike], start_date, rnday,
+        ocean_bnd_ids = [0], elev2D=True, TS=True, UV=True,
+        restart=False, adjust2D=False, lats=None, msl_shifts=None,
+        hycom_download_dir=None   
+    ):
         outdir = pathlib.Path(outdir)
+
+        if hycom_download_dir is None:  # create new download dir
+            hycom_download_dir = f'{outdir}/HYCOM_files/'
+            os.makedirs(hycom_download_dir, exist_ok=True)
 
         self.start_date = start_date
         self.rnday=rnday
@@ -407,30 +423,40 @@ class OpenBoundaryInventory:
                 ymin, ymax = np.min(blat), np.max(blat)
                 bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
 
-                time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2, _ = get_idxs(date, database, bbox, lonc=blonc, latc=blatc)
+                time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2, _, baseurl_prefix = get_idxs(date, database, bbox, lonc=blonc, latc=blatc)
 
-                if date >= datetime.utcnow():
-                    date2 = datetime.utcnow() - timedelta(days=1)
-                    url = f'https://tds.hycom.org/thredds/dodsC/{database}/FMRC/runs/GLBy0.08_930_FMRC_RUN_' + \
-                        f'{date2.strftime("%Y-%m-%dT12:00:00Z")}?depth[0:1:-1],lat[{lat_idx1}:1:{lat_idx2}],' + \
-                        f'lon[{lon_idx1}:1:{lon_idx2}],time[{time_idx}],' + \
-                        f'surf_el[{time_idx}][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
-                        f'water_temp[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
-                        f'salinity[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
-                        f'water_u[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
-                        f'water_v[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
+                # Generate a local copy of the HYCOM file for future use
+                hycom_local_copy = f'{hycom_download_dir}/hycom_{date.strftime("%Y%m%d")}_bnd_{ibnd}_ETSUV.nc'
+                if not os.path.exists(hycom_local_copy):
+                    logger.info(f'Local copy of HYCOM file {hycom_local_copy} does not exist. Downloading...')
 
-                else:
-                    url=f'https://tds.hycom.org/thredds/dodsC/{database}?lat[{lat_idx1}:1:{lat_idx2}],' + \
-                        f'lon[{lon_idx1}:1:{lon_idx2}],depth[0:1:-1],time[{time_idx}],' + \
-                        f'surf_el[{time_idx}][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
-                        f'water_temp[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
-                        f'salinity[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
-                        f'water_u[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
-                        f'water_v[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
-                #logger.info(url)
+                    if date >= datetime.utcnow():
+                        date2 = datetime.utcnow() - timedelta(days=1)
+                        url = f'https://tds.hycom.org/thredds/dodsC/{database}/FMRC/runs/GLBy0.08_930_FMRC_RUN_' + \
+                            f'{date2.strftime("%Y-%m-%dT12:00:00Z")}?depth[0:1:-1],lat[{lat_idx1}:1:{lat_idx2}],' + \
+                            f'lon[{lon_idx1}:1:{lon_idx2}],time[{time_idx}],' + \
+                            f'surf_el[{time_idx}][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
+                            f'water_temp[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
+                            f'salinity[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
+                            f'water_u[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
+                            f'water_v[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
 
-                ds=Dataset(url)
+                    else:
+                        url=f'https://tds.hycom.org/thredds/dodsC/{database}?lat[{lat_idx1}:1:{lat_idx2}],' + \
+                            f'lon[{lon_idx1}:1:{lon_idx2}],depth[0:1:-1],time[{time_idx}],' + \
+                            f'surf_el[{time_idx}][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
+                            f'water_temp[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
+                            f'salinity[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
+                            f'water_u[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
+                            f'water_v[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
+                    #logger.info(url)
+                    # Download the data
+                    xr.open_dataset(url).to_netcdf(hycom_local_copy)
+
+                # ds=Dataset(url)
+                # load the dataset from the local cached NetCDF file
+                ds = Dataset(hycom_local_copy)
+
                 dep=ds['depth'][:]
 
                 logger.info(f'****Interpolation starts for boundary {ibnd}****')
@@ -720,7 +746,7 @@ class Nudge:
                 bbox = Bbox.from_extents(xmin, ymin, xmax, ymax)
                 logger.info(f'bbox for nudge is {bbox}')
 
-                time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2, _ = get_idxs(date, database, bbox, lonc=nlonc, latc=nlatc)
+                time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2, _, baseurl_prefix = get_idxs(date, database, bbox, lonc=nlonc, latc=nlatc)
                 # Generate a local copy of the HYCOM file for future use
                 hycom_local_copy = f'{hycom_download_dir}/hycom_{date.strftime("%Y%m%d")}_bnd_{ibnd}_TS.nc'
                 if not os.path.exists(hycom_local_copy):
@@ -798,6 +824,8 @@ class DownloadHycom:
         nudge: file name is TS_*.nc used in gen_nudge_from_hycom.f90
         outdir: directory for output files
         '''
+        if outdir is None:
+            outdir = pathlib.Path(os.getcwd())
         if rnday == 1:
             timevector = [start_date]
         else:
@@ -809,9 +837,10 @@ class DownloadHycom:
             database=get_database(date)
             logger.info(f'Fetching data for {date} from database {database}')
 
-            time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2, isLonSame = get_idxs(date, database, self.bbox)
+            time_idx, lon_idx1, lon_idx2, lat_idx1, lat_idx2, x2, y2, isLonSame, baseurl_prefix = get_idxs(date, database, self.bbox)
 
-            url_ssh = f'https://tds.hycom.org/thredds/dodsC/{database}?lat[{lat_idx1}:{sub_sample}:{lat_idx2}],' + \
+            url_ssh = baseurl_prefix + \
+                f'?lat[{lat_idx1}:{sub_sample}:{lat_idx2}],' + \
                 f'lon[{lon_idx1}:{sub_sample}:{lon_idx2}],depth[0:1:-1],time[{time_idx}],' + \
                 f'surf_el[{time_idx}][{lat_idx1}:{sub_sample}:{lat_idx2}][{lon_idx1}:{sub_sample}:{lon_idx2}],' + \
                 f'water_u[{time_idx}][0:1:39][{lat_idx1}:{sub_sample}:{lat_idx2}][{lon_idx1}:{sub_sample}:{lon_idx2}],' + \
@@ -869,15 +898,6 @@ class DownloadHycom:
                         os.symlink(src, dst)
 
             elif fmt == 'hycom':
-                #url=f'https://tds.hycom.org/thredds/dodsC/{database}?lat[{lat_idx1}:1:{lat_idx2}],' + \
-                #    f'lon[{lon_idx1}:1:{lon_idx2}],depth[0:1:-1],time[{time_idx}],' + \
-                #    f'surf_el[{time_idx}][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
-                #    f'water_temp[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
-                #    f'salinity[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
-                #    f'water_u[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}],' + \
-                #    f'water_v[{time_idx}][0:1:39][{lat_idx1}:1:{lat_idx2}][{lon_idx1}:1:{lon_idx2}]'
-
-                #foutname = f'hycom_{date.strftime("%Y%m%d")}.nc'
                 ds = xr.open_dataset(url)
                 ds.to_netcdf(foutname, 'w')
 
