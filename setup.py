@@ -4,10 +4,10 @@ import setuptools  # type: ignore[import]
 import subprocess
 import sys
 
-subprocess.check_call(
-    [sys.executable, '-m', 'pip', 'install', '--upgrade', 'pip'])
-
-subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'wheel'])
+# subprocess.check_call(
+#     [sys.executable, '-m', 'pip', 'install', '--upgrade', 'pip'])
+#
+# subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'wheel'])
 
 try:
     from dunamai import Version

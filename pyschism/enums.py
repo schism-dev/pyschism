@@ -706,6 +706,7 @@ class NationalWaterModelDataSource(Enum):
 
 class Sflux1Types(Enum):
 
+    ''' This leads to circular imports
     from pyschism.forcing import nws
     # GDAS = GDAS
     # GDAS_0P25 = GDAS
@@ -714,6 +715,14 @@ class Sflux1Types(Enum):
     GFS_0P25_1HR = nws.GFS
     GFS_0P50 = nws.GFS
     GFS_1P00 = nws.GFS
+    '''
+
+    from pyschism.forcing.nws.nws2.gfs import GlobalForecastSystem
+    GFS = GlobalForecastSystem
+    GFS_0P25 = GlobalForecastSystem
+    GFS_0P25_1HR = GlobalForecastSystem
+    GFS_0P50 = GlobalForecastSystem
+    GFS_1P00 = GlobalForecastSystem
 
     @classmethod
     def _missing_(cls, name):
@@ -728,8 +737,11 @@ class Sflux1Types(Enum):
 
 class Sflux2Types(Enum):
 
+    ''' This leads to circular imports
     from pyschism.forcing import nws
     HRRR = nws.HRRR
+    '''
+    from pyschism.forcing.nws.nws2.hrrr import HRRR
 
     @classmethod
     def _missing_(cls, name):
