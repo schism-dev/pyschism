@@ -4,29 +4,6 @@ import setuptools  # type: ignore[import]
 import subprocess
 import sys
 
-# subprocess.check_call(
-#     [sys.executable, '-m', 'pip', 'install', '--upgrade', 'pip'])
-#
-# subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'wheel'])
-
-try:
-    from dunamai import Version
-except ImportError:
-    subprocess.check_call(
-            [sys.executable, '-m', 'pip', 'install', 'dunamai']
-    )
-    from dunamai import Version  # type: ignore[import]
-
-try:
-    version = Version.from_any_vcs().serialize()
-except RuntimeError:
-    version = '0.0.0'
-except ValueError as e:
-    if "time data '%cI' does not match format '%Y-%m-%dT%H:%M:%S%z'" in str(e):
-        version = '0.0.0'
-    else:
-        raise
-
 class BuildSchism(setuptools.Command):
 
     description = "build external SCHISM dependencies"
@@ -80,12 +57,28 @@ class BuildSchism(setuptools.Command):
         # subprocess.check_call(
         #   ["git", "submodule", "deinit", "-f", "submodules/jigsaw-python"])
 
+
+# Source - https://stackoverflow.com/a/7071358
+# Posted by Zooko, modified by community. See post 'Timeline' for change history
+# Retrieved 2026-05-08, License - CC BY-SA 4.0
+
+import re
+VERSIONFILE="pyschism/_version.py"
+verstrline = open(VERSIONFILE, "rt").read()
+VSRE = r"^__version__ = ['\"]([^'\"]*)['\"]"
+mo = re.search(VSRE, verstrline, re.M)
+if mo:
+    verstr = mo.group(1)
+else:
+    raise RuntimeError("Unable to find version string in %s." % (VERSIONFILE,))
+
+
 parent = pathlib.Path(__file__).parent.absolute()
 conf = setuptools.config.read_configuration(parent / 'setup.cfg')
 meta = conf['metadata']
 setuptools.setup(
     name=meta['name'],
-    version=version,
+    version=verstr,
     author=meta['author'],
     author_email=meta['author_email'],
     description=meta['description'],
@@ -115,7 +108,7 @@ setuptools.setup(
         'numba',
         'ordered-set',
         'psutil',
-        'pygeos',
+        'pyproj',
         'pyugrid',
         'rtree',
         'scipy',
