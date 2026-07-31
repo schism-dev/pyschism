@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 import json
 import logging
 from multiprocessing import Pool, cpu_count
@@ -8,7 +8,6 @@ import os
 import pathlib
 import posixpath
 import shutil
-import re
 
 import tarfile
 import tempfile
@@ -27,7 +26,7 @@ import numpy as np
 import pandas as pd
 from scipy.spatial import cKDTree
 from shapely import ops
-from shapely.geometry import LinearRing, Point, MultiPoint, LineString, box
+from shapely.geometry import LinearRing, Point, MultiPoint, LineString, MultiLineString, box
 import wget
 
 from pyschism import dates
@@ -41,14 +40,177 @@ DATADIR.mkdir(exist_ok=True, parents=True)
 
 logger = logging.getLogger(__name__)
 
+def streamflow_lookup_from_array(streamflow, indexes, threshold=-1e-5):
+    """
+    Aggregate streamflow from an already-read streamflow array.
+
+    This avoids reopening the same NetCDF file multiple times.
+    """
+    streamflow = np.ma.array(streamflow, copy=True)
+
+    streamflow[np.where(streamflow < threshold)] = 0.0
+
+    if np.ma.is_masked(streamflow):
+        streamflow[np.where(streamflow.mask)] = 0.0
+
+    data = []
+    for indxs in indexes:
+        data.append(np.sum(streamflow[indxs]))
+
+    return data
+
+
+def _iter_points_from_intersection(geom):
+    """
+    Convert a reach/ring intersection geometry into point candidates.
+
+    Notes
+    -----
+    The original pyschism code kept one intersection geometry and then used its
+    coordinates directly. That can miss valid intersections when one NWM reach
+    crosses multiple hull rings, and it can also be awkward for overlapping
+    LineString intersections. Here we explicitly preserve all point candidates.
+    """
+    if geom is None or geom.is_empty:
+        return []
+
+    if isinstance(geom, Point):
+        return [geom]
+
+    if isinstance(geom, MultiPoint):
+        return list(geom.geoms)
+
+    if isinstance(geom, LineString):
+        coords = list(geom.coords)
+        if len(coords) == 0:
+            return []
+        if len(coords) == 1:
+            return [Point(coords[0])]
+        return [Point(coords[0]), Point(coords[-1])]
+
+    if isinstance(geom, MultiLineString):
+        points = []
+        for line in geom.geoms:
+            points.extend(_iter_points_from_intersection(line))
+        return points
+
+    if hasattr(geom, "geoms"):
+        points = []
+        for subgeom in geom.geoms:
+            points.extend(_iter_points_from_intersection(subgeom))
+        return points
+
+    return []
+
+
+def _safe_reach_to_linestring(reach_geom):
+    """Return a LineString for a reach geometry if possible."""
+    if isinstance(reach_geom, LineString):
+        return reach_geom
+
+    if isinstance(reach_geom, MultiLineString):
+        merged = ops.linemerge(reach_geom)
+        if isinstance(merged, LineString):
+            return merged
+
+    return None
+
+
+def _get_feature_id_from_reach(reach_row):
+    """Support both feature_id and featureID style column names."""
+    for col in ["feature_id", "featureID", "FeatureID", "FEATUREID", "featureid"]:
+        if hasattr(reach_row, col):
+            return getattr(reach_row, col)
+    raise AttributeError(
+        "Cannot find feature_id/featureID column in NWM reach row. "
+        f"Available fields are: {getattr(reach_row, '_fields', [])}"
+    )
+
+
+def _get_probe_distance(hgrid):
+    """
+    Small distance used to move from an intersection point into the model domain.
+
+    If the grid CRS is geographic, coordinates are degrees and 1e-5 degree is
+    roughly O(1 m). If projected, use 1.0 map unit, normally meter.
+    """
+    try:
+        if hgrid.crs is not None and hgrid.crs.is_geographic:
+            return 1.0e-5
+    except Exception:
+        pass
+    return 1.0
+
+
+def _make_element_centroid_tree(hgrid):
+    """Build old-style centroid KDTree as fallback only."""
+    centroids = []
+    element_rows = []
+    for element in hgrid.elements.elements.values():
+        cent = LinearRing(
+            hgrid.nodes.coord[list(map(hgrid.nodes.get_index_by_id, element))]
+        ).centroid
+        centroids.append((cent.x, cent.y))
+        element_rows.append(element)
+    return cKDTree(centroids), element_rows
+
+
+def _fallback_nearest_centroid_element(hgrid, centroid_tree, point):
+    _, idx = centroid_tree.query([[point.x, point.y]])
+    idx = int(np.ravel(idx)[0])
+    return hgrid.elements.gdf.iloc[idx]
+
+def _find_best_element_for_probe(elements_gdf, probe_point, guide_line):
+    """
+    Choose an element using a point slightly inside the model domain.
+
+    Priority:
+    1. Elements covering the probe point.
+    2. If several cover it, choose the one with largest overlap with guide_line.
+    3. If no element covers it, use candidates intersecting guide_line and choose
+       the largest guide_line overlap.
+    4. Return None if no geometric candidate exists.
+    """
+    possible = list(elements_gdf.sindex.intersection(probe_point.bounds))
+
+    if len(possible) > 0:
+        candidates = elements_gdf.iloc[possible]
+        cover_mask = candidates.geometry.covers(probe_point)
+        covered = candidates.loc[cover_mask]
+
+        if len(covered) == 1:
+            return covered.iloc[0]
+
+        if len(covered) > 1:
+            scores = covered.geometry.intersection(guide_line).length
+            return covered.iloc[int(np.argmax(scores.values))]
+
+    possible = list(elements_gdf.sindex.intersection(guide_line.bounds))
+    if len(possible) == 0:
+        return None
+
+    candidates = elements_gdf.iloc[possible]
+    scores = candidates.geometry.intersection(guide_line).length
+
+    if len(scores) > 0 and np.nanmax(scores.values) > 0.0:
+        return candidates.iloc[int(np.nanargmax(scores.values))]
+
+    return None
+
+
+def _append_unique(mapping, element_id, feature_id):
+    """Append a feature ID to source/sink mapping without duplicating it."""
+    if feature_id not in mapping[element_id]:
+        mapping[element_id].append(feature_id)
+
+
 class NWMElementPairings:
     def __init__(self, hgrid: Gr3, nwm_file=None, workers=-1):
 
         # TODO: Accelerate using dask: https://blog.dask.org/2017/09/21/accelerating-geopandas-1
-
         self._nwm_file = nwm_file
 
-        logger.info("Computing NWMElementPairings...")
+        logger.info("Computing NWMElementPairings version...")
         self._hgrid = hgrid
 
         # An STR-Index returns the reaches that are near the boundaries of the
@@ -73,16 +235,16 @@ class NWMElementPairings:
         del possible_indexes
         del nwm_r_index
 
-        # The hull rings itersections is used to find the exact NWM reaches
+        # The hull rings intersections are used to find the exact NWM reaches
         # that intersect the mesh's hull.
         logger.info("Finding exact features intersections.")
         start = time()
         exact_indexes = set()
+        hull_rings_gdf = hgrid.hull.rings()
         for pm in possible_matches.itertuples():
-            if hgrid.hull.rings().geometry.intersects(pm.geometry).any():
+            if hull_rings_gdf.geometry.intersects(pm.geometry).any():
                 exact_indexes.add(pm.Index)
         reaches = self.gdf.iloc[list(exact_indexes)]
-
         logger.info(f"Finding exact features took {time()-start}.")
 
         # release some memory
@@ -90,90 +252,117 @@ class NWMElementPairings:
         del exact_indexes
         del self._gdf
 
-        logger.info("Pairing features to corresponding element.")
+        logger.info("Pairing features to corresponding element with all intersections and probe-point element selection.")
 
         # Pair each reach with corresponding element.
-        # 1) Find reach-hull intersections.
+        # 1) Find ALL reach-hull intersections. The original code stopped at the
+        # first intersecting ring. That can select the wrong boundary when one
+        # NWM reach intersects multiple rings/internal boundaries.
         start = time()
         data = []
-        intersection: gpd.GeoDataFrame
         for i, reach in enumerate(reaches.itertuples()):
-            for ring in hgrid.hull.rings().itertuples():
-                if ring.geometry.intersects(reach.geometry):
-                    intersections = ring.geometry.intersection(reach.geometry)
-                    if isinstance(intersections, MultiPoint):
-                        for point in intersections.geoms:
-                            data.append({"geometry": point, "reachIndex": i})
-                        continue
+            reach_geom = _safe_reach_to_linestring(reach.geometry)
+            if reach_geom is None:
+                continue
 
-                    data.append({"geometry": intersections, "reachIndex": i})
-                    break
+            for ring in hull_rings_gdf.itertuples():
+                if not ring.geometry.intersects(reach_geom):
+                    continue
+
+                intersections = ring.geometry.intersection(reach_geom)
+                for point in _iter_points_from_intersection(intersections):
+                    data.append({
+                        "geometry": point,
+                        "reachIndex": i,
+                        "ringIndex": ring.Index,
+                    })
 
         if len(data) == 0:
             # TODO: change for warning in future.
             raise IOError(
                 "No National Water model intersections found on the mesh.")
         intersection = gpd.GeoDataFrame(data, crs=hgrid.crs)
-        #TODO: add exporting intersection as an option
-        #intersection.to_file('intersections.shp')
+        # TODO: add exporting intersection as an option
+        # intersection.to_file('intersections_hj.shp')
         del data
 
-        # 2) Generate element centroid KDTree
-        centroids = []
-        for element in hgrid.elements.elements.values():
-            cent = LinearRing(
-                hgrid.nodes.coord[list(
-                    map(hgrid.nodes.get_index_by_id, element))]
-            ).centroid
-            centroids.append((cent.x, cent.y))
-        tree = cKDTree(centroids)
-        del centroids
-
-        # 3) Match reach/boundary intersection to nearest element centroid
-        coords = [
-            np.array(inters.geometry.coords) for inters in intersection.itertuples()
-        ]
-        _, idxs = tree.query(np.vstack(coords), workers=workers)
-        del tree
+        # 2) Build centroid KDTree only as fallback. The primary selection below
+        # uses a probe point slightly inside the model domain to avoid choosing a
+        # side element just because its centroid is closer to the boundary
+        # intersection.
+        centroid_tree, _ = _make_element_centroid_tree(hgrid)
+        elements_gdf = hgrid.elements.gdf
 
         logger.info(
-            "Pairing features to corresponding element took " f"{time()-start}."
+            "Preparing candidate intersections and fallback centroid tree took " f"{time()-start}."
         )
 
         hull = hgrid.hull.multipolygon()
+        probe_dist = _get_probe_distance(hgrid)
+        eps = np.finfo(np.float32).eps
 
         start = time()
         sources = defaultdict(list)
         sinks = defaultdict(list)
+
         for row in intersection.itertuples():
             poi = row.geometry
-            reach = reaches.iloc[row.reachIndex].geometry
-            if not isinstance(reach, LineString):
-                reach = ops.linemerge(reach)
-            for segment in map(
-                LineString, zip(reach.coords[:-1], reach.coords[1:])
-            ):
-                if segment.intersects(poi.buffer(np.finfo(np.float32).eps)):
-                    segment_origin = Point(segment.coords[0])
-                    d1 = segment_origin.distance(poi)
-                    downstream = segment.interpolate(
-                        d1 + np.finfo(np.float32).eps)
-                    element = hgrid.elements.gdf.iloc[idxs[row.Index]]
-                    if (
-                        box(*LineString([poi, downstream]).bounds)
-                        .intersection(hull)
-                        .intersects(downstream)
-                    ):
-                        sources[element.id].append(reaches.iloc[row.reachIndex].feature_id)
-                    else:
-                        sinks[element.id].append(reaches.iloc[row.reachIndex].feature_id)
-                    break
+            reach_row = reaches.iloc[row.reachIndex]
+            reach = _safe_reach_to_linestring(reach_row.geometry)
+            if reach is None:
+                continue
 
+            feature_id = _get_feature_id_from_reach(reach_row)
+
+            for segment in map(LineString, zip(reach.coords[:-1], reach.coords[1:])):
+                # Keep this fairly local. The intersection point should lie on
+                # one segment; the buffer protects against floating point noise.
+                if not segment.intersects(poi.buffer(max(eps, probe_dist * 0.1))):
+                    continue
+
+                d1 = segment.project(poi)
+                d_down = min(d1 + probe_dist, segment.length)
+                d_up = max(d1 - probe_dist, 0.0)
+
+                downstream = segment.interpolate(d_down)
+                upstream = segment.interpolate(d_up)
+
+                downstream_inside = (
+                    box(*LineString([poi, downstream]).bounds)
+                    .intersection(hull)
+                    .intersects(downstream)
+                )
+
+                if downstream_inside:
+                    source_or_sink = "source"
+                    probe = downstream
+                else:
+                    source_or_sink = "sink"
+                    probe = upstream
+
+                guide_line = LineString([poi, probe])
+                element = _find_best_element_for_probe(elements_gdf, probe, guide_line)
+
+                if element is None:
+                    # Last-resort fallback to old nearest-centroid behavior.
+                    element = _fallback_nearest_centroid_element(hgrid, centroid_tree, poi)
+                    logger.debug(
+                        "Falling back to nearest centroid for feature %s near point (%s, %s).",
+                        feature_id, poi.x, poi.y,
+                    )
+
+                if source_or_sink == "source":
+                    _append_unique(sources, element.id, feature_id)
+                else:
+                    _append_unique(sinks, element.id, feature_id)
+
+                break
+
+        del centroid_tree
         logger.info(
             "Sorting features into sources and sinks took: " f"{time()-start}.")
         self.sources = sources
         self.sinks = sinks
-
     def make_plot(self):
         # verification plot
         data = []
@@ -371,16 +560,10 @@ def get_aggregated_features(nc_feature_id, features):
 
 def streamflow_lookup(file, indexes, threshold=-1e-5):
     nc = Dataset(file)
-    streamflow = nc["streamflow"]
-    streamflow.set_auto_mask(False)  # see remarks on NWM masks below
-    streamflow = np.array(streamflow)
+    streamflow = nc["streamflow"][:]
     streamflow[np.where(streamflow < threshold)] = 0.0
-
-    # The original mask in NWM files is based on a valid range of [0 50000],
-    # which is not enough for Mississippi River, e.g. at streamflow[1994867]  nc['feature_id'][1994867]
-    # so don't use the following mask:
-    # streamflow[np.where(streamflow.mask)] = 0.0
-
+    #change masked value to zero
+    streamflow[np.where(streamflow.mask)] = 0.0
     data = []
     for indxs in indexes:
         # Note: Dataset already consideres scale factor and offset.
@@ -390,15 +573,14 @@ def streamflow_lookup(file, indexes, threshold=-1e-5):
 
 class AWSDataInventory(ABC):
     def __new__(
-        cls, start_date, rnday, product=None, verbose=False, fallback=True, cache=None,
+        cls, start_date, rnday, product=None, verbose=False, fallback=True, cache=None
     ):
         # AWSHindcastInventory
-        # The NWM v3.0 retrospective dataset covers from Feb 1979 through Jan 2023
-        # The NWM v2.1 AWSHindcast dataset covers from Feb 1979 through Dec 2020, which is superceded by v3.0
+        # The latest(as of 12/21/2021) AWSHindcast dataset covers from Feb 1979 through Dec 2020
         if start_date >= dates.localize_datetime(
             datetime(1979, 2, 1, 0, 0)
         ) and start_date + rnday <= dates.localize_datetime(
-            datetime(2023, 1, 31, 23, 59)
+            datetime(2020, 12, 31, 23, 59)
         ):
             return AWSHindcastInventory.__new__(cls)
 
@@ -453,17 +635,6 @@ class AWSDataInventory(ABC):
 
 
 class AWSHindcastInventory(AWSDataInventory):
-    """
-    AWS NWM v3.0 Retrospective Hindcast Data Inventory.
-    Covers Feb 1979 through Jan 2023.
-    This supercedes the AWS NWM v2.* Retrospective Hindcast Data Inventory.
-
-    NWM v3.0 S3 structure:
-    - Bucket: noaa-nwm-retrospective-3-0-pds
-    - Key: {region}/{fmt}/{ftype}/{YYYY}/{YYYYMMDDHHMM}.{stem}_DOMAIN1
-    where stem = ftype, except FORCING -> LDASIN (can extend later)
-    """
-
     def __new__(cls):
         return object.__new__(AWSHindcastInventory)
 
@@ -475,59 +646,89 @@ class AWSHindcastInventory(AWSDataInventory):
         verbose=False,
         fallback=True,
         cache=None,
-        region: str = "CONUS",
-        fmt: str = "netcdf",
-        tz: timezone = timezone.utc,
     ):
-        self.product = "CHRTOUT_DOMAIN1" if product is None else product
+        """This will download the National Water Model retro data.
+        A 42-year (February 1979 through December 2020) retrospective
+        simulation using version 2.1 of the NWM.
+        """
+        self.product = "CHRTOUT_DOMAIN1.comp" if product is None else product
         self.cache = cache
+        self.start_date = (
+            dates.nearest_cycle()
+            if start_date is None
+            else dates.nearest_cycle(dates.localize_datetime(start_date))
+        )
+        # self.start_date = self.start_date.replace(tzinfo=None)
+        self.rnday = rnday if isinstance(
+            rnday, timedelta) else timedelta(days=rnday)
         self.fallback = fallback
-        self.verbose = verbose
-        self.region = region
-        self.fmt = fmt
-        self.tz = tz
 
-        # If parent didn't set these, provide v3 defaults
-        if not getattr(self, "bucket", None):
-            self.bucket = "noaa-nwm-retrospective-3-0-pds"
-        # output interval defaults to hourly
-        if not getattr(self, "output_interval", None):
-            self.output_interval = timedelta(hours=1)
+        nwm_times = np.arange(
+            self.start_date,
+            self.start_date + self.rnday + self.output_interval,
+            self.output_interval,
+        ).astype(datetime)
 
-        # Normalize start_date
-        if start_date is None:
-            self.start_date = dates.nearest_cycle().astimezone(self.tz)
-        else:
-            self.start_date = dates.nearest_cycle(dates.localize_datetime(start_date)).astimezone(self.tz)
+        print(f"[NWM write] total time steps: {len(nwm_times)}", flush=True)
 
-        self.rnday = rnday if isinstance(rnday, timedelta) else timedelta(days=rnday)
+        for it, this_time in enumerate(nwm_times):
+            if it == 0 or (it + 1) % 5 == 0 or it == len(nwm_times) - 1:
+                print(
+                    f"[NWM write] preparing time step {it+1}/{len(nwm_times)}: "
+                    f"{this_time.strftime('%Y-%m-%dT%H')}",
+                    flush=True,
+                )
+
+        self._files = {
+            this_time: None
+            for this_time in nwm_times
+        }
+
+        #self._files = {
+        #    _: None
+        #    for _ in np.arange(
+        #        self.start_date,
+        #        self.start_date + self.rnday + self.output_interval,
+        #        self.output_interval,
+        #    ).astype(datetime)
+        #}
+
         end_date = self.start_date + self.rnday
 
-        # Build requested time grid (hourly). Minutes fixed to 00 for v3 keys
-        times = np.arange(
-            self.start_date,
-            end_date + self.output_interval,
-            self.output_interval,
-            dtype="datetime64[h]",
-        ).astype("datetime64[m]").astype(datetime)
+        years = np.arange(self.start_date.year, end_date.year+1)
 
-        # Pre-allocate files dict
-        self._files = {dt.replace(tzinfo=self.tz): None for dt in times}
+        file_metadata = []
+        for it, year in enumerate(years):
+            paginator = self.s3.get_paginator("list_objects_v2")
+            pages = paginator.paginate(
+                Bucket=self.bucket, Prefix=f"model_output/{year}"
+            )
 
-        # Build direct key mapping for v3.0
-        ftype = self._infer_ftype(self.product)
-        timefile = {}
-        for dt in self._files.keys():
-            # NWM v3 keys use YYYYMMDDHHMM (UTC). Ensure tz-aware then convert to UTC
-            dt_utc = dt.astimezone(timezone.utc)
-            ts = dt_utc.strftime("%Y%m%d%H%M")
-            key = self._key_for(self.region, self.fmt, ftype, ts)
-            timefile[dt] = key
+            self.data = []
+            for page in pages:
+                for obj in page["Contents"]:
+                    self.data.append(obj)
 
-        # Download
+            metadata = sorted([_["Key"] for _ in self.data if "CHRTOUT_DOMAIN1.comp" in _["Key"]])
+            [file_metadata.append(i) for i in metadata]
+
+        timevector = np.arange(
+            datetime(self.start_date.year, 1, 1),
+            datetime(end_date.year + 1, 1, 1),
+            np.timedelta64(1, "h"),
+            dtype="datetime64",
+        )
+
+        timefile = {
+            pd.to_datetime(str(timevector[i])): file_metadata[i]
+            for i in range(len(timevector))
+        }
+
         for requested_time in self._files:
-            logger.info(f"Requesting NWM v3 data for time {requested_time}")
-            self._files[requested_time] = self.request_data(timefile.get(requested_time))
+            logger.info(f"Requesting NWM data for time {requested_time}")
+            self._files[requested_time] = self.request_data(
+                timefile.get(requested_time)
+            )
 
     def request_data(self, key):
         filename = self.tmpdir / key
@@ -545,32 +746,10 @@ class AWSHindcastInventory(AWSDataInventory):
                 shutil.move(tmpfile, filename)
         return filename
 
-    # helper functions for AWSHindcastInventory
-    @staticmethod
-    def _infer_ftype(product: str) -> str:
-        """Infer NWM file type from product string."""
-        if product is None:
-            return "CHRTOUT"
-        up = product.upper()
-        for ftype in ("CHRTOUT", "RTOUT", "LDASOUT", "GWOUT", "LAKEOUT", "CHANOBS", "FORCING"):
-            if ftype in up:
-                return ftype
-        # Fallback: try to extract leading token before '_DOMAIN'
-        m = re.search(r"([A-Z]+)OUT", up)
-        if m:
-            return m.group(0)  # e.g., CHRTOUT
-        return "CHRTOUT"
-
-    @staticmethod
-    def _key_for(region: str, fmt: str, ftype: str, ts: str) -> str:
-        # ts is YYYYMMDDHHMM
-        return f"{region}/{fmt}/{ftype}/{ts[:4]}/{ts}.{ftype}_DOMAIN1"
-
     @property
     def bucket(self):
-        # return "noaa-nwm-retro-v2.0-pds"
-        # return "noaa-nwm-retrospective-2-1-pds"
-        return "noaa-nwm-retrospective-3-0-pds"
+        #return "noaa-nwm-retro-v2.0-pds"
+        return "noaa-nwm-retrospective-2-1-pds"
 
     @property
     def s3(self):
@@ -583,7 +762,7 @@ class AWSHindcastInventory(AWSDataInventory):
 
     @property
     def output_interval(self) -> timedelta:
-        return {"CHRTOUT_DOMAIN1": timedelta(hours=1)}[self.product]
+        return {"CHRTOUT_DOMAIN1.comp": timedelta(hours=1)}[self.product]
 
     @property
     def cached_files(self):
@@ -613,7 +792,6 @@ class AWSHindcastInventory(AWSDataInventory):
             raise TypeError(
                 f"Unhandled argument cache={cache} of type {type(cache)}.")
 
-
 class GOOGLEHindcastInventory(AWSDataInventory):
     def __new__(cls):
         return object.__new__(GOOGLEHindcastInventory)
@@ -622,6 +800,7 @@ class GOOGLEHindcastInventory(AWSDataInventory):
         self,
         start_date: datetime = None,
         rnday: Union[int, float, timedelta] = timedelta(days=5.0),
+        #product='short_range_mem1',
         product='medium_range_mem1',
         verbose=False,
         fallback=True,
@@ -692,7 +871,8 @@ class GOOGLEHindcastInventory(AWSDataInventory):
     @property
     def output_interval(self) -> timedelta:
         return {
-            'medium_range_mem1': timedelta(hours=3)
+            #'short_range_mem1': timedelta(hours=1)
+            'medium_range_mem1': timedelta(hours=1)
         }[self.product]
 
     @property
@@ -742,6 +922,7 @@ class AWSForecastInventory(AWSDataInventory):
         The AWS data goes back 30 days. For requesting hindcast data from
         before we need a different data source
         """
+        #self.product = "short_range_mem1" if product is None else product
         self.product = "medium_range_mem1" if product is None else product
         self.cache = cache
         self.start_date = (
@@ -844,6 +1025,7 @@ class AWSForecastInventory(AWSDataInventory):
 
     @property
     def output_interval(self) -> timedelta:
+        #return {"short_range_mem1": timedelta(hours=1)}[self.product]
         return {"medium_range_mem1": timedelta(hours=1)}[self.product]
 
     @property
@@ -860,6 +1042,7 @@ class AWSForecastInventory(AWSDataInventory):
 
     @property
     def requested_product(self):
+        #return {"short_range_mem1": "medium_range.channel_rt_1"}[self.product]
         return {"medium_range_mem1": "medium_range.channel_rt_1"}[self.product]
 
     @property
@@ -945,46 +1128,83 @@ class NationalWaterModel(SourceSink):
         #    )
         #pool.join()
 
-        sources = []
-        sinks = []
-        nc_fid0 = Dataset(list(self.inventory.files.values())[0])["feature_id"][:]
-        src_idxs = get_aggregated_features(nc_fid0, self.pairings.sources.values())
-        snk_idxs = get_aggregated_features(nc_fid0, self.pairings.sinks.values())
-        for file in self.inventory.files.values():
-            start = datetime.now()
-            nc = Dataset(file)
-            ncfeatureid=nc['feature_id'][:]
-            if not np.array_equal(ncfeatureid, nc_fid0):
-                logger.info(f'Indexes of feature_id are changed in  {file}')
-                src_idxs=get_aggregated_features(ncfeatureid, self.pairings.sources.values())
-                snk_idxs=get_aggregated_features(ncfeatureid, self.pairings.sinks.values())
-                nc_fid0 = ncfeatureid
 
-            sources.append(streamflow_lookup(file, src_idxs))
-            sinks.append(streamflow_lookup(file, snk_idxs))
-            logger.info(f'Processing file {file} took {datetime.now() - start}')
-            nc.close()
 
         source_data = {}
         sink_data = {}
-        for i, file in enumerate(self.inventory.files.values()):
-            nc = Dataset(file)
-            _time = dates.localize_datetime(
-                datetime.strptime(nc.model_output_valid_time,
-                                  "%Y-%m-%d_%H:%M:%S")
-            )
+
+        inventory_files = list(self.inventory.files.values())
+        nfiles = len(inventory_files)
+
+        # Read the first file only once to build feature-index mappings.
+        with Dataset(inventory_files[0]) as nc0:
+            nc_fid0 = nc0["feature_id"][:]
+
+        src_idxs = get_aggregated_features(nc_fid0, self.pairings.sources.values())
+        snk_idxs = get_aggregated_features(nc_fid0, self.pairings.sinks.values())
+
+        print(
+            f"[NWM fetch] start reading streamflow files: {nfiles} files, "
+            f"{len(self.pairings.sources)} sources, {len(self.pairings.sinks)} sinks",
+            flush=True,
+        )
+
+        for it, file in enumerate(inventory_files):
+            start = datetime.now()
+
+            if it == 0 or (it + 1) % 500 == 0 or it == nfiles - 1:
+                print(
+                    f"[NWM fetch] processing file {it+1}/{nfiles}: {file}",
+                    flush=True,
+                )
+
+            with Dataset(file) as nc:
+                ncfeatureid = nc["feature_id"][:]
+
+                if not np.all(ncfeatureid == nc_fid0):
+                    logger.info(f"Indexes of feature_id are changed in {file}")
+                    src_idxs = get_aggregated_features(
+                        ncfeatureid,
+                        self.pairings.sources.values(),
+                    )
+                    snk_idxs = get_aggregated_features(
+                        ncfeatureid,
+                        self.pairings.sinks.values(),
+                    )
+                    nc_fid0 = ncfeatureid
+
+                streamflow = nc["streamflow"][:]
+
+                source_flow = streamflow_lookup_from_array(streamflow, src_idxs)
+                sink_flow = streamflow_lookup_from_array(streamflow, snk_idxs)
+
+                _time = dates.localize_datetime(
+                    datetime.strptime(
+                        nc.model_output_valid_time,
+                        "%Y-%m-%d_%H:%M:%S",
+                    )
+                )
+
             for j, element_id in enumerate(self.pairings.sources):
                 source_data.setdefault(_time, {})[element_id] = {
-                    "flow": sources[i][j],
+                    "flow": source_flow[j],
                     "temperature": -9999.0,
                     "salinity": 0.0,
                 }
 
             for k, element_id in enumerate(self.pairings.sinks):
                 sink_data.setdefault(_time, {})[element_id] = {
-                    "flow": -sinks[i][k],
+                    "flow": -sink_flow[k],
                 }
-            nc.close()
+
+            if it == 0 or (it + 1) % 500 == 0 or it == nfiles - 1:
+                print(
+                    f"[NWM fetch] finished file {it+1}/{nfiles} "
+                    f"in {datetime.now() - start}",
+                    flush=True,
+                )
+
+
         logger.info(f'Timeseries aggregation took {datetime.now() - start0}')
         self._sources = Sources(source_data)
         self._sinks = Sinks(sink_data)
