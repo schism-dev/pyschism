@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import json
 import logging
 from multiprocessing import Pool, cpu_count
@@ -8,6 +8,7 @@ import os
 import pathlib
 import posixpath
 import shutil
+import re
 
 import tarfile
 import tempfile
@@ -39,26 +40,6 @@ DATADIR = pathlib.Path(appdirs.user_data_dir("pyschism/nwm"))
 DATADIR.mkdir(exist_ok=True, parents=True)
 
 logger = logging.getLogger(__name__)
-
-def streamflow_lookup_from_array(streamflow, indexes, threshold=-1e-5):
-    """
-    Aggregate streamflow from an already-read streamflow array.
-
-    This avoids reopening the same NetCDF file multiple times.
-    """
-    streamflow = np.ma.array(streamflow, copy=True)
-
-    streamflow[np.where(streamflow < threshold)] = 0.0
-
-    if np.ma.is_masked(streamflow):
-        streamflow[np.where(streamflow.mask)] = 0.0
-
-    data = []
-    for indxs in indexes:
-        data.append(np.sum(streamflow[indxs]))
-
-    return data
-
 
 def _iter_points_from_intersection(geom):
     """
@@ -558,12 +539,43 @@ def get_aggregated_features(nc_feature_id, features):
         sidx = eidx
     return in_file_2
 
+
+
+def streamflow_lookup_from_array(streamflow, indexes, threshold=-1e-5):
+    """
+    Aggregate streamflow from an already-read streamflow array.
+
+    This avoids reopening the same NetCDF file multiple times.
+
+    Notes
+    -----
+    The caller should read streamflow with set_auto_mask(False), following
+    the existing nwm.py behavior. This preserves the original handling of
+    large valid streamflow values that may otherwise be masked by the
+    NetCDF valid_range metadata.
+    """
+
+    streamflow = np.array(streamflow, copy=True)
+    streamflow[np.where(streamflow < threshold)] = 0.0
+
+    data = []
+    for indxs in indexes:
+        data.append(np.sum(streamflow[indxs]))
+
+    return data
+
 def streamflow_lookup(file, indexes, threshold=-1e-5):
     nc = Dataset(file)
-    streamflow = nc["streamflow"][:]
+    streamflow = nc["streamflow"]
+    streamflow.set_auto_mask(False)  # see remarks on NWM masks below
+    streamflow = np.array(streamflow)
     streamflow[np.where(streamflow < threshold)] = 0.0
-    #change masked value to zero
-    streamflow[np.where(streamflow.mask)] = 0.0
+
+    # The original mask in NWM files is based on a valid range of [0 50000],
+    # which is not enough for Mississippi River, e.g. at streamflow[1994867]  nc['feature_id'][1994867]
+    # so don't use the following mask:
+    # streamflow[np.where(streamflow.mask)] = 0.0
+
     data = []
     for indxs in indexes:
         # Note: Dataset already consideres scale factor and offset.
@@ -573,14 +585,15 @@ def streamflow_lookup(file, indexes, threshold=-1e-5):
 
 class AWSDataInventory(ABC):
     def __new__(
-        cls, start_date, rnday, product=None, verbose=False, fallback=True, cache=None
+        cls, start_date, rnday, product=None, verbose=False, fallback=True, cache=None,
     ):
         # AWSHindcastInventory
-        # The latest(as of 12/21/2021) AWSHindcast dataset covers from Feb 1979 through Dec 2020
+        # The NWM v3.0 retrospective dataset covers from Feb 1979 through Jan 2023
+        # The NWM v2.1 AWSHindcast dataset covers from Feb 1979 through Dec 2020, which is superceded by v3.0
         if start_date >= dates.localize_datetime(
             datetime(1979, 2, 1, 0, 0)
         ) and start_date + rnday <= dates.localize_datetime(
-            datetime(2020, 12, 31, 23, 59)
+            datetime(2023, 1, 31, 23, 59)
         ):
             return AWSHindcastInventory.__new__(cls)
 
@@ -635,6 +648,17 @@ class AWSDataInventory(ABC):
 
 
 class AWSHindcastInventory(AWSDataInventory):
+    """
+    AWS NWM v3.0 Retrospective Hindcast Data Inventory.
+    Covers Feb 1979 through Jan 2023.
+    This supercedes the AWS NWM v2.* Retrospective Hindcast Data Inventory.
+
+    NWM v3.0 S3 structure:
+    - Bucket: noaa-nwm-retrospective-3-0-pds
+    - Key: {region}/{fmt}/{ftype}/{YYYY}/{YYYYMMDDHHMM}.{stem}_DOMAIN1
+    where stem = ftype, except FORCING -> LDASIN (can extend later)
+    """
+
     def __new__(cls):
         return object.__new__(AWSHindcastInventory)
 
@@ -646,89 +670,69 @@ class AWSHindcastInventory(AWSDataInventory):
         verbose=False,
         fallback=True,
         cache=None,
+        region: str = "CONUS",
+        fmt: str = "netcdf",
+        tz: timezone = timezone.utc,
     ):
-        """This will download the National Water Model retro data.
-        A 42-year (February 1979 through December 2020) retrospective
-        simulation using version 2.1 of the NWM.
-        """
-        self.product = "CHRTOUT_DOMAIN1.comp" if product is None else product
+        self.product = "CHRTOUT_DOMAIN1" if product is None else product
         self.cache = cache
-        self.start_date = (
-            dates.nearest_cycle()
-            if start_date is None
-            else dates.nearest_cycle(dates.localize_datetime(start_date))
-        )
-        # self.start_date = self.start_date.replace(tzinfo=None)
-        self.rnday = rnday if isinstance(
-            rnday, timedelta) else timedelta(days=rnday)
         self.fallback = fallback
+        self.verbose = verbose
+        self.region = region
+        self.fmt = fmt
+        self.tz = tz
 
-        nwm_times = np.arange(
+        # If parent didn't set these, provide v3 defaults
+        if not getattr(self, "bucket", None):
+            self.bucket = "noaa-nwm-retrospective-3-0-pds"
+        # output interval defaults to hourly
+        if not getattr(self, "output_interval", None):
+            self.output_interval = timedelta(hours=1)
+
+        # Normalize start_date
+        if start_date is None:
+            self.start_date = dates.nearest_cycle().astimezone(self.tz)
+        else:
+            self.start_date = dates.nearest_cycle(dates.localize_datetime(start_date)).astimezone(self.tz)
+
+        self.rnday = rnday if isinstance(rnday, timedelta) else timedelta(days=rnday)
+        end_date = self.start_date + self.rnday
+
+        # Build requested time grid (hourly). Minutes fixed to 00 for v3 keys
+        times = np.arange(
             self.start_date,
-            self.start_date + self.rnday + self.output_interval,
+            end_date + self.output_interval,
             self.output_interval,
-        ).astype(datetime)
+            dtype="datetime64[h]",
+        ).astype("datetime64[m]").astype(datetime)
 
-        print(f"[NWM write] total time steps: {len(nwm_times)}", flush=True)
+        # Pre-allocate files dict
+        self._files = {dt.replace(tzinfo=self.tz): None for dt in times}
 
-        for it, this_time in enumerate(nwm_times):
-            if it == 0 or (it + 1) % 5 == 0 or it == len(nwm_times) - 1:
+        # Build direct key mapping for v3.0
+        ftype = self._infer_ftype(self.product)
+        timefile = {}
+        for dt in self._files.keys():
+            # NWM v3 keys use YYYYMMDDHHMM (UTC). Ensure tz-aware then convert to UTC
+            dt_utc = dt.astimezone(timezone.utc)
+            ts = dt_utc.strftime("%Y%m%d%H%M")
+            key = self._key_for(self.region, self.fmt, ftype, ts)
+            timefile[dt] = key
+
+        # Download
+        nreq = len(self._files)
+        print(f"[NWM inventory] total requested time steps: {nreq}", flush=True)
+
+        for it, requested_time in enumerate(self._files):
+            if it == 0 or (it + 1) % 500 == 0 or it == nreq - 1:
                 print(
-                    f"[NWM write] preparing time step {it+1}/{len(nwm_times)}: "
-                    f"{this_time.strftime('%Y-%m-%dT%H')}",
+                    f"[NWM inventory] requesting file {it+1}/{nreq}: "
+                    f"{requested_time}",
                     flush=True,
                 )
 
-        self._files = {
-            this_time: None
-            for this_time in nwm_times
-        }
-
-        #self._files = {
-        #    _: None
-        #    for _ in np.arange(
-        #        self.start_date,
-        #        self.start_date + self.rnday + self.output_interval,
-        #        self.output_interval,
-        #    ).astype(datetime)
-        #}
-
-        end_date = self.start_date + self.rnday
-
-        years = np.arange(self.start_date.year, end_date.year+1)
-
-        file_metadata = []
-        for it, year in enumerate(years):
-            paginator = self.s3.get_paginator("list_objects_v2")
-            pages = paginator.paginate(
-                Bucket=self.bucket, Prefix=f"model_output/{year}"
-            )
-
-            self.data = []
-            for page in pages:
-                for obj in page["Contents"]:
-                    self.data.append(obj)
-
-            metadata = sorted([_["Key"] for _ in self.data if "CHRTOUT_DOMAIN1.comp" in _["Key"]])
-            [file_metadata.append(i) for i in metadata]
-
-        timevector = np.arange(
-            datetime(self.start_date.year, 1, 1),
-            datetime(end_date.year + 1, 1, 1),
-            np.timedelta64(1, "h"),
-            dtype="datetime64",
-        )
-
-        timefile = {
-            pd.to_datetime(str(timevector[i])): file_metadata[i]
-            for i in range(len(timevector))
-        }
-
-        for requested_time in self._files:
-            logger.info(f"Requesting NWM data for time {requested_time}")
-            self._files[requested_time] = self.request_data(
-                timefile.get(requested_time)
-            )
+            logger.info(f"Requesting NWM v3 data for time {requested_time}")
+            self._files[requested_time] = self.request_data(timefile.get(requested_time))
 
     def request_data(self, key):
         filename = self.tmpdir / key
@@ -746,10 +750,32 @@ class AWSHindcastInventory(AWSDataInventory):
                 shutil.move(tmpfile, filename)
         return filename
 
+    # helper functions for AWSHindcastInventory
+    @staticmethod
+    def _infer_ftype(product: str) -> str:
+        """Infer NWM file type from product string."""
+        if product is None:
+            return "CHRTOUT"
+        up = product.upper()
+        for ftype in ("CHRTOUT", "RTOUT", "LDASOUT", "GWOUT", "LAKEOUT", "CHANOBS", "FORCING"):
+            if ftype in up:
+                return ftype
+        # Fallback: try to extract leading token before '_DOMAIN'
+        m = re.search(r"([A-Z]+)OUT", up)
+        if m:
+            return m.group(0)  # e.g., CHRTOUT
+        return "CHRTOUT"
+
+    @staticmethod
+    def _key_for(region: str, fmt: str, ftype: str, ts: str) -> str:
+        # ts is YYYYMMDDHHMM
+        return f"{region}/{fmt}/{ftype}/{ts[:4]}/{ts}.{ftype}_DOMAIN1"
+
     @property
     def bucket(self):
-        #return "noaa-nwm-retro-v2.0-pds"
-        return "noaa-nwm-retrospective-2-1-pds"
+        # return "noaa-nwm-retro-v2.0-pds"
+        # return "noaa-nwm-retrospective-2-1-pds"
+        return "noaa-nwm-retrospective-3-0-pds"
 
     @property
     def s3(self):
@@ -762,7 +788,7 @@ class AWSHindcastInventory(AWSDataInventory):
 
     @property
     def output_interval(self) -> timedelta:
-        return {"CHRTOUT_DOMAIN1.comp": timedelta(hours=1)}[self.product]
+        return {"CHRTOUT_DOMAIN1": timedelta(hours=1)}[self.product]
 
     @property
     def cached_files(self):
@@ -792,6 +818,7 @@ class AWSHindcastInventory(AWSDataInventory):
             raise TypeError(
                 f"Unhandled argument cache={cache} of type {type(cache)}.")
 
+
 class GOOGLEHindcastInventory(AWSDataInventory):
     def __new__(cls):
         return object.__new__(GOOGLEHindcastInventory)
@@ -800,7 +827,6 @@ class GOOGLEHindcastInventory(AWSDataInventory):
         self,
         start_date: datetime = None,
         rnday: Union[int, float, timedelta] = timedelta(days=5.0),
-        #product='short_range_mem1',
         product='medium_range_mem1',
         verbose=False,
         fallback=True,
@@ -871,8 +897,7 @@ class GOOGLEHindcastInventory(AWSDataInventory):
     @property
     def output_interval(self) -> timedelta:
         return {
-            #'short_range_mem1': timedelta(hours=1)
-            'medium_range_mem1': timedelta(hours=1)
+            'medium_range_mem1': timedelta(hours=3)
         }[self.product]
 
     @property
@@ -922,7 +947,6 @@ class AWSForecastInventory(AWSDataInventory):
         The AWS data goes back 30 days. For requesting hindcast data from
         before we need a different data source
         """
-        #self.product = "short_range_mem1" if product is None else product
         self.product = "medium_range_mem1" if product is None else product
         self.cache = cache
         self.start_date = (
@@ -1025,7 +1049,6 @@ class AWSForecastInventory(AWSDataInventory):
 
     @property
     def output_interval(self) -> timedelta:
-        #return {"short_range_mem1": timedelta(hours=1)}[self.product]
         return {"medium_range_mem1": timedelta(hours=1)}[self.product]
 
     @property
@@ -1042,7 +1065,6 @@ class AWSForecastInventory(AWSDataInventory):
 
     @property
     def requested_product(self):
-        #return {"short_range_mem1": "medium_range.channel_rt_1"}[self.product]
         return {"medium_range_mem1": "medium_range.channel_rt_1"}[self.product]
 
     @property
@@ -1113,35 +1135,28 @@ class NationalWaterModel(SourceSink):
             dates.localize_datetime(d) for d in self.inventory.files.keys()
         ]
 
-        #src_idxs, snk_idxs = self.inventory.get_nc_pairing_indexes(
-        #    self.pairings)
-        #logger.info(f'Start aggregating NWM timeseries using nprocs={nprocs}')
         start0 = datetime.now()
-        #with Pool(processes=nprocs) as pool:
-        #    sources = pool.starmap(
-        #        streamflow_lookup,
-        #        [(file, self.pairings.sources) for file in self.inventory.files.values()],
-        #    )
-        #    sinks = pool.starmap(
-        #        streamflow_lookup,
-        #        [(file, self.pairings.sinks) for file in self.inventory.files.values()],
-        #    )
-        #pool.join()
-
-
-
         source_data = {}
         sink_data = {}
 
         inventory_files = list(self.inventory.files.values())
         nfiles = len(inventory_files)
 
-        # Read the first file only once to build feature-index mappings.
+        if nfiles == 0:
+            raise IOError("No NWM files found in inventory.")
+
+        # Read the first file once to build feature-index mappings.
         with Dataset(inventory_files[0]) as nc0:
             nc_fid0 = nc0["feature_id"][:]
 
-        src_idxs = get_aggregated_features(nc_fid0, self.pairings.sources.values())
-        snk_idxs = get_aggregated_features(nc_fid0, self.pairings.sinks.values())
+        src_idxs = get_aggregated_features(
+            nc_fid0,
+            self.pairings.sources.values(),
+        )
+        snk_idxs = get_aggregated_features(
+            nc_fid0,
+            self.pairings.sinks.values(),
+        )
 
         print(
             f"[NWM fetch] start reading streamflow files: {nfiles} files, "
@@ -1161,7 +1176,7 @@ class NationalWaterModel(SourceSink):
             with Dataset(file) as nc:
                 ncfeatureid = nc["feature_id"][:]
 
-                if not np.all(ncfeatureid == nc_fid0):
+                if not np.array_equal(ncfeatureid, nc_fid0):
                     logger.info(f"Indexes of feature_id are changed in {file}")
                     src_idxs = get_aggregated_features(
                         ncfeatureid,
@@ -1173,7 +1188,12 @@ class NationalWaterModel(SourceSink):
                     )
                     nc_fid0 = ncfeatureid
 
-                streamflow = nc["streamflow"][:]
+                # Preserve the existing nwm.py mask behavior.
+                # Some valid large rivers can be masked by valid_range metadata,
+                # so disable auto-mask before reading streamflow.
+                streamflow_var = nc["streamflow"]
+                streamflow_var.set_auto_mask(False)
+                streamflow = np.array(streamflow_var[:])
 
                 source_flow = streamflow_lookup_from_array(streamflow, src_idxs)
                 sink_flow = streamflow_lookup_from_array(streamflow, snk_idxs)
@@ -1203,7 +1223,6 @@ class NationalWaterModel(SourceSink):
                     f"in {datetime.now() - start}",
                     flush=True,
                 )
-
 
         logger.info(f'Timeseries aggregation took {datetime.now() - start0}')
         self._sources = Sources(source_data)
